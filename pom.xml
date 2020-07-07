@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.alibaba.ververica</groupId>
+    <artifactId>flink-cdc-connectors</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>flink-mysql-cdc-connector</module>
+    </modules>
+
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <flink.version>1.11-SNAPSHOT</flink.version>
+        <java.version>1.8</java.version>
+        <scala.binary.version>2.11</scala.binary.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <log4j.version>2.12.1</log4j.version>
+        <flink.forkCount>1C</flink.forkCount>
+        <flink.reuseForks>true</flink.reuseForks>
+        <log4j.configuration>log4j2-test.properties</log4j.configuration>
+    </properties>
+
+    <dependencies>
+        <!-- Apache Flink dependencies -->
+        <!-- These dependencies are provided, because they should not be packaged into the JAR file. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-common</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-api-java-bridge_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-core</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.12</version><!--$NO-MVN-MAN-VER$-->
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludeSubProjects>false</excludeSubProjects>
+                    <numUnapprovedLicenses>0</numUnapprovedLicenses>
+                    <licenses>
+                        <!-- Enforce this license:
+                            Licensed to the Apache Software Foundation (ASF) under one
+                            or more contributor license agreements.  See the NOTICE file
+                            distributed with this work for additional information
+                            regarding copyright ownership.  The ASF licenses this file
+                            to you under the Apache License, Version 2.0 (the
+                            "License"); you may not use this file except in compliance
+                            with the License.  You may obtain a copy of the License at
+                              http://www.apache.org/licenses/LICENSE-2.0
+                            Unless required by applicable law or agreed to in writing,
+                            software distributed under the License is distributed on an
+                            "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+                            KIND, either express or implied.  See the License for the
+                            specific language governing permissions and limitations
+                            under the License.
+                        -->
+                        <license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+                            <licenseFamilyCategory>AL2 </licenseFamilyCategory>
+                            <licenseFamilyName>Apache License 2.0</licenseFamilyName>
+                            <notes />
+                            <patterns>
+                                <pattern>Licensed to the Apache Software Foundation (ASF) under one</pattern>
+                            </patterns>
+                        </license>
+                    </licenses>
+                    <licenseFamilies>
+                        <licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+                            <familyName>Apache License 2.0</familyName>
+                        </licenseFamily>
+                    </licenseFamilies>
+                    <excludes>
+                        <!-- Additional files like .gitignore etc.-->
+                        <exclude>**/.*/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>2.17</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>8.14</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <suppressionsLocation>/tools/maven/suppressions.xml</suppressionsLocation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <configLocation>/tools/maven/checkstyle.xml</configLocation>
+                    <logViolationsToConsole>true</logViolationsToConsole>
+                    <failOnViolation>true</failOnViolation>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.0</version>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/*Test.java</include>
+                                <include>**/*Test.scala</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>integration-tests</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/*ITCase.java</include>
+                                <include>**/*ITCase.scala</include>
+                            </includes>
+                            <reuseForks>false</reuseForks>
+                        </configuration>
+                    </execution>
+                </executions>
+                <configuration>
+                    <forkCount>${flink.forkCount}</forkCount>
+                    <reuseForks>${flink.reuseForks}</reuseForks>
+                    <systemPropertyVariables>
+                        <forkNumber>0${surefire.forkNumber}</forkNumber>
+                        <log4j.configuration>${log4j.configuration}</log4j.configuration>
+                    </systemPropertyVariables>
+                    <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}
+                        -XX:+UseG1GC
+                    </argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>dependency-convergence</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>shade-flink</id>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <artifactSet combine.self="override">
+                                <excludes>
+                                    <!-- log4j -->
+                                    <exclude>org.slf4j:slf4j-log4j12</exclude>
+                                    <exclude>log4j:log4j</exclude>
+                                    <!-- jars imported by parent -->
+                                    <exclude>org.slf4j:slf4j-api</exclude>
+                                    <exclude>com.google.code.findbugs:jsr305</exclude>
+                                    <!-- flink shaded jars -->
+                                    <exclude>org.apache.flink:flink-shaded-*</exclude>
+                                    <exclude>com.alibaba.blink:flink-shaded-*</exclude>
+                                    <exclude>com.google.guava:guava</exclude>
+                                    <exclude>com.fasterxml.jackson.*:*</exclude>
+                                    <exclude>tv.cntt:*</exclude>
+                                    <exclude>io.netty:*</exclude>
+                                    <exclude>org.ow2.asm:*</exclude>
+                                    <!-- other third-party jars we must use -->
+                                    <exclude>commons-logging:commons-logging</exclude>
+                                    <exclude>commons-codec:commons-codec</exclude>
+                                    <exclude>commons-collections:commons-collections</exclude>
+                                    <exclude>org.apache.commons:commons-lang3</exclude>
+                                    <!-- flink dependencies are provided -->
+                                    <exclude>org.apache.flink:*</exclude>
+                                    <exclude>com.alibaba.blink:force-shading</exclude>
+                                </excludes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
