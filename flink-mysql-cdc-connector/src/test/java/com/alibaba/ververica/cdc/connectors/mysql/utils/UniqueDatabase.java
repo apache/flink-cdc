@@ -75,6 +75,14 @@ public class UniqueDatabase {
 		return databaseName;
 	}
 
+	public String getUsername() {
+		return username;
+	}
+
+	public String getPassword() {
+		return password;
+	}
+
 	/**
 	 * @return Fully qualified table name <code>&lt;databaseName&gt;.&lt;tableName&gt;</code>
 	 */

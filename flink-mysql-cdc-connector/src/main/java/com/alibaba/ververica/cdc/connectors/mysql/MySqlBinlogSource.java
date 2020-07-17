@@ -35,15 +35,15 @@ public class MySqlBinlogSource {
 		return new Builder<>();
 	}
 
-	static class Builder<T> {
+	public static class Builder<T> {
 
 		private int port = 3306; // default 3306 port
 		private String hostname;
-		private String database;
+		private String[] databaseList;
 		private String username;
 		private String password;
 		private Integer serverId;
-		private String tableName;
+		private String[] tableList;
 		private DebeziumDeserializationSchema<T> deserializer;
 
 		public Builder<T> hostname(String hostname) {
@@ -60,18 +60,23 @@ public class MySqlBinlogSource {
 		}
 
 		/**
-		 * The database name to consume.
+		 * An optional list of regular expressions that match database names to be monitored;
+		 * any database name not included in the whitelist will be excluded from monitoring.
+		 * By default all databases will be monitored.
 		 */
-		public Builder<T> database(String database) {
-			this.database = database;
+		public Builder<T> databaseList(String... databaseList) {
+			this.databaseList = databaseList;
 			return this;
 		}
 
 		/**
-		 * The table name to consume.
+		 * An optional list of regular expressions that match fully-qualified table identifiers
+		 * for tables to be monitored; any table not included in the list will be excluded from
+		 * monitoring. Each identifier is of the form databaseName.tableName.
+		 * By default the connector will monitor every non-system table in each monitored database.
 		 */
-		public Builder<T> tableName(String tableName) {
-			this.tableName = tableName;
+		public Builder<T> tableList(String... tableList) {
+			this.tableList = tableList;
 			return this;
 		}
 
@@ -120,15 +125,19 @@ public class MySqlBinlogSource {
 			// Only alphanumeric characters and underscores should be used.
 			props.setProperty("database.server.name", "mysql-binlog-source");
 			props.setProperty("database.hostname", checkNotNull(hostname));
-			props.setProperty("database.port", String.valueOf(port));
-			props.setProperty("database.whitelist", checkNotNull(database));
 			props.setProperty("database.user", checkNotNull(username));
 			props.setProperty("database.password", checkNotNull(password));
-			props.setProperty("database.server.id", checkNotNull(serverId).toString());
-			// An optional comma-separated list of regular expressions that match fully-qualified
-			// table identifiers for tables to be monitored; any table not included in the whitelist
-			// will be excluded from monitoring. Each identifier is of the form databaseName.tableName.
-			props.setProperty("table.whitelist", checkNotNull(database) + "." + checkNotNull(tableName));
+			props.setProperty("database.port", String.valueOf(port));
+
+			if (serverId != null) {
+				props.setProperty("database.server.id", String.valueOf(serverId));
+			}
+			if (databaseList != null) {
+				props.setProperty("database.whitelist", String.join(",", databaseList));
+			}
+			if (tableList != null) {
+				props.setProperty("table.whitelist", String.join(",", tableList));
+			}
 			return new DebeziumSourceFunction<>(
 				deserializer,
 				props);

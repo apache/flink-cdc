@@ -19,6 +19,7 @@
 package com.alibaba.ververica.cdc.debezium.internal;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.core.memory.MemoryUtils;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
 
@@ -36,7 +37,6 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.Semaphore;
 
 /**
  * A consumer that consumes change messages from {@link DebeziumEngine}.
@@ -66,14 +66,9 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 
 	private final DebeziumStateSerializer stateSerializer;
 
-	private final Semaphore semaphore;
-
-	private final Thread lockHolderThread;
-
-	private volatile boolean lockIsHold = false;
-
 	private boolean isInDbSnapshotPhase;
 
+	private boolean lockHold = false;
 
 	// ------------------------------------------------------------------------
 
@@ -90,13 +85,6 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 		this.errorReporter = errorReporter;
 		this.debeziumState = new DebeziumState();
 		this.stateSerializer = new DebeziumStateSerializer();
-		this.semaphore = new Semaphore(0);
-		if (isInDbSnapshotPhase) {
-			this.lockHolderThread = new Thread(new LockHolderRunner(), "cp-lock-holder");
-			lockHolderThread.start();
-		} else {
-			this.lockHolderThread = null;
-		}
 	}
 
 	@Override
@@ -109,13 +97,15 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 				deserialization.deserialize(record, debeziumCollector);
 
 				if (isInDbSnapshotPhase) {
+					if (!lockHold) {
+						MemoryUtils.UNSAFE.monitorEnter(checkpointLock);
+						lockHold = true;
+						LOG.info("Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
+					}
 					if (!isSnapshotRecord(record)) {
-						// notify lock holder thread to release the lock
-						semaphore.release();
+						MemoryUtils.UNSAFE.monitorExit(checkpointLock);
 						isInDbSnapshotPhase = false;
-						LOG.info("Received record from streaming binlog phase, notify to release checkpoint lock.");
-						// wait until the thread is finished, i.e. wait for the checkpoint lock
-						lockHolderThread.join();
+						LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
 					}
 				}
 
@@ -147,10 +137,6 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 			Map<String, ?> sourcePartition,
 			Map<String, ?> sourceOffset) throws InterruptedException {
 		if (isInDbSnapshotPhase) {
-			// lockHolderThread may not started yet, wait it to hold the lock
-			while (!lockIsHold) {
-				Thread.sleep(100);
-			}
 			// lockHolderThread holds the lock, don't need to hold it again
 			emitRecords(records, sourcePartition, sourceOffset);
 		} else {
@@ -186,6 +172,9 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 	public byte[] snapshotCurrentState() throws Exception {
 		// this method assumes that the checkpoint lock is held
 		assert Thread.holdsLock(checkpointLock);
+		if (debeziumState.sourceOffset == null || debeziumState.sourcePartition == null) {
+			return null;
+		}
 
 		return stateSerializer.serialize(debeziumState);
 	}
@@ -201,23 +190,6 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 		@Override
 		public void close() {
 
-		}
-	}
-
-	private class LockHolderRunner implements Runnable {
-
-		@Override
-		public void run() {
-			synchronized (checkpointLock) {
-				lockIsHold = true;
-				LOG.info("Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
-				try {
-					semaphore.acquire();
-				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
-				}
-			}
-			LOG.info("Database snapshot phase is finished, checkpoint lock is released.");
 		}
 	}
 }

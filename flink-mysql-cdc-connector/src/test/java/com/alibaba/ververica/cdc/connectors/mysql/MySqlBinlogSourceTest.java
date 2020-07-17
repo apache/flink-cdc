@@ -169,8 +169,8 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 			runThread.start();
 
 			// wait until consumer is started
-			int received = drain(sourceContext, 1).size();
-			assertEquals(1, received);
+			int received = drain(sourceContext, 2).size();
+			assertEquals(2, received);
 
 			// we can't perform checkpoint during DB snapshot
 			assertFalse(waitForCheckpointLock(sourceContext.getCheckpointLock(), Duration.ofSeconds(3)));
@@ -342,11 +342,10 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 		return MySqlBinlogSource.<SourceRecord>builder()
 			.hostname(mysqlContainer.getHost())
 			.port(mysqlContainer.getDatabasePort())
-			.database(DATABASE.getDatabaseName())
-			.tableName("products") // monitor table "products"
+			.databaseList(DATABASE.getDatabaseName())
+			.tableList(DATABASE.getDatabaseName() + "." + "products") // monitor table "products"
 			.username(mysqlContainer.getUsername())
 			.password(mysqlContainer.getPassword())
-			.serverId(1234)
 			.deserializer(new ForwardDeserializeSchema())
 			.build();
 	}
