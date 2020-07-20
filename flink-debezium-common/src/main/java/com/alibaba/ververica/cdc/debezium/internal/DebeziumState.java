@@ -33,8 +33,8 @@ import java.util.Map;
  * name, or topic-partition). The sourceOffset represents a position in that sourcePartition which can be used
  * to resume consumption of data.
  * </p>
- * <p>
- * These values can have arbitrary structure and should be represented using
+ *
+ * <p>These values can have arbitrary structure and should be represented using
  * org.apache.kafka.connect.data objects (or primitive values). For example, a database connector
  * might specify the sourcePartition as a record containing { "db": "database_name", "table":
  * "table_name"} and the sourceOffset as a Long containing the timestamp of the row.

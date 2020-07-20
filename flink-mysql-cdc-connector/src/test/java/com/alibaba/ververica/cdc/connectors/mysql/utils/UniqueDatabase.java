@@ -99,7 +99,7 @@ public class UniqueDatabase {
 		assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
 		try {
 			try (Connection connection = DriverManager.getConnection(container.getJdbcUrl(), username, password);
-				 Statement statement = connection.createStatement()) {
+					Statement statement = connection.createStatement()) {
 				final List<String> statements = Arrays.stream(
 					Stream.concat(
 						Arrays.stream(CREATE_DATABASE_DDL),

@@ -32,6 +32,7 @@ import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.ExceptionUtils;
+
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
@@ -319,7 +320,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 			}
 		}
 	}
-
 
 	@Override
 	public void cancel() {

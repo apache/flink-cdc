@@ -39,7 +39,7 @@ public abstract class MySqlBinlogTestBase extends AbstractTestBase {
 
 	private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogTestBase.class);
 
-	protected static final MySqlBinlogContainer mysqlContainer = (MySqlBinlogContainer) new MySqlBinlogContainer()
+	protected static final MySqlBinlogContainer MYSQL_CONTAINER = (MySqlBinlogContainer) new MySqlBinlogContainer()
 		.withConfigurationOverride("docker/my.cnf")
 		.withSetupSQL("docker/setup.sql")
 		.withDatabaseName("flink-test")
@@ -50,14 +50,14 @@ public abstract class MySqlBinlogTestBase extends AbstractTestBase {
 	@BeforeClass
 	public static void startContainers() {
 		LOG.info("Starting containers...");
-		Startables.deepStart(Stream.of(mysqlContainer)).join();
+		Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
 		LOG.info("Containers are started.");
 	}
 
 	protected Connection getJdbcConnection() throws SQLException {
 		return DriverManager.getConnection(
-			mysqlContainer.getJdbcUrl(),
-			mysqlContainer.getUsername(),
-			mysqlContainer.getPassword());
+			MYSQL_CONTAINER.getJdbcUrl(),
+			MYSQL_CONTAINER.getUsername(),
+			MYSQL_CONTAINER.getPassword());
 	}
 }

@@ -122,8 +122,12 @@ public class MySqlBinlogTableSource implements ScanTableSource {
 
 	@Override
 	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (o == null || getClass() != o.getClass()) return false;
+		if (this == o) {
+			return true;
+		}
+		if (o == null || getClass() != o.getClass()) {
+			return false;
+		}
 		MySqlBinlogTableSource that = (MySqlBinlogTableSource) o;
 		return port == that.port &&
 			Objects.equals(physicalSchema, that.physicalSchema) &&

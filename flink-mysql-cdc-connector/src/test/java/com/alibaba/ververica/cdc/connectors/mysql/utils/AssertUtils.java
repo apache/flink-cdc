@@ -26,6 +26,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
+/**
+ * Utilities for asserting {@link SourceRecord}.
+ */
 public class AssertUtils {
 	/**
 	 * Verify that the given {@link SourceRecord} is a {@link Envelope.Operation#CREATE INSERT/CREATE} record.

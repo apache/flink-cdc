@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.debezium.utils;
 
-
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;

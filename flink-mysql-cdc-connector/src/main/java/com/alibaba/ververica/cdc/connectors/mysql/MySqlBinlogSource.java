@@ -35,6 +35,9 @@ public class MySqlBinlogSource {
 		return new Builder<>();
 	}
 
+	/**
+	 * Builder class of {@link MySqlBinlogSource}.
+	 */
 	public static class Builder<T> {
 
 		private int port = 3306; // default 3306 port

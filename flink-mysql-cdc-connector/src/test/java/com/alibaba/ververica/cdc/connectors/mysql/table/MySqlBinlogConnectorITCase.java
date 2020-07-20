@@ -45,14 +45,14 @@ import static org.junit.Assert.assertThat;
  */
 public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
 
-	private final UniqueDatabase INVENTORY_DATABASE = new UniqueDatabase(
-		mysqlContainer,
+	private final UniqueDatabase inventoryDatabase = new UniqueDatabase(
+		MYSQL_CONTAINER,
 		"inventory",
 		"mysqluser",
 		"mysqlpw");
 
-	private final UniqueDatabase TYPES_DATABASE = new UniqueDatabase(
-		mysqlContainer,
+	private final UniqueDatabase fullTypesDatabase = new UniqueDatabase(
+		MYSQL_CONTAINER,
 		"column_type_test",
 		"mysqluser",
 		"mysqlpw");
@@ -71,7 +71,7 @@ public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
 
 	@Test
 	public void testConsumingAllEvents() throws SQLException, ExecutionException, InterruptedException {
-		INVENTORY_DATABASE.createAndInitialize();
+		inventoryDatabase.createAndInitialize();
 		String sourceDDL = String.format(
 				"CREATE TABLE debezium_source (" +
 				" id INT NOT NULL," +
@@ -87,11 +87,11 @@ public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
 				" 'database-name' = '%s'," +
 				" 'table-name' = '%s'" +
 				")",
-			mysqlContainer.getHost(),
-			mysqlContainer.getDatabasePort(),
-			INVENTORY_DATABASE.getUsername(),
-			INVENTORY_DATABASE.getPassword(),
-			INVENTORY_DATABASE.getDatabaseName(),
+			MYSQL_CONTAINER.getHost(),
+			MYSQL_CONTAINER.getDatabasePort(),
+			inventoryDatabase.getUsername(),
+			inventoryDatabase.getPassword(),
+			inventoryDatabase.getDatabaseName(),
 			"products");
 		String sinkDDL = "CREATE TABLE sink (" +
 			" name STRING," +
@@ -110,8 +110,8 @@ public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
 
 		waitForSnapshotStarted("sink");
 
-		try (Connection connection = INVENTORY_DATABASE.getJdbcConnection();
-			 Statement statement = connection.createStatement()) {
+		try (Connection connection = inventoryDatabase.getJdbcConnection();
+				Statement statement = connection.createStatement()) {
 
 			statement.execute("UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
 			statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
@@ -154,7 +154,7 @@ public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
 
 	@Test
 	public void testAllTypes() throws Throwable {
-		TYPES_DATABASE.createAndInitialize();
+		fullTypesDatabase.createAndInitialize();
 		String sourceDDL = String.format(
 				"CREATE TABLE full_types (\n" +
 				"    id INT NOT NULL,\n" +
@@ -186,11 +186,11 @@ public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
 				" 'database-name' = '%s'," +
 				" 'table-name' = '%s'" +
 				")",
-			mysqlContainer.getHost(),
-			mysqlContainer.getDatabasePort(),
-			TYPES_DATABASE.getUsername(),
-			TYPES_DATABASE.getPassword(),
-			TYPES_DATABASE.getDatabaseName(),
+			MYSQL_CONTAINER.getHost(),
+			MYSQL_CONTAINER.getDatabasePort(),
+			fullTypesDatabase.getUsername(),
+			fullTypesDatabase.getPassword(),
+			fullTypesDatabase.getDatabaseName(),
 			"full_types");
 		String sinkDDL =
 				"CREATE TABLE sink (\n" +
@@ -245,8 +245,8 @@ public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
 
 		waitForSnapshotStarted("sink");
 
-		try (Connection connection = TYPES_DATABASE.getJdbcConnection();
-			 Statement statement = connection.createStatement()) {
+		try (Connection connection = fullTypesDatabase.getJdbcConnection();
+				Statement statement = connection.createStatement()) {
 
 			statement.execute("UPDATE full_types SET tiny_c=0 WHERE id=1;");
 		}

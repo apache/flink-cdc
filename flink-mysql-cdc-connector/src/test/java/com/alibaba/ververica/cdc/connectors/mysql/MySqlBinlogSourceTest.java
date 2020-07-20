@@ -68,15 +68,15 @@ import static org.junit.Assert.assertTrue;
  */
 public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 
-	private final UniqueDatabase DATABASE = new UniqueDatabase(
-		mysqlContainer,
+	private final UniqueDatabase database = new UniqueDatabase(
+		MYSQL_CONTAINER,
 		"inventory",
 		"mysqluser",
 		"mysqlpw");
 
 	@Before
 	public void before() {
-		DATABASE.createAndInitialize();
+		database.createAndInitialize();
 	}
 
 	@Test
@@ -86,8 +86,8 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 
 		setupSource(source);
 
-		try (Connection connection = DATABASE.getJdbcConnection();
-			 Statement statement = connection.createStatement()) {
+		try (Connection connection = database.getJdbcConnection();
+				Statement statement = connection.createStatement()) {
 
 			// start the source
 			final CheckedThread runThread = new CheckedThread() {
@@ -133,7 +133,7 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 			// Add a column with default to the 'products' table and explicitly update one record ...
 			statement.execute(String.format(
 				"ALTER TABLE %s.products ADD COLUMN volume FLOAT, ADD COLUMN alias VARCHAR(30) NULL AFTER description",
-				DATABASE.getDatabaseName()));
+				database.getDatabaseName()));
 			statement.execute("UPDATE products SET volume=13.5 WHERE id=2001");
 			records = drain(sourceContext, 1);
 			assertUpdate(records.get(0), "id", 2001);
@@ -228,8 +228,8 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 			// make sure there is no more events
 			assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-			try (Connection connection = DATABASE.getJdbcConnection();
-				 Statement statement = connection.createStatement()) {
+			try (Connection connection = database.getJdbcConnection();
+					Statement statement = connection.createStatement()) {
 
 				statement.execute("INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
 				List<SourceRecord> records = drain(sourceContext2, 1);
@@ -293,8 +293,8 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 			assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
 
 			// can continue to receive new events
-			try (Connection connection = DATABASE.getJdbcConnection();
-				 Statement statement = connection.createStatement()) {
+			try (Connection connection = database.getJdbcConnection();
+					Statement statement = connection.createStatement()) {
 				statement.execute("DELETE FROM products WHERE id=1001");
 			}
 			records = drain(sourceContext3, 1);
@@ -340,16 +340,15 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 
 	private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
 		return MySqlBinlogSource.<SourceRecord>builder()
-			.hostname(mysqlContainer.getHost())
-			.port(mysqlContainer.getDatabasePort())
-			.databaseList(DATABASE.getDatabaseName())
-			.tableList(DATABASE.getDatabaseName() + "." + "products") // monitor table "products"
-			.username(mysqlContainer.getUsername())
-			.password(mysqlContainer.getPassword())
+			.hostname(MYSQL_CONTAINER.getHost())
+			.port(MYSQL_CONTAINER.getDatabasePort())
+			.databaseList(database.getDatabaseName())
+			.tableList(database.getDatabaseName() + "." + "products") // monitor table "products"
+			.username(MYSQL_CONTAINER.getUsername())
+			.password(MYSQL_CONTAINER.getPassword())
 			.deserializer(new ForwardDeserializeSchema())
 			.build();
 	}
-
 
 	private <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount) throws Exception {
 		List<T> allRecords = new ArrayList<>();
@@ -440,6 +439,7 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 			return TypeInformation.of(SourceRecord.class);
 		}
 	}
+
 	private static class MockOperatorStateStore implements OperatorStateStore {
 
 		private final ListState<?> restoredOffsetListState;

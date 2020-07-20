@@ -112,12 +112,12 @@ public class MySqlBinlogContainer extends JdbcDatabaseContainer {
 	protected String constructUrlForConnection(String queryString) {
 		String url = super.constructUrlForConnection(queryString);
 
-		if (! url.contains("useSSL=")) {
+		if (!url.contains("useSSL=")) {
 			String separator = url.contains("?") ? "&" : "?";
 			url = url + separator + "useSSL=false";
 		}
 
-		if (! url.contains("allowPublicKeyRetrieval=")) {
+		if (!url.contains("allowPublicKeyRetrieval=")) {
 			url = url + "&allowPublicKeyRetrieval=true";
 		}
 

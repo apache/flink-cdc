@@ -106,7 +106,6 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 		}
 	}
 
-
 	@Override
 	public void stop() {
 		super.stop();

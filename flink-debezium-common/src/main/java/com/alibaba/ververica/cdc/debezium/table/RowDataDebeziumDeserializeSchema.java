@@ -29,6 +29,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
+
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -254,10 +255,10 @@ public class RowDataDebeziumDeserializeSchema implements DebeziumDeserialization
 					return TimestampData.fromEpochMillis((Long) dbzObj);
 				case MicroTimestamp.SCHEMA_NAME:
 					long micro = (long) dbzObj;
-					return TimestampData.fromEpochMillis(micro/1000, (int) (micro % 1000 * 1000));
+					return TimestampData.fromEpochMillis(micro / 1000, (int) (micro % 1000 * 1000));
 				case NanoTimestamp.SCHEMA_NAME:
 					long nano = (long) dbzObj;
-					return TimestampData.fromEpochMillis(nano/1000_000, (int) (nano % 1000_000));
+					return TimestampData.fromEpochMillis(nano / 1000_000, (int) (nano % 1000_000));
 			}
 		}
 		LocalDateTime localDateTime = TemporalConversions.toLocalDateTime(dbzObj);

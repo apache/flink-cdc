@@ -61,7 +61,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
 
 	public static final String OFFSET_STATE_VALUE = "offset.storage.flink.state.value";
 	public static final int FLUSH_TIMEOUT_SECONDS = 10;
-	
+
 	protected Map<ByteBuffer, ByteBuffer> data = new HashMap<>();
 	protected ExecutorService executor;
 
@@ -181,8 +181,9 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
 			for (Map.Entry<ByteBuffer, ByteBuffer> entry : values.entrySet()) {
 				data.put(entry.getKey(), entry.getValue());
 			}
-			if (callback != null)
+			if (callback != null) {
 				callback.onCompletion(null, null);
+			}
 			return null;
 		});
 	}

@@ -131,7 +131,6 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 		return false;
 	}
 
-
 	private void emitRecordsUnderCheckpointLock(
 			Queue<T> records,
 			Map<String, ?> sourcePartition,
