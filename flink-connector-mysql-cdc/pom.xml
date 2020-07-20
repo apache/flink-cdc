@@ -25,8 +25,8 @@ under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-mysql-cdc-connector</artifactId>
-    <name>flink-mysql-cdc-connector</name>
+    <artifactId>flink-connector-mysql-cdc</artifactId>
+    <name>flink-connector-mysql-cdc</name>
     <packaging>jar</packaging>
 
     <dependencies>
