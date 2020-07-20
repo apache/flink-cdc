@@ -26,8 +26,8 @@ under the License.
     <packaging>pom</packaging>
 
     <modules>
-        <module>flink-debezium-common</module>
-        <module>flink-mysql-cdc-connector</module>
+        <module>flink-connector-debezium</module>
+        <module>flink-connector-mysql-cdc</module>
     </modules>
 
     <licenses>
