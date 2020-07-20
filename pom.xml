@@ -274,9 +274,7 @@ under the License.
                                     <exclude>com.google.code.findbugs:jsr305</exclude>
                                     <!-- flink shaded jars -->
                                     <exclude>org.apache.flink:flink-shaded-*</exclude>
-                                    <exclude>com.alibaba.blink:flink-shaded-*</exclude>
                                     <exclude>com.google.guava:guava</exclude>
-                                    <exclude>com.fasterxml.jackson.*:*</exclude>
                                     <exclude>tv.cntt:*</exclude>
                                     <exclude>io.netty:*</exclude>
                                     <exclude>org.ow2.asm:*</exclude>
@@ -287,7 +285,6 @@ under the License.
                                     <exclude>org.apache.commons:commons-lang3</exclude>
                                     <!-- flink dependencies are provided -->
                                     <exclude>org.apache.flink:*</exclude>
-                                    <exclude>com.alibaba.blink:force-shading</exclude>
                                 </excludes>
                             </artifactSet>
                         </configuration>

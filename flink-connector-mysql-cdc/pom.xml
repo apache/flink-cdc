@@ -34,7 +34,7 @@ under the License.
         <!-- Debezium dependencies -->
         <dependency>
             <groupId>com.alibaba.ververica</groupId>
-            <artifactId>flink-debezium-common</artifactId>
+            <artifactId>flink-connector-debezium</artifactId>
             <version>${project.version}</version>
             <exclusions>
                 <exclusion>
@@ -54,7 +54,7 @@ under the License.
 
         <dependency>
             <groupId>com.alibaba.ververica</groupId>
-            <artifactId>flink-debezium-common</artifactId>
+            <artifactId>flink-connector-debezium</artifactId>
             <version>${project.version}</version>
             <exclusions>
                 <exclusion>
