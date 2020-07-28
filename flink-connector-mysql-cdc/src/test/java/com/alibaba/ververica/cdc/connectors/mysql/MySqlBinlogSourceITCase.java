@@ -27,7 +27,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 /**
- * Tests for {@link MySqlBinlogSource}
+ * Tests for {@link MySqlBinlogSource}.
  */
 @Ignore
 public class MySqlBinlogSourceITCase extends MySqlBinlogTestBase {
