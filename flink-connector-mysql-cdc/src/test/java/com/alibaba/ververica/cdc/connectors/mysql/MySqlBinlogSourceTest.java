@@ -56,9 +56,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.utils.AssertUtils.assertDelete;
-import static com.alibaba.ververica.cdc.connectors.mysql.utils.AssertUtils.assertInsert;
-import static com.alibaba.ververica.cdc.connectors.mysql.utils.AssertUtils.assertUpdate;
+import static com.alibaba.ververica.cdc.debezium.utils.AssertUtils.assertDelete;
+import static com.alibaba.ververica.cdc.debezium.utils.AssertUtils.assertInsert;
+import static com.alibaba.ververica.cdc.debezium.utils.AssertUtils.assertUpdate;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
