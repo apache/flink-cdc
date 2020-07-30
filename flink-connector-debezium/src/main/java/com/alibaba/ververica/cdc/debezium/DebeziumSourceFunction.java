@@ -307,17 +307,22 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 
 		// on a clean exit, wait for the runner thread
 		try {
-			executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+			while (running) {
+				if (executor.awaitTermination(5, TimeUnit.SECONDS)) {
+					break;
+				}
+				if (error != null) {
+					running = false;
+					shutdownEngine();
+					// rethrow the error from Debezium consumer
+					ExceptionUtils.rethrow(error);
+				}
+			}
 		}
 		catch (InterruptedException e) {
 			// may be the result of a wake-up interruption after an exception.
 			// we ignore this here and only restore the interruption state
 			Thread.currentThread().interrupt();
-		} finally {
-			if (error != null) {
-				// rethrow the error from Debezium consumer
-				ExceptionUtils.rethrow(error);
-			}
 		}
 	}
 
@@ -347,8 +352,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 	private void reportError(Throwable error) {
 		LOG.error("Reporting error:", error);
 		this.error = error;
-		// shutdown executor to fail the source
-		shutdownEngine();
 	}
 
 	/**

@@ -26,6 +26,9 @@ import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
+/**
+ * Integration tests for {@link MySqlBinlogSource}.
+ */
 @Ignore
 public class MySqlBinlogSourceITCase extends MySqlBinlogTestBase {
 

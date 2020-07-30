@@ -35,6 +35,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.utils.TemporalConversions;
 import io.debezium.data.Envelope;
+import io.debezium.data.SpecialValueDecimal;
+import io.debezium.data.VariableScaleDecimal;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
@@ -53,8 +55,15 @@ import java.time.LocalDateTime;
 /**
  * Deserialization schema from Debezium object to Flink Table/SQL internal data structure {@link RowData}.
  */
-public class RowDataDebeziumDeserializeSchema implements DebeziumDeserializationSchema<RowData> {
+public final class RowDataDebeziumDeserializeSchema implements DebeziumDeserializationSchema<RowData> {
 	private static final long serialVersionUID = -4852684966051743776L;
+
+	/**
+	 * Custom validator to validate the row value.
+	 */
+	public interface ValueValidator extends Serializable {
+		void validate(RowData rowData, RowKind rowKind) throws Exception;
+	}
 
 	/** TypeInformation of the produced {@link RowData}. **/
 	private final TypeInformation<RowData> resultTypeInfo;
@@ -64,9 +73,19 @@ public class RowDataDebeziumDeserializeSchema implements DebeziumDeserialization
 	 * objects of Flink SQL internal data structures. **/
 	private final DeserializationRuntimeConverter runtimeConverter;
 
-	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo) {
+	/**
+	 * Validator to validate the row value.
+	 */
+	private final ValueValidator validator;
+
+	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo, ValueValidator validator) {
 		this.runtimeConverter = createConverter(rowType);
 		this.resultTypeInfo = resultTypeInfo;
+		this.validator = validator;
+	}
+
+	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo) {
+		this(rowType, resultTypeInfo, ((rowData, rowKind) -> {}));
 	}
 
 	@Override
@@ -76,18 +95,22 @@ public class RowDataDebeziumDeserializeSchema implements DebeziumDeserialization
 		Schema valueSchema = record.valueSchema();
 		if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
 			GenericRowData insert = extractAfterRow(value, valueSchema);
+			validator.validate(insert, RowKind.INSERT);
 			insert.setRowKind(RowKind.INSERT);
 			out.collect(insert);
 		} else if (op == Envelope.Operation.DELETE) {
 			GenericRowData delete = extractBeforeRow(value, valueSchema);
+			validator.validate(delete, RowKind.DELETE);
 			delete.setRowKind(RowKind.DELETE);
 			out.collect(delete);
 		} else {
 			GenericRowData before = extractBeforeRow(value, valueSchema);
+			validator.validate(before, RowKind.UPDATE_BEFORE);
 			before.setRowKind(RowKind.UPDATE_BEFORE);
 			out.collect(before);
 
 			GenericRowData after = extractAfterRow(value, valueSchema);
+			validator.validate(after, RowKind.UPDATE_AFTER);
 			after.setRowKind(RowKind.UPDATE_AFTER);
 			out.collect(after);
 		}
@@ -297,8 +320,13 @@ public class RowDataDebeziumDeserializeSchema implements DebeziumDeserialization
 				// decimal.handling.mode=double
 				bigDecimal = BigDecimal.valueOf((Double) dbzObj);
 			} else {
-				// fallback to string
-				bigDecimal = new BigDecimal(dbzObj.toString());
+				if (VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
+					SpecialValueDecimal decimal = VariableScaleDecimal.toLogical((Struct) dbzObj);
+					bigDecimal = decimal.getDecimalValue().orElse(BigDecimal.ZERO);
+				} else {
+					// fallback to string
+					bigDecimal = new BigDecimal(dbzObj.toString());
+				}
 			}
 			return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
 		};

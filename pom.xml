@@ -35,7 +35,9 @@ under the License.
     <modules>
         <module>flink-connector-debezium</module>
         <module>flink-connector-mysql-cdc</module>
+        <module>flink-connector-postgres-cdc</module>
         <module>flink-sql-connector-mysql-cdc</module>
+        <module>flink-sql-connector-postgres-cdc</module>
     </modules>
 
     <licenses>
@@ -159,6 +161,8 @@ under the License.
                         <exclude>**/target/**</exclude>
                         <!-- Build files -->
                         <exclude>**/*.iml</exclude>
+                        <!-- Docs -->
+                        <exclude>**/*.md</exclude>
                     </excludes>
                 </configuration>
             </plugin>
@@ -260,10 +264,15 @@ under the License.
                 <executions>
                     <execution>
                         <id>shade-flink</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
                         <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <shadedArtifactAttached>true</shadedArtifactAttached>
-                            <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+                            <shadeTestJar>true</shadeTestJar>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <dependencyReducedPomLocation>${project.basedir}/target/dependency-reduced-pom.xml</dependencyReducedPomLocation>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
