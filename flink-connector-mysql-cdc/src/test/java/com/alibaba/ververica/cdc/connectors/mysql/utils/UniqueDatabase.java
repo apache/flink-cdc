@@ -53,17 +53,17 @@ public class UniqueDatabase {
 	};
 	private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-	private final MySqlBinlogContainer container;
+	private final MySQLContainer container;
 	private final String databaseName;
 	private final String templateName;
 	private final String username;
 	private final String password;
 
-	public UniqueDatabase(MySqlBinlogContainer container, String databaseName, String username, String password) {
+	public UniqueDatabase(MySQLContainer container, String databaseName, String username, String password) {
 		this(container, databaseName, Integer.toUnsignedString(new Random().nextInt(), 36), username, password);
 	}
 
-	private UniqueDatabase(MySqlBinlogContainer container, String databaseName, final String identifier, String username, String password) {
+	private UniqueDatabase(MySQLContainer container, String databaseName, final String identifier, String username, String password) {
 		this.container = container;
 		this.databaseName = databaseName + "_" + identifier;
 		this.templateName = databaseName;

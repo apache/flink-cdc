@@ -45,7 +45,7 @@ import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 /**
  * Integration tests for MySQL binlog SQL source.
  */
-public class PostgreSqlChangelogConnectorITCase extends PostgresTestBase {
+public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
 	private final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 	private final StreamTableEnvironment tEnv = StreamTableEnvironment.create(

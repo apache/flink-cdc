@@ -65,9 +65,9 @@ import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /**
- * Tests for {@link PostgreSqlChangelogSource} which also heavily tests {@link DebeziumSourceFunction}.
+ * Tests for {@link PostgreSQLSource} which also heavily tests {@link DebeziumSourceFunction}.
  */
-public class PostgreSqlChangelogSourceTest extends PostgresTestBase {
+public class PostgreSQLSourceTest extends PostgresTestBase {
 
 	@Before
 	public void before() {
@@ -316,7 +316,7 @@ public class PostgreSqlChangelogSourceTest extends PostgresTestBase {
 	// ------------------------------------------------------------------------------------------
 
 	private DebeziumSourceFunction<SourceRecord> createPostgreSqlSource() {
-		return PostgreSqlChangelogSource.<SourceRecord>builder()
+		return PostgreSQLSource.<SourceRecord>builder()
 			.hostname(POSTGERS_CONTAINER.getHost())
 			.port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
 			.database(POSTGERS_CONTAINER.getDatabaseName())

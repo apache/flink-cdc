@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.mysql.table;
+package com.alibaba.ververica.cdc.connectors.postgres.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.api.TableSchema;
@@ -28,50 +28,50 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySqlBinlogSource;
+import com.alibaba.ververica.cdc.connectors.postgres.PostgreSQLSource;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
-import javax.annotation.Nullable;
-
 import java.util.Objects;
-import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A {@link DynamicTableSource} that describes how to create a MySQL binlog source from a logical
+ * A {@link DynamicTableSource} that describes how to create a PostgreSQL source from a logical
  * description.
  */
-public class MySqlBinlogTableSource implements ScanTableSource {
+public class PostgreSQLTableSource implements ScanTableSource {
 
 	private final TableSchema physicalSchema;
 	private final int port;
 	private final String hostname;
 	private final String database;
+	private final String schemaName;
+	private final String tableName;
 	private final String username;
 	private final String password;
-	private final Integer serverId;
-	private final String tableName;
+	private final String pluginName;
 
-	public MySqlBinlogTableSource(
+	public PostgreSQLTableSource(
 			TableSchema physicalSchema,
 			int port,
 			String hostname,
 			String database,
+			String schemaName,
 			String tableName,
 			String username,
 			String password,
-			@Nullable Integer serverId) {
+			String pluginName) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
 		this.hostname = checkNotNull(hostname);
 		this.database = checkNotNull(database);
+		this.schemaName = checkNotNull(schemaName);
 		this.tableName = checkNotNull(tableName);
 		this.username = checkNotNull(username);
 		this.password = checkNotNull(password);
-		this.serverId = serverId;
+		this.pluginName = checkNotNull(pluginName);
 	}
 
 	@Override
@@ -91,33 +91,34 @@ public class MySqlBinlogTableSource implements ScanTableSource {
 		TypeInformation<RowData> typeInfo = (TypeInformation<RowData>) scanContext.createTypeInformation(physicalSchema.toRowDataType());
 		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
 			rowType,
-			typeInfo);
-		MySqlBinlogSource.Builder<RowData> builder = MySqlBinlogSource.<RowData>builder()
+			typeInfo,
+			new PostgresValueValidator(schemaName, tableName));
+		DebeziumSourceFunction<RowData> sourceFunction = PostgreSQLSource.<RowData>builder()
 			.hostname(hostname)
 			.port(port)
-			.databaseList(database)
-			.tableList(database + "." + tableName)
+			.database(database)
+			.schemaList(schemaName)
+			.tableList(schemaName + "." + tableName)
 			.username(username)
 			.password(password)
-			.deserializer(deserializer);
-		Optional.ofNullable(serverId).ifPresent(builder::serverId);
-		DebeziumSourceFunction<RowData> sourceFunction = builder.build();
-
+			.decodingPluginName(pluginName)
+			.deserializer(deserializer)
+			.build();
 		return SourceFunctionProvider.of(sourceFunction, false);
 	}
 
 	@Override
 	public DynamicTableSource copy() {
-		return new MySqlBinlogTableSource(
+		return new PostgreSQLTableSource(
 			physicalSchema,
 			port,
 			hostname,
 			database,
+			schemaName,
 			tableName,
 			username,
 			password,
-			serverId
-		);
+			pluginName);
 	}
 
 	@Override
@@ -128,24 +129,24 @@ public class MySqlBinlogTableSource implements ScanTableSource {
 		if (o == null || getClass() != o.getClass()) {
 			return false;
 		}
-		MySqlBinlogTableSource that = (MySqlBinlogTableSource) o;
+		PostgreSQLTableSource that = (PostgreSQLTableSource) o;
 		return port == that.port &&
 			Objects.equals(physicalSchema, that.physicalSchema) &&
 			Objects.equals(hostname, that.hostname) &&
 			Objects.equals(database, that.database) &&
+			Objects.equals(schemaName, that.schemaName) &&
+			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(username, that.username) &&
-			Objects.equals(password, that.password) &&
-			Objects.equals(serverId, that.serverId) &&
-			Objects.equals(tableName, that.tableName);
+			Objects.equals(password, that.password);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName);
+		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password);
 	}
 
 	@Override
 	public String asSummaryString() {
-		return "MySQL-CDC";
+		return "PostgreSQL-CDC";
 	}
 }

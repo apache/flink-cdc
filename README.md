@@ -68,10 +68,11 @@ Include following Maven dependency (available through Maven Central):
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
-    SourceFunction<String> sourceFunction = MySqlBinlogSource.<String>builder()
+    SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
       .hostname("localhost")
       .port(3306)
       .databaseList("inventory") // monitor all tables under inventory database

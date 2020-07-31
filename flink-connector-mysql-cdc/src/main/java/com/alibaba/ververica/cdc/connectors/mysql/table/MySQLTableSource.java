@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.postgres.table;
+package com.alibaba.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.api.TableSchema;
@@ -28,50 +28,50 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.alibaba.ververica.cdc.connectors.postgres.PostgreSqlChangelogSource;
+import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import javax.annotation.Nullable;
+
 import java.util.Objects;
+import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A {@link DynamicTableSource} that describes how to create a PostgreSQL source from a logical
+ * A {@link DynamicTableSource} that describes how to create a MySQL binlog source from a logical
  * description.
  */
-public class PostgreSqlChangelogTableSource implements ScanTableSource {
+public class MySQLTableSource implements ScanTableSource {
 
 	private final TableSchema physicalSchema;
 	private final int port;
 	private final String hostname;
 	private final String database;
-	private final String schemaName;
-	private final String tableName;
 	private final String username;
 	private final String password;
-	private final String pluginName;
+	private final Integer serverId;
+	private final String tableName;
 
-	public PostgreSqlChangelogTableSource(
+	public MySQLTableSource(
 			TableSchema physicalSchema,
 			int port,
 			String hostname,
 			String database,
-			String schemaName,
 			String tableName,
 			String username,
 			String password,
-			String pluginName) {
+			@Nullable Integer serverId) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
 		this.hostname = checkNotNull(hostname);
 		this.database = checkNotNull(database);
-		this.schemaName = checkNotNull(schemaName);
 		this.tableName = checkNotNull(tableName);
 		this.username = checkNotNull(username);
 		this.password = checkNotNull(password);
-		this.pluginName = checkNotNull(pluginName);
+		this.serverId = serverId;
 	}
 
 	@Override
@@ -91,34 +91,33 @@ public class PostgreSqlChangelogTableSource implements ScanTableSource {
 		TypeInformation<RowData> typeInfo = (TypeInformation<RowData>) scanContext.createTypeInformation(physicalSchema.toRowDataType());
 		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
 			rowType,
-			typeInfo,
-			new PostgresValueValidator(schemaName, tableName));
-		DebeziumSourceFunction<RowData> sourceFunction = PostgreSqlChangelogSource.<RowData>builder()
+			typeInfo);
+		MySQLSource.Builder<RowData> builder = MySQLSource.<RowData>builder()
 			.hostname(hostname)
 			.port(port)
-			.database(database)
-			.schemaList(schemaName)
-			.tableList(schemaName + "." + tableName)
+			.databaseList(database)
+			.tableList(database + "." + tableName)
 			.username(username)
 			.password(password)
-			.decodingPluginName(pluginName)
-			.deserializer(deserializer)
-			.build();
+			.deserializer(deserializer);
+		Optional.ofNullable(serverId).ifPresent(builder::serverId);
+		DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+
 		return SourceFunctionProvider.of(sourceFunction, false);
 	}
 
 	@Override
 	public DynamicTableSource copy() {
-		return new PostgreSqlChangelogTableSource(
+		return new MySQLTableSource(
 			physicalSchema,
 			port,
 			hostname,
 			database,
-			schemaName,
 			tableName,
 			username,
 			password,
-			pluginName);
+			serverId
+		);
 	}
 
 	@Override
@@ -129,24 +128,24 @@ public class PostgreSqlChangelogTableSource implements ScanTableSource {
 		if (o == null || getClass() != o.getClass()) {
 			return false;
 		}
-		PostgreSqlChangelogTableSource that = (PostgreSqlChangelogTableSource) o;
+		MySQLTableSource that = (MySQLTableSource) o;
 		return port == that.port &&
 			Objects.equals(physicalSchema, that.physicalSchema) &&
 			Objects.equals(hostname, that.hostname) &&
 			Objects.equals(database, that.database) &&
-			Objects.equals(schemaName, that.schemaName) &&
-			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(username, that.username) &&
-			Objects.equals(password, that.password);
+			Objects.equals(password, that.password) &&
+			Objects.equals(serverId, that.serverId) &&
+			Objects.equals(tableName, that.tableName);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password);
+		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName);
 	}
 
 	@Override
 	public String asSummaryString() {
-		return "PostgreSQL-CDC";
+		return "MySQL-CDC";
 	}
 }

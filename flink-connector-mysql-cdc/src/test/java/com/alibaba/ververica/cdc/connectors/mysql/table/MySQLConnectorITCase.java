@@ -24,7 +24,7 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySqlBinlogTestBase;
+import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,7 +43,7 @@ import static org.junit.Assert.assertThat;
 /**
  * Integration tests for MySQL binlog SQL source.
  */
-public class MySqlBinlogConnectorITCase extends MySqlBinlogTestBase {
+public class MySQLConnectorITCase extends MySQLTestBase {
 
 	private final UniqueDatabase inventoryDatabase = new UniqueDatabase(
 		MYSQL_CONTAINER,

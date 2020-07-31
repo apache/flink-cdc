@@ -64,9 +64,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Tests for {@link MySqlBinlogSource} which also heavily tests {@link DebeziumSourceFunction}.
+ * Tests for {@link MySQLSource} which also heavily tests {@link DebeziumSourceFunction}.
  */
-public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
+public class MySQLSourceTest extends MySQLTestBase {
 
 	private final UniqueDatabase database = new UniqueDatabase(
 		MYSQL_CONTAINER,
@@ -339,7 +339,7 @@ public class MySqlBinlogSourceTest extends MySqlBinlogTestBase {
 	// ------------------------------------------------------------------------------------------
 
 	private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
-		return MySqlBinlogSource.<SourceRecord>builder()
+		return MySQLSource.<SourceRecord>builder()
 			.hostname(MYSQL_CONTAINER.getHost())
 			.port(MYSQL_CONTAINER.getDatabasePort())
 			.databaseList(database.getDatabaseName())

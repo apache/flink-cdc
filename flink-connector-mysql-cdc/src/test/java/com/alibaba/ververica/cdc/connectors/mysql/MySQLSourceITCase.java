@@ -27,10 +27,10 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 /**
- * Integration tests for {@link MySqlBinlogSource}.
+ * Integration tests for {@link MySQLSource}.
  */
 @Ignore
-public class MySqlBinlogSourceITCase extends MySqlBinlogTestBase {
+public class MySQLSourceITCase extends MySQLTestBase {
 
 	private final UniqueDatabase inventoryDatabase = new UniqueDatabase(
 		MYSQL_CONTAINER,
@@ -41,7 +41,7 @@ public class MySqlBinlogSourceITCase extends MySqlBinlogTestBase {
 	@Test
 	public void testConsumingAllEvents() throws Exception {
 		inventoryDatabase.createAndInitialize();
-		SourceFunction<String> sourceFunction = MySqlBinlogSource.<String>builder()
+		SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
 			.hostname(MYSQL_CONTAINER.getHost())
 			.port(MYSQL_CONTAINER.getDatabasePort())
 			.databaseList(inventoryDatabase.getDatabaseName()) // monitor all tables under inventory database

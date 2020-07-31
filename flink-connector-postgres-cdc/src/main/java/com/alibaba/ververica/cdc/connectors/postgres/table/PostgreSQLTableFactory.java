@@ -32,9 +32,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Factory for creating configured instance of {@link PostgreSqlChangelogTableSource}.
+ * Factory for creating configured instance of {@link PostgreSQLTableSource}.
  */
-public class PostgreSqlChangelogTableFactory implements DynamicTableSourceFactory {
+public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 
 	private static final String IDENTIFIER = "postgres-cdc";
 
@@ -96,7 +96,7 @@ public class PostgreSqlChangelogTableFactory implements DynamicTableSourceFactor
 		String pluginName = config.get(DECODING_PLUGIN_NAME);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
-		return new PostgreSqlChangelogTableSource(
+		return new PostgreSQLTableSource(
 			physicalSchema,
 			port,
 			hostname,

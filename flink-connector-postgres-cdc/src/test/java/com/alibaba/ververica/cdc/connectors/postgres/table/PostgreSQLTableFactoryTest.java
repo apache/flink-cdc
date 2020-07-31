@@ -40,9 +40,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Test for {@link PostgreSqlChangelogTableSource} created by {@link PostgreSqlChangelogTableFactory}.
+ * Test for {@link PostgreSQLTableSource} created by {@link PostgreSQLTableFactory}.
  */
-public class PostgreSqlChangelogTableSourceFactoryTest {
+public class PostgreSQLTableFactoryTest {
 	private static final TableSchema SCHEMA = TableSchema.builder()
 		.field("aaa", DataTypes.INT().notNull())
 		.field("bbb", DataTypes.STRING().notNull())
@@ -65,7 +65,7 @@ public class PostgreSqlChangelogTableSourceFactoryTest {
 
 		// validation for source
 		DynamicTableSource actualSource = createTableSource(properties);
-		PostgreSqlChangelogTableSource expectedSource = new PostgreSqlChangelogTableSource(
+		PostgreSQLTableSource expectedSource = new PostgreSQLTableSource(
 			TableSchemaUtils.getPhysicalSchema(SCHEMA),
 			5432,
 			MY_LOCALHOST,
@@ -85,7 +85,7 @@ public class PostgreSqlChangelogTableSourceFactoryTest {
 		properties.put("decoding.plugin.name", "wal2json");
 
 		DynamicTableSource actualSource = createTableSource(properties);
-		PostgreSqlChangelogTableSource expectedSource = new PostgreSqlChangelogTableSource(
+		PostgreSQLTableSource expectedSource = new PostgreSQLTableSource(
 			TableSchemaUtils.getPhysicalSchema(SCHEMA),
 			5444,
 			MY_LOCALHOST,
@@ -113,7 +113,7 @@ public class PostgreSqlChangelogTableSourceFactoryTest {
 		}
 
 		// validate missing required
-		Factory factory = new PostgreSqlChangelogTableFactory();
+		Factory factory = new PostgreSQLTableFactory();
 		for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
 			Map<String, String> properties = getAllOptions();
 			properties.remove(requiredOption.key());
@@ -158,6 +158,6 @@ public class PostgreSqlChangelogTableSourceFactoryTest {
 			ObjectIdentifier.of("default", "default", "t1"),
 			new CatalogTableImpl(SCHEMA, options, "mock source"),
 			new Configuration(),
-			PostgreSqlChangelogTableSourceFactoryTest.class.getClassLoader());
+			PostgreSQLTableFactoryTest.class.getClassLoader());
 	}
 }

@@ -31,9 +31,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Factory for creating configured instance of {@link MySqlBinlogTableSource}.
+ * Factory for creating configured instance of {@link MySQLTableSource}.
  */
-public class MySqlBinlogTableSourceFactory implements DynamicTableSourceFactory {
+public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 
 	private static final String IDENTIFIER = "mysql-cdc";
 
@@ -90,7 +90,7 @@ public class MySqlBinlogTableSourceFactory implements DynamicTableSourceFactory 
 		Integer serverId = config.getOptional(SERVER_ID).orElse(null);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
-		return new MySqlBinlogTableSource(
+		return new MySQLTableSource(
 			physicalSchema,
 			port,
 			hostname,

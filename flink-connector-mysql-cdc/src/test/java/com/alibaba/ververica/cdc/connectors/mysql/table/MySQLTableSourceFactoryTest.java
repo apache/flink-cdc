@@ -40,9 +40,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Test for {@link MySqlBinlogTableSource} created by {@link MySqlBinlogTableSourceFactory}.
+ * Test for {@link MySQLTableSource} created by {@link MySQLTableSourceFactory}.
  */
-public class MySqlBinlogTableSourceFactoryTest {
+public class MySQLTableSourceFactoryTest {
 	private static final TableSchema SCHEMA = TableSchema.builder()
 		.field("aaa", DataTypes.INT().notNull())
 		.field("bbb", DataTypes.STRING().notNull())
@@ -64,7 +64,7 @@ public class MySqlBinlogTableSourceFactoryTest {
 
 		// validation for source
 		DynamicTableSource actualSource = createTableSource(properties);
-		MySqlBinlogTableSource expectedSource = new MySqlBinlogTableSource(
+		MySQLTableSource expectedSource = new MySQLTableSource(
 			TableSchemaUtils.getPhysicalSchema(SCHEMA),
 			3306,
 			MY_LOCALHOST,
@@ -84,7 +84,7 @@ public class MySqlBinlogTableSourceFactoryTest {
 		properties.put("server-id", "4321");
 
 		DynamicTableSource actualSource = createTableSource(properties);
-		MySqlBinlogTableSource expectedSource = new MySqlBinlogTableSource(
+		MySQLTableSource expectedSource = new MySQLTableSource(
 			TableSchemaUtils.getPhysicalSchema(SCHEMA),
 			3307,
 			MY_LOCALHOST,
@@ -124,7 +124,7 @@ public class MySqlBinlogTableSourceFactoryTest {
 		}
 
 		// validate missing required
-		Factory factory = new MySqlBinlogTableSourceFactory();
+		Factory factory = new MySQLTableSourceFactory();
 		for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
 			Map<String, String> properties = getAllOptions();
 			properties.remove(requiredOption.key());
@@ -168,6 +168,6 @@ public class MySqlBinlogTableSourceFactoryTest {
 			ObjectIdentifier.of("default", "default", "t1"),
 			new CatalogTableImpl(SCHEMA, options, "mock source"),
 			new Configuration(),
-			MySqlBinlogTableSourceFactoryTest.class.getClassLoader());
+			MySQLTableSourceFactoryTest.class.getClassLoader());
 	}
 }
