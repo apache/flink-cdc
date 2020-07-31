@@ -49,7 +49,7 @@ under the License.
     </licenses>
 
     <properties>
-        <flink.version>1.11.0</flink.version>
+        <flink.version>1.11.1</flink.version>
         <debezium.version>1.2.0.Final</debezium.version>
         <testcontainers.version>1.14.3</testcontainers.version>
         <java.version>1.8</java.version>
@@ -328,6 +328,18 @@ under the License.
                                 <dependencyConvergence/>
                             </rules>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
