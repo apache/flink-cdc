@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.debezium.utils;
+package com.alibaba.ververica.cdc.connectors.utils;
 
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;

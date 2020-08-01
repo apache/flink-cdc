@@ -55,17 +55,11 @@ under the License.
 
         <dependency>
             <groupId>com.alibaba.ververica</groupId>
-            <artifactId>flink-connector-debezium</artifactId>
+            <artifactId>flink-connector-test-util</artifactId>
             <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>kafka-log4j-appender</artifactId>
-                    <groupId>org.apache.kafka</groupId>
-                </exclusion>
-            </exclusions>
-            <type>test-jar</type>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-core</artifactId>

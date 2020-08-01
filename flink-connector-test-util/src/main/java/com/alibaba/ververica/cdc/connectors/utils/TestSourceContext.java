@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.debezium.utils;
+package com.alibaba.ververica.cdc.connectors.utils;
 
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.watermark.Watermark;
