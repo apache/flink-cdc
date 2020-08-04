@@ -1,7 +1,7 @@
 # Flink CDC Connectors
 
 Flink CDC Connectors is a set of source connectors for Apache Flink, ingesting changes from different databases using change data capture (CDC).
-The Flink CDC Connectors integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debebezium](https://github.com/debezium/debezium).
+The Flink CDC Connectors integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
 This README is meant as a brief walkthrough on the core features with Flink CDC Connectors. For a fully detailed documentation, please see [Documentation](https://github.com/ververica/flink-cdc-connectors/wiki).
 
@@ -10,7 +10,7 @@ This README is meant as a brief walkthrough on the core features with Flink CDC 
 | Database | Version |
 | --- | --- |
 | MySQL | Database: 5.7, 8.0.x <br/>JDBC Driver: 8.0.16 |
-| PostgreSQL | Coming soon |
+| PostgreSQL | Database: 9.6, 10, 11, 12 <br/>JDBC Driver: 42.2.12|
 | SQL Server | Coming soon |
 
 ## Features
