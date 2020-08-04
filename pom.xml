@@ -39,6 +39,7 @@ under the License.
         <module>flink-connector-postgres-cdc</module>
         <module>flink-sql-connector-mysql-cdc</module>
         <module>flink-sql-connector-postgres-cdc</module>
+        <module>flink-format-changelog-json</module>
     </modules>
 
     <licenses>
@@ -175,6 +176,8 @@ under the License.
                         <exclude>**/*.iml</exclude>
                         <!-- Docs -->
                         <exclude>**/*.md</exclude>
+                        <!-- Tests -->
+                        <exclude>**/*.txt</exclude>
                     </excludes>
                 </configuration>
             </plugin>
