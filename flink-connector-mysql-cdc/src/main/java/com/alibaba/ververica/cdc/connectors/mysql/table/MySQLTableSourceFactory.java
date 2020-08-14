@@ -18,6 +18,8 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.table;
 
+import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
@@ -26,6 +28,8 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
+
+import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -78,7 +82,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 	@Override
 	public DynamicTableSource createDynamicTableSource(Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
-		helper.validate();
+		helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
 
 		final ReadableConfig config = helper.getOptions();
 		String hostname = config.get(HOSTNAME);
@@ -98,6 +102,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			tableName,
 			username,
 			password,
+			getDebeziumProperties(context.getCatalogTable().getOptions()),
 			serverId
 		);
 	}

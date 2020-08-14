@@ -37,6 +37,7 @@ import javax.annotation.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -54,6 +55,7 @@ public class MySQLTableSource implements ScanTableSource {
 	private final String password;
 	private final Integer serverId;
 	private final String tableName;
+	private final Properties dbzProperties;
 
 	public MySQLTableSource(
 			TableSchema physicalSchema,
@@ -63,6 +65,7 @@ public class MySQLTableSource implements ScanTableSource {
 			String tableName,
 			String username,
 			String password,
+			Properties dbzProperties,
 			@Nullable Integer serverId) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
@@ -72,6 +75,7 @@ public class MySQLTableSource implements ScanTableSource {
 		this.username = checkNotNull(username);
 		this.password = checkNotNull(password);
 		this.serverId = serverId;
+		this.dbzProperties = dbzProperties;
 	}
 
 	@Override
@@ -99,6 +103,7 @@ public class MySQLTableSource implements ScanTableSource {
 			.tableList(database + "." + tableName)
 			.username(username)
 			.password(password)
+			.debeziumProperties(dbzProperties)
 			.deserializer(deserializer);
 		Optional.ofNullable(serverId).ifPresent(builder::serverId);
 		DebeziumSourceFunction<RowData> sourceFunction = builder.build();
@@ -116,6 +121,7 @@ public class MySQLTableSource implements ScanTableSource {
 			tableName,
 			username,
 			password,
+			dbzProperties,
 			serverId
 		);
 	}
@@ -136,12 +142,13 @@ public class MySQLTableSource implements ScanTableSource {
 			Objects.equals(username, that.username) &&
 			Objects.equals(password, that.password) &&
 			Objects.equals(serverId, that.serverId) &&
-			Objects.equals(tableName, that.tableName);
+			Objects.equals(tableName, that.tableName) &&
+			Objects.equals(dbzProperties, that.dbzProperties);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName);
+		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, dbzProperties);
 	}
 
 	@Override

@@ -18,6 +18,9 @@
 
 package com.alibaba.ververica.cdc.connectors.postgres.table;
 
+import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
+import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
@@ -83,7 +86,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 	@Override
 	public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
-		helper.validate();
+		helper.validateExcept(DEBEZIUM_OPTIONS_PREFIX);
 
 		final ReadableConfig config = helper.getOptions();
 		String hostname = config.get(HOSTNAME);
@@ -105,7 +108,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 			tableName,
 			username,
 			password,
-			pluginName);
+			pluginName,
+			getDebeziumProperties(context.getCatalogTable().getOptions()));
 	}
 
 	@Override

@@ -34,6 +34,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -58,6 +59,7 @@ public class PostgreSQLTableFactoryTest {
 	private static final String MY_DATABASE = "myDB";
 	private static final String MY_TABLE = "myTable";
 	private static final String MY_SCHEMA = "public";
+	private static final Properties PROPERTIES = new Properties();
 
 	@Test
 	public void testCommonProperties() {
@@ -74,17 +76,21 @@ public class PostgreSQLTableFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
-			"decoderbufs");
+			"decoderbufs",
+			PROPERTIES);
 		assertEquals(expectedSource, actualSource);
 	}
 
 	@Test
 	public void testOptionalProperties() {
-		Map<String, String> properties = getAllOptions();
-		properties.put("port", "5444");
-		properties.put("decoding.plugin.name", "wal2json");
+		Map<String, String> options = getAllOptions();
+		options.put("port", "5444");
+		options.put("decoding.plugin.name", "wal2json");
+		options.put("debezium.snapshot.mode", "never");
 
-		DynamicTableSource actualSource = createTableSource(properties);
+		DynamicTableSource actualSource = createTableSource(options);
+		Properties dbzProperties = new Properties();
+		dbzProperties.put("snapshot.mode", "never");
 		PostgreSQLTableSource expectedSource = new PostgreSQLTableSource(
 			TableSchemaUtils.getPhysicalSchema(SCHEMA),
 			5444,
@@ -94,7 +100,8 @@ public class PostgreSQLTableFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
-			"wal2json");
+			"wal2json",
+			dbzProperties);
 		assertEquals(expectedSource, actualSource);
 	}
 

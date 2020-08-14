@@ -47,6 +47,7 @@ public class MySQLSource {
 		private String password;
 		private Integer serverId;
 		private String[] tableList;
+		private Properties dbzProperties;
 		private DebeziumDeserializationSchema<T> deserializer;
 
 		public Builder<T> hostname(String hostname) {
@@ -111,6 +112,14 @@ public class MySQLSource {
 		}
 
 		/**
+		 * The Debezium MySQL connector properties. For example, "snapshot.mode".
+		 */
+		public Builder<T> debeziumProperties(Properties properties) {
+			this.dbzProperties = properties;
+			return this;
+		}
+
+		/**
 		 * The deserializer used to convert from consumed {@link org.apache.kafka.connect.source.SourceRecord}.
 		 */
 		public Builder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
@@ -141,6 +150,11 @@ public class MySQLSource {
 			if (tableList != null) {
 				props.setProperty("table.whitelist", String.join(",", tableList));
 			}
+
+			if (dbzProperties != null) {
+				dbzProperties.forEach(props::put);
+			}
+
 			return new DebeziumSourceFunction<>(
 				deserializer,
 				props);

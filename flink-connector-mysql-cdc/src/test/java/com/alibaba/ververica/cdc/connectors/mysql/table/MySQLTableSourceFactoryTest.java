@@ -34,6 +34,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -57,6 +58,7 @@ public class MySQLTableSourceFactoryTest {
 	private static final String MY_PASSWORD = "flinkpw";
 	private static final String MY_DATABASE = "myDB";
 	private static final String MY_TABLE = "myTable";
+	private static final Properties PROPERTIES = new Properties();
 
 	@Test
 	public void testCommonProperties() {
@@ -72,6 +74,7 @@ public class MySQLTableSourceFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
+			PROPERTIES,
 			null
 		);
 		assertEquals(expectedSource, actualSource);
@@ -79,11 +82,14 @@ public class MySQLTableSourceFactoryTest {
 
 	@Test
 	public void testOptionalProperties() {
-		Map<String, String> properties = getAllOptions();
-		properties.put("port", "3307");
-		properties.put("server-id", "4321");
+		Map<String, String> options = getAllOptions();
+		options.put("port", "3307");
+		options.put("server-id", "4321");
+		options.put("debezium.snapshot.mode", "never");
 
-		DynamicTableSource actualSource = createTableSource(properties);
+		DynamicTableSource actualSource = createTableSource(options);
+		Properties dbzProperties = new Properties();
+		dbzProperties.put("snapshot.mode", "never");
 		MySQLTableSource expectedSource = new MySQLTableSource(
 			TableSchemaUtils.getPhysicalSchema(SCHEMA),
 			3307,
@@ -92,6 +98,7 @@ public class MySQLTableSourceFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
+			dbzProperties,
 			4321
 		);
 		assertEquals(expectedSource, actualSource);
