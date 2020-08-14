@@ -22,6 +22,7 @@ import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.connector.mysql.MySqlConnector;
 
+import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -47,6 +48,7 @@ public class MySQLSource {
 		private String password;
 		private Integer serverId;
 		private String[] tableList;
+		private Map<String, String> properties;
 		private DebeziumDeserializationSchema<T> deserializer;
 
 		public Builder<T> hostname(String hostname) {
@@ -111,6 +113,14 @@ public class MySQLSource {
 		}
 
 		/**
+		 * The Debezium MySQL connector properties
+		 */
+		public Builder<T> properties(Map<String, String> properties) {
+			this.properties = properties;
+			return this;
+		}
+
+		/**
 		 * The deserializer used to convert from consumed {@link org.apache.kafka.connect.source.SourceRecord}.
 		 */
 		public Builder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
@@ -141,9 +151,14 @@ public class MySQLSource {
 			if (tableList != null) {
 				props.setProperty("table.whitelist", String.join(",", tableList));
 			}
+
+			Properties mergedProps = new Properties();
+			mergedProps.putAll(props);
+			mergedProps.putAll(properties);
+
 			return new DebeziumSourceFunction<>(
 				deserializer,
-				props);
+				mergedProps);
 		}
 	}
 }

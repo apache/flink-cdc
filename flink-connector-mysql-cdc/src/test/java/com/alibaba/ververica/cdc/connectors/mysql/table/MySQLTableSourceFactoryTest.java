@@ -57,6 +57,7 @@ public class MySQLTableSourceFactoryTest {
 	private static final String MY_PASSWORD = "flinkpw";
 	private static final String MY_DATABASE = "myDB";
 	private static final String MY_TABLE = "myTable";
+	private static final Map<String, String > PROPERTIES = new HashMap<>();
 
 	@Test
 	public void testCommonProperties() {
@@ -72,6 +73,7 @@ public class MySQLTableSourceFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
+			PROPERTIES,
 			null
 		);
 		assertEquals(expectedSource, actualSource);
@@ -92,6 +94,7 @@ public class MySQLTableSourceFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
+			PROPERTIES,
 			4321
 		);
 		assertEquals(expectedSource, actualSource);

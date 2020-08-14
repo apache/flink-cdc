@@ -28,6 +28,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -75,6 +76,11 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			"MySQL database cluster as another server (with this unique ID) so it can read the binlog. " +
 			"By default, a random number is generated between 5400 and 6400, though we recommend setting an explicit value.");
 
+	private static final ConfigOption<Map<String, String>> PROPERTIES = ConfigOptions.key("properties")
+		.mapType()
+		.noDefaultValue()
+		.withDescription("The Debezium MySQL connector properties.");
+
 	@Override
 	public DynamicTableSource createDynamicTableSource(Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
@@ -87,6 +93,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		String databaseName = config.get(DATABASE_NAME);
 		String tableName = config.get(TABLE_NAME);
 		int port = config.get(PORT);
+		Map<String, String> properties = config.get(PROPERTIES);;
 		Integer serverId = config.getOptional(SERVER_ID).orElse(null);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
@@ -98,6 +105,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			tableName,
 			username,
 			password,
+			properties,
 			serverId
 		);
 	}
