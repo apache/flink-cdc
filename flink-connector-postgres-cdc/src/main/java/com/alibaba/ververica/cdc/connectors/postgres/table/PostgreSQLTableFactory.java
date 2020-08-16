@@ -18,6 +18,8 @@
 
 package com.alibaba.ververica.cdc.connectors.postgres.table;
 
+import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
@@ -105,7 +107,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 			tableName,
 			username,
 			password,
-			pluginName);
+			pluginName,
+			getDebeziumProperties(context.getCatalogTable().getOptions()));
 	}
 
 	@Override

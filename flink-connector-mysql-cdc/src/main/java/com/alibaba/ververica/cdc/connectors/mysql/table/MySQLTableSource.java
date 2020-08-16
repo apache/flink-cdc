@@ -35,9 +35,9 @@ import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema
 
 import javax.annotation.Nullable;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -55,7 +55,7 @@ public class MySQLTableSource implements ScanTableSource {
 	private final String password;
 	private final Integer serverId;
 	private final String tableName;
-	private final Map<String, String> properties;
+	private final Properties properties;
 
 	public MySQLTableSource(
 			TableSchema physicalSchema,
@@ -65,7 +65,7 @@ public class MySQLTableSource implements ScanTableSource {
 			String tableName,
 			String username,
 			String password,
-			Map<String, String> properties,
+			Properties properties,
 			@Nullable Integer serverId) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;

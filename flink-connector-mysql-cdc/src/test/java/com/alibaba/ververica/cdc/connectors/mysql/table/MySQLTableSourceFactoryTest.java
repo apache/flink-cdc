@@ -34,6 +34,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -57,7 +58,7 @@ public class MySQLTableSourceFactoryTest {
 	private static final String MY_PASSWORD = "flinkpw";
 	private static final String MY_DATABASE = "myDB";
 	private static final String MY_TABLE = "myTable";
-	private static final Map<String, String > PROPERTIES = new HashMap<>();
+	private static final Properties PROPERTIES = new Properties();
 
 	@Test
 	public void testCommonProperties() {

@@ -34,6 +34,7 @@ import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
 import java.util.Objects;
+import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -52,6 +53,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 	private final String username;
 	private final String password;
 	private final String pluginName;
+	private final Properties properties;
 
 	public PostgreSQLTableSource(
 			TableSchema physicalSchema,
@@ -62,7 +64,8 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			String tableName,
 			String username,
 			String password,
-			String pluginName) {
+			String pluginName,
+			Properties properties) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
 		this.hostname = checkNotNull(hostname);
@@ -72,6 +75,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 		this.username = checkNotNull(username);
 		this.password = checkNotNull(password);
 		this.pluginName = checkNotNull(pluginName);
+		this.properties = properties;
 	}
 
 	@Override
@@ -102,6 +106,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			.username(username)
 			.password(password)
 			.decodingPluginName(pluginName)
+			.properties(properties)
 			.deserializer(deserializer)
 			.build();
 		return SourceFunctionProvider.of(sourceFunction, false);
@@ -118,7 +123,8 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			tableName,
 			username,
 			password,
-			pluginName);
+			pluginName,
+			properties);
 	}
 
 	@Override
@@ -137,12 +143,13 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			Objects.equals(schemaName, that.schemaName) &&
 			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(username, that.username) &&
-			Objects.equals(password, that.password);
+			Objects.equals(password, that.password) &&
+			Objects.equals(properties, that.properties);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password);
+		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password, properties);
 	}
 
 	@Override

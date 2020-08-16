@@ -34,6 +34,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -58,6 +59,7 @@ public class PostgreSQLTableFactoryTest {
 	private static final String MY_DATABASE = "myDB";
 	private static final String MY_TABLE = "myTable";
 	private static final String MY_SCHEMA = "public";
+	private static final Properties PROPERTIES = new Properties();
 
 	@Test
 	public void testCommonProperties() {
@@ -74,7 +76,8 @@ public class PostgreSQLTableFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
-			"decoderbufs");
+			"decoderbufs",
+			PROPERTIES);
 		assertEquals(expectedSource, actualSource);
 	}
 
@@ -94,7 +97,8 @@ public class PostgreSQLTableFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
-			"wal2json");
+			"wal2json",
+			PROPERTIES);
 		assertEquals(expectedSource, actualSource);
 	}
 

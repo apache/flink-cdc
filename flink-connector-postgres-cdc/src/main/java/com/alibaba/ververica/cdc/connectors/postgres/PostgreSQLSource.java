@@ -24,7 +24,10 @@ import io.debezium.connector.postgresql.PostgresConnector;
 
 import java.util.Properties;
 
+import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import org.apache.flink.shaded.guava18.com.google.common.collect.Maps;
 
 /**
  * A builder to build a SourceFunction which can read snapshot and continue to consume binlog for PostgreSQL.
@@ -49,6 +52,7 @@ public class PostgreSQLSource {
 		private String password;
 		private String[] schemaList;
 		private String[] tableList;
+		private Properties properties;
 		private DebeziumDeserializationSchema<T> deserializer;
 
 		/**
@@ -120,6 +124,14 @@ public class PostgreSQLSource {
 		}
 
 		/**
+		 * The Debezium MySQL connector properties
+		 */
+		public Builder<T> properties(Properties properties) {
+			this.properties = properties;
+			return this;
+		}
+
+		/**
 		 * The deserializer used to convert from consumed {@link org.apache.kafka.connect.source.SourceRecord}.
 		 */
 		public Builder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
@@ -149,6 +161,10 @@ public class PostgreSQLSource {
 			if (tableList != null) {
 				props.setProperty("table.whitelist", String.join(",", tableList));
 			}
+
+			Properties debeziumProps = getDebeziumProperties(Maps.fromProperties(properties));
+			debeziumProps.forEach(props::put);
+
 			return new DebeziumSourceFunction<>(
 				deserializer,
 				props);

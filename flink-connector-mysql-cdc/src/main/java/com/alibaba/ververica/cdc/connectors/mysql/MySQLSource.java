@@ -22,10 +22,12 @@ import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.connector.mysql.MySqlConnector;
 
-import java.util.Map;
 import java.util.Properties;
 
+import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import org.apache.flink.shaded.guava18.com.google.common.collect.Maps;
 
 /**
  * A builder to build a SourceFunction which can read snapshot and continue to consume binlog.
@@ -48,7 +50,7 @@ public class MySQLSource {
 		private String password;
 		private Integer serverId;
 		private String[] tableList;
-		private Map<String, String> properties;
+		private Properties properties;
 		private DebeziumDeserializationSchema<T> deserializer;
 
 		public Builder<T> hostname(String hostname) {
@@ -115,7 +117,7 @@ public class MySQLSource {
 		/**
 		 * The Debezium MySQL connector properties
 		 */
-		public Builder<T> properties(Map<String, String> properties) {
+		public Builder<T> properties(Properties properties) {
 			this.properties = properties;
 			return this;
 		}
@@ -152,13 +154,12 @@ public class MySQLSource {
 				props.setProperty("table.whitelist", String.join(",", tableList));
 			}
 
-			Properties mergedProps = new Properties();
-			mergedProps.putAll(props);
-			mergedProps.putAll(properties);
+			Properties debeziumProps = getDebeziumProperties(Maps.fromProperties(properties));
+			debeziumProps.forEach(props::put);
 
 			return new DebeziumSourceFunction<>(
 				deserializer,
-				mergedProps);
+				props);
 		}
 	}
 }
