@@ -37,6 +37,7 @@ CREATE TABLE full_types (
     time_c TIME(0),
     datetime3_c DATETIME(3),
     datetime6_c DATETIME(6),
+    timestamp_c TIMESTAMP,
     file_uuid BINARY(16),
     PRIMARY KEY (id)
 ) DEFAULT CHARSET=utf8;
@@ -44,6 +45,6 @@ CREATE TABLE full_types (
 INSERT INTO full_types VALUES (
     DEFAULT, 127, 255, 32767, 65535, 2147483647, 4294967295, 9223372036854775807,
     'Hello World', 'abc', 123.102, 404.4443, 123.4567, 345.6, true,
-    '2020-07-17', '18:00:22', '2020-07-17 18:00:22.123', '2020-07-17 18:00:22.123456',
+    '2020-07-17', '18:00:22', '2020-07-17 18:00:22.123', '2020-07-17 18:00:22.123456', '2020-07-17 18:00:22',
     unhex(replace('651aed08-390f-4893-b2f1-36923e7b7400','-',''))
 );

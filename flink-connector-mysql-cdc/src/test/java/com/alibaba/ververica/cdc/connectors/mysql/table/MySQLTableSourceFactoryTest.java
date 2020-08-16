@@ -32,6 +32,7 @@ import org.apache.flink.util.ExceptionUtils;
 
 import org.junit.Test;
 
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -74,6 +75,7 @@ public class MySQLTableSourceFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
+			ZoneId.of("UTC"),
 			PROPERTIES,
 			null
 		);
@@ -85,6 +87,7 @@ public class MySQLTableSourceFactoryTest {
 		Map<String, String> options = getAllOptions();
 		options.put("port", "3307");
 		options.put("server-id", "4321");
+		options.put("server-time-zone", "Asia/Shanghai");
 		options.put("debezium.snapshot.mode", "never");
 
 		DynamicTableSource actualSource = createTableSource(options);
@@ -98,6 +101,7 @@ public class MySQLTableSourceFactoryTest {
 			MY_TABLE,
 			MY_USERNAME,
 			MY_PASSWORD,
+			ZoneId.of("Asia/Shanghai"),
 			dbzProperties,
 			4321
 		);

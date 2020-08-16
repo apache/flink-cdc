@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.concurrent.TimeUnit;
 
@@ -129,7 +130,7 @@ public final class TemporalConversions {
 		throw new IllegalArgumentException("Unable to convert to LocalTime from unexpected value '" + obj + "' of type " + obj.getClass().getName());
 	}
 
-	public static LocalDateTime toLocalDateTime(Object obj) {
+	public static LocalDateTime toLocalDateTime(Object obj, ZoneId serverTimeZone) {
 		if (obj == null) {
 			return null;
 		}
@@ -183,6 +184,12 @@ public final class TemporalConversions {
 				date.getMinutes(),
 				date.getSeconds(),
 				nanosOfSecond);
+		}
+		if (obj instanceof String) {
+			String str = (String) obj;
+			// TIMESTAMP type is encoded in string type
+			Instant instant = Instant.parse(str);
+			return LocalDateTime.ofInstant(instant, serverTimeZone);
 		}
 		throw new IllegalArgumentException("Unable to convert to LocalDateTime from unexpected value '" + obj + "' of type " + obj.getClass().getName());
 	}

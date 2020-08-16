@@ -50,7 +50,9 @@ import org.apache.kafka.connect.source.SourceRecord;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * Deserialization schema from Debezium object to Flink Table/SQL internal data structure {@link RowData}.
@@ -74,18 +76,20 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 	private final DeserializationRuntimeConverter runtimeConverter;
 
 	/**
+	 * Time zone of the database server.
+	 */
+	private final ZoneId serverTimeZone;
+
+	/**
 	 * Validator to validate the row value.
 	 */
 	private final ValueValidator validator;
 
-	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo, ValueValidator validator) {
+	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo, ValueValidator validator, ZoneId serverTimeZone) {
 		this.runtimeConverter = createConverter(rowType);
 		this.resultTypeInfo = resultTypeInfo;
 		this.validator = validator;
-	}
-
-	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo) {
-		this(rowType, resultTypeInfo, ((rowData, rowKind) -> {}));
+		this.serverTimeZone = serverTimeZone;
 	}
 
 	@Override
@@ -177,6 +181,8 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 				return this::convertToTime;
 			case TIMESTAMP_WITHOUT_TIME_ZONE:
 				return this::convertToTimestamp;
+			case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+				return this::convertToLocalTimeZoneTimestamp;
 			case FLOAT:
 				return this::convertToFloat;
 			case DOUBLE:
@@ -284,8 +290,18 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 					return TimestampData.fromEpochMillis(nano / 1000_000, (int) (nano % 1000_000));
 			}
 		}
-		LocalDateTime localDateTime = TemporalConversions.toLocalDateTime(dbzObj);
+		LocalDateTime localDateTime = TemporalConversions.toLocalDateTime(dbzObj, serverTimeZone);
 		return TimestampData.fromLocalDateTime(localDateTime);
+	}
+
+	private TimestampData convertToLocalTimeZoneTimestamp(Object dbzObj, Schema schema) {
+		if (dbzObj instanceof String) {
+			String str = (String) dbzObj;
+			// TIMESTAMP type is encoded in string type
+			Instant instant = Instant.parse(str);
+			return TimestampData.fromLocalDateTime(LocalDateTime.ofInstant(instant, serverTimeZone));
+		}
+		throw new IllegalArgumentException("Unable to convert to TimestampData from unexpected value '" + dbzObj + "' of type " + dbzObj.getClass().getName());
 	}
 
 	private StringData convertToString(Object dbzObj, Schema schema) {

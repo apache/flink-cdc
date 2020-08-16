@@ -18,8 +18,6 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.table;
 
-import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
-
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
@@ -31,8 +29,11 @@ import org.apache.flink.table.utils.TableSchemaUtils;
 
 import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
 
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
+
+import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 
 /**
  * Factory for creating configured instance of {@link MySQLTableSource}.
@@ -71,6 +72,11 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		.noDefaultValue()
 		.withDescription("Table name of the MySQL database to monitor.");
 
+	private static final ConfigOption<String> SERVER_TIME_ZONE = ConfigOptions.key("server-time-zone")
+		.stringType()
+		.defaultValue("UTC")
+		.withDescription("The session time zone in database server.");
+
 	private static final ConfigOption<Integer> SERVER_ID = ConfigOptions.key("server-id")
 		.intType()
 		.noDefaultValue()
@@ -92,6 +98,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		String tableName = config.get(TABLE_NAME);
 		int port = config.get(PORT);
 		Integer serverId = config.getOptional(SERVER_ID).orElse(null);
+		ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
 		return new MySQLTableSource(
@@ -102,6 +109,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			tableName,
 			username,
 			password,
+			serverTimeZone,
 			getDebeziumProperties(context.getCatalogTable().getOptions()),
 			serverId
 		);
@@ -127,6 +135,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 	public Set<ConfigOption<?>> optionalOptions() {
 		Set<ConfigOption<?>> options = new HashSet<>();
 		options.add(PORT);
+		options.add(SERVER_TIME_ZONE);
 		options.add(SERVER_ID);
 		return options;
 	}

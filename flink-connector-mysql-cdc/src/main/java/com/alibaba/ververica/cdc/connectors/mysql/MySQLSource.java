@@ -46,6 +46,7 @@ public class MySQLSource {
 		private String username;
 		private String password;
 		private Integer serverId;
+		private String serverTimeZone;
 		private String[] tableList;
 		private Properties dbzProperties;
 		private DebeziumDeserializationSchema<T> deserializer;
@@ -101,6 +102,16 @@ public class MySQLSource {
 		}
 
 		/**
+		 * The session time zone in database server, e.g. "America/Los_Angeles".
+		 * It controls how the TIMESTAMP type in MYSQL converted to STRING.
+		 * See more https://debezium.io/documentation/reference/1.2/connectors/mysql.html#_temporal_values
+		 */
+		public Builder<T> serverTimeZone(String timeZone) {
+			this.serverTimeZone = timeZone;
+			return this;
+		}
+
+		/**
 		 * A numeric ID of this database client, which must be unique across all currently-running
 		 * database processes in the MySQL cluster. This connector joins the MySQL database cluster
 		 * as another server (with this unique ID) so it can read the binlog. By default, a random
@@ -149,6 +160,9 @@ public class MySQLSource {
 			}
 			if (tableList != null) {
 				props.setProperty("table.whitelist", String.join(",", tableList));
+			}
+			if (serverTimeZone != null) {
+				props.setProperty("database.serverTimezone", serverTimeZone);
 			}
 
 			if (dbzProperties != null) {

@@ -176,6 +176,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 				"    time_c TIME(0),\n" +
 				"    datetime3_c TIMESTAMP(3),\n" +
 				"    datetime6_c TIMESTAMP(6),\n" +
+				"    timestamp_c TIMESTAMP(0),\n" +
 				"    file_uuid BYTES\n" +
 				") WITH (" +
 				" 'connector' = 'mysql-cdc'," +
@@ -213,6 +214,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 				"    time_c TIME(0),\n" +
 				"    datetime3_c TIMESTAMP(3),\n" +
 				"    datetime6_c TIMESTAMP(6),\n" +
+				"    timestamp_c TIMESTAMP(0),\n" +
 				"    file_uuid STRING\n" +
 				") WITH (" +
 				" 'connector' = 'values'," +
@@ -241,6 +243,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 			"time_c,\n" +
 			"datetime3_c,\n" +
 			"datetime6_c,\n" +
+			"timestamp_c,\n" +
 			"TO_BASE64(DECODE(file_uuid, 'UTF-8')) FROM full_types");
 
 		waitForSnapshotStarted("sink");
@@ -248,7 +251,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 		try (Connection connection = fullTypesDatabase.getJdbcConnection();
 				Statement statement = connection.createStatement()) {
 
-			statement.execute("UPDATE full_types SET tiny_c=0 WHERE id=1;");
+			statement.execute("UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
 		}
 
 		waitForSinkSize("sink", 3);
@@ -256,13 +259,13 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 		List<String> expected = Arrays.asList(
 			"+I(1,127,255,32767,65535,2147483647,4294967295,9223372036854775807,Hello World,abc," +
 				"123.102,404.4443,123.4567,346,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123," +
-				"2020-07-17T18:00:22.123456,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)",
+				"2020-07-17T18:00:22.123456,2020-07-17T18:00:22,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)",
 			"-U(1,127,255,32767,65535,2147483647,4294967295,9223372036854775807,Hello World,abc," +
 				"123.102,404.4443,123.4567,346,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123," +
-				"2020-07-17T18:00:22.123456,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)",
-			"+U(1,0,255,32767,65535,2147483647,4294967295,9223372036854775807,Hello World,abc," +
+				"2020-07-17T18:00:22.123456,2020-07-17T18:00:22,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)",
+			"+U(1,127,255,32767,65535,2147483647,4294967295,9223372036854775807,Hello World,abc," +
 				"123.102,404.4443,123.4567,346,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123," +
-				"2020-07-17T18:00:22.123456,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)");
+				"2020-07-17T18:00:22.123456,2020-07-17T18:33:22,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)");
 		List<String> actual = TestValuesTableFactory.getRawResults("sink");
 		assertEquals(expected, actual);
 

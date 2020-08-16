@@ -35,6 +35,7 @@ import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema
 
 import javax.annotation.Nullable;
 
+import java.time.ZoneId;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -55,6 +56,7 @@ public class MySQLTableSource implements ScanTableSource {
 	private final String password;
 	private final Integer serverId;
 	private final String tableName;
+	private final ZoneId serverTimeZone;
 	private final Properties dbzProperties;
 
 	public MySQLTableSource(
@@ -65,6 +67,7 @@ public class MySQLTableSource implements ScanTableSource {
 			String tableName,
 			String username,
 			String password,
+			ZoneId serverTimeZone,
 			Properties dbzProperties,
 			@Nullable Integer serverId) {
 		this.physicalSchema = physicalSchema;
@@ -75,6 +78,7 @@ public class MySQLTableSource implements ScanTableSource {
 		this.username = checkNotNull(username);
 		this.password = checkNotNull(password);
 		this.serverId = serverId;
+		this.serverTimeZone = serverTimeZone;
 		this.dbzProperties = dbzProperties;
 	}
 
@@ -95,7 +99,9 @@ public class MySQLTableSource implements ScanTableSource {
 		TypeInformation<RowData> typeInfo = (TypeInformation<RowData>) scanContext.createTypeInformation(physicalSchema.toRowDataType());
 		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
 			rowType,
-			typeInfo);
+			typeInfo,
+			((rowData, rowKind) -> {}),
+			serverTimeZone);
 		MySQLSource.Builder<RowData> builder = MySQLSource.<RowData>builder()
 			.hostname(hostname)
 			.port(port)
@@ -103,6 +109,7 @@ public class MySQLTableSource implements ScanTableSource {
 			.tableList(database + "." + tableName)
 			.username(username)
 			.password(password)
+			.serverTimeZone(serverTimeZone.toString())
 			.debeziumProperties(dbzProperties)
 			.deserializer(deserializer);
 		Optional.ofNullable(serverId).ifPresent(builder::serverId);
@@ -121,6 +128,7 @@ public class MySQLTableSource implements ScanTableSource {
 			tableName,
 			username,
 			password,
+			serverTimeZone,
 			dbzProperties,
 			serverId
 		);
@@ -143,12 +151,13 @@ public class MySQLTableSource implements ScanTableSource {
 			Objects.equals(password, that.password) &&
 			Objects.equals(serverId, that.serverId) &&
 			Objects.equals(tableName, that.tableName) &&
+			Objects.equals(serverTimeZone, that.serverTimeZone) &&
 			Objects.equals(dbzProperties, that.dbzProperties);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, dbzProperties);
+		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties);
 	}
 
 	@Override
