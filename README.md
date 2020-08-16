@@ -107,13 +107,6 @@ mvn clean install -DskipTests
 
 Flink CDC Connectors is now available at your local `.m2` repository.
 
-## Roadmap
-
-- Supports PostgreSQL Connector
-- Supports MS SQL Server Connector
-- Supports Oracle Connector
-- Supports changelog CSV or JSON format which can produce and consume changelog streams.
-
 ## License
 
 The code in this repository is licensed under the [Apache Software License 2](https://github.com/ververica/flink-cdc-connectors/blob/master/LICENSE).
