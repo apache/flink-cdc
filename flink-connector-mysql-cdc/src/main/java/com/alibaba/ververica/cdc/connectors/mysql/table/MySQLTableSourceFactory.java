@@ -22,6 +22,7 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
@@ -85,6 +86,16 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			"MySQL database cluster as another server (with this unique ID) so it can read the binlog. " +
 			"By default, a random number is generated between 5400 and 6400, though we recommend setting an explicit value.");
 
+	private static final ConfigOption<String> SOURCE_OFFSET_FILE = ConfigOptions.key("source-offset-file")
+			.stringType()
+			.noDefaultValue()
+			.withDescription("File Name of the MySQL binlog.");
+
+	private static final ConfigOption<Integer> SOURCE_OFFSET_POSITION = ConfigOptions.key("source-offset-pos")
+			.intType()
+			.noDefaultValue()
+			.withDescription("Position of the MySQL binlog.");
+
 	@Override
 	public DynamicTableSource createDynamicTableSource(Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
@@ -99,6 +110,10 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		int port = config.get(PORT);
 		Integer serverId = config.getOptional(SERVER_ID).orElse(null);
 		ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+		// Validate the source offset options
+		validateSourceOffset(config);
+		String sourceOffsetFile = config.get(SOURCE_OFFSET_FILE);
+		int sourceOffsetPosition = config.get(SOURCE_OFFSET_POSITION);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
 		return new MySQLTableSource(
@@ -111,7 +126,9 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			password,
 			serverTimeZone,
 			getDebeziumProperties(context.getCatalogTable().getOptions()),
-			serverId
+			serverId,
+			sourceOffsetFile,
+			sourceOffsetPosition
 		);
 	}
 
@@ -137,6 +154,28 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		options.add(PORT);
 		options.add(SERVER_TIME_ZONE);
 		options.add(SERVER_ID);
+		options.add(SOURCE_OFFSET_FILE);
+		options.add(SOURCE_OFFSET_POSITION);
 		return options;
+	}
+
+	private void validateSourceOffset(ReadableConfig tableOptions) {
+		tableOptions.getOptional(SOURCE_OFFSET_FILE)
+				.ifPresent(file -> {
+					Integer offsetPosition = tableOptions.getOptional(SOURCE_OFFSET_POSITION).orElse(null);
+					if (offsetPosition == null) {
+						throw new ValidationException(
+								String.format("Option '%s' should be a non-empty number.", SOURCE_OFFSET_POSITION.key()));
+					}
+				});
+
+		tableOptions.getOptional(SOURCE_OFFSET_POSITION)
+				.ifPresent(pos -> {
+					String offsetFile = tableOptions.getOptional(SOURCE_OFFSET_FILE).orElse(null);
+					if (offsetFile == null) {
+						throw new ValidationException(
+								String.format("Option '%s' should be a non-empty string.", SOURCE_OFFSET_FILE.key()));
+					}
+				});
 	}
 }

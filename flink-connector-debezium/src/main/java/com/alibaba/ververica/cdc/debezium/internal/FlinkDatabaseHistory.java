@@ -64,6 +64,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
 	private ConcurrentLinkedQueue<HistoryRecord> records;
 	private String instanceName;
+	private boolean databaseexists;
 
 	/**
 	 * Registers the given HistoryRecords into global variable under the given instance name,
@@ -104,6 +105,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 			throw new IllegalStateException(
 				String.format("Couldn't find engine instance %s in the global records.", instanceName));
 		}
+		this.databaseexists = config.getBoolean("database.history.exists", true);
 	}
 
 	@Override
@@ -129,7 +131,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
 	@Override
 	public boolean exists() {
-		return true;
+		return databaseexists;
 	}
 
 	@Override

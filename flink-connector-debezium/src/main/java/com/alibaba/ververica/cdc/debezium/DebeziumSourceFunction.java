@@ -375,4 +375,5 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 	public TypeInformation<T> getProducedType() {
 		return deserializer.getProducedType();
 	}
+
 }

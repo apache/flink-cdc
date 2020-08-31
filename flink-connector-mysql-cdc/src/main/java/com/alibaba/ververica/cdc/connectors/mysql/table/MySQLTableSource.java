@@ -58,7 +58,8 @@ public class MySQLTableSource implements ScanTableSource {
 	private final String tableName;
 	private final ZoneId serverTimeZone;
 	private final Properties dbzProperties;
-
+	private final String sourceOffsetFile;
+	private final Integer sourceOffsetPosition;
 	public MySQLTableSource(
 			TableSchema physicalSchema,
 			int port,
@@ -69,7 +70,9 @@ public class MySQLTableSource implements ScanTableSource {
 			String password,
 			ZoneId serverTimeZone,
 			Properties dbzProperties,
-			@Nullable Integer serverId) {
+			@Nullable Integer serverId,
+			@Nullable String sourceOffsetFile,
+			@Nullable Integer sourceOffsetPosition) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
 		this.hostname = checkNotNull(hostname);
@@ -80,6 +83,8 @@ public class MySQLTableSource implements ScanTableSource {
 		this.serverId = serverId;
 		this.serverTimeZone = serverTimeZone;
 		this.dbzProperties = dbzProperties;
+		this.sourceOffsetFile = sourceOffsetFile;
+		this.sourceOffsetPosition = sourceOffsetPosition;
 	}
 
 	@Override
@@ -113,6 +118,8 @@ public class MySQLTableSource implements ScanTableSource {
 			.debeziumProperties(dbzProperties)
 			.deserializer(deserializer);
 		Optional.ofNullable(serverId).ifPresent(builder::serverId);
+		Optional.ofNullable(sourceOffsetFile).ifPresent(builder::sourceOffsetFile);
+		Optional.ofNullable(sourceOffsetPosition).ifPresent(builder::sourceOffsetPosition);
 		DebeziumSourceFunction<RowData> sourceFunction = builder.build();
 
 		return SourceFunctionProvider.of(sourceFunction, false);
@@ -130,7 +137,9 @@ public class MySQLTableSource implements ScanTableSource {
 			password,
 			serverTimeZone,
 			dbzProperties,
-			serverId
+			serverId,
+			sourceOffsetFile,
+			sourceOffsetPosition
 		);
 	}
 
@@ -152,12 +161,14 @@ public class MySQLTableSource implements ScanTableSource {
 			Objects.equals(serverId, that.serverId) &&
 			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(serverTimeZone, that.serverTimeZone) &&
-			Objects.equals(dbzProperties, that.dbzProperties);
+			Objects.equals(dbzProperties, that.dbzProperties) &&
+			Objects.equals(sourceOffsetFile, that.sourceOffsetFile) &&
+			Objects.equals(sourceOffsetPosition, that.sourceOffsetPosition);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties);
+		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties, sourceOffsetFile, sourceOffsetPosition);
 	}
 
 	@Override

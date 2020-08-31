@@ -77,6 +77,8 @@ public class MySQLTableSourceFactoryTest {
 			MY_PASSWORD,
 			ZoneId.of("UTC"),
 			PROPERTIES,
+			null,
+			null,
 			null
 		);
 		assertEquals(expectedSource, actualSource);
@@ -103,7 +105,9 @@ public class MySQLTableSourceFactoryTest {
 			MY_PASSWORD,
 			ZoneId.of("Asia/Shanghai"),
 			dbzProperties,
-			4321
+			4321,
+			null,
+			null
 		);
 		assertEquals(expectedSource, actualSource);
 	}
