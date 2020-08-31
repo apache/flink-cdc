@@ -113,7 +113,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		// Validate the source offset options
 		validateSourceOffset(config);
 		String sourceOffsetFile = config.get(SOURCE_OFFSET_FILE);
-		int sourceOffsetPosition = config.get(SOURCE_OFFSET_POSITION);
+		Integer sourceOffsetPosition = config.getOptional(SOURCE_OFFSET_POSITION).orElse(null);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
 		return new MySQLTableSource(
