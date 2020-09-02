@@ -151,6 +151,7 @@ public class MySQLSource {
 			props.setProperty("database.user", checkNotNull(username));
 			props.setProperty("database.password", checkNotNull(password));
 			props.setProperty("database.port", String.valueOf(port));
+			props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
 
 			if (serverId != null) {
 				props.setProperty("database.server.id", String.valueOf(serverId));
