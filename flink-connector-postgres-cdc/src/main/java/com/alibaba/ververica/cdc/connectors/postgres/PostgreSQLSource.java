@@ -145,7 +145,7 @@ public class PostgreSQLSource {
 			// database server/cluster being monitored. The logical name should be unique across
 			// all other connectors, since it is used as a prefix for all Kafka topic names coming
 			// from this connector. Only alphanumeric characters and underscores should be used.
-			props.setProperty("database.server.name", "postgres-binlog-source");
+			props.setProperty("database.server.name", "postgres_binlog_source");
 			props.setProperty("database.hostname", checkNotNull(hostname));
 			props.setProperty("database.dbname", checkNotNull(database));
 			props.setProperty("database.user", checkNotNull(username));
