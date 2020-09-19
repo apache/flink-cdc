@@ -27,6 +27,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 
+import com.alibaba.ververica.cdc.connectors.mysql.options.MySQLOffsetOptions;
 import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.ZoneId;
@@ -85,6 +86,16 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			"MySQL database cluster as another server (with this unique ID) so it can read the binlog. " +
 			"By default, a random number is generated between 5400 and 6400, though we recommend setting an explicit value.");
 
+	private static final ConfigOption<String> SOURCE_OFFSET_FILE = ConfigOptions.key("source-offset-file")
+			.stringType()
+			.noDefaultValue()
+			.withDescription("File Name of the MySQL binlog.");
+
+	private static final ConfigOption<Integer> SOURCE_OFFSET_POSITION = ConfigOptions.key("source-offset-pos")
+			.intType()
+			.noDefaultValue()
+			.withDescription("Position of the MySQL binlog.");
+
 	@Override
 	public DynamicTableSource createDynamicTableSource(Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
@@ -100,6 +111,9 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		Integer serverId = config.getOptional(SERVER_ID).orElse(null);
 		ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+		MySQLOffsetOptions.Builder builder = MySQLOffsetOptions.builder();
+		builder.sourceOffsetFile(config.get(SOURCE_OFFSET_FILE))
+				.sourceOffsetPosition(config.getOptional(SOURCE_OFFSET_POSITION).orElse(null));
 
 		return new MySQLTableSource(
 			physicalSchema,
@@ -111,7 +125,8 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			password,
 			serverTimeZone,
 			getDebeziumProperties(context.getCatalogTable().getOptions()),
-			serverId
+			serverId,
+			builder.build()
 		);
 	}
 
@@ -137,6 +152,8 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		options.add(PORT);
 		options.add(SERVER_TIME_ZONE);
 		options.add(SERVER_ID);
+		options.add(SOURCE_OFFSET_FILE);
+		options.add(SOURCE_OFFSET_POSITION);
 		return options;
 	}
 }
