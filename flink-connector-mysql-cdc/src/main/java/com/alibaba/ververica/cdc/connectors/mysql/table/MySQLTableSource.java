@@ -29,6 +29,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
+import com.alibaba.ververica.cdc.connectors.mysql.options.MySQLOffsetOptions;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
@@ -58,6 +59,7 @@ public class MySQLTableSource implements ScanTableSource {
 	private final String tableName;
 	private final ZoneId serverTimeZone;
 	private final Properties dbzProperties;
+	private final MySQLOffsetOptions offsetOptions;
 
 	public MySQLTableSource(
 			TableSchema physicalSchema,
@@ -69,7 +71,8 @@ public class MySQLTableSource implements ScanTableSource {
 			String password,
 			ZoneId serverTimeZone,
 			Properties dbzProperties,
-			@Nullable Integer serverId) {
+			@Nullable Integer serverId,
+			MySQLOffsetOptions offsetOptions) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
 		this.hostname = checkNotNull(hostname);
@@ -80,6 +83,7 @@ public class MySQLTableSource implements ScanTableSource {
 		this.serverId = serverId;
 		this.serverTimeZone = serverTimeZone;
 		this.dbzProperties = dbzProperties;
+		this.offsetOptions = offsetOptions;
 	}
 
 	@Override
@@ -111,7 +115,9 @@ public class MySQLTableSource implements ScanTableSource {
 			.password(password)
 			.serverTimeZone(serverTimeZone.toString())
 			.debeziumProperties(dbzProperties)
-			.deserializer(deserializer);
+			.deserializer(deserializer)
+			.sourceOffsetFile(offsetOptions.getSourceOffsetFile())
+			.sourceOffsetPosition(offsetOptions.getSourceOffsetPosition());
 		Optional.ofNullable(serverId).ifPresent(builder::serverId);
 		DebeziumSourceFunction<RowData> sourceFunction = builder.build();
 
@@ -121,16 +127,17 @@ public class MySQLTableSource implements ScanTableSource {
 	@Override
 	public DynamicTableSource copy() {
 		return new MySQLTableSource(
-			physicalSchema,
-			port,
-			hostname,
-			database,
-			tableName,
-			username,
-			password,
-			serverTimeZone,
-			dbzProperties,
-			serverId
+				physicalSchema,
+				port,
+				hostname,
+				database,
+				tableName,
+				username,
+				password,
+				serverTimeZone,
+				dbzProperties,
+				serverId,
+				offsetOptions
 		);
 	}
 
@@ -152,12 +159,13 @@ public class MySQLTableSource implements ScanTableSource {
 			Objects.equals(serverId, that.serverId) &&
 			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(serverTimeZone, that.serverTimeZone) &&
-			Objects.equals(dbzProperties, that.dbzProperties);
+			Objects.equals(dbzProperties, that.dbzProperties) &&
+			Objects.equals(offsetOptions, that.offsetOptions);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties);
+		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties, offsetOptions);
 	}
 
 	@Override

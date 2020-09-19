@@ -30,6 +30,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.alibaba.ververica.cdc.connectors.mysql.options.MySQLOffsetOptions;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -77,7 +78,8 @@ public class MySQLTableSourceFactoryTest {
 			MY_PASSWORD,
 			ZoneId.of("UTC"),
 			PROPERTIES,
-			null
+			null,
+			MySQLOffsetOptions.builder().build()
 		);
 		assertEquals(expectedSource, actualSource);
 	}
@@ -103,7 +105,8 @@ public class MySQLTableSourceFactoryTest {
 			MY_PASSWORD,
 			ZoneId.of("Asia/Shanghai"),
 			dbzProperties,
-			4321
+			4321,
+			MySQLOffsetOptions.builder().build()
 		);
 		assertEquals(expectedSource, actualSource);
 	}
