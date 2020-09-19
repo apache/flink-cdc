@@ -196,7 +196,7 @@ public class MySQLSourceTest extends MySQLTestBase {
 			assertHistoryState(historyState);
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("mysql-binlog-source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
 			assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
 			assertFalse(state.contains("row"));
 			assertFalse(state.contains("server_id"));
@@ -247,7 +247,7 @@ public class MySQLSourceTest extends MySQLTestBase {
 				assertHistoryState(historyState); // assert the DDL is stored in the history state
 				assertEquals(1, offsetState.list.size());
 				String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-				assertEquals("mysql-binlog-source", JsonPath.read(state, "$.sourcePartition.server"));
+				assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
 				assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
 				assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
 				assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
@@ -310,7 +310,7 @@ public class MySQLSourceTest extends MySQLTestBase {
 			assertHistoryState(historyState); // assert the DDL is stored in the history state
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("mysql-binlog-source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
 			assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
 			assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
 			assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
@@ -328,7 +328,7 @@ public class MySQLSourceTest extends MySQLTestBase {
 		// assert the DDL is stored in the history state
 		assertEquals(4, historyState.list.size());
 		String lastHistory = historyState.list.get(3);
-		assertEquals("mysql-binlog-source", JsonPath.read(lastHistory, "$.source.server"));
+		assertEquals("mysql_binlog_source", JsonPath.read(lastHistory, "$.source.server"));
 		assertEquals("true", JsonPath.read(lastHistory, "$.position.snapshot").toString());
 		assertTrue(JsonPath.read(lastHistory, "$.databaseName").toString().startsWith("inventory"));
 		assertTrue(JsonPath.read(lastHistory, "$.ddl").toString().startsWith("CREATE TABLE `products`"));

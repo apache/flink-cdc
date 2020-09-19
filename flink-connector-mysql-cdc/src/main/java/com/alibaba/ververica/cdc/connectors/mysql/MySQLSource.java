@@ -171,11 +171,12 @@ public class MySQLSource {
 			// server/cluster being monitored. The logical name should be unique across all other connectors,
 			// since it is used as a prefix for all Kafka topic names emanating from this connector.
 			// Only alphanumeric characters and underscores should be used.
-			props.setProperty("database.server.name", "mysql-binlog-source");
+			props.setProperty("database.server.name", "mysql_binlog_source");
 			props.setProperty("database.hostname", checkNotNull(hostname));
 			props.setProperty("database.user", checkNotNull(username));
 			props.setProperty("database.password", checkNotNull(password));
 			props.setProperty("database.port", String.valueOf(port));
+			props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
 
 			if (serverId != null) {
 				props.setProperty("database.server.id", String.valueOf(serverId));

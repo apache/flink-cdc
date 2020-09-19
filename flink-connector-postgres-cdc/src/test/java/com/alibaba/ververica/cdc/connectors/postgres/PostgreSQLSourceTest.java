@@ -187,7 +187,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("postgres-binlog-source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
 			assertEquals("557", JsonPath.read(state, "$.sourceOffset.txId").toString());
 			assertEquals("true", JsonPath.read(state, "$.sourceOffset.last_snapshot_record").toString());
 			assertEquals("true", JsonPath.read(state, "$.sourceOffset.snapshot").toString());
@@ -237,7 +237,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
 				assertEquals(1, offsetState.list.size());
 				String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-				assertEquals("postgres-binlog-source", JsonPath.read(state, "$.sourcePartition.server"));
+				assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
 				assertEquals("558", JsonPath.read(state, "$.sourceOffset.txId").toString());
 				assertTrue(state.contains("ts_usec"));
 				assertFalse(state.contains("snapshot"));
@@ -298,7 +298,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			}
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("postgres-binlog-source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
 			assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
 			assertTrue(state.contains("ts_usec"));
 			assertFalse(state.contains("snapshot"));
