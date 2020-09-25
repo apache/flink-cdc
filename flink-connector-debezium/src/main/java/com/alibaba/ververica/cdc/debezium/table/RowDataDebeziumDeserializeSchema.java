@@ -85,11 +85,17 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 	 */
 	private final ValueValidator validator;
 
-	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo, ValueValidator validator, ZoneId serverTimeZone) {
+	/**
+	 * whether to capture the updates if that have no change or not.
+	 */
+	private final boolean captureUnchangedUpdates;
+
+	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo, ValueValidator validator, ZoneId serverTimeZone, boolean captureUnchangedUpdates) {
 		this.runtimeConverter = createConverter(rowType);
 		this.resultTypeInfo = resultTypeInfo;
 		this.validator = validator;
 		this.serverTimeZone = serverTimeZone;
+		this.captureUnchangedUpdates = captureUnchangedUpdates;
 	}
 
 	@Override
@@ -110,11 +116,15 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 		} else {
 			GenericRowData before = extractBeforeRow(value, valueSchema);
 			validator.validate(before, RowKind.UPDATE_BEFORE);
+			GenericRowData after = extractAfterRow(value, valueSchema);
+			validator.validate(after, RowKind.UPDATE_AFTER);
+			// ignore the record on unchange updates
+			if (!captureUnchangedUpdates && after.equals(before)) {
+				return;
+			}
 			before.setRowKind(RowKind.UPDATE_BEFORE);
 			out.collect(before);
 
-			GenericRowData after = extractAfterRow(value, valueSchema);
-			validator.validate(after, RowKind.UPDATE_AFTER);
 			after.setRowKind(RowKind.UPDATE_AFTER);
 			out.collect(after);
 		}
@@ -389,5 +399,50 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 			}
 			return converter.convert(dbzObj, schema);
 		};
+	}
+
+	public static Builder builder() {
+		return new Builder();
+	}
+
+	/**
+	 * Builder of {@link RowDataDebeziumDeserializeSchema}.
+	 */
+	public static class Builder {
+
+		private RowType rowType;
+		private TypeInformation<RowData> resultTypeInfo;
+		private ZoneId serverTimeZone;
+		private ValueValidator validator;
+		private boolean captureUnchangedUpdates;
+
+		public Builder setRowType(RowType rowType) {
+			this.rowType = rowType;
+			return this;
+		}
+
+		public Builder setResultTypeInfo(TypeInformation<RowData> resultTypeInfo) {
+			this.resultTypeInfo = resultTypeInfo;
+			return this;
+		}
+
+		public Builder setServerTimeZone(ZoneId serverTimeZone) {
+			this.serverTimeZone = serverTimeZone;
+			return this;
+		}
+
+		public Builder setValidator(ValueValidator validator) {
+			this.validator = validator;
+			return this;
+		}
+
+		public Builder setCaptureUnchangedUpdates(boolean captureUnchangedUpdates) {
+			this.captureUnchangedUpdates = captureUnchangedUpdates;
+			return this;
+		}
+
+		public DebeziumDeserializationSchema<RowData> build() {
+			return new RowDataDebeziumDeserializeSchema(rowType, resultTypeInfo, validator, serverTimeZone, captureUnchangedUpdates);
+		}
 	}
 }

@@ -38,3 +38,20 @@ VALUES (default,'scooter','Small 2-wheel scooter',3.14),
        (default,'rocks','box of assorted rocks',5.3),
        (default,'jacket','water resistent black wind breaker',0.1),
        (default,'spare tire','24 inch spare tire',22.2);
+
+-- Create some customers ...
+CREATE TABLE customers (
+  id SERIAL NOT NULL PRIMARY KEY,
+  first_name VARCHAR(255) NOT NULL,
+  last_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL
+);
+
+ALTER SEQUENCE customers_id_seq RESTART WITH 1001;
+ALTER TABLE customers REPLICA IDENTITY FULL;
+
+INSERT INTO customers
+VALUES (default,'Sally','Thomas','sally.thomas@acme.com'),
+       (default,'George','Bailey','gbailey@foobar.com'),
+       (default,'Edward','Walker','ed@walker.com'),
+       (default,'Anne','Kretchmar','annek@noanswer.org');

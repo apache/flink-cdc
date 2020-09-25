@@ -76,7 +76,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 				" 'password' = '%s'," +
 				" 'database-name' = '%s'," +
 				" 'schema-name' = '%s'," +
-				" 'table-name' = '%s'" +
+				" 'table-name' = '%s'," +
+				" 'debezium.slot.name' = 'debezium1'" +
 				")",
 			POSTGERS_CONTAINER.getHost(),
 			POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -161,7 +162,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 				" 'password' = '%s'," +
 				" 'database-name' = '%s'," +
 				" 'schema-name' = '%s'," +
-				" 'table-name' = '%s'" +
+				" 'table-name' = '%s'," +
+				" 'debezium.slot.name' = 'debezium2'" +
 				")",
 			POSTGERS_CONTAINER.getHost(),
 			POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -240,7 +242,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 				" 'password' = '%s'," +
 				" 'database-name' = '%s'," +
 				" 'schema-name' = '%s'," +
-				" 'table-name' = '%s'" +
+				" 'table-name' = '%s'," +
+				" 'debezium.slot.name' = 'debezium3'" +
 				")",
 			POSTGERS_CONTAINER.getHost(),
 			POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -296,6 +299,68 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 		List<String> actual = TestValuesTableFactory.getRawResults("sink");
 		assertEquals(expected, actual);
 
+		result.getJobClient().get().cancel().get();
+	}
+
+	@Test
+	public void testIgnoreUnchangeUpdates() throws SQLException, InterruptedException, ExecutionException {
+		initializePostgresTable("inventory");
+		String sourceDDL = String.format(
+				"CREATE TABLE debezium_source (" +
+				" first_name STRING," +
+				" last_name STRING" +
+				") WITH (" +
+				" 'connector' = 'postgres-cdc'," +
+				" 'hostname' = '%s'," +
+				" 'port' = '%s'," +
+				" 'username' = '%s'," +
+				" 'password' = '%s'," +
+				" 'database-name' = '%s'," +
+				" 'schema-name' = '%s'," +
+				" 'table-name' = '%s'," +
+				" 'debezium.slot.name' = 'debezium4'," +
+				" 'capture-unchanged-updates' = 'false'" +
+				")",
+			POSTGERS_CONTAINER.getHost(),
+			POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+			POSTGERS_CONTAINER.getUsername(),
+			POSTGERS_CONTAINER.getPassword(),
+			POSTGERS_CONTAINER.getDatabaseName(),
+			"inventory",
+			"customers");
+		String sinkDDL = "CREATE TABLE sink (" +
+				" first_name STRING," +
+				" last_name STRING" +
+				") WITH (" +
+				" 'connector' = 'values'," +
+				" 'sink-insert-only' = 'false'" +
+				")";
+		tEnv.executeSql(sourceDDL);
+		tEnv.executeSql(sinkDDL);
+
+		// async submit job
+		TableResult result = tEnv.executeSql("INSERT INTO sink SELECT first_name, last_name FROM debezium_source");
+
+		waitForSnapshotStarted("sink");
+		try (Connection connection = getJdbcConnection();
+				Statement statement = connection.createStatement()) {
+
+			statement.execute("UPDATE inventory.customers SET email='isaiah.thomas@acme.com' WHERE id=1001;");
+			statement.execute("UPDATE inventory.customers SET first_name='Isaiah' WHERE id=1001;");
+		}
+
+		waitForSinkSize("sink", 6);
+		List<String> expected = Arrays.asList(
+				"+I(Sally,Thomas)",
+				"+I(George,Bailey)",
+				"+I(Edward,Walker)",
+				"+I(Anne,Kretchmar)",
+				"-U(Sally,Thomas)",
+				"+U(Isaiah,Thomas)"
+		);
+
+		List<String> actual = TestValuesTableFactory.getRawResults("sink");
+		assertEquals(expected, actual);
 		result.getJobClient().get().cancel().get();
 	}
 

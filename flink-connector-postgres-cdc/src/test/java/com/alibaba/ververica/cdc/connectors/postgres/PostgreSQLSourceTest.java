@@ -48,6 +48,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -76,7 +77,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
 	@Test
 	public void testConsumingAllEvents() throws Exception {
-		DebeziumSourceFunction<SourceRecord> source = createPostgreSqlSource();
+		DebeziumSourceFunction<SourceRecord> source = createPostgreSqlSource("debezium1");
 		TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
 
 		setupSource(source);
@@ -146,7 +147,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			// ---------------------------------------------------------------------------
 			// Step-1: start the source from empty state
 			// ---------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source = createPostgreSqlSource();
+			final DebeziumSourceFunction<SourceRecord> source = createPostgreSqlSource("debezium");
 			// we use blocking context to block the source to emit before last snapshot record
 			final BlockingSourceContext<SourceRecord> sourceContext = new BlockingSourceContext<>(8);
 			// setup source with empty state
@@ -188,7 +189,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
 			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
-			assertEquals("557", JsonPath.read(state, "$.sourceOffset.txId").toString());
+			assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
 			assertEquals("true", JsonPath.read(state, "$.sourceOffset.last_snapshot_record").toString());
 			assertEquals("true", JsonPath.read(state, "$.sourceOffset.snapshot").toString());
 			assertTrue(state.contains("ts_usec"));
@@ -205,7 +206,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			// ---------------------------------------------------------------------------
 			// Step-3: restore the source from state
 			// ---------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source2 = createPostgreSqlSource();
+			final DebeziumSourceFunction<SourceRecord> source2 = createPostgreSqlSource("debezium");
 			final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
 			setupSource(source2, true, offsetState, historyState, true, 0, 1);
 			final CheckedThread runThread2 = new CheckedThread() {
@@ -238,7 +239,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 				assertEquals(1, offsetState.list.size());
 				String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
 				assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
-				assertEquals("558", JsonPath.read(state, "$.sourceOffset.txId").toString());
+				assertEquals("562", JsonPath.read(state, "$.sourceOffset.txId").toString());
 				assertTrue(state.contains("ts_usec"));
 				assertFalse(state.contains("snapshot"));
 				int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
@@ -260,7 +261,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			// ---------------------------------------------------------------------------
 			// Step-5: restore the source from checkpoint-2
 			// ---------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source3 = createPostgreSqlSource();
+			final DebeziumSourceFunction<SourceRecord> source3 = createPostgreSqlSource("debezium");
 			final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
 			setupSource(source3, true, offsetState, historyState, true, 0, 1);
 
@@ -299,7 +300,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
 			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
-			assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
+			assertEquals("565", JsonPath.read(state, "$.sourceOffset.txId").toString());
 			assertTrue(state.contains("ts_usec"));
 			assertFalse(state.contains("snapshot"));
 			int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
@@ -315,7 +316,9 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 	// Utilities
 	// ------------------------------------------------------------------------------------------
 
-	private DebeziumSourceFunction<SourceRecord> createPostgreSqlSource() {
+	private DebeziumSourceFunction<SourceRecord> createPostgreSqlSource(String slotName) {
+		Properties dbzProperties = new Properties();
+		dbzProperties.setProperty("slot.name", slotName);
 		return PostgreSQLSource.<SourceRecord>builder()
 			.hostname(POSTGERS_CONTAINER.getHost())
 			.port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
@@ -324,6 +327,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			.password(POSTGERS_CONTAINER.getPassword())
 			.schemaList("inventory")
 			.tableList("inventory.products")
+			.debeziumProperties(dbzProperties)
 			.deserializer(new ForwardDeserializeSchema())
 			.build();
 	}

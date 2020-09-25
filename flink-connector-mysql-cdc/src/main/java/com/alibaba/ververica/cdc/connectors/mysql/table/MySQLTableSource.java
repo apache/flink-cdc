@@ -58,6 +58,7 @@ public class MySQLTableSource implements ScanTableSource {
 	private final String tableName;
 	private final ZoneId serverTimeZone;
 	private final Properties dbzProperties;
+	private final boolean captureUnchangedUpdates;
 
 	public MySQLTableSource(
 			TableSchema physicalSchema,
@@ -69,7 +70,8 @@ public class MySQLTableSource implements ScanTableSource {
 			String password,
 			ZoneId serverTimeZone,
 			Properties dbzProperties,
-			@Nullable Integer serverId) {
+			@Nullable Integer serverId,
+			boolean captureUnchangedUpdates) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
 		this.hostname = checkNotNull(hostname);
@@ -80,6 +82,7 @@ public class MySQLTableSource implements ScanTableSource {
 		this.serverId = serverId;
 		this.serverTimeZone = serverTimeZone;
 		this.dbzProperties = dbzProperties;
+		this.captureUnchangedUpdates = captureUnchangedUpdates;
 	}
 
 	@Override
@@ -97,11 +100,13 @@ public class MySQLTableSource implements ScanTableSource {
 	public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
 		RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
 		TypeInformation<RowData> typeInfo = (TypeInformation<RowData>) scanContext.createTypeInformation(physicalSchema.toRowDataType());
-		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
-			rowType,
-			typeInfo,
-			((rowData, rowKind) -> {}),
-			serverTimeZone);
+		DebeziumDeserializationSchema<RowData> deserializer = RowDataDebeziumDeserializeSchema.builder()
+			.setRowType(rowType)
+			.setResultTypeInfo(typeInfo)
+			.setValidator((rowData, rowKind) -> {})
+			.setServerTimeZone(serverTimeZone)
+			.setCaptureUnchangedUpdates(captureUnchangedUpdates)
+			.build();
 		MySQLSource.Builder<RowData> builder = MySQLSource.<RowData>builder()
 			.hostname(hostname)
 			.port(port)
@@ -130,7 +135,8 @@ public class MySQLTableSource implements ScanTableSource {
 			password,
 			serverTimeZone,
 			dbzProperties,
-			serverId
+			serverId,
+			captureUnchangedUpdates
 		);
 	}
 
@@ -152,12 +158,13 @@ public class MySQLTableSource implements ScanTableSource {
 			Objects.equals(serverId, that.serverId) &&
 			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(serverTimeZone, that.serverTimeZone) &&
-			Objects.equals(dbzProperties, that.dbzProperties);
+			Objects.equals(dbzProperties, that.dbzProperties) &&
+			captureUnchangedUpdates == that.captureUnchangedUpdates;
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties);
+		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties, captureUnchangedUpdates);
 	}
 
 	@Override

@@ -77,7 +77,8 @@ public class PostgreSQLTableFactoryTest {
 			MY_USERNAME,
 			MY_PASSWORD,
 			"decoderbufs",
-			PROPERTIES);
+			PROPERTIES,
+			true);
 		assertEquals(expectedSource, actualSource);
 	}
 
@@ -87,6 +88,7 @@ public class PostgreSQLTableFactoryTest {
 		options.put("port", "5444");
 		options.put("decoding.plugin.name", "wal2json");
 		options.put("debezium.snapshot.mode", "never");
+		options.put("capture-unchanged-updates", "false");
 
 		DynamicTableSource actualSource = createTableSource(options);
 		Properties dbzProperties = new Properties();
@@ -101,7 +103,8 @@ public class PostgreSQLTableFactoryTest {
 			MY_USERNAME,
 			MY_PASSWORD,
 			"wal2json",
-			dbzProperties);
+			dbzProperties,
+			false);
 		assertEquals(expectedSource, actualSource);
 	}
 
