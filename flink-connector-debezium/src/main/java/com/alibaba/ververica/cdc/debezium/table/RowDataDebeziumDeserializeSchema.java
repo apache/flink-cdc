@@ -90,7 +90,7 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 	 */
 	private final boolean captureUnchangedUpdates;
 
-	public RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo, ValueValidator validator, ZoneId serverTimeZone, boolean captureUnchangedUpdates) {
+	private RowDataDebeziumDeserializeSchema(RowType rowType, TypeInformation<RowData> resultTypeInfo, ValueValidator validator, ZoneId serverTimeZone, boolean captureUnchangedUpdates) {
 		this.runtimeConverter = createConverter(rowType);
 		this.resultTypeInfo = resultTypeInfo;
 		this.validator = validator;
