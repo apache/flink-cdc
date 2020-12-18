@@ -18,6 +18,7 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql;
 
+import io.debezium.data.Json;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.KeyedStateStore;
 import org.apache.flink.api.common.state.ListState;
@@ -416,12 +417,12 @@ public class MySQLSourceTest extends MySQLTestBase {
 
 	private void assertHistoryState(TestingListState<String> historyState) {
 		// assert the DDL is stored in the history state
-		assertEquals(4, historyState.list.size());
-		String lastHistory = historyState.list.get(3);
-		assertEquals("mysql_binlog_source", JsonPath.read(lastHistory, "$.source.server"));
-		assertEquals("true", JsonPath.read(lastHistory, "$.position.snapshot").toString());
-		assertTrue(JsonPath.read(lastHistory, "$.databaseName").toString().startsWith("inventory"));
-		assertTrue(JsonPath.read(lastHistory, "$.ddl").toString().startsWith("CREATE TABLE `products`"));
+		assertTrue(historyState.list.size() > 0);
+		boolean hasDDL = historyState.list.stream().skip(1).anyMatch(history ->
+			JsonPath.read(history, "$.source.server").equals("mysql_binlog_source")
+				&& JsonPath.read(history, "$.position.snapshot").toString().equals("true")
+				&& JsonPath.read(history, "$.ddl").toString().startsWith("CREATE TABLE `products`"));
+		assertTrue(hasDDL);
 	}
 
 	// ------------------------------------------------------------------------------------------
