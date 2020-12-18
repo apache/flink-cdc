@@ -266,8 +266,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 		// see https://stackoverflow.com/questions/57147584/debezium-error-schema-isnt-know-to-this-connector
 		// and https://debezium.io/blog/2018/03/16/note-on-database-history-topic-configuration/
 		properties.setProperty("database.history", FlinkDatabaseHistory.class.getCanonicalName());
-		// reduce the history records to store
-		properties.setProperty("database.history.store.only.monitored.tables.ddl", "true");
 		if (engineInstanceName == null) {
 			// not restore from recovery
 			engineInstanceName = UUID.randomUUID().toString();
