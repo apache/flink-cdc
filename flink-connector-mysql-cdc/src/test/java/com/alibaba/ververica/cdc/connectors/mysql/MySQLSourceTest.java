@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql;
 
-import io.debezium.data.Json;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.KeyedStateStore;
 import org.apache.flink.api.common.state.ListState;
@@ -332,8 +331,7 @@ public class MySQLSourceTest extends MySQLTestBase {
 
 		{
 			try (Connection connection = database.getJdbcConnection();
-			     Statement statement = connection.createStatement()) {
-
+					Statement statement = connection.createStatement()) {
 				// Step-1: start the source from empty state
 				final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
 				final TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
@@ -355,7 +353,6 @@ public class MySQLSourceTest extends MySQLTestBase {
 				// state is still empty
 				assertEquals(0, offsetState.list.size());
 				assertEquals(0, historyState.list.size());
-
 
 				// create temporary tables which are not in the whitelist
 				statement.execute("CREATE TABLE `tp_001_ogt_products` LIKE `products`;");
@@ -401,8 +398,7 @@ public class MySQLSourceTest extends MySQLTestBase {
 			assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
 			try (Connection connection = database.getJdbcConnection();
-			     Statement statement = connection.createStatement()) {
-
+					Statement statement = connection.createStatement()) {
 				statement.execute("INSERT INTO `products` VALUES (113,'Airplane','Toy airplane',1.304)"); // 113
 				List<SourceRecord> records = drain(sourceContext2, 1);
 				assertEquals(1, records.size());
