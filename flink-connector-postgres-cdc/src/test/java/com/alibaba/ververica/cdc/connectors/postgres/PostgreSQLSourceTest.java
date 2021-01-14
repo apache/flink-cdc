@@ -309,6 +309,47 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			source3.close();
 			runThread3.sync();
 		}
+
+		{
+			// ---------------------------------------------------------------------------
+			// Step-7: restore the source from checkpoint-3
+			// ---------------------------------------------------------------------------
+			final DebeziumSourceFunction<SourceRecord> source4 = createPostgreSqlSource();
+			final TestSourceContext<SourceRecord> sourceContext4 = new TestSourceContext<>();
+			setupSource(source4, true, offsetState, historyState, true, 0, 1);
+
+			// restart the source
+			final CheckedThread runThread4 = new CheckedThread() {
+				@Override
+				public void go() throws Exception {
+					source4.run(sourceContext4);
+				}
+			};
+			runThread4.start();
+
+			// make sure there is no more events
+			assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4));
+
+			// ---------------------------------------------------------------------------
+			// Step-6: trigger checkpoint-2 to make sure we can continue to to further checkpoints
+			// ---------------------------------------------------------------------------
+			synchronized (sourceContext4.getCheckpointLock()) {
+				// checkpoint 3
+				source4.snapshotState(new StateSnapshotContextSynchronousImpl(254, 254));
+			}
+			assertEquals(1, offsetState.list.size());
+			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
+			assertTrue(state.contains("ts_usec"));
+			assertFalse(state.contains("snapshot"));
+			int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
+			assertTrue(lsn > prevLsn);
+
+			source4.cancel();
+			source4.close();
+			runThread4.sync();
+		}
 	}
 
 	// ------------------------------------------------------------------------------------------

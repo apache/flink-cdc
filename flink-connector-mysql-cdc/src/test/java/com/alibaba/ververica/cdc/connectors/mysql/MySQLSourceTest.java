@@ -322,6 +322,50 @@ public class MySQLSourceTest extends MySQLTestBase {
 			source3.close();
 			runThread3.sync();
 		}
+
+		{
+			// ---------------------------------------------------------------------------
+			// Step-7: restore the source from checkpoint-3
+			// ---------------------------------------------------------------------------
+			final DebeziumSourceFunction<SourceRecord> source4 = createMySqlBinlogSource();
+			final TestSourceContext<SourceRecord> sourceContext4 = new TestSourceContext<>();
+			setupSource(source4, true, offsetState, historyState, true, 0, 1);
+
+			// restart the source
+			final CheckedThread runThread4 = new CheckedThread() {
+				@Override
+				public void go() throws Exception {
+					source4.run(sourceContext4);
+				}
+			};
+			runThread4.start();
+
+			// make sure there is no more events
+			assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4));
+
+			// ---------------------------------------------------------------------------
+			// Step-8: trigger checkpoint-3 to make sure we can continue to to further checkpoints
+			// ---------------------------------------------------------------------------
+			synchronized (sourceContext4.getCheckpointLock()) {
+				// checkpoint 4
+				source4.snapshotState(new StateSnapshotContextSynchronousImpl(254, 254));
+			}
+			assertHistoryState(historyState); // assert the DDL is stored in the history state
+			assertEquals(1, offsetState.list.size());
+			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+			assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
+			assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
+			assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
+			assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
+			int pos = JsonPath.read(state, "$.sourceOffset.pos");
+			assertTrue(pos > prevPos);
+
+			source4.cancel();
+			source4.close();
+			runThread4.sync();
+		}
+
 	}
 
 	@Test
