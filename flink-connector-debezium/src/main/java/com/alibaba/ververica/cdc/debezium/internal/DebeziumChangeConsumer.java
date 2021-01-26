@@ -19,9 +19,9 @@
 package com.alibaba.ververica.cdc.debezium.internal;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.core.memory.MemoryUtils;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.ExceptionUtils;
 
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.connector.SnapshotRecord;
@@ -36,9 +36,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A consumer that consumes change messages from {@link DebeziumEngine}.
@@ -46,8 +47,7 @@ import java.util.Queue;
  * @param <T> The type of elements produced by the consumer.
  */
 @Internal
-public class DebeziumChangeConsumer<T>
-        implements DebeziumEngine.ChangeConsumer<ChangeEvent<SourceRecord, SourceRecord>> {
+public class DebeziumChangeConsumer<T> implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumChangeConsumer.class);
 
@@ -78,7 +78,7 @@ public class DebeziumChangeConsumer<T>
 
     private boolean isInDbSnapshotPhase;
 
-    private boolean lockHold = false;
+    private final BlockingQueue<ChangeEvent<SourceRecord, SourceRecord>> changeEventQueue;
 
     // ---------------------------------------------------------------------------------------
     // Metrics
@@ -112,7 +112,8 @@ public class DebeziumChangeConsumer<T>
             DebeziumDeserializationSchema<T> deserialization,
             boolean isInDbSnapshotPhase,
             ErrorReporter errorReporter,
-            String heartbeatTopicPrefix) {
+            String heartbeatTopicPrefix,
+            BlockingQueue<ChangeEvent<SourceRecord, SourceRecord>> changeEventQueue) {
         this.sourceContext = sourceContext;
         this.checkpointLock = sourceContext.getCheckpointLock();
         this.deserialization = deserialization;
@@ -122,55 +123,49 @@ public class DebeziumChangeConsumer<T>
         this.errorReporter = errorReporter;
         this.debeziumOffset = new DebeziumOffset();
         this.stateSerializer = DebeziumOffsetSerializer.INSTANCE;
+        this.changeEventQueue = changeEventQueue;
     }
 
-    @Override
-    public void handleBatch(
-            List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents,
-            DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer)
-            throws InterruptedException {
-        this.currentCommitter = committer;
-        this.processTime = System.currentTimeMillis();
-        try {
-            for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
-                SourceRecord record = event.value();
-                updateMessageTimestamp(record);
-                fetchDelay = processTime - messageTimestamp;
+    private void handleBatch() {
+        while (true) {
+            try {
+                final ChangeEvent<SourceRecord, SourceRecord> event =
+                        changeEventQueue.poll(5L, TimeUnit.SECONDS);
+                if (event != null) {
+                    SourceRecord record = event.value();
 
-                if (isHeartbeatEvent(record)) {
-                    // keep offset update
-                    synchronized (checkpointLock) {
-                        debeziumOffset.setSourcePartition(record.sourcePartition());
-                        debeziumOffset.setSourceOffset(record.sourceOffset());
+                    processTime = System.currentTimeMillis();
+                    updateMessageTimestamp(record);
+                    fetchDelay = processTime - messageTimestamp;
+
+                    if (isHeartbeatEvent(record)) {
+                        // keep offset update
+                        synchronized (checkpointLock) {
+                            debeziumOffset.setSourcePartition(record.sourcePartition());
+                            debeziumOffset.setSourceOffset(record.sourceOffset());
+                        }
+                        // drop heartbeat events
+                        continue;
                     }
-                    // drop heartbeat events
-                    continue;
-                }
 
-                deserialization.deserialize(record, debeziumCollector);
+                    deserialization.deserialize(record, debeziumCollector);
 
-                if (isInDbSnapshotPhase) {
-                    if (!lockHold) {
-                        MemoryUtils.UNSAFE.monitorEnter(checkpointLock);
-                        lockHold = true;
-                        LOG.info(
-                                "Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
-                    }
-                    if (!isSnapshotRecord(record)) {
-                        MemoryUtils.UNSAFE.monitorExit(checkpointLock);
+                    // emit the actual records. this also updates offset state atomically
+                    emitRecordsUnderCheckpointLock(
+                            debeziumCollector.records,
+                            record.sourcePartition(),
+                            record.sourceOffset());
+
+                    if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
                         isInDbSnapshotPhase = false;
-                        LOG.info(
-                                "Received record from streaming binlog phase, released checkpoint lock.");
+                        break;
                     }
                 }
-
-                // emit the actual records. this also updates offset state atomically
-                emitRecordsUnderCheckpointLock(
-                        debeziumCollector.records, record.sourcePartition(), record.sourceOffset());
+            } catch (Exception e) {
+                LOG.error("Error happens when consuming change messages.", e);
+                errorReporter.reportError(e);
+                ExceptionUtils.rethrow(e);
             }
-        } catch (Exception e) {
-            LOG.error("Error happens when consuming change messages.", e);
-            errorReporter.reportError(e);
         }
     }
 
@@ -306,7 +301,22 @@ public class DebeziumChangeConsumer<T>
         return sourceOffset;
     }
 
+    @Override
+    public void run() {
+        if (isInDbSnapshotPhase) {
+            synchronized (checkpointLock) {
+                LOG.info(
+                        "Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
+                handleBatch();
+            }
+            LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
+        }
+
+        handleBatch();
+    }
+
     private class DebeziumCollector implements Collector<T> {
+
         private final Queue<T> records = new ArrayDeque<>();
 
         @Override

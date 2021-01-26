@@ -42,16 +42,19 @@ import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadF
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
+import com.alibaba.ververica.cdc.debezium.internal.EventQueueConsumer;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
+import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.relational.history.HistoryRecord;
 import org.apache.commons.collections.map.LinkedMap;
+import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,9 +64,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -151,6 +156,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      */
     private transient String engineInstanceName;
 
+    private transient BlockingQueue<ChangeEvent<SourceRecord, SourceRecord>> changeEventQueue;
+
     public DebeziumSourceFunction(
             DebeziumDeserializationSchema<T> deserializer,
             Properties properties,
@@ -165,7 +172,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         super.open(parameters);
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-engine").build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executor = Executors.newFixedThreadPool(2, threadFactory);
+        this.changeEventQueue = new LinkedBlockingQueue<>();
     }
 
     // ------------------------------------------------------------------------
@@ -351,13 +359,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         deserializer,
                         restoredOffsetState == null, // DB snapshot phase if restore state is null
                         this::reportError,
-                        dbzHeartbeatPrefix);
+                        dbzHeartbeatPrefix,
+                        changeEventQueue);
 
         // create the engine with this configuration ...
         this.engine =
                 DebeziumEngine.create(Connect.class)
                         .using(properties)
-                        .notifying(debeziumConsumer)
+                        .notifying(new EventQueueConsumer(changeEventQueue))
                         .using(OffsetCommitPolicy.always())
                         .using(
                                 (success, message, error) -> {
@@ -382,6 +391,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         metricGroup.gauge(
                 "currentEmitEventTimeLag", (Gauge<Long>) () -> debeziumConsumer.getEmitDelay());
         metricGroup.gauge("sourceIdleTime", (Gauge<Long>) () -> debeziumConsumer.getIdleTime());
+
+        // run the real debezium consumer
+        executor.execute(debeziumConsumer);
 
         // on a clean exit, wait for the runner thread
         try {
