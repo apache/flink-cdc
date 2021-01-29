@@ -179,6 +179,7 @@ public class MySQLTableSourceFactoryTest {
 			ObjectIdentifier.of("default", "default", "t1"),
 			new CatalogTableImpl(SCHEMA, options, "mock source"),
 			new Configuration(),
-			MySQLTableSourceFactoryTest.class.getClassLoader());
+			MySQLTableSourceFactoryTest.class.getClassLoader(),
+			false);
 	}
 }

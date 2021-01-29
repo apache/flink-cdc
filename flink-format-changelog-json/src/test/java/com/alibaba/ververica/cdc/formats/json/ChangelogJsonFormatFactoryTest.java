@@ -33,7 +33,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.TestDynamicTableFactory;
 import org.apache.flink.table.runtime.connector.sink.SinkRuntimeProviderContext;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
-import org.apache.flink.table.runtime.typeutils.RowDataTypeInfo;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.TestLogger;
@@ -68,7 +68,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 	public void testSeDeSchema() {
 		final ChangelogJsonDeserializationSchema expectedDeser = new ChangelogJsonDeserializationSchema(
 			ROW_TYPE,
-			RowDataTypeInfo.of(ROW_TYPE),
+			InternalTypeInfo.of(ROW_TYPE),
 			true,
 			TimestampFormat.ISO_8601);
 		final ChangelogJsonSerializationSchema expectedSer = new ChangelogJsonSerializationSchema(
@@ -148,7 +148,8 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 				ObjectIdentifier.of("default", "default", "t1"),
 				new CatalogTableImpl(SCHEMA, options, "mock source"),
 				new Configuration(),
-				ChangelogJsonFormatFactoryTest.class.getClassLoader());
+				ChangelogJsonFormatFactoryTest.class.getClassLoader(),
+				false);
 	}
 
 	private static DynamicTableSink createTableSink(Map<String, String> options) {
@@ -157,6 +158,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 				ObjectIdentifier.of("default", "default", "t1"),
 				new CatalogTableImpl(SCHEMA, options, "mock sink"),
 				new Configuration(),
-				ChangelogJsonFormatFactoryTest.class.getClassLoader());
+				ChangelogJsonFormatFactoryTest.class.getClassLoader(),
+				false);
 	}
 }

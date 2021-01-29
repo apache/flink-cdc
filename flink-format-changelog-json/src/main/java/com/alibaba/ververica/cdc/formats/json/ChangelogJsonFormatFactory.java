@@ -62,13 +62,11 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 		TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
 
 		return new DecodingFormat<DeserializationSchema<RowData>>() {
-			@SuppressWarnings("unchecked")
 			@Override
 			public DeserializationSchema<RowData> createRuntimeDecoder(
 				DynamicTableSource.Context context, DataType producedDataType) {
 				final RowType rowType = (RowType) producedDataType.getLogicalType();
-				final TypeInformation<RowData> rowDataTypeInfo =
-					(TypeInformation<RowData>) context.createTypeInformation(producedDataType);
+				final TypeInformation<RowData> rowDataTypeInfo = context.createTypeInformation(producedDataType);
 				return new ChangelogJsonDeserializationSchema(
 					rowType,
 					rowDataTypeInfo,
@@ -111,8 +109,7 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 				final RowType rowType = (RowType) consumedDataType.getLogicalType();
 				return new ChangelogJsonSerializationSchema(
 					rowType,
-					timestampFormat
-				);
+					timestampFormat);
 			}
 		};
 	}
