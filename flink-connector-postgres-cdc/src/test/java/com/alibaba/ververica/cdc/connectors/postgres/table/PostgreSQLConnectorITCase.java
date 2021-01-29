@@ -161,7 +161,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 				" 'password' = '%s'," +
 				" 'database-name' = '%s'," +
 				" 'schema-name' = '%s'," +
-				" 'table-name' = '%s'" +
+				" 'table-name' = '%s'," +
+				" 'debezium.slot.name' = '%s'" +
 				")",
 			POSTGERS_CONTAINER.getHost(),
 			POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -169,7 +170,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 			POSTGERS_CONTAINER.getPassword(),
 			POSTGERS_CONTAINER.getDatabaseName(),
 			"inventory",
-			"products");
+			"products",
+			"replica_identity_slot");
 		String sinkDDL = "CREATE TABLE sink (" +
 			" name STRING," +
 			" weightSum DECIMAL(10,3)," +
@@ -199,7 +201,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 		}
 
 		try {
-			result.getJobClient().get().getJobExecutionResult(Thread.currentThread().getContextClassLoader()).get();
+			result.getJobClient().get().getJobExecutionResult().get();
 		} catch (Exception e) {
 			assertTrue(ExceptionUtils.findThrowableWithMessage(e,
 				"The \"before\" field of UPDATE/DELETE message is null, " +

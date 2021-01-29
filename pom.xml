@@ -62,7 +62,7 @@ under the License.
     </distributionManagement>
 
     <properties>
-        <flink.version>1.11.1</flink.version>
+        <flink.version>1.12.0</flink.version>
         <debezium.version>1.2.1.Final</debezium.version>
         <testcontainers.version>1.15.1</testcontainers.version>
         <java.version>1.8</java.version>

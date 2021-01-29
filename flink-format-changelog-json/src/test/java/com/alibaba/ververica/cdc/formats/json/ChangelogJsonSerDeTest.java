@@ -18,9 +18,10 @@
 
 package com.alibaba.ververica.cdc.formats.json;
 
+import org.apache.flink.formats.json.JsonOptions;
 import org.apache.flink.formats.json.TimestampFormat;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.runtime.typeutils.RowDataTypeInfo;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
@@ -61,7 +62,7 @@ public class ChangelogJsonSerDeTest {
 		List<String> lines = readLines("changelog-json-data.txt");
 		ChangelogJsonDeserializationSchema deserializationSchema = new ChangelogJsonDeserializationSchema(
 			SCHEMA,
-			RowDataTypeInfo.of(SCHEMA),
+			InternalTypeInfo.of(SCHEMA),
 			false,
 			TimestampFormat.SQL);
 
@@ -125,7 +126,9 @@ public class ChangelogJsonSerDeTest {
 
 		ChangelogJsonSerializationSchema serializationSchema = new ChangelogJsonSerializationSchema(
 			SCHEMA,
-			TimestampFormat.SQL);
+			TimestampFormat.SQL,
+				JsonOptions.MapNullKeyMode.LITERAL,
+				"null");
 		serializationSchema.open(null);
 		List<String> result = new ArrayList<>();
 		for (RowData rowData : collector.list) {

@@ -54,6 +54,10 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 
 	public static final ConfigOption<String> TIMESTAMP_FORMAT = JsonOptions.TIMESTAMP_FORMAT;
 
+	public static final ConfigOption<String> MAP_NULL_KEY_MODE = JsonOptions.MAP_NULL_KEY_MODE;
+
+	public static final ConfigOption<String> MAP_NULL_KEY_LITERAL = JsonOptions.MAP_NULL_KEY_LITERAL;
+
 	@Override
 	public DecodingFormat<DeserializationSchema<RowData>> createDecodingFormat(
 			DynamicTableFactory.Context context, ReadableConfig formatOptions) {
@@ -67,8 +71,7 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 			public DeserializationSchema<RowData> createRuntimeDecoder(
 				DynamicTableSource.Context context, DataType producedDataType) {
 				final RowType rowType = (RowType) producedDataType.getLogicalType();
-				final TypeInformation<RowData> rowDataTypeInfo =
-					(TypeInformation<RowData>) context.createTypeInformation(producedDataType);
+				final TypeInformation<RowData> rowDataTypeInfo = context.createTypeInformation(producedDataType);
 				return new ChangelogJsonDeserializationSchema(
 					rowType,
 					rowDataTypeInfo,
@@ -93,6 +96,8 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 			DynamicTableFactory.Context context, ReadableConfig formatOptions) {
 		FactoryUtil.validateFactoryOptions(this, formatOptions);
 		TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
+		JsonOptions.MapNullKeyMode mapNullKeyMode = JsonOptions.getMapNullKeyMode(formatOptions);
+		String mapNullKeyLiteral = formatOptions.get(MAP_NULL_KEY_LITERAL);
 
 		return new EncodingFormat<SerializationSchema<RowData>>() {
 
@@ -111,7 +116,9 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 				final RowType rowType = (RowType) consumedDataType.getLogicalType();
 				return new ChangelogJsonSerializationSchema(
 					rowType,
-					timestampFormat
+					timestampFormat,
+					mapNullKeyMode,
+					mapNullKeyLiteral
 				);
 			}
 		};
@@ -132,6 +139,8 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 		Set<ConfigOption<?>> options = new HashSet<>();
 		options.add(IGNORE_PARSE_ERRORS);
 		options.add(TIMESTAMP_FORMAT);
+		options.add(MAP_NULL_KEY_MODE);
+		options.add(MAP_NULL_KEY_LITERAL);
 		return options;
 	}
 }

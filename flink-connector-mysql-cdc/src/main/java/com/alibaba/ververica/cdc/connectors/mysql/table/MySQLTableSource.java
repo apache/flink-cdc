@@ -96,7 +96,7 @@ public class MySQLTableSource implements ScanTableSource {
 	@Override
 	public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
 		RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
-		TypeInformation<RowData> typeInfo = (TypeInformation<RowData>) scanContext.createTypeInformation(physicalSchema.toRowDataType());
+		TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(physicalSchema.toRowDataType());
 		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
 			rowType,
 			typeInfo,

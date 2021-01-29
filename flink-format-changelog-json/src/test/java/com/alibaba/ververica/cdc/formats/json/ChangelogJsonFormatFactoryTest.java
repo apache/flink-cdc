@@ -21,6 +21,7 @@ package com.alibaba.ververica.cdc.formats.json;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.formats.json.JsonOptions;
 import org.apache.flink.formats.json.TimestampFormat;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableSchema;
@@ -33,7 +34,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.TestDynamicTableFactory;
 import org.apache.flink.table.runtime.connector.sink.SinkRuntimeProviderContext;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
-import org.apache.flink.table.runtime.typeutils.RowDataTypeInfo;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.TestLogger;
@@ -68,12 +69,14 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 	public void testSeDeSchema() {
 		final ChangelogJsonDeserializationSchema expectedDeser = new ChangelogJsonDeserializationSchema(
 			ROW_TYPE,
-			RowDataTypeInfo.of(ROW_TYPE),
+			InternalTypeInfo.of(ROW_TYPE),
 			true,
 			TimestampFormat.ISO_8601);
 		final ChangelogJsonSerializationSchema expectedSer = new ChangelogJsonSerializationSchema(
 			ROW_TYPE,
-			TimestampFormat.ISO_8601);
+			TimestampFormat.ISO_8601,
+			JsonOptions.MapNullKeyMode.LITERAL,
+			"null");
 
 		final Map<String, String> options = getAllOptions();
 
@@ -139,6 +142,8 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 		options.put("format", "changelog-json");
 		options.put("changelog-json.ignore-parse-errors", "true");
 		options.put("changelog-json.timestamp-format.standard", "ISO-8601");
+		options.put("changelog-json.map-null-key.mode", "LITERAL");
+		options.put("changelog-json.map-null-key.literal", "null");
 		return options;
 	}
 
@@ -148,7 +153,8 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 				ObjectIdentifier.of("default", "default", "t1"),
 				new CatalogTableImpl(SCHEMA, options, "mock source"),
 				new Configuration(),
-				ChangelogJsonFormatFactoryTest.class.getClassLoader());
+				ChangelogJsonFormatFactoryTest.class.getClassLoader(),
+				false);
 	}
 
 	private static DynamicTableSink createTableSink(Map<String, String> options) {
@@ -157,6 +163,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 				ObjectIdentifier.of("default", "default", "t1"),
 				new CatalogTableImpl(SCHEMA, options, "mock sink"),
 				new Configuration(),
-				ChangelogJsonFormatFactoryTest.class.getClassLoader());
+				ChangelogJsonFormatFactoryTest.class.getClassLoader(),
+				false);
 	}
 }

@@ -165,6 +165,7 @@ public class PostgreSQLTableFactoryTest {
 			ObjectIdentifier.of("default", "default", "t1"),
 			new CatalogTableImpl(SCHEMA, options, "mock source"),
 			new Configuration(),
-			PostgreSQLTableFactoryTest.class.getClassLoader());
+			PostgreSQLTableFactoryTest.class.getClassLoader(),
+			false);
 	}
 }
