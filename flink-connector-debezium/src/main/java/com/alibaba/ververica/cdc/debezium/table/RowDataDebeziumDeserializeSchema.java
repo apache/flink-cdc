@@ -228,7 +228,7 @@ public final class RowDataDebeziumDeserializeSchema
 
     private long convertToLong(Object dbzObj, Schema schema) {
         if (dbzObj instanceof Integer) {
-            return (long) dbzObj;
+            return ((Integer) dbzObj).longValue();
         } else if (dbzObj instanceof Long) {
             return (long) dbzObj;
         } else {
@@ -238,7 +238,7 @@ public final class RowDataDebeziumDeserializeSchema
 
     private double convertToDouble(Object dbzObj, Schema schema) {
         if (dbzObj instanceof Float) {
-            return (double) dbzObj;
+            return ((Float) dbzObj).doubleValue();
         } else if (dbzObj instanceof Double) {
             return (double) dbzObj;
         } else {

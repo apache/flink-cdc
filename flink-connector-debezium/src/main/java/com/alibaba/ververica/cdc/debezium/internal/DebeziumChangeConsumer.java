@@ -175,29 +175,33 @@ public class DebeziumChangeConsumer<T>
     }
 
     private void updateMessageTimestamp(SourceRecord record) {
-        Schema schema = record.valueSchema();
-        Struct value = (Struct) record.value();
-        if (schema.field(Envelope.FieldName.SOURCE) == null) {
-            return;
-        }
-
-        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-        if (source.schema().field(Envelope.FieldName.TIMESTAMP) == null) {
-            return;
-        }
-
-        Long tsMs = source.getInt64(Envelope.FieldName.TIMESTAMP);
+        Long tsMs = getMessageTimestamp(record);
         if (tsMs != null) {
             this.messageTimestamp = tsMs;
         }
     }
 
-    private boolean isHeartbeatEvent(SourceRecord record) {
+    protected Long getMessageTimestamp(SourceRecord record) {
+        Schema schema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        if (schema.field(Envelope.FieldName.SOURCE) == null) {
+            return null;
+        }
+
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        if (source.schema().field(Envelope.FieldName.TIMESTAMP) == null) {
+            return null;
+        }
+
+        return source.getInt64(Envelope.FieldName.TIMESTAMP);
+    }
+
+    protected boolean isHeartbeatEvent(SourceRecord record) {
         String topic = record.topic();
         return topic != null && topic.startsWith(heartbeatTopicPrefix);
     }
 
-    private boolean isSnapshotRecord(SourceRecord record) {
+    protected boolean isSnapshotRecord(SourceRecord record) {
         Struct value = (Struct) record.value();
         if (value != null) {
             Struct source = value.getStruct(Envelope.FieldName.SOURCE);

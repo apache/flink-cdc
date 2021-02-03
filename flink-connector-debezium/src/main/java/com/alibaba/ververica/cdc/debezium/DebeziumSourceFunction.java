@@ -99,7 +99,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     // -------------------------------------------------------------------------------------------
 
     /** The schema to convert from Debezium's messages into Flink's objects. */
-    private final DebeziumDeserializationSchema<T> deserializer;
+    protected final DebeziumDeserializationSchema<T> deserializer;
 
     /** User-supplied properties for Kafka. * */
     private final Properties properties;
@@ -340,18 +340,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         properties.setProperty(
                 FlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME, engineInstanceName);
 
-        // we have to filter out the heartbeat events, otherwise the deserializer will fail
-        String dbzHeartbeatPrefix =
-                properties.getProperty(
-                        Heartbeat.HEARTBEAT_TOPICS_PREFIX.name(),
-                        Heartbeat.HEARTBEAT_TOPICS_PREFIX.defaultValueAsString());
-        this.debeziumConsumer =
-                new DebeziumChangeConsumer<>(
-                        sourceContext,
-                        deserializer,
-                        restoredOffsetState == null, // DB snapshot phase if restore state is null
-                        this::reportError,
-                        dbzHeartbeatPrefix);
+        // DB snapshot phase if restore state is null
+        boolean isInDbSnapshotPhase = restoredOffsetState == null;
+        this.debeziumConsumer = createConsumer(sourceContext, isInDbSnapshotPhase);
 
         // create the engine with this configuration ...
         this.engine =
@@ -468,11 +459,27 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         super.close();
     }
 
+    protected DebeziumChangeConsumer<T> createConsumer(
+            SourceContext<T> sourceContext, boolean isInDbSnapshotPhase) {
+        // we have to filter out the heartbeat events, otherwise the deserializer will fail
+        String dbzHeartbeatPrefix =
+                properties.getProperty(
+                        Heartbeat.HEARTBEAT_TOPICS_PREFIX.name(),
+                        Heartbeat.HEARTBEAT_TOPICS_PREFIX.defaultValueAsString());
+
+        return new DebeziumChangeConsumer<>(
+                sourceContext,
+                deserializer,
+                isInDbSnapshotPhase, // DB snapshot phase if restore state is null
+                this::reportError,
+                dbzHeartbeatPrefix);
+    }
+
     // --------------------------------------------------------------------------------
     // Error callbacks
     // --------------------------------------------------------------------------------
 
-    private void reportError(Throwable error) {
+    protected void reportError(Throwable error) {
         LOG.error("Reporting error:", error);
         this.error = error;
     }
