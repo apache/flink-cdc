@@ -92,10 +92,11 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 			List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents,
 			DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer) throws InterruptedException {
 		try {
+			Map<String, ?> lastSourcePartition = null;
+			Map<String, ?> lastSourceOffset = null;
 			for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
 				SourceRecord record = event.value();
 				deserialization.deserialize(record, debeziumCollector);
-
 				if (isInDbSnapshotPhase) {
 					if (!lockHold) {
 						MemoryUtils.UNSAFE.monitorEnter(checkpointLock);
@@ -108,9 +109,12 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 						LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
 					}
 				}
-
+				lastSourcePartition = record.sourcePartition();
+				lastSourceOffset = record.sourceOffset();
+			}
+			if (lastSourcePartition != null && lastSourceOffset != null) {
 				// emit the actual records. this also updates offset state atomically
-				emitRecordsUnderCheckpointLock(debeziumCollector.records, record.sourcePartition(), record.sourceOffset());
+				emitRecordsUnderCheckpointLock(debeziumCollector.records, lastSourcePartition, lastSourceOffset);
 			}
 		} catch (Exception e) {
 			LOG.error("Error happens when consuming change messages.", e);
