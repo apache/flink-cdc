@@ -64,7 +64,7 @@ under the License.
     <properties>
         <flink.version>1.11.1</flink.version>
         <debezium.version>1.2.1.Final</debezium.version>
-        <testcontainers.version>1.14.3</testcontainers.version>
+        <testcontainers.version>1.15.1</testcontainers.version>
         <java.version>1.8</java.version>
         <scala.binary.version>2.11</scala.binary.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
