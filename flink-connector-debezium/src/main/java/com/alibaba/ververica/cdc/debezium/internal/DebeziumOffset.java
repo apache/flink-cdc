@@ -40,7 +40,7 @@ import java.util.Map;
  * "table_name"} and the sourceOffset as a Long containing the timestamp of the row.
  */
 @Internal
-public class DebeziumState {
+public class DebeziumOffset {
 
 	public Map<String, ?> sourcePartition;
 	public Map<String, ?> sourceOffset;
@@ -55,7 +55,7 @@ public class DebeziumState {
 
 	@Override
 	public String toString() {
-		return "DebeziumConsumerState{" +
+		return "DebeziumOffset{" +
 			"sourcePartition=" + sourcePartition +
 			", sourceOffset=" + sourceOffset +
 			'}';

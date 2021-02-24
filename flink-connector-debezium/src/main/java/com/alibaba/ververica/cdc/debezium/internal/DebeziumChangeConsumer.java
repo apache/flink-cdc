@@ -62,9 +62,9 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 
 	private final ErrorReporter errorReporter;
 
-	private final DebeziumState debeziumState;
+	private final DebeziumOffset debeziumOffset;
 
-	private final DebeziumStateSerializer stateSerializer;
+	private final DebeziumOffsetSerializer stateSerializer;
 
 	private boolean isInDbSnapshotPhase;
 
@@ -83,8 +83,8 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 		this.isInDbSnapshotPhase = isInDbSnapshotPhase;
 		this.debeziumCollector = new DebeziumCollector();
 		this.errorReporter = errorReporter;
-		this.debeziumState = new DebeziumState();
-		this.stateSerializer = new DebeziumStateSerializer();
+		this.debeziumOffset = new DebeziumOffset();
+		this.stateSerializer = new DebeziumOffsetSerializer();
 	}
 
 	@Override
@@ -159,8 +159,8 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 			sourceContext.collect(record);
 		}
 		// update offset to state
-		debeziumState.setSourcePartition(sourcePartition);
-		debeziumState.setSourceOffset(sourceOffset);
+		debeziumOffset.setSourcePartition(sourcePartition);
+		debeziumOffset.setSourceOffset(sourceOffset);
 	}
 
 	/**
@@ -171,11 +171,11 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 	public byte[] snapshotCurrentState() throws Exception {
 		// this method assumes that the checkpoint lock is held
 		assert Thread.holdsLock(checkpointLock);
-		if (debeziumState.sourceOffset == null || debeziumState.sourcePartition == null) {
+		if (debeziumOffset.sourceOffset == null || debeziumOffset.sourcePartition == null) {
 			return null;
 		}
 
-		return stateSerializer.serialize(debeziumState);
+		return stateSerializer.serialize(debeziumOffset);
 	}
 
 	private class DebeziumCollector implements Collector<T> {

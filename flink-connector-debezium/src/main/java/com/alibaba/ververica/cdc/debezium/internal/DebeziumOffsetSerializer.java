@@ -25,19 +25,19 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import java.io.IOException;
 
 /**
- * Serializer implementation for a {@link DebeziumState}.
+ * Serializer implementation for a {@link DebeziumOffset}.
  */
 @Internal
-public class DebeziumStateSerializer {
-	public byte[] serialize(DebeziumState debeziumState) throws IOException {
+public class DebeziumOffsetSerializer {
+	public byte[] serialize(DebeziumOffset debeziumOffset) throws IOException {
 		// we currently use JSON serialization for simplification, as the state is very small.
 		// we can improve this in the future if needed
 		ObjectMapper objectMapper = new ObjectMapper();
-		return objectMapper.writeValueAsBytes(debeziumState);
+		return objectMapper.writeValueAsBytes(debeziumOffset);
 	}
 
-	public DebeziumState deserialize(byte[] bytes) throws IOException {
+	public DebeziumOffset deserialize(byte[] bytes) throws IOException {
 		ObjectMapper objectMapper = new ObjectMapper();
-		return objectMapper.readValue(bytes, DebeziumState.class);
+		return objectMapper.readValue(bytes, DebeziumOffset.class);
 	}
 }

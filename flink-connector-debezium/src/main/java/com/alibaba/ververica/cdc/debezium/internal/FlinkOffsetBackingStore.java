@@ -77,10 +77,10 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
 		}
 
 		String stateJson = (String) conf.get(OFFSET_STATE_VALUE);
-		DebeziumStateSerializer serializer = new DebeziumStateSerializer();
-		DebeziumState debeziumState;
+		DebeziumOffsetSerializer serializer = new DebeziumOffsetSerializer();
+		DebeziumOffset debeziumOffset;
 		try {
-			debeziumState = serializer.deserialize(stateJson.getBytes(StandardCharsets.UTF_8));
+			debeziumOffset = serializer.deserialize(stateJson.getBytes(StandardCharsets.UTF_8));
 		} catch (IOException e) {
 			LOG.error("Can't deserialize debezium offset state from JSON: " + stateJson, e);
 			throw new RuntimeException(e);
@@ -100,7 +100,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
 			keyConverter,
 			valueConverter);
 
-		offsetWriter.offset(debeziumState.sourcePartition, debeziumState.sourceOffset);
+		offsetWriter.offset(debeziumOffset.sourcePartition, debeziumOffset.sourceOffset);
 
 		// flush immediately
 		if (!offsetWriter.beginFlush()) {
@@ -122,8 +122,8 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
 		try {
 			flushFuture.get(FLUSH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 			LOG.info("Flush offsets successfully, partition: {}, offsets: {}",
-				debeziumState.sourcePartition,
-				debeziumState.sourceOffset);
+				debeziumOffset.sourcePartition,
+				debeziumOffset.sourceOffset);
 		} catch (InterruptedException e) {
 			LOG.warn("Flush offsets interrupted, cancelling.", e);
 			offsetWriter.cancelFlush();
