@@ -140,6 +140,75 @@ public class MySQLTableSourceFactoryTest {
 	}
 
 	@Test
+	public void testStartupFromInitial() {
+		Map<String, String> properties = getAllOptions();
+		properties.put("scan.startup.mode", "initial");
+
+		// validation for source
+		DynamicTableSource actualSource = createTableSource(properties);
+		MySQLTableSource expectedSource = new MySQLTableSource(
+				TableSchemaUtils.getPhysicalSchema(SCHEMA),
+				3306,
+				MY_LOCALHOST,
+				MY_DATABASE,
+				MY_TABLE,
+				MY_USERNAME,
+				MY_PASSWORD,
+				ZoneId.of("UTC"),
+				PROPERTIES,
+				null,
+				StartupOptions.initial()
+		);
+		assertEquals(expectedSource, actualSource);
+	}
+
+	@Test
+	public void testStartupFromEarliestOffset() {
+		Map<String, String> properties = getAllOptions();
+		properties.put("scan.startup.mode", "earliest-offset");
+
+		// validation for source
+		DynamicTableSource actualSource = createTableSource(properties);
+		MySQLTableSource expectedSource = new MySQLTableSource(
+				TableSchemaUtils.getPhysicalSchema(SCHEMA),
+				3306,
+				MY_LOCALHOST,
+				MY_DATABASE,
+				MY_TABLE,
+				MY_USERNAME,
+				MY_PASSWORD,
+				ZoneId.of("UTC"),
+				PROPERTIES,
+				null,
+				StartupOptions.earliest()
+		);
+		assertEquals(expectedSource, actualSource);
+	}
+
+	@Test
+	public void testStartupFromLatestOffset() {
+		Map<String, String> properties = getAllOptions();
+		properties.put("scan.startup.mode", "latest-offset");
+
+		// validation for source
+		DynamicTableSource actualSource = createTableSource(properties);
+		MySQLTableSource expectedSource = new MySQLTableSource(
+				TableSchemaUtils.getPhysicalSchema(SCHEMA),
+				3306,
+				MY_LOCALHOST,
+				MY_DATABASE,
+				MY_TABLE,
+				MY_USERNAME,
+				MY_PASSWORD,
+				ZoneId.of("UTC"),
+				PROPERTIES,
+				null,
+				StartupOptions.latest()
+		);
+		assertEquals(expectedSource, actualSource);
+	}
+
+	@Test
 	public void testValidation() {
 		// validate illegal port
 		try {

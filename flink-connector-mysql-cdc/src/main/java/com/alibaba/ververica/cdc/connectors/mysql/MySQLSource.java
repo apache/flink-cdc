@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql;
 
-import com.alibaba.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.alibaba.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -182,24 +181,39 @@ public class MySQLSource {
 				props.setProperty("database.serverTimezone", serverTimeZone);
 			}
 
-			final DebeziumOffset specificOffset;
-			if (startupOptions.startupMode == StartupMode.SPECIFIC_OFFSETS) {
-				// if binlog offset is specified, 'snapshot.mode=schema_only_recovery' must be configured
-				// 'schema_only_recovery' only snapshots the schemas, not the data,
-				// and continue binlog reading from the restored offset
-				props.setProperty("snapshot.mode", "schema_only_recovery");
+			DebeziumOffset specificOffset = null;
+			switch (startupOptions.startupMode) {
+				case INITIAL:
+					props.setProperty("snapshot.mode", "initial");
+					break;
 
-				specificOffset = new DebeziumOffset();
-				Map<String, String> sourcePartition = new HashMap<>();
-				sourcePartition.put("server", DATABASE_SERVER_NAME);
-				specificOffset.setSourcePartition(sourcePartition);
+				case EARLIEST_OFFSET:
+					props.setProperty("snapshot.mode", "never");
+					break;
 
-				Map<String, Object> sourceOffset = new HashMap<>();
-				sourceOffset.put("file", startupOptions.specificOffsetFile);
-				sourceOffset.put("pos", startupOptions.specificOffsetPos);
-				specificOffset.setSourceOffset(sourceOffset);
-			} else {
-				specificOffset = null;
+				case LATEST_OFFSET:
+					props.setProperty("snapshot.mode", "schema_only");
+					break;
+
+				case SPECIFIC_OFFSETS:
+					// if binlog offset is specified, 'snapshot.mode=schema_only_recovery' must
+					// be configured. It only snapshots the schemas, not the data,
+					// and continue binlog reading from the specified offset
+					props.setProperty("snapshot.mode", "schema_only_recovery");
+
+					specificOffset = new DebeziumOffset();
+					Map<String, String> sourcePartition = new HashMap<>();
+					sourcePartition.put("server", DATABASE_SERVER_NAME);
+					specificOffset.setSourcePartition(sourcePartition);
+
+					Map<String, Object> sourceOffset = new HashMap<>();
+					sourceOffset.put("file", startupOptions.specificOffsetFile);
+					sourceOffset.put("pos", startupOptions.specificOffsetPos);
+					specificOffset.setSourceOffset(sourceOffset);
+					break;
+
+				default:
+					throw new UnsupportedOperationException();
 			}
 
 			if (dbzProperties != null) {
