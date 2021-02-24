@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -50,8 +51,11 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 	private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
 	private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
+	private static final DockerImageName PG_IMAGE = DockerImageName
+			.parse("debezium/postgres:9.6")
+			.asCompatibleSubstituteFor("postgres");
 
-	protected static final PostgreSQLContainer<?> POSTGERS_CONTAINER = new PostgreSQLContainer<>("debezium/postgres:9.6")
+	protected static final PostgreSQLContainer<?> POSTGERS_CONTAINER = new PostgreSQLContainer<>(PG_IMAGE)
 		.withDatabaseName("postgres")
 		.withUsername("postgres")
 		.withPassword("postgres")
