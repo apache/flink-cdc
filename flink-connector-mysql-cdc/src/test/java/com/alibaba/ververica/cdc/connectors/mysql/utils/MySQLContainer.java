@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.utils;
 
-import org.jetbrains.annotations.NotNull;
 import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
@@ -50,7 +49,6 @@ public class MySQLContainer extends JdbcDatabaseContainer {
 		addExposedPort(MYSQL_PORT);
 	}
 
-	@NotNull
 	@Override
 	protected Set<Integer> getLivenessCheckPorts() {
 		return new HashSet<>(getMappedPort(MYSQL_PORT));
