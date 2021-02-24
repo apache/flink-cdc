@@ -29,6 +29,8 @@ import java.io.IOException;
  */
 @Internal
 public class DebeziumOffsetSerializer {
+	public static final DebeziumOffsetSerializer INSTANCE = new DebeziumOffsetSerializer();
+
 	public byte[] serialize(DebeziumOffset debeziumOffset) throws IOException {
 		// we currently use JSON serialization for simplification, as the state is very small.
 		// we can improve this in the future if needed

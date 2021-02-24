@@ -22,12 +22,12 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 
-import com.alibaba.ververica.cdc.connectors.mysql.options.MySQLOffsetOptions;
 import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.ZoneId;
@@ -86,6 +86,36 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			"MySQL database cluster as another server (with this unique ID) so it can read the binlog. " +
 			"By default, a random number is generated between 5400 and 6400, though we recommend setting an explicit value.");
 
+	public static final ConfigOption<String> SCAN_STARTUP_MODE =
+			ConfigOptions.key("scan.startup.mode")
+					.stringType()
+					.defaultValue("initial")
+					.withDescription(
+							"Optional startup mode for Kafka consumer, valid enumerations are "
+									+ "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
+									+ "or \"specific-offset\"");
+
+	public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_FILE =
+			ConfigOptions.key("scan.startup.specific-offset.file")
+					.stringType()
+					.noDefaultValue()
+					.withDescription(
+							"Optional offsets used in case of \"specific-offset\" startup mode");
+
+	public static final ConfigOption<Integer> SCAN_STARTUP_SPECIFIC_OFFSET_POS =
+			ConfigOptions.key("scan.startup.specific-offset.pos")
+					.intType()
+					.noDefaultValue()
+					.withDescription(
+							"Optional offsets used in case of \"specific-offset\" startup mode");
+
+	public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
+			ConfigOptions.key("scan.startup.timestamp-millis")
+					.longType()
+					.noDefaultValue()
+					.withDescription(
+							"Optional timestamp used in case of \"timestamp\" startup mode");
+
 	private static final ConfigOption<String> SOURCE_OFFSET_FILE = ConfigOptions.key("source-offset-file")
 			.stringType()
 			.noDefaultValue()
@@ -110,10 +140,8 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		int port = config.get(PORT);
 		Integer serverId = config.getOptional(SERVER_ID).orElse(null);
 		ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+		StartupOptions startupOptions = getStartupOptions(config);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
-		MySQLOffsetOptions.Builder builder = MySQLOffsetOptions.builder();
-		builder.sourceOffsetFile(config.get(SOURCE_OFFSET_FILE))
-				.sourceOffsetPosition(config.getOptional(SOURCE_OFFSET_POSITION).orElse(null));
 
 		return new MySQLTableSource(
 			physicalSchema,
@@ -126,7 +154,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			serverTimeZone,
 			getDebeziumProperties(context.getCatalogTable().getOptions()),
 			serverId,
-			builder.build()
+			startupOptions
 		);
 	}
 
@@ -152,8 +180,52 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		options.add(PORT);
 		options.add(SERVER_TIME_ZONE);
 		options.add(SERVER_ID);
-		options.add(SOURCE_OFFSET_FILE);
-		options.add(SOURCE_OFFSET_POSITION);
+		options.add(SCAN_STARTUP_MODE);
+		options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+		options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+		options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
 		return options;
+	}
+
+	private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
+	private static final String SCAN_STARTUP_MODE_VALUE_EARLIEST = "earliest-offset";
+	private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+	private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET = "specific-offset";
+	private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
+
+	private static StartupOptions getStartupOptions(ReadableConfig config) {
+		String modeString = config.get(SCAN_STARTUP_MODE);
+
+		switch (modeString.toLowerCase()) {
+			case SCAN_STARTUP_MODE_VALUE_INITIAL:
+				return StartupOptions.initial();
+
+			case SCAN_STARTUP_MODE_VALUE_EARLIEST:
+				return StartupOptions.earliest();
+
+			case SCAN_STARTUP_MODE_VALUE_LATEST:
+				return StartupOptions.latest();
+
+			case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET:
+				String offsetFile = config.get(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+				int offsetPos = config.get(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+				return StartupOptions.specificOffset(offsetFile, offsetPos);
+
+			case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+				long millis = config.get(SCAN_STARTUP_TIMESTAMP_MILLIS);
+				return StartupOptions.timestamp(millis);
+
+			default:
+				throw new ValidationException(
+						String.format(
+								"Invalid value for option '%s'. Supported values are [%s, %s, %s, %s, %s], but was: %s",
+								SCAN_STARTUP_MODE.key(),
+								SCAN_STARTUP_MODE_VALUE_INITIAL,
+								SCAN_STARTUP_MODE_VALUE_EARLIEST,
+								SCAN_STARTUP_MODE_VALUE_LATEST,
+								SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET,
+								SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
+								modeString));
+		}
 	}
 }

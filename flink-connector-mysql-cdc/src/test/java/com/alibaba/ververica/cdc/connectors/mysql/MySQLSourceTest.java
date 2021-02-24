@@ -25,6 +25,7 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
@@ -34,6 +35,7 @@ import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
+import com.alibaba.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.connectors.utils.TestSourceContext;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -455,6 +457,87 @@ public class MySQLSourceTest extends MySQLTestBase {
 		}
 	}
 
+	@Test
+	public void testStartupFromSpecificOffset() throws Exception {
+		try (Connection connection = database.getJdbcConnection();
+				Statement statement = connection.createStatement()) {
+			statement.execute("INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
+		}
+
+		Tuple2<String, Integer> offset = currentMySQLLatestOffset(database, "products", 10);
+		final String offsetFile = offset.f0;
+		final int offsetPos = offset.f1;
+		final TestingListState<byte[]> offsetState = new TestingListState<>();
+		final TestingListState<String> historyState = new TestingListState<>();
+		// ---------------------------------------------------------------------------
+		// Step-3: start source from the specific offset
+		// ---------------------------------------------------------------------------
+		try (Connection connection = database.getJdbcConnection();
+				Statement statement = connection.createStatement()) {
+			statement.execute("INSERT INTO products VALUES (1001,'roy','old robot',1234.56)"); // 1001
+			statement.execute("UPDATE products SET id=2001, description='really old robot' WHERE id=1001");
+			statement.execute("UPDATE products SET weight=1345.67 WHERE id=2001");
+
+			final DebeziumSourceFunction<SourceRecord> source2 = createMySqlBinlogSource(offsetFile, offsetPos);
+			final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
+			setupSource(source2, false, offsetState, historyState, true, 0, 1);
+			final CheckedThread runThread2 = new CheckedThread() {
+				@Override
+				public void go() throws Exception {
+					source2.run(sourceContext2);
+				}
+			};
+			runThread2.start();
+
+			// we can continue to read binlog from specific offset
+			List<SourceRecord> records = drain(sourceContext2, 4);
+			assertEquals(4, records.size());
+			assertInsert(records.get(0), "id", 1001);
+			assertDelete(records.get(1), "id", 1001);
+			assertInsert(records.get(2), "id", 2001);
+			assertUpdate(records.get(3), "id", 2001);
+
+			// ---------------------------------------------------------------------------
+			// Step-4: trigger checkpoint-2
+			// ---------------------------------------------------------------------------
+			synchronized (sourceContext2.getCheckpointLock()) {
+				// trigger checkpoint-2
+				source2.snapshotState(new StateSnapshotContextSynchronousImpl(201, 201));
+			}
+
+			source2.cancel();
+			source2.close();
+			runThread2.sync();
+		}
+
+		try (Connection connection = database.getJdbcConnection();
+				Statement statement = connection.createStatement()) {
+
+			// --------------------------------------------------------------------------------
+			// Step-5: restore from last checkpoint to verify not restore from specific offset
+			// --------------------------------------------------------------------------------
+			final DebeziumSourceFunction<SourceRecord> source3 = createMySqlBinlogSource(offsetFile, offsetPos);
+			final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
+			setupSource(source3, true, offsetState, historyState, true, 0, 1);
+			final CheckedThread runThread3 = new CheckedThread() {
+				@Override
+				public void go() throws Exception {
+					source3.run(sourceContext3);
+				}
+			};
+			runThread3.start();
+
+			statement.execute("DELETE FROM products WHERE id=2001");
+			List<SourceRecord> records = drain(sourceContext3, 1);
+			assertEquals(1, records.size());
+			assertDelete(records.get(0), "id", 2001);
+
+			source3.cancel();
+			source3.close();
+			runThread3.sync();
+		}
+	}
+
 	private void assertHistoryState(TestingListState<String> historyState) {
 		// assert the DDL is stored in the history state
 		assertTrue(historyState.list.size() > 0);
@@ -466,8 +549,77 @@ public class MySQLSourceTest extends MySQLTestBase {
 	}
 
 	// ------------------------------------------------------------------------------------------
+	// Public Utilities
+	// ------------------------------------------------------------------------------------------
+
+	/**
+	 * Gets the latest offset of current MySQL server.
+	 */
+	public static Tuple2<String, Integer> currentMySQLLatestOffset(
+			UniqueDatabase database, String table, int expectedRecordCount) throws Exception {
+		DebeziumSourceFunction<SourceRecord> source =  MySQLSource.<SourceRecord>builder()
+				.hostname(MYSQL_CONTAINER.getHost())
+				.port(MYSQL_CONTAINER.getDatabasePort())
+				.databaseList(database.getDatabaseName())
+				.tableList(database.getDatabaseName() + "." + table)
+				.username(MYSQL_CONTAINER.getUsername())
+				.password(MYSQL_CONTAINER.getPassword())
+				.deserializer(new MySQLSourceTest.ForwardDeserializeSchema())
+				.build();
+		final TestingListState<byte[]> offsetState = new TestingListState<>();
+		final TestingListState<String> historyState = new TestingListState<>();
+
+		// ---------------------------------------------------------------------------
+		// Step-1: start source
+		// ---------------------------------------------------------------------------
+		TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
+		setupSource(source, false, offsetState, historyState, true, 0, 1);
+		final CheckedThread runThread = new CheckedThread() {
+			@Override
+			public void go() throws Exception {
+				source.run(sourceContext);
+			}
+		};
+		runThread.start();
+
+		drain(sourceContext, expectedRecordCount);
+
+		// ---------------------------------------------------------------------------
+		// Step-2: trigger checkpoint-1 after snapshot finished
+		// ---------------------------------------------------------------------------
+		synchronized (sourceContext.getCheckpointLock()) {
+			// trigger checkpoint-1
+			source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
+		}
+
+		assertEquals(1, offsetState.list.size());
+		String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+		String offsetFile = JsonPath.read(state, "$.sourceOffset.file");
+		int offsetPos = JsonPath.read(state, "$.sourceOffset.pos");
+
+		source.cancel();
+		source.close();
+		runThread.sync();
+
+		return Tuple2.of(offsetFile, offsetPos);
+	}
+
+	// ------------------------------------------------------------------------------------------
 	// Utilities
 	// ------------------------------------------------------------------------------------------
+
+	private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(String offsetFile, int offsetPos) {
+		return MySQLSource.<SourceRecord>builder()
+				.hostname(MYSQL_CONTAINER.getHost())
+				.port(MYSQL_CONTAINER.getDatabasePort())
+				.databaseList(database.getDatabaseName())
+				.tableList(database.getDatabaseName() + "." + "products") // monitor table "products"
+				.username(MYSQL_CONTAINER.getUsername())
+				.password(MYSQL_CONTAINER.getPassword())
+				.startupOptions(StartupOptions.specificOffset(offsetFile, offsetPos))
+				.deserializer(new ForwardDeserializeSchema())
+				.build();
+	}
 
 	private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
 		return MySQLSource.<SourceRecord>builder()
@@ -481,7 +633,7 @@ public class MySQLSourceTest extends MySQLTestBase {
 			.build();
 	}
 
-	private <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount) throws Exception {
+	private static <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount) throws Exception {
 		List<T> allRecords = new ArrayList<>();
 		LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
 		while (allRecords.size() < expectedRecordCount) {
@@ -556,7 +708,11 @@ public class MySQLSourceTest extends MySQLTestBase {
 		source.open(new Configuration());
 	}
 
-	private static class ForwardDeserializeSchema implements DebeziumDeserializationSchema<SourceRecord> {
+	/**
+	 * A simple implementation of {@link DebeziumDeserializationSchema} which just forward
+	 * the {@link SourceRecord}.
+	 */
+	public static class ForwardDeserializeSchema implements DebeziumDeserializationSchema<SourceRecord> {
 
 		private static final long serialVersionUID = 2975058057832211228L;
 

@@ -30,7 +30,6 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.ExceptionUtils;
 
-import com.alibaba.ververica.cdc.connectors.mysql.options.MySQLOffsetOptions;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -79,7 +78,7 @@ public class MySQLTableSourceFactoryTest {
 			ZoneId.of("UTC"),
 			PROPERTIES,
 			null,
-			MySQLOffsetOptions.builder().build()
+			StartupOptions.initial()
 		);
 		assertEquals(expectedSource, actualSource);
 	}
@@ -106,7 +105,36 @@ public class MySQLTableSourceFactoryTest {
 			ZoneId.of("Asia/Shanghai"),
 			dbzProperties,
 			4321,
-			MySQLOffsetOptions.builder().build()
+			StartupOptions.initial()
+		);
+		assertEquals(expectedSource, actualSource);
+	}
+
+	@Test
+	public void testStartupFromSpecificOffset() {
+		final String offsetFile = "mysql-bin.000003";
+		final int offsetPos = 100203;
+
+		Map<String, String> options = getAllOptions();
+		options.put("port", "3307");
+		options.put("server-id", "4321");
+		options.put("scan.startup.mode", "specific-offset");
+		options.put("scan.startup.specific-offset.file", offsetFile);
+		options.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
+
+		DynamicTableSource actualSource = createTableSource(options);
+		MySQLTableSource expectedSource = new MySQLTableSource(
+				TableSchemaUtils.getPhysicalSchema(SCHEMA),
+				3307,
+				MY_LOCALHOST,
+				MY_DATABASE,
+				MY_TABLE,
+				MY_USERNAME,
+				MY_PASSWORD,
+				ZoneId.of("UTC"),
+				PROPERTIES,
+				4321,
+				StartupOptions.specificOffset(offsetFile, offsetPos)
 		);
 		assertEquals(expectedSource, actualSource);
 	}
@@ -162,6 +190,20 @@ public class MySQLTableSourceFactoryTest {
 		} catch (Throwable t) {
 			assertTrue(ExceptionUtils.findThrowableWithMessage(t,
 				"Unsupported options:\n\nunknown").isPresent());
+		}
+
+		// validate unsupported option
+		try {
+			Map<String, String> properties = getAllOptions();
+			properties.put("scan.startup.mode", "abc");
+
+			createTableSource(properties);
+			fail("exception expected");
+		} catch (Throwable t) {
+			String msg = "Invalid value for option 'scan.startup.mode'. Supported values are " +
+					"[initial, earliest-offset, latest-offset, specific-offset, timestamp], " +
+					"but was: abc";
+			assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
 		}
 	}
 

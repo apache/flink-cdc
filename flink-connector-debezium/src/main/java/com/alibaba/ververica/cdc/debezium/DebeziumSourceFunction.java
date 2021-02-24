@@ -36,6 +36,8 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
+import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
+import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import io.debezium.document.DocumentReader;
@@ -45,6 +47,8 @@ import io.debezium.engine.DebeziumEngine;
 import io.debezium.relational.history.HistoryRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -90,6 +94,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 	/** User-supplied properties for Kafka. **/
 	private final Properties properties;
 
+	/** The specific binlog offset to read from when the first startup. */
+	private final @Nullable DebeziumOffset specificOffset;
+
 	private ExecutorService executor;
 	private DebeziumEngine<?> engine;
 
@@ -127,9 +134,13 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 	 */
 	private transient String engineInstanceName;
 
-	public DebeziumSourceFunction(DebeziumDeserializationSchema<T> deserializer, Properties properties) {
+	public DebeziumSourceFunction(
+			DebeziumDeserializationSchema<T> deserializer,
+			Properties properties,
+			@Nullable DebeziumOffset specificOffset) {
 		this.deserializer = deserializer;
 		this.properties = properties;
+		this.specificOffset = specificOffset;
 	}
 
 	@Override
@@ -159,7 +170,16 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 			restoreOffsetState();
 			restoreHistoryRecordsState();
 		} else {
-			LOG.info("Consumer subtask {} has no restore state.", getRuntimeContext().getIndexOfThisSubtask());
+			if (specificOffset != null) {
+				byte[] serializedOffset = DebeziumOffsetSerializer.INSTANCE.serialize(specificOffset);
+				restoredOffsetState = new String(serializedOffset, StandardCharsets.UTF_8);
+				LOG.info(
+						"Consumer subtask {} starts to read from specified offset {}.",
+						getRuntimeContext().getIndexOfThisSubtask(),
+						restoredOffsetState);
+			} else {
+				LOG.info("Consumer subtask {} has no restore state.", getRuntimeContext().getIndexOfThisSubtask());
+			}
 		}
 	}
 

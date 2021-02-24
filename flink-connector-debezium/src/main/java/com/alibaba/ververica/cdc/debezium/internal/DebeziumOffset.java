@@ -20,6 +20,7 @@ package com.alibaba.ververica.cdc.debezium.internal;
 
 import org.apache.flink.annotation.Internal;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -40,7 +41,8 @@ import java.util.Map;
  * "table_name"} and the sourceOffset as a Long containing the timestamp of the row.
  */
 @Internal
-public class DebeziumOffset {
+public class DebeziumOffset implements Serializable {
+	private static final long serialVersionUID = 1L;
 
 	public Map<String, ?> sourcePartition;
 	public Map<String, ?> sourceOffset;

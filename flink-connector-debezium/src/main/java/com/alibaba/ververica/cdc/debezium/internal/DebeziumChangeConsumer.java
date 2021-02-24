@@ -84,7 +84,7 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 		this.debeziumCollector = new DebeziumCollector();
 		this.errorReporter = errorReporter;
 		this.debeziumOffset = new DebeziumOffset();
-		this.stateSerializer = new DebeziumOffsetSerializer();
+		this.stateSerializer = DebeziumOffsetSerializer.INSTANCE;
 	}
 
 	@Override

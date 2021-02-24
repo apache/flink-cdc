@@ -18,15 +18,13 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql;
 
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-
+import com.alibaba.ververica.cdc.connectors.mysql.table.StartupMode;
+import com.alibaba.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumState;
-import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
+import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
 import io.debezium.connector.mysql.MySqlConnector;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -37,6 +35,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A builder to build a SourceFunction which can read snapshot and continue to consume binlog.
  */
 public class MySQLSource {
+
+	private static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
 
 	public static <T> Builder<T> builder() {
 		return new Builder<>();
@@ -56,8 +56,7 @@ public class MySQLSource {
 		private String serverTimeZone;
 		private String[] tableList;
 		private Properties dbzProperties;
-		private String sourceOffsetFile;
-		private Integer sourceOffsetPosition;
+		private StartupOptions startupOptions = StartupOptions.initial();
 		private DebeziumDeserializationSchema<T> deserializer;
 
 		public Builder<T> hostname(String hostname) {
@@ -148,18 +147,10 @@ public class MySQLSource {
 		}
 
 		/**
-		 * Sets the MySql source offset file name.
+		 * Specifies the startup options.
 		 */
-		public Builder<T> sourceOffsetFile(String sourceOffsetFile) {
-			this.sourceOffsetFile = sourceOffsetFile;
-			return this;
-		}
-
-		/**
-		 * Sets the MySql source offset position.
-		 */
-		public Builder<T> sourceOffsetPosition(Integer sourceOffsetPosition) {
-			this.sourceOffsetPosition = sourceOffsetPosition;
+		public Builder<T> startupOptions(StartupOptions startupOptions) {
+			this.startupOptions = startupOptions;
 			return this;
 		}
 
@@ -171,7 +162,7 @@ public class MySQLSource {
 			// server/cluster being monitored. The logical name should be unique across all other connectors,
 			// since it is used as a prefix for all Kafka topic names emanating from this connector.
 			// Only alphanumeric characters and underscores should be used.
-			props.setProperty("database.server.name", "mysql_binlog_source");
+			props.setProperty("database.server.name", DATABASE_SERVER_NAME);
 			props.setProperty("database.hostname", checkNotNull(hostname));
 			props.setProperty("database.user", checkNotNull(username));
 			props.setProperty("database.password", checkNotNull(password));
@@ -190,29 +181,25 @@ public class MySQLSource {
 			if (serverTimeZone != null) {
 				props.setProperty("database.serverTimezone", serverTimeZone);
 			}
-			if (sourceOffsetFile != null && sourceOffsetPosition != null) {
+
+			final DebeziumOffset specificOffset;
+			if (startupOptions.startupMode == StartupMode.SPECIFIC_OFFSETS) {
 				// if binlog offset is specified, 'snapshot.mode=schema_only_recovery' must be configured
+				// 'schema_only_recovery' only snapshots the schemas, not the data,
+				// and continue binlog reading from the restored offset
 				props.setProperty("snapshot.mode", "schema_only_recovery");
 
-				DebeziumState debeziumState = new DebeziumState();
+				specificOffset = new DebeziumOffset();
 				Map<String, String> sourcePartition = new HashMap<>();
-				sourcePartition.put("server", props.getProperty("database.server.name"));
-				debeziumState.setSourcePartition(sourcePartition);
+				sourcePartition.put("server", DATABASE_SERVER_NAME);
+				specificOffset.setSourcePartition(sourcePartition);
 
 				Map<String, Object> sourceOffset = new HashMap<>();
-				sourceOffset.put("file", sourceOffsetFile);
-				sourceOffset.put("pos", sourceOffsetPosition);
-				debeziumState.setSourceOffset(sourceOffset);
-
-				try {
-					ObjectMapper objectMapper = new ObjectMapper();
-					String offsetJson = objectMapper.writeValueAsString(debeziumState);
-					// if the task is restored from savepoint, it will be overwritten by restoredOffsetState
-					props.setProperty(FlinkOffsetBackingStore.OFFSET_STATE_VALUE, offsetJson);
-					props.setProperty("database.history.exists", "false");
-				} catch (IOException e) {
-					throw new RuntimeException("Can't serialize debezium offset state from Object: " + debeziumState, e);
-				}
+				sourceOffset.put("file", startupOptions.specificOffsetFile);
+				sourceOffset.put("pos", startupOptions.specificOffsetPos);
+				specificOffset.setSourceOffset(sourceOffset);
+			} else {
+				specificOffset = null;
 			}
 
 			if (dbzProperties != null) {
@@ -221,7 +208,8 @@ public class MySQLSource {
 
 			return new DebeziumSourceFunction<>(
 				deserializer,
-				props);
+				props,
+				specificOffset);
 		}
 	}
 }

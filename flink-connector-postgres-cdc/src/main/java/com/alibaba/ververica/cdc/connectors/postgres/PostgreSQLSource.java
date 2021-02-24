@@ -165,7 +165,8 @@ public class PostgreSQLSource {
 
 			return new DebeziumSourceFunction<>(
 				deserializer,
-				props);
+				props,
+				null);
 		}
 	}
 }
