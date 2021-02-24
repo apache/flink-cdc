@@ -153,6 +153,68 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 	}
 
 	@Test
+	public void testIgnoreUnchangeUpdates()throws Throwable {
+		inventoryDatabase.createAndInitialize();
+		String sourceDDL = String.format(
+				"CREATE TABLE debezium_source (" +
+				" first_name STRING," +
+				" last_name STRING" +
+				") WITH (" +
+				" 'connector' = 'mysql-cdc'," +
+				" 'hostname' = '%s'," +
+				" 'port' = '%s'," +
+				" 'username' = '%s'," +
+				" 'password' = '%s'," +
+				" 'database-name' = '%s'," +
+				" 'table-name' = '%s'," +
+				" 'capture-unchanged-updates' = 'false'" +
+				")",
+			MYSQL_CONTAINER.getHost(),
+			MYSQL_CONTAINER.getDatabasePort(),
+			inventoryDatabase.getUsername(),
+			inventoryDatabase.getPassword(),
+			inventoryDatabase.getDatabaseName(),
+			"customers");
+		String sinkDDL = "CREATE TABLE sink (" +
+			" first_name STRING," +
+			" last_name STRING" +
+			") WITH (" +
+			" 'connector' = 'values'," +
+			" 'sink-insert-only' = 'false'" +
+			")";
+		tEnv.executeSql(sourceDDL);
+		tEnv.executeSql(sinkDDL);
+
+		// async submit job
+		TableResult result = tEnv.executeSql("INSERT INTO sink SELECT first_name, last_name FROM debezium_source");
+
+		waitForSnapshotStarted("sink");
+
+		try (Connection connection = inventoryDatabase.getJdbcConnection();
+				Statement statement = connection.createStatement()) {
+
+			statement.execute("UPDATE customers SET email='isaiah.thomas@acme.com' WHERE id=1001;");
+			statement.execute("UPDATE customers SET first_name='Isaiah' WHERE id=1001;");
+		}
+
+		waitForSinkSize("sink", 6);
+
+		List<String> expected = Arrays.asList(
+				"+I(Sally,Thomas)",
+				"+I(George,Bailey)",
+				"+I(Edward,Walker)",
+				"+I(Anne,Kretchmar)",
+				"-U(Sally,Thomas)",
+				"+U(Isaiah,Thomas)"
+		);
+
+		List<String> actual = TestValuesTableFactory.getRawResults("sink");
+		assertEquals(expected, actual);
+
+		result.getJobClient().get().cancel().get();
+	}
+
+	@Test
 	public void testAllTypes() throws Throwable {
 		fullTypesDatabase.createAndInitialize();
 		String sourceDDL = String.format(

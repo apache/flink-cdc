@@ -83,6 +83,14 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 			"Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming,\n" +
 			"wal2json_rds_streaming and pgoutput.");
 
+	private static final ConfigOption<Boolean> CAPTURE_UNCHANGED_UPDATES = ConfigOptions.key("capture-unchanged-updates")
+		.booleanType()
+		.defaultValue(true)
+		.withDescription("Whether to capture the updates which don't change any monitored columns." +
+			"This may happen if the monitored columns (columns defined in Flink SQL DDL) is a subset " +
+			"of the columns in database table. Default 'true', which means all the updates will be captured. " +
+			"You can set to 'false' to only capture changed updates, but note this may increase some comparison overhead for each update event.");
+
 	@Override
 	public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
@@ -97,6 +105,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 		String tableName = config.get(TABLE_NAME);
 		int port = config.get(PORT);
 		String pluginName = config.get(DECODING_PLUGIN_NAME);
+		boolean captureUnchangedUpdates = config.get(CAPTURE_UNCHANGED_UPDATES);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
 		return new PostgreSQLTableSource(
@@ -109,7 +118,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 			username,
 			password,
 			pluginName,
-			getDebeziumProperties(context.getCatalogTable().getOptions()));
+			getDebeziumProperties(context.getCatalogTable().getOptions()),
+			captureUnchangedUpdates);
 	}
 
 	@Override
@@ -134,6 +144,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 		Set<ConfigOption<?>> options = new HashSet<>();
 		options.add(PORT);
 		options.add(DECODING_PLUGIN_NAME);
+		options.add(CAPTURE_UNCHANGED_UPDATES);
 		return options;
 	}
 }

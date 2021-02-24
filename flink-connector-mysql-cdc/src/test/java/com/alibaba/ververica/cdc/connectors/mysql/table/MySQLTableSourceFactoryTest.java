@@ -77,7 +77,8 @@ public class MySQLTableSourceFactoryTest {
 			MY_PASSWORD,
 			ZoneId.of("UTC"),
 			PROPERTIES,
-			null
+			null,
+			true
 		);
 		assertEquals(expectedSource, actualSource);
 	}
@@ -89,6 +90,7 @@ public class MySQLTableSourceFactoryTest {
 		options.put("server-id", "4321");
 		options.put("server-time-zone", "Asia/Shanghai");
 		options.put("debezium.snapshot.mode", "never");
+		options.put("capture-unchanged-updates", "false");
 
 		DynamicTableSource actualSource = createTableSource(options);
 		Properties dbzProperties = new Properties();
@@ -103,7 +105,8 @@ public class MySQLTableSourceFactoryTest {
 			MY_PASSWORD,
 			ZoneId.of("Asia/Shanghai"),
 			dbzProperties,
-			4321
+			4321,
+			false
 		);
 		assertEquals(expectedSource, actualSource);
 	}

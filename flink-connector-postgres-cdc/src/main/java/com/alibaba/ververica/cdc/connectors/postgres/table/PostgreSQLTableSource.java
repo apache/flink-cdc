@@ -55,6 +55,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 	private final String password;
 	private final String pluginName;
 	private final Properties dbzProperties;
+	private final boolean captureUnchangedUpdates;
 
 	public PostgreSQLTableSource(
 			TableSchema physicalSchema,
@@ -66,7 +67,8 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			String username,
 			String password,
 			String pluginName,
-			Properties dbzProperties) {
+			Properties dbzProperties,
+			boolean captureUnchangedUpdates) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
 		this.hostname = checkNotNull(hostname);
@@ -77,6 +79,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 		this.password = checkNotNull(password);
 		this.pluginName = checkNotNull(pluginName);
 		this.dbzProperties = dbzProperties;
+		this.captureUnchangedUpdates = captureUnchangedUpdates;
 	}
 
 	@Override
@@ -94,11 +97,13 @@ public class PostgreSQLTableSource implements ScanTableSource {
 	public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
 		RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
 		TypeInformation<RowData> typeInfo = (TypeInformation<RowData>) scanContext.createTypeInformation(physicalSchema.toRowDataType());
-		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
-			rowType,
-			typeInfo,
-			new PostgresValueValidator(schemaName, tableName),
-			ZoneId.of("UTC"));
+		DebeziumDeserializationSchema<RowData> deserializer = RowDataDebeziumDeserializeSchema.builder()
+			.setRowType(rowType)
+			.setResultTypeInfo(typeInfo)
+			.setValidator(new PostgresValueValidator(schemaName, tableName))
+			.setServerTimeZone(ZoneId.of("UTC"))
+			.setCaptureUnchangedUpdates(captureUnchangedUpdates)
+			.build();
 		DebeziumSourceFunction<RowData> sourceFunction = PostgreSQLSource.<RowData>builder()
 			.hostname(hostname)
 			.port(port)
@@ -126,7 +131,8 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			username,
 			password,
 			pluginName,
-			dbzProperties);
+			dbzProperties,
+			captureUnchangedUpdates);
 	}
 
 	@Override
@@ -146,12 +152,13 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(username, that.username) &&
 			Objects.equals(password, that.password) &&
-			Objects.equals(dbzProperties, that.dbzProperties);
+			Objects.equals(dbzProperties, that.dbzProperties) &&
+			captureUnchangedUpdates == that.captureUnchangedUpdates;
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password, dbzProperties);
+		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password, dbzProperties, captureUnchangedUpdates);
 	}
 
 	@Override

@@ -85,6 +85,14 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			"MySQL database cluster as another server (with this unique ID) so it can read the binlog. " +
 			"By default, a random number is generated between 5400 and 6400, though we recommend setting an explicit value.");
 
+	private static final ConfigOption<Boolean> CAPTURE_UNCHANGED_UPDATES = ConfigOptions.key("capture-unchanged-updates")
+		.booleanType()
+		.defaultValue(true)
+		.withDescription("Whether to capture the updates which don't change any monitored columns." +
+			"This may happen if the monitored columns (columns defined in Flink SQL DDL) is a subset " +
+			"of the columns in database table. Default 'true', which means all the updates will be captured. " +
+			"You can set to 'false' to only capture changed updates, but note this may increase some comparison overhead for each update event.");
+
 	@Override
 	public DynamicTableSource createDynamicTableSource(Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
@@ -99,6 +107,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		int port = config.get(PORT);
 		Integer serverId = config.getOptional(SERVER_ID).orElse(null);
 		ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+		boolean captureUnchangedUpdates = config.get(CAPTURE_UNCHANGED_UPDATES);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
 		return new MySQLTableSource(
@@ -111,7 +120,8 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 			password,
 			serverTimeZone,
 			getDebeziumProperties(context.getCatalogTable().getOptions()),
-			serverId
+			serverId,
+			captureUnchangedUpdates
 		);
 	}
 
@@ -137,6 +147,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 		options.add(PORT);
 		options.add(SERVER_TIME_ZONE);
 		options.add(SERVER_ID);
+		options.add(CAPTURE_UNCHANGED_UPDATES);
 		return options;
 	}
 }
