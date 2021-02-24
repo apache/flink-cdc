@@ -201,7 +201,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 		}
 
 		try {
-			result.getJobClient().get().getJobExecutionResult().get();
+			result.await();
 		} catch (Exception e) {
 			assertTrue(ExceptionUtils.findThrowableWithMessage(e,
 				"The \"before\" field of UPDATE/DELETE message is null, " +

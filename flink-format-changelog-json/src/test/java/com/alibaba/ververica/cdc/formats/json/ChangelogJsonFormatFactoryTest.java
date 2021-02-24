@@ -74,9 +74,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 			TimestampFormat.ISO_8601);
 		final ChangelogJsonSerializationSchema expectedSer = new ChangelogJsonSerializationSchema(
 			ROW_TYPE,
-			TimestampFormat.ISO_8601,
-			JsonOptions.MapNullKeyMode.LITERAL,
-			"null");
+			TimestampFormat.ISO_8601);
 
 		final Map<String, String> options = getAllOptions();
 
@@ -142,8 +140,6 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 		options.put("format", "changelog-json");
 		options.put("changelog-json.ignore-parse-errors", "true");
 		options.put("changelog-json.timestamp-format.standard", "ISO-8601");
-		options.put("changelog-json.map-null-key.mode", "LITERAL");
-		options.put("changelog-json.map-null-key.literal", "null");
 		return options;
 	}
 

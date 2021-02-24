@@ -54,10 +54,6 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 
 	public static final ConfigOption<String> TIMESTAMP_FORMAT = JsonOptions.TIMESTAMP_FORMAT;
 
-	public static final ConfigOption<String> MAP_NULL_KEY_MODE = JsonOptions.MAP_NULL_KEY_MODE;
-
-	public static final ConfigOption<String> MAP_NULL_KEY_LITERAL = JsonOptions.MAP_NULL_KEY_LITERAL;
-
 	@Override
 	public DecodingFormat<DeserializationSchema<RowData>> createDecodingFormat(
 			DynamicTableFactory.Context context, ReadableConfig formatOptions) {
@@ -66,7 +62,6 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 		TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
 
 		return new DecodingFormat<DeserializationSchema<RowData>>() {
-			@SuppressWarnings("unchecked")
 			@Override
 			public DeserializationSchema<RowData> createRuntimeDecoder(
 				DynamicTableSource.Context context, DataType producedDataType) {
@@ -96,8 +91,6 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 			DynamicTableFactory.Context context, ReadableConfig formatOptions) {
 		FactoryUtil.validateFactoryOptions(this, formatOptions);
 		TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
-		JsonOptions.MapNullKeyMode mapNullKeyMode = JsonOptions.getMapNullKeyMode(formatOptions);
-		String mapNullKeyLiteral = formatOptions.get(MAP_NULL_KEY_LITERAL);
 
 		return new EncodingFormat<SerializationSchema<RowData>>() {
 
@@ -116,10 +109,7 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 				final RowType rowType = (RowType) consumedDataType.getLogicalType();
 				return new ChangelogJsonSerializationSchema(
 					rowType,
-					timestampFormat,
-					mapNullKeyMode,
-					mapNullKeyLiteral
-				);
+					timestampFormat);
 			}
 		};
 	}
@@ -139,8 +129,6 @@ public class ChangelogJsonFormatFactory implements DeserializationFormatFactory,
 		Set<ConfigOption<?>> options = new HashSet<>();
 		options.add(IGNORE_PARSE_ERRORS);
 		options.add(TIMESTAMP_FORMAT);
-		options.add(MAP_NULL_KEY_MODE);
-		options.add(MAP_NULL_KEY_LITERAL);
 		return options;
 	}
 }

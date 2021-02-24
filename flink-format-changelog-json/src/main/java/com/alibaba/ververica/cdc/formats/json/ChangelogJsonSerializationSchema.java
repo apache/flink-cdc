@@ -54,14 +54,12 @@ public class ChangelogJsonSerializationSchema implements SerializationSchema<Row
 
 	public ChangelogJsonSerializationSchema(
 			RowType rowType,
-			TimestampFormat timestampFormat,
-			JsonOptions.MapNullKeyMode mapNullKeyMode,
-			String mapNullKeyLiteral) {
+			TimestampFormat timestampFormat) {
 		this.jsonSerializer = new JsonRowDataSerializationSchema(
 			createJsonRowType(fromLogicalToDataType(rowType)),
 			timestampFormat,
-			mapNullKeyMode,
-			mapNullKeyLiteral);
+			JsonOptions.MapNullKeyMode.FAIL,
+			JsonOptions.MAP_NULL_KEY_LITERAL.defaultValue());
 		this.timestampFormat = timestampFormat;
 	}
 
