@@ -474,6 +474,66 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 		result.getJobClient().get().cancel().get();
 	}
 
+	@Test
+	public void testStartupFromTimestamp() throws Exception {
+		inventoryDatabase.createAndInitialize();
+		String sourceDDL = String.format(
+				"CREATE TABLE debezium_source (" +
+						" id INT NOT NULL," +
+						" name STRING," +
+						" description STRING," +
+						" weight DECIMAL(10,3)" +
+						") WITH (" +
+						" 'connector' = 'mysql-cdc'," +
+						" 'hostname' = '%s'," +
+						" 'port' = '%s'," +
+						" 'username' = '%s'," +
+						" 'password' = '%s'," +
+						" 'database-name' = '%s'," +
+						" 'table-name' = '%s'," +
+						" 'scan.startup.mode' = 'timestamp'," +
+						" 'scan.startup.timestamp-millis' = '%s'" +
+						")",
+				MYSQL_CONTAINER.getHost(),
+				MYSQL_CONTAINER.getDatabasePort(),
+				inventoryDatabase.getUsername(),
+				inventoryDatabase.getPassword(),
+				inventoryDatabase.getDatabaseName(),
+				"products",
+				System.currentTimeMillis());
+		String sinkDDL = "CREATE TABLE sink " +
+				" WITH (" +
+				" 'connector' = 'values'," +
+				" 'sink-insert-only' = 'false'" +
+				") LIKE debezium_source (EXCLUDING OPTIONS)";
+		tEnv.executeSql(sourceDDL);
+		tEnv.executeSql(sinkDDL);
+
+		// async submit job
+		TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+		// wait for the source startup, we don't have a better way to wait it, use sleep for now
+		Thread.sleep(5000L);
+
+		try (Connection connection = inventoryDatabase.getJdbcConnection();
+			 Statement statement = connection.createStatement()) {
+
+			statement.execute("INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+			statement.execute("INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+			statement.execute("UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+			statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+			statement.execute("DELETE FROM products WHERE id=111;");
+		}
+
+		waitForSinkSize("sink", 7);
+
+		String[] expected = new String[]{"110,jacket,new water resistent white wind breaker,0.500"};
+
+		List<String> actual = TestValuesTableFactory.getResults("sink");
+		assertThat(actual, containsInAnyOrder(expected));
+
+		result.getJobClient().get().cancel().get();
+	}
+
 	// ------------------------------------------------------------------------------------
 
 	private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {

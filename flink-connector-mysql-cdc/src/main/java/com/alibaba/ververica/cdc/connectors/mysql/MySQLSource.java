@@ -212,6 +212,14 @@ public class MySQLSource {
 					specificOffset.setSourceOffset(sourceOffset);
 					break;
 
+				case TIMESTAMP:
+					checkNotNull(deserializer);
+					props.setProperty("snapshot.mode", "never");
+					deserializer = new SeekBinlogToTimestampFilter<>(
+							startupOptions.startupTimestampMillis,
+							deserializer);
+					break;
+
 				default:
 					throw new UnsupportedOperationException();
 			}
