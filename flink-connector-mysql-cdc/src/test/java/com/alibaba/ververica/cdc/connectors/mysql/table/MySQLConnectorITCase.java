@@ -515,7 +515,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 		Thread.sleep(5000L);
 
 		try (Connection connection = inventoryDatabase.getJdbcConnection();
-			 Statement statement = connection.createStatement()) {
+				Statement statement = connection.createStatement()) {
 
 			statement.execute("INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
 			statement.execute("INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
