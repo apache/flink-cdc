@@ -22,6 +22,8 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
 
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.connect.source.SourceRecord;
 
 /**
  * The {@link RowDataDebeziumDeserializeSchema.ValueValidator} for Postgres connector.
@@ -35,9 +37,23 @@ public final class PostgresValueValidator implements RowDataDebeziumDeserializeS
 		"Please see more in Debezium documentation: https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-replica-identity";
 
 	private final String schemaTable;
+	private final String heartbeatPrefix;
 
-	public PostgresValueValidator(String schema, String table) {
+	public PostgresValueValidator(String schema, String table, String heartbeatPrefix) {
 		this.schemaTable = schema + "." + table;
+		this.heartbeatPrefix = heartbeatPrefix;
+	}
+
+	@Override
+	public boolean filter(SourceRecord sourceRecord) {
+		String topic = sourceRecord.topic();
+		if (StringUtils.isBlank(topic)) {
+			return false;
+		}
+		if (topic.startsWith(heartbeatPrefix)) {
+			return true;
+		}
+		return false;
 	}
 
 	@Override

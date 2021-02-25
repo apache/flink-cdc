@@ -38,16 +38,21 @@ import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadF
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
+import io.debezium.connector.common.BaseSourceTask;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
+import io.debezium.embedded.EmbeddedEngine;
 import io.debezium.engine.DebeziumEngine;
+import io.debezium.pipeline.ChangeEventSourceCoordinator;
 import io.debezium.relational.history.HistoryRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -92,6 +97,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 
 	private ExecutorService executor;
 	private DebeziumEngine<?> engine;
+	/** The debeziumCoordinator to flush lsn for slot in pg {@link ChangeEventSourceCoordinator}.*/
+	private transient ChangeEventSourceCoordinator debeziumCoordinator;
 
 	/** The error from {@link #engine} thread. */
 	private transient volatile Throwable error;
@@ -206,6 +213,12 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 		} else {
 			snapshotOffsetState();
 			snapshotHistoryRecordsState();
+			if (Objects.isNull(debeziumCoordinator)){
+				initDebeziumCoordinator();
+			}
+			if (Objects.nonNull(debeziumCoordinator)){
+				debeziumCoordinator.commitOffset(debeziumConsumer.getDebeziumState().sourceOffset);
+			}
 		}
 	}
 
@@ -380,5 +393,41 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 	@Override
 	public TypeInformation<T> getProducedType() {
 		return deserializer.getProducedType();
+	}
+
+	/**
+	 * there's no public method to get coordinator var in Debezium instance, so use java reflect.
+	 */
+	private void initDebeziumCoordinator() {
+		Class<?> anonymousEngine = engine.getClass();
+		Field[] anonymousEngineFields = anonymousEngine.getDeclaredFields();
+		Object delegate = null;
+		try {
+			for (Field field : anonymousEngineFields) {
+				field.setAccessible(true);
+				Object f = field.get(engine);
+				if (f instanceof DebeziumEngine) {
+					delegate = f;
+					break;
+				}
+			}
+			if (Objects.isNull(delegate)) {
+				return;
+			}
+			Field taskField = EmbeddedEngine.class.getDeclaredField("task");
+			taskField.setAccessible(true);
+			Object sourceTask = taskField.get(delegate);
+			if (Objects.nonNull(sourceTask)) {
+				BaseSourceTask baseSourceTask = (BaseSourceTask) sourceTask;
+				Field coordinatorField = BaseSourceTask.class.getDeclaredField("coordinator");
+				coordinatorField.setAccessible(true);
+				Object coordinatorObj = coordinatorField.get(baseSourceTask);
+				if (Objects.nonNull(coordinatorObj)) {
+					debeziumCoordinator = (ChangeEventSourceCoordinator) coordinatorObj;
+				}
+			}
+		} catch (IllegalAccessException | NoSuchFieldException e) {
+			LOG.warn("can't get debezium ChangeEventSourceCoordinator, not a deadly exception for flink but will pg WAL disk space exhausted");
+		}
 	}
 }

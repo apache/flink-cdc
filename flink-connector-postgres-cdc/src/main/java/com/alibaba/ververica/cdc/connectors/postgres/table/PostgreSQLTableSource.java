@@ -32,6 +32,8 @@ import com.alibaba.ververica.cdc.connectors.postgres.PostgreSQLSource;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import io.debezium.config.Configuration;
+import io.debezium.heartbeat.Heartbeat;
 
 import java.time.ZoneId;
 import java.util.Objects;
@@ -94,10 +96,12 @@ public class PostgreSQLTableSource implements ScanTableSource {
 	public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
 		RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
 		TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(physicalSchema.toRowDataType());
+		Configuration dbzConfig = Configuration.from(dbzProperties);
+		String dbzHeartbeatPrefix = dbzConfig.getString(Heartbeat.HEARTBEAT_TOPICS_PREFIX);
 		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
 			rowType,
 			typeInfo,
-			new PostgresValueValidator(schemaName, tableName),
+			new PostgresValueValidator(schemaName, tableName, dbzHeartbeatPrefix),
 			ZoneId.of("UTC"));
 		DebeziumSourceFunction<RowData> sourceFunction = PostgreSQLSource.<RowData>builder()
 			.hostname(hostname)

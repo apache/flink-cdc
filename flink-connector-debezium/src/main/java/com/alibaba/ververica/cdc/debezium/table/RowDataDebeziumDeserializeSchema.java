@@ -64,6 +64,10 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 	 * Custom validator to validate the row value.
 	 */
 	public interface ValueValidator extends Serializable {
+		default boolean filter(SourceRecord sourceRecord){
+			return false;
+		}
+
 		void validate(RowData rowData, RowKind rowKind) throws Exception;
 	}
 
@@ -94,6 +98,9 @@ public final class RowDataDebeziumDeserializeSchema implements DebeziumDeseriali
 
 	@Override
 	public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
+		if (validator.filter(record)){
+			return;
+		}
 		Envelope.Operation op = Envelope.operationFor(record);
 		Struct value = (Struct) record.value();
 		Schema valueSchema = record.valueSchema();

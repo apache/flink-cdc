@@ -178,6 +178,10 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 		return stateSerializer.serialize(debeziumState);
 	}
 
+	public DebeziumState getDebeziumState() {
+		return debeziumState;
+	}
+
 	private class DebeziumCollector implements Collector<T> {
 		private final Queue<T> records = new ArrayDeque<>();
 
