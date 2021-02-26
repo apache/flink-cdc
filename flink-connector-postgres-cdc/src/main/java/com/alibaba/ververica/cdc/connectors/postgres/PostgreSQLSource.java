@@ -42,6 +42,7 @@ public class PostgreSQLSource {
 	public static class Builder<T> {
 
 		private String pluginName = "decoderbufs";
+		private String slotName = "flink";
 		private int port = 5432; // default 5432 port
 		private String hostname;
 		private String database;
@@ -121,6 +122,20 @@ public class PostgreSQLSource {
 		}
 
 		/**
+		 * The name of the PostgreSQL logical decoding slot that was created for streaming changes
+		 * from a particular plug-in for a particular database/schema. The server uses this slot
+		 * to stream events to the connector that you are configuring. Default is "flink".
+		 *
+		 * <p>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>,
+		 * which state: "Each replication slot has a name, which can contain lower-case letters,
+		 * numbers, and the underscore character."
+		 */
+		public Builder<T> slotName(String slotName) {
+			this.slotName = slotName;
+			return this;
+		}
+
+		/**
 		 * The Debezium Postgres connector properties.
 		 */
 		public Builder<T> debeziumProperties(Properties properties) {
@@ -145,12 +160,13 @@ public class PostgreSQLSource {
 			// database server/cluster being monitored. The logical name should be unique across
 			// all other connectors, since it is used as a prefix for all Kafka topic names coming
 			// from this connector. Only alphanumeric characters and underscores should be used.
-			props.setProperty("database.server.name", "postgres_binlog_source");
+			props.setProperty("database.server.name", "postgres_cdc_source");
 			props.setProperty("database.hostname", checkNotNull(hostname));
 			props.setProperty("database.dbname", checkNotNull(database));
 			props.setProperty("database.user", checkNotNull(username));
 			props.setProperty("database.password", checkNotNull(password));
 			props.setProperty("database.port", String.valueOf(port));
+			props.setProperty("slot.name", slotName);
 
 			if (schemaList != null) {
 				props.setProperty("schema.whitelist", String.join(",", schemaList));

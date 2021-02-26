@@ -77,6 +77,7 @@ public class PostgreSQLTableFactoryTest {
 			MY_USERNAME,
 			MY_PASSWORD,
 			"decoderbufs",
+			"flink",
 			PROPERTIES);
 		assertEquals(expectedSource, actualSource);
 	}
@@ -101,6 +102,7 @@ public class PostgreSQLTableFactoryTest {
 			MY_USERNAME,
 			MY_PASSWORD,
 			"wal2json",
+			"flink",
 			dbzProperties);
 		assertEquals(expectedSource, actualSource);
 	}

@@ -54,6 +54,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 	private final String username;
 	private final String password;
 	private final String pluginName;
+	private final String slotName;
 	private final Properties dbzProperties;
 
 	public PostgreSQLTableSource(
@@ -66,6 +67,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			String username,
 			String password,
 			String pluginName,
+			String slotName,
 			Properties dbzProperties) {
 		this.physicalSchema = physicalSchema;
 		this.port = port;
@@ -76,6 +78,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 		this.username = checkNotNull(username);
 		this.password = checkNotNull(password);
 		this.pluginName = checkNotNull(pluginName);
+		this.slotName = slotName;
 		this.dbzProperties = dbzProperties;
 	}
 
@@ -89,7 +92,6 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			.build();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
 		RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
@@ -108,6 +110,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			.username(username)
 			.password(password)
 			.decodingPluginName(pluginName)
+			.slotName(slotName)
 			.debeziumProperties(dbzProperties)
 			.deserializer(deserializer)
 			.build();
@@ -126,6 +129,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			username,
 			password,
 			pluginName,
+			slotName,
 			dbzProperties);
 	}
 
@@ -146,12 +150,14 @@ public class PostgreSQLTableSource implements ScanTableSource {
 			Objects.equals(tableName, that.tableName) &&
 			Objects.equals(username, that.username) &&
 			Objects.equals(password, that.password) &&
+			Objects.equals(pluginName, that.pluginName) &&
+			Objects.equals(slotName, that.slotName) &&
 			Objects.equals(dbzProperties, that.dbzProperties);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password, dbzProperties);
+		return Objects.hash(physicalSchema, port, hostname, database, schemaName, tableName, username, password, pluginName, slotName, dbzProperties);
 	}
 
 	@Override

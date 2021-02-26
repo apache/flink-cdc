@@ -83,6 +83,13 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 			"Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming,\n" +
 			"wal2json_rds_streaming and pgoutput.");
 
+	private static final ConfigOption<String> SLOT_NAME = ConfigOptions.key("slot.name")
+			.stringType()
+			.defaultValue("flink")
+			.withDescription("The name of the PostgreSQL logical decoding slot that was created for streaming changes " +
+					"from a particular plug-in for a particular database/schema. The server uses this slot " +
+					"to stream events to the connector that you are configuring. Default is \"flink\".");
+
 	@Override
 	public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
 		final FactoryUtil.TableFactoryHelper helper = FactoryUtil.createTableFactoryHelper(this, context);
@@ -97,6 +104,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 		String tableName = config.get(TABLE_NAME);
 		int port = config.get(PORT);
 		String pluginName = config.get(DECODING_PLUGIN_NAME);
+		String slotName = config.get(SLOT_NAME);
 		TableSchema physicalSchema = TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
 
 		return new PostgreSQLTableSource(
@@ -109,6 +117,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 			username,
 			password,
 			pluginName,
+			slotName,
 			getDebeziumProperties(context.getCatalogTable().getOptions()));
 	}
 
