@@ -22,6 +22,7 @@ import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.connector.postgresql.PostgresConnector;
 
+import java.time.Duration;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -30,6 +31,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A builder to build a SourceFunction which can read snapshot and continue to consume binlog for PostgreSQL.
  */
 public class PostgreSQLSource {
+
+	private static final long DEFAULT_HEARTBEAT_MS = Duration.ofMinutes(5).toMillis();
 
 	public static <T> Builder<T> builder() {
 		return new Builder<>();
@@ -167,6 +170,9 @@ public class PostgreSQLSource {
 			props.setProperty("database.password", checkNotNull(password));
 			props.setProperty("database.port", String.valueOf(port));
 			props.setProperty("slot.name", slotName);
+			// we have to enable heartbeat for PG to make sure DebeziumChangeConsumer#handleBatch
+			// is invoked after job restart
+			props.setProperty("heartbeat.interval.ms", String.valueOf(DEFAULT_HEARTBEAT_MS));
 
 			if (schemaList != null) {
 				props.setProperty("schema.whitelist", String.join(",", schemaList));

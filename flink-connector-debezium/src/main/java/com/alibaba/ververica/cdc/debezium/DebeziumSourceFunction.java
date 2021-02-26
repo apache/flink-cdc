@@ -19,6 +19,8 @@
 package com.alibaba.ververica.cdc.debezium;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
@@ -44,7 +46,10 @@ import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
 import io.debezium.engine.DebeziumEngine;
+import io.debezium.engine.spi.OffsetCommitPolicy;
+import io.debezium.heartbeat.Heartbeat;
 import io.debezium.relational.history.HistoryRecord;
+import org.apache.commons.collections.map.LinkedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +80,7 @@ import java.util.concurrent.TimeUnit;
 @PublicEvolving
 public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 		CheckpointedFunction,
+		CheckpointListener,
 		ResultTypeQueryable<T> {
 
 	private static final long serialVersionUID = -5808108641062931623L;
@@ -87,6 +93,11 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 	/** State name of the consumer's history records state. */
 	public static final String HISTORY_RECORDS_STATE_NAME = "history-records-states";
 
+	/** The maximum number of pending non-committed checkpoints to track, to avoid memory leaks. */
+	public static final int MAX_NUM_PENDING_CHECKPOINTS = 100;
+
+	// -------------------------------------------------------------------------------------------
+
 	/** The schema to convert from Debezium's messages into Flink's objects. */
 	private final DebeziumDeserializationSchema<T> deserializer;
 
@@ -95,6 +106,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 
 	/** The specific binlog offset to read from when the first startup. */
 	private final @Nullable DebeziumOffset specificOffset;
+
+	/** Data for pending but uncommitted offsets. */
+	private final LinkedMap pendingOffsetsToCommit = new LinkedMap();
 
 	private ExecutorService executor;
 	private DebeziumEngine<?> engine;
@@ -223,12 +237,12 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 		if (!running) {
 			LOG.debug("snapshotState() called on closed source");
 		} else {
-			snapshotOffsetState();
+			snapshotOffsetState(functionSnapshotContext.getCheckpointId());
 			snapshotHistoryRecordsState();
 		}
 	}
 
-	private void snapshotOffsetState() throws Exception {
+	private void snapshotOffsetState(long checkpointId) throws Exception {
 		offsetState.clear();
 
 		final DebeziumChangeConsumer<?> consumer = this.debeziumConsumer;
@@ -254,6 +268,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 
 		if (serializedOffset != null) {
 			offsetState.add(serializedOffset);
+			// the map cannot be asynchronously updated, because only one checkpoint call
+			// can happen on this function at a time: either snapshotState() or
+			// notifyCheckpointComplete()
+			pendingOffsetsToCommit.put(checkpointId, serializedOffset);
+			// truncate the map of pending offsets to commit, to prevent infinite growth
+			while (pendingOffsetsToCommit.size() > MAX_NUM_PENDING_CHECKPOINTS) {
+				pendingOffsetsToCommit.remove(0);
+			}
 		}
 	}
 
@@ -301,16 +323,22 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 		// history instance name to initialize FlinkDatabaseHistory
 		properties.setProperty(FlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME, engineInstanceName);
 
+		// we have to filter out the heartbeat events, otherwise the deserializer will fail
+		String dbzHeartbeatPrefix = properties.getProperty(
+				Heartbeat.HEARTBEAT_TOPICS_PREFIX.name(),
+				Heartbeat.HEARTBEAT_TOPICS_PREFIX.defaultValueAsString());
 		this.debeziumConsumer = new DebeziumChangeConsumer<>(
 			sourceContext,
 			deserializer,
 			restoredOffsetState == null, // DB snapshot phase if restore state is null
-			this::reportError);
+			this::reportError,
+			dbzHeartbeatPrefix);
 
 		// create the engine with this configuration ...
 		this.engine = DebeziumEngine.create(Connect.class)
 			.using(properties)
 			.notifying(debeziumConsumer)
+			.using(OffsetCommitPolicy.always())
 			.using((success, message, error) -> {
 				if (!success && error != null) {
 					this.reportError(error);
@@ -343,6 +371,51 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 			// may be the result of a wake-up interruption after an exception.
 			// we ignore this here and only restore the interruption state
 			Thread.currentThread().interrupt();
+		}
+	}
+
+	@Override
+	public void notifyCheckpointComplete(long checkpointId) throws Exception {
+		if (!running) {
+			LOG.debug("notifyCheckpointComplete() called on closed source");
+			return;
+		}
+
+		final DebeziumChangeConsumer<T> consumer = this.debeziumConsumer;
+		if (consumer == null) {
+			LOG.debug("notifyCheckpointComplete() called on uninitialized source");
+			return;
+		}
+
+		try {
+			final int posInMap = pendingOffsetsToCommit.indexOf(checkpointId);
+			if (posInMap == -1) {
+				LOG.warn(
+						"Consumer subtask {} received confirmation for unknown checkpoint id {}",
+						getRuntimeContext().getIndexOfThisSubtask(),
+						checkpointId);
+				return;
+			}
+
+			byte[] serializedOffsets = (byte[]) pendingOffsetsToCommit.remove(posInMap);
+
+			// remove older checkpoints in map
+			for (int i = 0; i < posInMap; i++) {
+				pendingOffsetsToCommit.remove(0);
+			}
+
+			if (serializedOffsets == null || serializedOffsets.length == 0) {
+				LOG.debug(
+						"Consumer subtask {} has empty checkpoint state.",
+						getRuntimeContext().getIndexOfThisSubtask());
+				return;
+			}
+
+			DebeziumOffset offset = DebeziumOffsetSerializer.INSTANCE.deserialize(serializedOffsets);
+			consumer.commitOffset(offset);
+		} catch (Exception e) {
+			// ignore exception if we are no longer running
+			LOG.warn("Ignore error when committing offset to database.", e);
 		}
 	}
 
@@ -394,5 +467,10 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T> implements
 	@Override
 	public TypeInformation<T> getProducedType() {
 		return deserializer.getProducedType();
+	}
+
+	@VisibleForTesting
+	public LinkedMap getPendingOffsetsToCommit() {
+		return pendingOffsetsToCommit;
 	}
 }

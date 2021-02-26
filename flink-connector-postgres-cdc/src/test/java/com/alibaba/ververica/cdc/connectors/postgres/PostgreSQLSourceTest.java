@@ -44,10 +44,14 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -62,12 +66,14 @@ import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertUpdat
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /**
  * Tests for {@link PostgreSQLSource} which also heavily tests {@link DebeziumSourceFunction}.
  */
 public class PostgreSQLSourceTest extends PostgresTestBase {
+	private static final String SLOT_NAME = "flink";
 
 	@Before
 	public void before() {
@@ -187,7 +193,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
 			assertEquals("557", JsonPath.read(state, "$.sourceOffset.txId").toString());
 			assertEquals("true", JsonPath.read(state, "$.sourceOffset.last_snapshot_record").toString());
 			assertEquals("true", JsonPath.read(state, "$.sourceOffset.snapshot").toString());
@@ -237,7 +243,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
 				assertEquals(1, offsetState.list.size());
 				String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-				assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+				assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
 				assertEquals("558", JsonPath.read(state, "$.sourceOffset.txId").toString());
 				assertTrue(state.contains("ts_usec"));
 				assertFalse(state.contains("snapshot"));
@@ -298,7 +304,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			}
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
 			assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
 			assertTrue(state.contains("ts_usec"));
 			assertFalse(state.contains("snapshot"));
@@ -339,7 +345,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			}
 			assertEquals(1, offsetState.list.size());
 			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("postgres_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+			assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
 			assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
 			assertTrue(state.contains("ts_usec"));
 			assertFalse(state.contains("snapshot"));
@@ -352,11 +358,131 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 		}
 	}
 
+	@Test
+	public void testFlushLsn() throws Exception {
+		final TestingListState<byte[]> offsetState = new TestingListState<>();
+		final TestingListState<String> historyState = new TestingListState<>();
+		final LinkedHashSet<String> flushLsn = new LinkedHashSet<>();
+		{
+			// ---------------------------------------------------------------------------
+			// Step-1: start the source from empty state
+			// ---------------------------------------------------------------------------
+			final DebeziumSourceFunction<SourceRecord> source = createPostgreSqlSource();
+			final TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
+			// setup source with empty state
+			setupSource(source, false, offsetState, historyState, true, 0, 1);
+
+			final CheckedThread runThread = new CheckedThread() {
+				@Override
+				public void go() throws Exception {
+					source.run(sourceContext);
+				}
+			};
+			runThread.start();
+
+			// wait until consumer is started
+			int received = drain(sourceContext, 9).size();
+			assertEquals(9, received);
+
+			// ---------------------------------------------------------------------------
+			// Step-2: trigger checkpoint-1 after snapshot finished
+			// ---------------------------------------------------------------------------
+			synchronized (sourceContext.getCheckpointLock()) {
+				// trigger checkpoint-1
+				source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
+			}
+			source.notifyCheckpointComplete(101);
+			assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+
+			batchInsertAndCheckpoint(5, source, sourceContext, 201);
+			assertEquals(1, source.getPendingOffsetsToCommit().size());
+			source.notifyCheckpointComplete(201);
+			assertEquals(0, source.getPendingOffsetsToCommit().size());
+			assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+
+			batchInsertAndCheckpoint(1, source, sourceContext, 301);
+			// do not notify checkpoint complete to see the LSN is not advanced.
+			assertFalse(flushLsn.add(getConfirmedFlushLsn()));
+
+			// make sure there is no more events
+			assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext));
+
+			source.cancel();
+			source.close();
+			runThread.sync();
+		}
+
+		{
+			// ---------------------------------------------------------------------------
+			// Step-3: restore the source from state
+			// ---------------------------------------------------------------------------
+			final DebeziumSourceFunction<SourceRecord> source2 = createPostgreSqlSource();
+			final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
+			// setup source with empty state
+			setupSource(source2, true, offsetState, historyState, true, 0, 1);
+
+			final CheckedThread runThread = new CheckedThread() {
+				@Override
+				public void go() throws Exception {
+					source2.run(sourceContext2);
+				}
+			};
+			runThread.start();
+
+			assertFalse(flushLsn.add(getConfirmedFlushLsn()));
+
+			batchInsertAndCheckpoint(0, source2, sourceContext2, 401);
+			Thread.sleep(3_000); // waiting heartbeat events, we set 1s heartbeat interval
+			// trigger checkpoint once again to make sure ChangeConsumer is initialized
+			batchInsertAndCheckpoint(0, source2, sourceContext2, 402);
+			source2.notifyCheckpointComplete(402);
+			assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+
+			batchInsertAndCheckpoint(3, source2, sourceContext2, 501);
+			batchInsertAndCheckpoint(2, source2, sourceContext2, 502);
+			batchInsertAndCheckpoint(1, source2, sourceContext2, 503);
+			assertEquals(3, source2.getPendingOffsetsToCommit().size());
+			source2.notifyCheckpointComplete(503);
+			assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+			assertEquals(0, source2.getPendingOffsetsToCommit().size());
+
+			// make sure there is no more events
+			assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext2));
+
+			source2.cancel();
+			source2.close();
+			runThread.sync();
+		}
+
+		assertEquals(4, flushLsn.size());
+	}
+
+	private void batchInsertAndCheckpoint(
+			int num,
+			DebeziumSourceFunction<SourceRecord> source,
+			TestSourceContext<SourceRecord> sourceContext,
+			long checkpointId) throws Exception {
+		try (Connection connection = getJdbcConnection();
+				Statement statement = connection.createStatement()) {
+			for (int i = 0; i < num; i++) {
+				statement.execute("INSERT INTO inventory.products VALUES (default,'dummy','My Dummy',1.1)");
+			}
+		}
+		assertEquals(num, drain(sourceContext, num).size());
+		synchronized (sourceContext.getCheckpointLock()) {
+			// trigger checkpoint-1
+			source.snapshotState(new StateSnapshotContextSynchronousImpl(checkpointId, checkpointId));
+		}
+	}
+
+
 	// ------------------------------------------------------------------------------------------
 	// Utilities
 	// ------------------------------------------------------------------------------------------
 
 	private DebeziumSourceFunction<SourceRecord> createPostgreSqlSource() {
+		Properties properties = new Properties();
+		properties.setProperty("heartbeat.interval.ms", "1000");
 		return PostgreSQLSource.<SourceRecord>builder()
 			.hostname(POSTGERS_CONTAINER.getHost())
 			.port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
@@ -366,7 +492,26 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 			.schemaList("inventory")
 			.tableList("inventory.products")
 			.deserializer(new ForwardDeserializeSchema())
+			.debeziumProperties(properties)
 			.build();
+	}
+
+	private String getConfirmedFlushLsn() throws SQLException {
+		try (Connection connection = getJdbcConnection();
+				Statement statement = connection.createStatement()) {
+			ResultSet rs = statement.executeQuery(String.format(
+					"select * from pg_replication_slots where slot_name = '%s' and database = '%s' and plugin = '%s'",
+					SLOT_NAME,
+					POSTGERS_CONTAINER.getDatabaseName(),
+					"decoderbufs"
+					));
+			if (rs.next()) {
+				return rs.getString("confirmed_flush_lsn");
+			} else {
+				fail("No replication slot info available");
+			}
+			return null;
+		}
 	}
 
 	private <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount) throws Exception {
