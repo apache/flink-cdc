@@ -29,8 +29,6 @@ import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.metrics.Gauge;
-import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -40,21 +38,20 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
+import com.alibaba.ververica.cdc.debezium.internal.EventQueueConsumer;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
-import com.alibaba.ververica.cdc.debezium.internal.EventQueueConsumer;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
+import com.alibaba.ververica.cdc.debezium.internal.Handover;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
-import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.relational.history.HistoryRecord;
 import org.apache.commons.collections.map.LinkedMap;
-import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,11 +61,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -118,17 +113,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     private ExecutorService executor;
     private DebeziumEngine<?> engine;
 
-    /** The error from {@link #engine} thread. */
-    private transient volatile Throwable error;
-
-    /** Flag indicating whether the consumer is still running. */
-    private volatile boolean running = true;
-
-    /** Flag indicating whether the Debezium Engine is started. */
-    private volatile boolean debeziumStarted = false;
-
-    /** The consumer to fetch records from {@link DebeziumEngine}. */
-    private transient volatile DebeziumChangeConsumer<T> debeziumConsumer;
+	/** The consumer to fetch records from {@link DebeziumEngine}. */
+	private transient volatile DebeziumChangeConsumer<T> debeziumConsumer;
 
     /**
      * The offsets to restore to, if the consumer restores state from a checkpoint.
@@ -156,7 +142,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      */
     private transient String engineInstanceName;
 
-    private transient BlockingQueue<ChangeEvent<SourceRecord, SourceRecord>> changeEventQueue;
+	private transient Handover handover;
 
     public DebeziumSourceFunction(
             DebeziumDeserializationSchema<T> deserializer,
@@ -167,14 +153,15 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         this.specificOffset = specificOffset;
     }
 
-    @Override
-    public void open(Configuration parameters) throws Exception {
-        super.open(parameters);
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-engine").build();
-        this.executor = Executors.newFixedThreadPool(2, threadFactory);
-        this.changeEventQueue = new LinkedBlockingQueue<>();
-    }
+	@Override
+	public void open(Configuration parameters) throws Exception {
+		super.open(parameters);
+		ThreadFactory threadFactory = new ThreadFactoryBuilder()
+				.setNameFormat("debezium-engine")
+				.build();
+		this.executor = Executors.newSingleThreadExecutor(threadFactory);
+		this.handover = new Handover();
+	}
 
     // ------------------------------------------------------------------------
     //  Checkpoint and restore
@@ -256,7 +243,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
-        if (!running) {
+        if (handover.isClosed()) {
             LOG.debug("snapshotState() called on closed source");
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
@@ -278,7 +265,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             }
         } else {
             byte[] currentState = consumer.snapshotCurrentState();
-            if (currentState == null && restoredOffsetState != null) {
+            if (currentState == null) {
                 // the consumer has been initialized, but has not yet received any data,
                 // which means we need to return the originally restored offsets
                 serializedOffset = restoredOffsetState.getBytes(StandardCharsets.UTF_8);
@@ -358,15 +345,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         sourceContext,
                         deserializer,
                         restoredOffsetState == null, // DB snapshot phase if restore state is null
-                        this::reportError,
                         dbzHeartbeatPrefix,
-                        changeEventQueue);
+                        handover);
 
         // create the engine with this configuration ...
         this.engine =
                 DebeziumEngine.create(Connect.class)
                         .using(properties)
-                        .notifying(new EventQueueConsumer(changeEventQueue))
+                        .notifying(new EventQueueConsumer(handover))
                         .using(OffsetCommitPolicy.always())
                         .using(
                                 (success, message, error) -> {
@@ -376,48 +362,33 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                                 })
                         .build();
 
-        if (!running) {
-            return;
-        }
+		// run the engine asynchronously
+		executor.execute(engine);
 
-        // run the engine asynchronously
-        executor.execute(engine);
-        debeziumStarted = true;
+		try {
+			// start the real debezium consumer
+			debeziumConsumer.run();
 
-        // initialize metrics
-        MetricGroup metricGroup = getRuntimeContext().getMetricGroup();
-        metricGroup.gauge(
-                "currentFetchEventTimeLag", (Gauge<Long>) () -> debeziumConsumer.getFetchDelay());
-        metricGroup.gauge(
-                "currentEmitEventTimeLag", (Gauge<Long>) () -> debeziumConsumer.getEmitDelay());
-        metricGroup.gauge("sourceIdleTime", (Gauge<Long>) () -> debeziumConsumer.getIdleTime());
-
-        // run the real debezium consumer
-        executor.execute(debeziumConsumer);
-
-        // on a clean exit, wait for the runner thread
-        try {
-            while (running) {
-                if (executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    break;
-                }
-                if (error != null) {
-                    running = false;
-                    shutdownEngine();
-                    // rethrow the error from Debezium consumer
-                    ExceptionUtils.rethrow(error);
-                }
-            }
-        } catch (InterruptedException e) {
-            // may be the result of a wake-up interruption after an exception.
-            // we ignore this here and only restore the interruption state
-            Thread.currentThread().interrupt();
-        }
-    }
+			// on a clean exit, wait for the runner thread
+			if (handover.isClosed()) {
+				shutdownEngine();
+				if (executor != null) {
+					executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+				}
+				// rethrow the error from Debezium consumer
+				ExceptionUtils.rethrow(handover.getError());
+			}
+		}
+		catch (InterruptedException e) {
+			// may be the result of a wake-up interruption after an exception.
+			// we ignore this here and only restore the interruption state
+			Thread.currentThread().interrupt();
+		}
+	}
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
-        if (!running) {
+        if (handover.isClosed()) {
             LOG.debug("notifyCheckpointComplete() called on closed source");
             return;
         }
@@ -480,30 +451,26 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         super.close();
     }
 
-    // --------------------------------------------------------------------------------
-    // Error callbacks
-    // --------------------------------------------------------------------------------
+	/**
+	 * Safely and gracefully stop the Debezium engine.
+	 */
+	private void shutdownEngine() {
+		try {
+			if (engine != null) {
+				engine.close();
+			}
+		} catch (IOException e) {
+			ExceptionUtils.rethrow(e);
+		} finally {
+			if (executor != null) {
+				executor.shutdown();
+			}
 
-    private void reportError(Throwable error) {
-        LOG.error("Reporting error:", error);
-        this.error = error;
-    }
-
-    /** Safely and gracefully stop the Debezium engine. */
-    private void shutdownEngine() {
-        try {
-            if (engine != null) {
-                engine.close();
-            }
-        } catch (IOException e) {
-            ExceptionUtils.rethrow(e);
-        } finally {
-            if (executor != null) {
-                executor.shutdown();
-            }
-            debeziumStarted = false;
-        }
-    }
+			if (handover != null) {
+				handover.close();
+			}
+		}
+	}
 
     @Override
     public TypeInformation<T> getProducedType() {
@@ -513,10 +480,5 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     @VisibleForTesting
     public LinkedMap getPendingOffsetsToCommit() {
         return pendingOffsetsToCommit;
-    }
-
-    @VisibleForTesting
-    public boolean getDebeziumStarted() {
-        return debeziumStarted;
     }
 }

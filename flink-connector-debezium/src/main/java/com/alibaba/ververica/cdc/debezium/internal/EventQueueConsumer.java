@@ -26,25 +26,25 @@ import io.debezium.engine.DebeziumEngine.RecordCommitter;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 
 /** Consume debezium change events. */
 @Internal
-public class EventQueueConsumer
-        implements DebeziumEngine.ChangeConsumer<ChangeEvent<SourceRecord, SourceRecord>> {
+public class EventQueueConsumer implements DebeziumEngine.ChangeConsumer<ChangeEvent<SourceRecord, SourceRecord>> {
 
-    private final BlockingQueue<ChangeEvent<SourceRecord, SourceRecord>> changeEventQueue;
+	private final Handover handover;
 
-    public EventQueueConsumer(
-            BlockingQueue<ChangeEvent<SourceRecord, SourceRecord>> changeEventQueue) {
-        this.changeEventQueue = changeEventQueue;
-    }
+	public EventQueueConsumer(Handover handover) {
+		this.handover = handover;
+	}
 
-    @Override
-    public void handleBatch(
-            List<ChangeEvent<SourceRecord, SourceRecord>> events,
-            RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> recordCommitter)
-            throws InterruptedException {
-        changeEventQueue.addAll(events);
-    }
+	@Override
+	public void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> events,
+			RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> recordCommitter) throws InterruptedException {
+		try {
+			handover.produce(events);
+		} catch (Throwable e) {
+			// this will hold this exception in handover and trigger consumer exit loop
+			handover.reportError(e);
+		}
+	}
 }
