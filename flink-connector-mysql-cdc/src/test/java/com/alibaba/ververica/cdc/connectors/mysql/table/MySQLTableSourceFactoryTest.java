@@ -41,259 +41,267 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/**
- * Test for {@link MySQLTableSource} created by {@link MySQLTableSourceFactory}.
- */
+/** Test for {@link MySQLTableSource} created by {@link MySQLTableSourceFactory}. */
 public class MySQLTableSourceFactoryTest {
-	private static final TableSchema SCHEMA = TableSchema.builder()
-		.field("aaa", DataTypes.INT().notNull())
-		.field("bbb", DataTypes.STRING().notNull())
-		.field("ccc", DataTypes.DOUBLE())
-		.field("ddd", DataTypes.DECIMAL(31, 18))
-		.field("eee", DataTypes.TIMESTAMP(3))
-		.primaryKey("bbb", "aaa")
-		.build();
+    private static final TableSchema SCHEMA =
+            TableSchema.builder()
+                    .field("aaa", DataTypes.INT().notNull())
+                    .field("bbb", DataTypes.STRING().notNull())
+                    .field("ccc", DataTypes.DOUBLE())
+                    .field("ddd", DataTypes.DECIMAL(31, 18))
+                    .field("eee", DataTypes.TIMESTAMP(3))
+                    .primaryKey("bbb", "aaa")
+                    .build();
 
-	private static final String MY_LOCALHOST = "localhost";
-	private static final String MY_USERNAME = "flinkuser";
-	private static final String MY_PASSWORD = "flinkpw";
-	private static final String MY_DATABASE = "myDB";
-	private static final String MY_TABLE = "myTable";
-	private static final Properties PROPERTIES = new Properties();
+    private static final String MY_LOCALHOST = "localhost";
+    private static final String MY_USERNAME = "flinkuser";
+    private static final String MY_PASSWORD = "flinkpw";
+    private static final String MY_DATABASE = "myDB";
+    private static final String MY_TABLE = "myTable";
+    private static final Properties PROPERTIES = new Properties();
 
-	@Test
-	public void testCommonProperties() {
-		Map<String, String> properties = getAllOptions();
+    @Test
+    public void testCommonProperties() {
+        Map<String, String> properties = getAllOptions();
 
-		// validation for source
-		DynamicTableSource actualSource = createTableSource(properties);
-		MySQLTableSource expectedSource = new MySQLTableSource(
-			TableSchemaUtils.getPhysicalSchema(SCHEMA),
-			3306,
-			MY_LOCALHOST,
-			MY_DATABASE,
-			MY_TABLE,
-			MY_USERNAME,
-			MY_PASSWORD,
-			ZoneId.of("UTC"),
-			PROPERTIES,
-			null,
-			StartupOptions.initial()
-		);
-		assertEquals(expectedSource, actualSource);
-	}
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        null,
+                        StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testOptionalProperties() {
-		Map<String, String> options = getAllOptions();
-		options.put("port", "3307");
-		options.put("server-id", "4321");
-		options.put("server-time-zone", "Asia/Shanghai");
-		options.put("debezium.snapshot.mode", "never");
+    @Test
+    public void testOptionalProperties() {
+        Map<String, String> options = getAllOptions();
+        options.put("port", "3307");
+        options.put("server-id", "4321");
+        options.put("server-time-zone", "Asia/Shanghai");
+        options.put("debezium.snapshot.mode", "never");
 
-		DynamicTableSource actualSource = createTableSource(options);
-		Properties dbzProperties = new Properties();
-		dbzProperties.put("snapshot.mode", "never");
-		MySQLTableSource expectedSource = new MySQLTableSource(
-			TableSchemaUtils.getPhysicalSchema(SCHEMA),
-			3307,
-			MY_LOCALHOST,
-			MY_DATABASE,
-			MY_TABLE,
-			MY_USERNAME,
-			MY_PASSWORD,
-			ZoneId.of("Asia/Shanghai"),
-			dbzProperties,
-			4321,
-			StartupOptions.initial()
-		);
-		assertEquals(expectedSource, actualSource);
-	}
+        DynamicTableSource actualSource = createTableSource(options);
+        Properties dbzProperties = new Properties();
+        dbzProperties.put("snapshot.mode", "never");
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        3307,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("Asia/Shanghai"),
+                        dbzProperties,
+                        4321,
+                        StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testStartupFromSpecificOffset() {
-		final String offsetFile = "mysql-bin.000003";
-		final int offsetPos = 100203;
+    @Test
+    public void testStartupFromSpecificOffset() {
+        final String offsetFile = "mysql-bin.000003";
+        final int offsetPos = 100203;
 
-		Map<String, String> options = getAllOptions();
-		options.put("port", "3307");
-		options.put("server-id", "4321");
-		options.put("scan.startup.mode", "specific-offset");
-		options.put("scan.startup.specific-offset.file", offsetFile);
-		options.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
+        Map<String, String> options = getAllOptions();
+        options.put("port", "3307");
+        options.put("server-id", "4321");
+        options.put("scan.startup.mode", "specific-offset");
+        options.put("scan.startup.specific-offset.file", offsetFile);
+        options.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
 
-		DynamicTableSource actualSource = createTableSource(options);
-		MySQLTableSource expectedSource = new MySQLTableSource(
-				TableSchemaUtils.getPhysicalSchema(SCHEMA),
-				3307,
-				MY_LOCALHOST,
-				MY_DATABASE,
-				MY_TABLE,
-				MY_USERNAME,
-				MY_PASSWORD,
-				ZoneId.of("UTC"),
-				PROPERTIES,
-				4321,
-				StartupOptions.specificOffset(offsetFile, offsetPos)
-		);
-		assertEquals(expectedSource, actualSource);
-	}
+        DynamicTableSource actualSource = createTableSource(options);
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        3307,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        4321,
+                        StartupOptions.specificOffset(offsetFile, offsetPos));
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testStartupFromInitial() {
-		Map<String, String> properties = getAllOptions();
-		properties.put("scan.startup.mode", "initial");
+    @Test
+    public void testStartupFromInitial() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.startup.mode", "initial");
 
-		// validation for source
-		DynamicTableSource actualSource = createTableSource(properties);
-		MySQLTableSource expectedSource = new MySQLTableSource(
-				TableSchemaUtils.getPhysicalSchema(SCHEMA),
-				3306,
-				MY_LOCALHOST,
-				MY_DATABASE,
-				MY_TABLE,
-				MY_USERNAME,
-				MY_PASSWORD,
-				ZoneId.of("UTC"),
-				PROPERTIES,
-				null,
-				StartupOptions.initial()
-		);
-		assertEquals(expectedSource, actualSource);
-	}
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        null,
+                        StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testStartupFromEarliestOffset() {
-		Map<String, String> properties = getAllOptions();
-		properties.put("scan.startup.mode", "earliest-offset");
+    @Test
+    public void testStartupFromEarliestOffset() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.startup.mode", "earliest-offset");
 
-		// validation for source
-		DynamicTableSource actualSource = createTableSource(properties);
-		MySQLTableSource expectedSource = new MySQLTableSource(
-				TableSchemaUtils.getPhysicalSchema(SCHEMA),
-				3306,
-				MY_LOCALHOST,
-				MY_DATABASE,
-				MY_TABLE,
-				MY_USERNAME,
-				MY_PASSWORD,
-				ZoneId.of("UTC"),
-				PROPERTIES,
-				null,
-				StartupOptions.earliest()
-		);
-		assertEquals(expectedSource, actualSource);
-	}
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        null,
+                        StartupOptions.earliest());
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testStartupFromLatestOffset() {
-		Map<String, String> properties = getAllOptions();
-		properties.put("scan.startup.mode", "latest-offset");
+    @Test
+    public void testStartupFromLatestOffset() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.startup.mode", "latest-offset");
 
-		// validation for source
-		DynamicTableSource actualSource = createTableSource(properties);
-		MySQLTableSource expectedSource = new MySQLTableSource(
-				TableSchemaUtils.getPhysicalSchema(SCHEMA),
-				3306,
-				MY_LOCALHOST,
-				MY_DATABASE,
-				MY_TABLE,
-				MY_USERNAME,
-				MY_PASSWORD,
-				ZoneId.of("UTC"),
-				PROPERTIES,
-				null,
-				StartupOptions.latest()
-		);
-		assertEquals(expectedSource, actualSource);
-	}
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        null,
+                        StartupOptions.latest());
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testValidation() {
-		// validate illegal port
-		try {
-			Map<String, String> properties = getAllOptions();
-			properties.put("port", "123b");
+    @Test
+    public void testValidation() {
+        // validate illegal port
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("port", "123b");
 
-			createTableSource(properties);
-			fail("exception expected");
-		} catch (Throwable t) {
-			assertTrue(ExceptionUtils.findThrowableWithMessage(t,
-				"Could not parse value '123b' for key 'port'.").isPresent());
-		}
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "Could not parse value '123b' for key 'port'.")
+                            .isPresent());
+        }
 
-		// validate illegal server id
-		try {
-			Map<String, String> properties = getAllOptions();
-			properties.put("server-id", "123b");
+        // validate illegal server id
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("server-id", "123b");
 
-			createTableSource(properties);
-			fail("exception expected");
-		} catch (Throwable t) {
-			assertTrue(ExceptionUtils.findThrowableWithMessage(t,
-				"Could not parse value '123b' for key 'server-id'.").isPresent());
-		}
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "Could not parse value '123b' for key 'server-id'.")
+                            .isPresent());
+        }
 
-		// validate missing required
-		Factory factory = new MySQLTableSourceFactory();
-		for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
-			Map<String, String> properties = getAllOptions();
-			properties.remove(requiredOption.key());
+        // validate missing required
+        Factory factory = new MySQLTableSourceFactory();
+        for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
+            Map<String, String> properties = getAllOptions();
+            properties.remove(requiredOption.key());
 
-			try {
-				createTableSource(properties);
-				fail("exception expected");
-			} catch (Throwable t) {
-				assertTrue(ExceptionUtils.findThrowableWithMessage(t,
-					"Missing required options are:\n\n" + requiredOption.key()).isPresent());
-			}
-		}
+            try {
+                createTableSource(properties);
+                fail("exception expected");
+            } catch (Throwable t) {
+                assertTrue(
+                        ExceptionUtils.findThrowableWithMessage(
+                                        t,
+                                        "Missing required options are:\n\n" + requiredOption.key())
+                                .isPresent());
+            }
+        }
 
-		// validate unsupported option
-		try {
-			Map<String, String> properties = getAllOptions();
-			properties.put("unknown", "abc");
+        // validate unsupported option
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("unknown", "abc");
 
-			createTableSource(properties);
-			fail("exception expected");
-		} catch (Throwable t) {
-			assertTrue(ExceptionUtils.findThrowableWithMessage(t,
-				"Unsupported options:\n\nunknown").isPresent());
-		}
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
+                            .isPresent());
+        }
 
-		// validate unsupported option
-		try {
-			Map<String, String> properties = getAllOptions();
-			properties.put("scan.startup.mode", "abc");
+        // validate unsupported option
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.startup.mode", "abc");
 
-			createTableSource(properties);
-			fail("exception expected");
-		} catch (Throwable t) {
-			String msg = "Invalid value for option 'scan.startup.mode'. Supported values are " +
-					"[initial, earliest-offset, latest-offset, specific-offset, timestamp], " +
-					"but was: abc";
-			assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-		}
-	}
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            String msg =
+                    "Invalid value for option 'scan.startup.mode'. Supported values are "
+                            + "[initial, earliest-offset, latest-offset, specific-offset, timestamp], "
+                            + "but was: abc";
+            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
+        }
+    }
 
-	private Map<String, String> getAllOptions() {
-		Map<String, String> options = new HashMap<>();
-		options.put("connector", "mysql-cdc");
-		options.put("hostname", MY_LOCALHOST);
-		options.put("database-name", MY_DATABASE);
-		options.put("table-name", MY_TABLE);
-		options.put("username", MY_USERNAME);
-		options.put("password", MY_PASSWORD);
-		return options;
-	}
+    private Map<String, String> getAllOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put("connector", "mysql-cdc");
+        options.put("hostname", MY_LOCALHOST);
+        options.put("database-name", MY_DATABASE);
+        options.put("table-name", MY_TABLE);
+        options.put("username", MY_USERNAME);
+        options.put("password", MY_PASSWORD);
+        return options;
+    }
 
-	private static DynamicTableSource createTableSource(Map<String, String> options) {
-		return FactoryUtil.createTableSource(
-			null,
-			ObjectIdentifier.of("default", "default", "t1"),
-			new CatalogTableImpl(SCHEMA, options, "mock source"),
-			new Configuration(),
-			MySQLTableSourceFactoryTest.class.getClassLoader(),
-			false);
-	}
+    private static DynamicTableSource createTableSource(Map<String, String> options) {
+        return FactoryUtil.createTableSource(
+                null,
+                ObjectIdentifier.of("default", "default", "t1"),
+                new CatalogTableImpl(SCHEMA, options, "mock source"),
+                new Configuration(),
+                MySQLTableSourceFactoryTest.class.getClassLoader(),
+                false);
+    }
 }

@@ -24,15 +24,13 @@ package com.alibaba.ververica.cdc.connectors.mysql.table;
  * @see StartupOptions
  */
 public enum StartupMode {
+    INITIAL,
 
-	INITIAL,
+    EARLIEST_OFFSET,
 
-	EARLIEST_OFFSET,
+    LATEST_OFFSET,
 
-	LATEST_OFFSET,
+    SPECIFIC_OFFSETS,
 
-	SPECIFIC_OFFSETS,
-
-	TIMESTAMP
-
+    TIMESTAMP
 }

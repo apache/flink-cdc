@@ -34,28 +34,29 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * @see Heartbeat
  */
 public class HeartbeatEventFilter<T> implements DebeziumDeserializationSchema<T> {
-	private static final long serialVersionUID = -4450118969976653497L;
+    private static final long serialVersionUID = -4450118969976653497L;
 
-	private final String heartbeatTopicPrefix;
-	private final DebeziumDeserializationSchema<T> serializer;
+    private final String heartbeatTopicPrefix;
+    private final DebeziumDeserializationSchema<T> serializer;
 
-	public HeartbeatEventFilter(String heartbeatTopicPrefix, DebeziumDeserializationSchema<T> serializer) {
-		this.heartbeatTopicPrefix = checkNotNull(heartbeatTopicPrefix);
-		this.serializer = checkNotNull(serializer);
-	}
+    public HeartbeatEventFilter(
+            String heartbeatTopicPrefix, DebeziumDeserializationSchema<T> serializer) {
+        this.heartbeatTopicPrefix = checkNotNull(heartbeatTopicPrefix);
+        this.serializer = checkNotNull(serializer);
+    }
 
-	@Override
-	public void deserialize(SourceRecord record, Collector<T> out) throws Exception {
-		String topic = record.topic();
-		if (topic != null && topic.startsWith(heartbeatTopicPrefix)) {
-			// drop heartbeat events
-			return;
-		}
-		serializer.deserialize(record, out);
-	}
+    @Override
+    public void deserialize(SourceRecord record, Collector<T> out) throws Exception {
+        String topic = record.topic();
+        if (topic != null && topic.startsWith(heartbeatTopicPrefix)) {
+            // drop heartbeat events
+            return;
+        }
+        serializer.deserialize(record, out);
+    }
 
-	@Override
-	public TypeInformation<T> getProducedType() {
-		return serializer.getProducedType();
-	}
+    @Override
+    public TypeInformation<T> getProducedType() {
+        return serializer.getProducedType();
+    }
 }

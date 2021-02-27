@@ -24,22 +24,20 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 
 import java.io.IOException;
 
-/**
- * Serializer implementation for a {@link DebeziumOffset}.
- */
+/** Serializer implementation for a {@link DebeziumOffset}. */
 @Internal
 public class DebeziumOffsetSerializer {
-	public static final DebeziumOffsetSerializer INSTANCE = new DebeziumOffsetSerializer();
+    public static final DebeziumOffsetSerializer INSTANCE = new DebeziumOffsetSerializer();
 
-	public byte[] serialize(DebeziumOffset debeziumOffset) throws IOException {
-		// we currently use JSON serialization for simplification, as the state is very small.
-		// we can improve this in the future if needed
-		ObjectMapper objectMapper = new ObjectMapper();
-		return objectMapper.writeValueAsBytes(debeziumOffset);
-	}
+    public byte[] serialize(DebeziumOffset debeziumOffset) throws IOException {
+        // we currently use JSON serialization for simplification, as the state is very small.
+        // we can improve this in the future if needed
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.writeValueAsBytes(debeziumOffset);
+    }
 
-	public DebeziumOffset deserialize(byte[] bytes) throws IOException {
-		ObjectMapper objectMapper = new ObjectMapper();
-		return objectMapper.readValue(bytes, DebeziumOffset.class);
-	}
+    public DebeziumOffset deserialize(byte[] bytes) throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.readValue(bytes, DebeziumOffset.class);
+    }
 }

@@ -18,8 +18,5 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql;
 
-/**
- * This is used to generate a dummy docs jar for this module to pass OSS repository rule.
- */
-public class DummyDocs {
-}
+/** This is used to generate a dummy docs jar for this module to pass OSS repository rule. */
+public class DummyDocs {}

@@ -26,33 +26,32 @@ import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
-/**
- * Integration tests for {@link MySQLSource}.
- */
+/** Integration tests for {@link MySQLSource}. */
 @Ignore
 public class MySQLSourceITCase extends MySQLTestBase {
 
-	private final UniqueDatabase inventoryDatabase = new UniqueDatabase(
-		MYSQL_CONTAINER,
-		"inventory",
-		"mysqluser",
-		"mysqlpw");
+    private final UniqueDatabase inventoryDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
 
-	@Test
-	public void testConsumingAllEvents() throws Exception {
-		inventoryDatabase.createAndInitialize();
-		SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
-			.hostname(MYSQL_CONTAINER.getHost())
-			.port(MYSQL_CONTAINER.getDatabasePort())
-			.databaseList(inventoryDatabase.getDatabaseName()) // monitor all tables under inventory database
-			.username(inventoryDatabase.getUsername())
-			.password(inventoryDatabase.getPassword())
-			.deserializer(new StringDebeziumDeserializationSchema())
-			.build();
+    @Test
+    public void testConsumingAllEvents() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        SourceFunction<String> sourceFunction =
+                MySQLSource.<String>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(
+                                inventoryDatabase
+                                        .getDatabaseName()) // monitor all tables under inventory
+                        // database
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
+                        .deserializer(new StringDebeziumDeserializationSchema())
+                        .build();
 
-		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-		env.addSource(sourceFunction).print().setParallelism(1);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.addSource(sourceFunction).print().setParallelism(1);
 
-		env.execute("Print MySQL Snapshot + Binlog");
-	}
+        env.execute("Print MySQL Snapshot + Binlog");
+    }
 }

@@ -48,125 +48,135 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class MySQLTableSource implements ScanTableSource {
 
-	private final TableSchema physicalSchema;
-	private final int port;
-	private final String hostname;
-	private final String database;
-	private final String username;
-	private final String password;
-	private final Integer serverId;
-	private final String tableName;
-	private final ZoneId serverTimeZone;
-	private final Properties dbzProperties;
-	private final StartupOptions startupOptions;
+    private final TableSchema physicalSchema;
+    private final int port;
+    private final String hostname;
+    private final String database;
+    private final String username;
+    private final String password;
+    private final Integer serverId;
+    private final String tableName;
+    private final ZoneId serverTimeZone;
+    private final Properties dbzProperties;
+    private final StartupOptions startupOptions;
 
-	public MySQLTableSource(
-			TableSchema physicalSchema,
-			int port,
-			String hostname,
-			String database,
-			String tableName,
-			String username,
-			String password,
-			ZoneId serverTimeZone,
-			Properties dbzProperties,
-			@Nullable Integer serverId,
-			StartupOptions startupOptions) {
-		this.physicalSchema = physicalSchema;
-		this.port = port;
-		this.hostname = checkNotNull(hostname);
-		this.database = checkNotNull(database);
-		this.tableName = checkNotNull(tableName);
-		this.username = checkNotNull(username);
-		this.password = checkNotNull(password);
-		this.serverId = serverId;
-		this.serverTimeZone = serverTimeZone;
-		this.dbzProperties = dbzProperties;
-		this.startupOptions = startupOptions;
-	}
+    public MySQLTableSource(
+            TableSchema physicalSchema,
+            int port,
+            String hostname,
+            String database,
+            String tableName,
+            String username,
+            String password,
+            ZoneId serverTimeZone,
+            Properties dbzProperties,
+            @Nullable Integer serverId,
+            StartupOptions startupOptions) {
+        this.physicalSchema = physicalSchema;
+        this.port = port;
+        this.hostname = checkNotNull(hostname);
+        this.database = checkNotNull(database);
+        this.tableName = checkNotNull(tableName);
+        this.username = checkNotNull(username);
+        this.password = checkNotNull(password);
+        this.serverId = serverId;
+        this.serverTimeZone = serverTimeZone;
+        this.dbzProperties = dbzProperties;
+        this.startupOptions = startupOptions;
+    }
 
-	@Override
-	public ChangelogMode getChangelogMode() {
-		return ChangelogMode.newBuilder()
-			.addContainedKind(RowKind.INSERT)
-			.addContainedKind(RowKind.UPDATE_BEFORE)
-			.addContainedKind(RowKind.UPDATE_AFTER)
-			.addContainedKind(RowKind.DELETE)
-			.build();
-	}
+    @Override
+    public ChangelogMode getChangelogMode() {
+        return ChangelogMode.newBuilder()
+                .addContainedKind(RowKind.INSERT)
+                .addContainedKind(RowKind.UPDATE_BEFORE)
+                .addContainedKind(RowKind.UPDATE_AFTER)
+                .addContainedKind(RowKind.DELETE)
+                .build();
+    }
 
-	@Override
-	public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-		RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
-		TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(physicalSchema.toRowDataType());
-		DebeziumDeserializationSchema<RowData> deserializer = new RowDataDebeziumDeserializeSchema(
-			rowType,
-			typeInfo,
-			((rowData, rowKind) -> {}),
-			serverTimeZone);
-		MySQLSource.Builder<RowData> builder = MySQLSource.<RowData>builder()
-			.hostname(hostname)
-			.port(port)
-			.databaseList(database)
-			.tableList(database + "." + tableName)
-			.username(username)
-			.password(password)
-			.serverTimeZone(serverTimeZone.toString())
-			.debeziumProperties(dbzProperties)
-			.startupOptions(startupOptions)
-			.deserializer(deserializer);
-		Optional.ofNullable(serverId).ifPresent(builder::serverId);
-		DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+    @Override
+    public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
+        RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
+        TypeInformation<RowData> typeInfo =
+                scanContext.createTypeInformation(physicalSchema.toRowDataType());
+        DebeziumDeserializationSchema<RowData> deserializer =
+                new RowDataDebeziumDeserializeSchema(
+                        rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
+        MySQLSource.Builder<RowData> builder =
+                MySQLSource.<RowData>builder()
+                        .hostname(hostname)
+                        .port(port)
+                        .databaseList(database)
+                        .tableList(database + "." + tableName)
+                        .username(username)
+                        .password(password)
+                        .serverTimeZone(serverTimeZone.toString())
+                        .debeziumProperties(dbzProperties)
+                        .startupOptions(startupOptions)
+                        .deserializer(deserializer);
+        Optional.ofNullable(serverId).ifPresent(builder::serverId);
+        DebeziumSourceFunction<RowData> sourceFunction = builder.build();
 
-		return SourceFunctionProvider.of(sourceFunction, false);
-	}
+        return SourceFunctionProvider.of(sourceFunction, false);
+    }
 
-	@Override
-	public DynamicTableSource copy() {
-		return new MySQLTableSource(
-				physicalSchema,
-				port,
-				hostname,
-				database,
-				tableName,
-				username,
-				password,
-				serverTimeZone,
-				dbzProperties,
-				serverId,
-				startupOptions
-		);
-	}
+    @Override
+    public DynamicTableSource copy() {
+        return new MySQLTableSource(
+                physicalSchema,
+                port,
+                hostname,
+                database,
+                tableName,
+                username,
+                password,
+                serverTimeZone,
+                dbzProperties,
+                serverId,
+                startupOptions);
+    }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) {
-			return true;
-		}
-		if (o == null || getClass() != o.getClass()) {
-			return false;
-		}
-		MySQLTableSource that = (MySQLTableSource) o;
-		return port == that.port &&
-			Objects.equals(physicalSchema, that.physicalSchema) &&
-			Objects.equals(hostname, that.hostname) &&
-			Objects.equals(database, that.database) &&
-			Objects.equals(username, that.username) &&
-			Objects.equals(password, that.password) &&
-			Objects.equals(serverId, that.serverId) &&
-			Objects.equals(tableName, that.tableName) &&
-			Objects.equals(serverTimeZone, that.serverTimeZone) &&
-			Objects.equals(dbzProperties, that.dbzProperties) &&
-			Objects.equals(startupOptions, that.startupOptions);
-	}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MySQLTableSource that = (MySQLTableSource) o;
+        return port == that.port
+                && Objects.equals(physicalSchema, that.physicalSchema)
+                && Objects.equals(hostname, that.hostname)
+                && Objects.equals(database, that.database)
+                && Objects.equals(username, that.username)
+                && Objects.equals(password, that.password)
+                && Objects.equals(serverId, that.serverId)
+                && Objects.equals(tableName, that.tableName)
+                && Objects.equals(serverTimeZone, that.serverTimeZone)
+                && Objects.equals(dbzProperties, that.dbzProperties)
+                && Objects.equals(startupOptions, that.startupOptions);
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(physicalSchema, port, hostname, database, username, password, serverId, tableName, serverTimeZone, dbzProperties, startupOptions);
-	}
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                physicalSchema,
+                port,
+                hostname,
+                database,
+                username,
+                password,
+                serverId,
+                tableName,
+                serverTimeZone,
+                dbzProperties,
+                startupOptions);
+    }
 
-	@Override
-	public String asSummaryString() {
-		return "MySQL-CDC";
-	}
+    @Override
+    public String asSummaryString() {
+        return "MySQL-CDC";
+    }
 }

@@ -22,107 +22,105 @@ import java.util.Objects;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/**
- * Debezium startup options.
- */
+/** Debezium startup options. */
 public final class StartupOptions {
-	public final StartupMode startupMode;
-	public final String specificOffsetFile;
-	public final Integer specificOffsetPos;
-	public final Long startupTimestampMillis;
+    public final StartupMode startupMode;
+    public final String specificOffsetFile;
+    public final Integer specificOffsetPos;
+    public final Long startupTimestampMillis;
 
-	/**
-	 * Performs an initial snapshot on the monitored database tables upon first startup,
-	 * and continue to read the latest binlog.
-	 */
-	public static StartupOptions initial() {
-		return new StartupOptions(StartupMode.INITIAL, null, null, null);
-	}
+    /**
+     * Performs an initial snapshot on the monitored database tables upon first startup, and
+     * continue to read the latest binlog.
+     */
+    public static StartupOptions initial() {
+        return new StartupOptions(StartupMode.INITIAL, null, null, null);
+    }
 
-	/**
-	 * Never to perform snapshot on the monitored database tables upon first startup,
-	 * just read from the beginning of the binlog.
-	 * This should be used with care, as it is only valid when the binlog is guaranteed to contain
-	 * the entire history of the database.
-	 */
-	public static StartupOptions earliest() {
-		return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null);
-	}
+    /**
+     * Never to perform snapshot on the monitored database tables upon first startup, just read from
+     * the beginning of the binlog. This should be used with care, as it is only valid when the
+     * binlog is guaranteed to contain the entire history of the database.
+     */
+    public static StartupOptions earliest() {
+        return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null);
+    }
 
-	/**
-	 * Never to perform snapshot on the monitored database tables upon first startup,
-	 * just read from the end of the binlog which means only have the changes since the connector
-	 * was started.
-	 */
-	public static StartupOptions latest() {
-		return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null);
-	}
+    /**
+     * Never to perform snapshot on the monitored database tables upon first startup, just read from
+     * the end of the binlog which means only have the changes since the connector was started.
+     */
+    public static StartupOptions latest() {
+        return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null);
+    }
 
-	/**
-	 * Never to perform snapshot on the monitored database tables upon first startup,
-	 * and directly read binlog from the specified offset.
-	 */
-	public static StartupOptions specificOffset(String specificOffsetFile, int specificOffsetPos) {
-		return new StartupOptions(StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null);
-	}
+    /**
+     * Never to perform snapshot on the monitored database tables upon first startup, and directly
+     * read binlog from the specified offset.
+     */
+    public static StartupOptions specificOffset(String specificOffsetFile, int specificOffsetPos) {
+        return new StartupOptions(
+                StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null);
+    }
 
-	/**
-	 * Never to perform snapshot on the monitored database tables upon first startup,
-	 * and directly read binlog from the specified timestamp.
-	 *
-	 * <p>The consumer will traverse the binlog from the beginning and ignore change events whose
-	 * timestamp is smaller than the specified timestamp.
-	 *
-	 * @param startupTimestampMillis timestamp for the startup offsets, as milliseconds from epoch.
-	 */
-	public static StartupOptions timestamp(long startupTimestampMillis) {
-		return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis);
-	}
+    /**
+     * Never to perform snapshot on the monitored database tables upon first startup, and directly
+     * read binlog from the specified timestamp.
+     *
+     * <p>The consumer will traverse the binlog from the beginning and ignore change events whose
+     * timestamp is smaller than the specified timestamp.
+     *
+     * @param startupTimestampMillis timestamp for the startup offsets, as milliseconds from epoch.
+     */
+    public static StartupOptions timestamp(long startupTimestampMillis) {
+        return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis);
+    }
 
-	private StartupOptions(
-			StartupMode startupMode,
-			String specificOffsetFile,
-			Integer specificOffsetPos,
-			Long startupTimestampMillis) {
-		this.startupMode = startupMode;
-		this.specificOffsetFile = specificOffsetFile;
-		this.specificOffsetPos = specificOffsetPos;
-		this.startupTimestampMillis = startupTimestampMillis;
+    private StartupOptions(
+            StartupMode startupMode,
+            String specificOffsetFile,
+            Integer specificOffsetPos,
+            Long startupTimestampMillis) {
+        this.startupMode = startupMode;
+        this.specificOffsetFile = specificOffsetFile;
+        this.specificOffsetPos = specificOffsetPos;
+        this.startupTimestampMillis = startupTimestampMillis;
 
-		switch (startupMode) {
-			case INITIAL:
-			case EARLIEST_OFFSET:
-			case LATEST_OFFSET:
-				break;
-			case SPECIFIC_OFFSETS:
-				checkNotNull(specificOffsetFile, "specificOffsetFile shouldn't be null");
-				checkNotNull(specificOffsetPos, "specificOffsetPos shouldn't be null");
-				break;
-			case TIMESTAMP:
-				checkNotNull(startupTimestampMillis, "startupTimestampMillis shouldn't be null");
-				break;
-			default:
-				throw new UnsupportedOperationException(startupMode + " mode is not supported.");
-		}
-	}
+        switch (startupMode) {
+            case INITIAL:
+            case EARLIEST_OFFSET:
+            case LATEST_OFFSET:
+                break;
+            case SPECIFIC_OFFSETS:
+                checkNotNull(specificOffsetFile, "specificOffsetFile shouldn't be null");
+                checkNotNull(specificOffsetPos, "specificOffsetPos shouldn't be null");
+                break;
+            case TIMESTAMP:
+                checkNotNull(startupTimestampMillis, "startupTimestampMillis shouldn't be null");
+                break;
+            default:
+                throw new UnsupportedOperationException(startupMode + " mode is not supported.");
+        }
+    }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) {
-			return true;
-		}
-		if (o == null || getClass() != o.getClass()) {
-			return false;
-		}
-		StartupOptions that = (StartupOptions) o;
-		return startupMode == that.startupMode &&
-				Objects.equals(specificOffsetFile, that.specificOffsetFile) &&
-				Objects.equals(specificOffsetPos, that.specificOffsetPos) &&
-				Objects.equals(startupTimestampMillis, that.startupTimestampMillis);
-	}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        StartupOptions that = (StartupOptions) o;
+        return startupMode == that.startupMode
+                && Objects.equals(specificOffsetFile, that.specificOffsetFile)
+                && Objects.equals(specificOffsetPos, that.specificOffsetPos)
+                && Objects.equals(startupTimestampMillis, that.startupTimestampMillis);
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(startupMode, specificOffsetFile, specificOffsetPos, startupTimestampMillis);
-	}
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                startupMode, specificOffsetFile, specificOffsetPos, startupTimestampMillis);
+    }
 }

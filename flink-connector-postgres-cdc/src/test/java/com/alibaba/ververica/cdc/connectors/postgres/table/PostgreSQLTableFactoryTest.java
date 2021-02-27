@@ -40,134 +40,141 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/**
- * Test for {@link PostgreSQLTableSource} created by {@link PostgreSQLTableFactory}.
- */
+/** Test for {@link PostgreSQLTableSource} created by {@link PostgreSQLTableFactory}. */
 public class PostgreSQLTableFactoryTest {
-	private static final TableSchema SCHEMA = TableSchema.builder()
-		.field("aaa", DataTypes.INT().notNull())
-		.field("bbb", DataTypes.STRING().notNull())
-		.field("ccc", DataTypes.DOUBLE())
-		.field("ddd", DataTypes.DECIMAL(31, 18))
-		.field("eee", DataTypes.TIMESTAMP(3))
-		.primaryKey("bbb", "aaa")
-		.build();
+    private static final TableSchema SCHEMA =
+            TableSchema.builder()
+                    .field("aaa", DataTypes.INT().notNull())
+                    .field("bbb", DataTypes.STRING().notNull())
+                    .field("ccc", DataTypes.DOUBLE())
+                    .field("ddd", DataTypes.DECIMAL(31, 18))
+                    .field("eee", DataTypes.TIMESTAMP(3))
+                    .primaryKey("bbb", "aaa")
+                    .build();
 
-	private static final String MY_LOCALHOST = "localhost";
-	private static final String MY_USERNAME = "flinkuser";
-	private static final String MY_PASSWORD = "flinkpw";
-	private static final String MY_DATABASE = "myDB";
-	private static final String MY_TABLE = "myTable";
-	private static final String MY_SCHEMA = "public";
-	private static final Properties PROPERTIES = new Properties();
+    private static final String MY_LOCALHOST = "localhost";
+    private static final String MY_USERNAME = "flinkuser";
+    private static final String MY_PASSWORD = "flinkpw";
+    private static final String MY_DATABASE = "myDB";
+    private static final String MY_TABLE = "myTable";
+    private static final String MY_SCHEMA = "public";
+    private static final Properties PROPERTIES = new Properties();
 
-	@Test
-	public void testCommonProperties() {
-		Map<String, String> properties = getAllOptions();
+    @Test
+    public void testCommonProperties() {
+        Map<String, String> properties = getAllOptions();
 
-		// validation for source
-		DynamicTableSource actualSource = createTableSource(properties);
-		PostgreSQLTableSource expectedSource = new PostgreSQLTableSource(
-			TableSchemaUtils.getPhysicalSchema(SCHEMA),
-			5432,
-			MY_LOCALHOST,
-			MY_DATABASE,
-			MY_SCHEMA,
-			MY_TABLE,
-			MY_USERNAME,
-			MY_PASSWORD,
-			"decoderbufs",
-			"flink",
-			PROPERTIES);
-		assertEquals(expectedSource, actualSource);
-	}
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        "flink",
+                        PROPERTIES);
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testOptionalProperties() {
-		Map<String, String> options = getAllOptions();
-		options.put("port", "5444");
-		options.put("decoding.plugin.name", "wal2json");
-		options.put("debezium.snapshot.mode", "never");
+    @Test
+    public void testOptionalProperties() {
+        Map<String, String> options = getAllOptions();
+        options.put("port", "5444");
+        options.put("decoding.plugin.name", "wal2json");
+        options.put("debezium.snapshot.mode", "never");
 
-		DynamicTableSource actualSource = createTableSource(options);
-		Properties dbzProperties = new Properties();
-		dbzProperties.put("snapshot.mode", "never");
-		PostgreSQLTableSource expectedSource = new PostgreSQLTableSource(
-			TableSchemaUtils.getPhysicalSchema(SCHEMA),
-			5444,
-			MY_LOCALHOST,
-			MY_DATABASE,
-			MY_SCHEMA,
-			MY_TABLE,
-			MY_USERNAME,
-			MY_PASSWORD,
-			"wal2json",
-			"flink",
-			dbzProperties);
-		assertEquals(expectedSource, actualSource);
-	}
+        DynamicTableSource actualSource = createTableSource(options);
+        Properties dbzProperties = new Properties();
+        dbzProperties.put("snapshot.mode", "never");
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        5444,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "wal2json",
+                        "flink",
+                        dbzProperties);
+        assertEquals(expectedSource, actualSource);
+    }
 
-	@Test
-	public void testValidation() {
-		// validate illegal port
-		try {
-			Map<String, String> properties = getAllOptions();
-			properties.put("port", "123b");
+    @Test
+    public void testValidation() {
+        // validate illegal port
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("port", "123b");
 
-			createTableSource(properties);
-			fail("exception expected");
-		} catch (Throwable t) {
-			assertTrue(ExceptionUtils.findThrowableWithMessage(t,
-				"Could not parse value '123b' for key 'port'.").isPresent());
-		}
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "Could not parse value '123b' for key 'port'.")
+                            .isPresent());
+        }
 
-		// validate missing required
-		Factory factory = new PostgreSQLTableFactory();
-		for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
-			Map<String, String> properties = getAllOptions();
-			properties.remove(requiredOption.key());
+        // validate missing required
+        Factory factory = new PostgreSQLTableFactory();
+        for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
+            Map<String, String> properties = getAllOptions();
+            properties.remove(requiredOption.key());
 
-			try {
-				createTableSource(properties);
-				fail("exception expected");
-			} catch (Throwable t) {
-				assertTrue(ExceptionUtils.findThrowableWithMessage(t,
-					"Missing required options are:\n\n" + requiredOption.key()).isPresent());
-			}
-		}
+            try {
+                createTableSource(properties);
+                fail("exception expected");
+            } catch (Throwable t) {
+                assertTrue(
+                        ExceptionUtils.findThrowableWithMessage(
+                                        t,
+                                        "Missing required options are:\n\n" + requiredOption.key())
+                                .isPresent());
+            }
+        }
 
-		// validate unsupported option
-		try {
-			Map<String, String> properties = getAllOptions();
-			properties.put("unknown", "abc");
+        // validate unsupported option
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("unknown", "abc");
 
-			createTableSource(properties);
-			fail("exception expected");
-		} catch (Throwable t) {
-			assertTrue(ExceptionUtils.findThrowableWithMessage(t,
-				"Unsupported options:\n\nunknown").isPresent());
-		}
-	}
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
+                            .isPresent());
+        }
+    }
 
-	private Map<String, String> getAllOptions() {
-		Map<String, String> options = new HashMap<>();
-		options.put("connector", "postgres-cdc");
-		options.put("hostname", MY_LOCALHOST);
-		options.put("database-name", MY_DATABASE);
-		options.put("schema-name", MY_SCHEMA);
-		options.put("table-name", MY_TABLE);
-		options.put("username", MY_USERNAME);
-		options.put("password", MY_PASSWORD);
-		return options;
-	}
+    private Map<String, String> getAllOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put("connector", "postgres-cdc");
+        options.put("hostname", MY_LOCALHOST);
+        options.put("database-name", MY_DATABASE);
+        options.put("schema-name", MY_SCHEMA);
+        options.put("table-name", MY_TABLE);
+        options.put("username", MY_USERNAME);
+        options.put("password", MY_PASSWORD);
+        return options;
+    }
 
-	private static DynamicTableSource createTableSource(Map<String, String> options) {
-		return FactoryUtil.createTableSource(
-			null,
-			ObjectIdentifier.of("default", "default", "t1"),
-			new CatalogTableImpl(SCHEMA, options, "mock source"),
-			new Configuration(),
-			PostgreSQLTableFactoryTest.class.getClassLoader(),
-			false);
-	}
+    private static DynamicTableSource createTableSource(Map<String, String> options) {
+        return FactoryUtil.createTableSource(
+                null,
+                ObjectIdentifier.of("default", "default", "t1"),
+                new CatalogTableImpl(SCHEMA, options, "mock source"),
+                new Configuration(),
+                PostgreSQLTableFactoryTest.class.getClassLoader(),
+                false);
+    }
 }

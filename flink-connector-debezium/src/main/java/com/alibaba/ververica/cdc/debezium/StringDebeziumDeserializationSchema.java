@@ -29,15 +29,15 @@ import org.apache.kafka.connect.source.SourceRecord;
  * {@link SourceRecord} into String.
  */
 public class StringDebeziumDeserializationSchema implements DebeziumDeserializationSchema<String> {
-	private static final long serialVersionUID = -3168848963265670603L;
+    private static final long serialVersionUID = -3168848963265670603L;
 
-	@Override
-	public void deserialize(SourceRecord record, Collector<String> out) throws Exception {
-		out.collect(record.toString());
-	}
+    @Override
+    public void deserialize(SourceRecord record, Collector<String> out) throws Exception {
+        out.collect(record.toString());
+    }
 
-	@Override
-	public TypeInformation<String> getProducedType() {
-		return BasicTypeInfo.STRING_TYPE_INFO;
-	}
+    @Override
+    public TypeInformation<String> getProducedType() {
+        return BasicTypeInfo.STRING_TYPE_INFO;
+    }
 }

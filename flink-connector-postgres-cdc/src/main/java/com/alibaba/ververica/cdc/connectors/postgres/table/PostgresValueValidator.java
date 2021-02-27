@@ -23,27 +23,27 @@ import org.apache.flink.types.RowKind;
 
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
-/**
- * The {@link RowDataDebeziumDeserializeSchema.ValueValidator} for Postgres connector.
- */
-public final class PostgresValueValidator implements RowDataDebeziumDeserializeSchema.ValueValidator {
-	private static final long serialVersionUID = -1870679469578028765L;
+/** The {@link RowDataDebeziumDeserializeSchema.ValueValidator} for Postgres connector. */
+public final class PostgresValueValidator
+        implements RowDataDebeziumDeserializeSchema.ValueValidator {
+    private static final long serialVersionUID = -1870679469578028765L;
 
-	private static final String REPLICA_IDENTITY_EXCEPTION = "The \"before\" field of UPDATE/DELETE message is null, " +
-		"please check the Postgres table has been set REPLICA IDENTITY to FULL level. " +
-		"You can update the setting by running the command in Postgres 'ALTER TABLE %s REPLICA IDENTITY FULL'. " +
-		"Please see more in Debezium documentation: https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-replica-identity";
+    private static final String REPLICA_IDENTITY_EXCEPTION =
+            "The \"before\" field of UPDATE/DELETE message is null, "
+                    + "please check the Postgres table has been set REPLICA IDENTITY to FULL level. "
+                    + "You can update the setting by running the command in Postgres 'ALTER TABLE %s REPLICA IDENTITY FULL'. "
+                    + "Please see more in Debezium documentation: https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-replica-identity";
 
-	private final String schemaTable;
+    private final String schemaTable;
 
-	public PostgresValueValidator(String schema, String table) {
-		this.schemaTable = schema + "." + table;
-	}
+    public PostgresValueValidator(String schema, String table) {
+        this.schemaTable = schema + "." + table;
+    }
 
-	@Override
-	public void validate(RowData rowData, RowKind rowKind) throws Exception {
-		if (rowData == null) {
-			throw new IllegalStateException(String.format(REPLICA_IDENTITY_EXCEPTION, schemaTable));
-		}
-	}
+    @Override
+    public void validate(RowData rowData, RowKind rowKind) throws Exception {
+        if (rowData == null) {
+            throw new IllegalStateException(String.format(REPLICA_IDENTITY_EXCEPTION, schemaTable));
+        }
+    }
 }

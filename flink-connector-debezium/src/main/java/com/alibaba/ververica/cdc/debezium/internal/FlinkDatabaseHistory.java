@@ -36,8 +36,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
 /**
- * Inspired from {@link io.debezium.relational.history.MemoryDatabaseHistory} but we will store
- * the HistoryRecords in Flink's state for persistence.
+ * Inspired from {@link io.debezium.relational.history.MemoryDatabaseHistory} but we will store the
+ * HistoryRecords in Flink's state for persistence.
  *
  * <p>Note: This is not a clean solution because we depends on a global variable and all the history
  * records will be stored in state (grow infinitely). We may need to come up with a
@@ -45,100 +45,107 @@ import java.util.function.Consumer;
  */
 public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
-	public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
+    public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
 
-	/**
-	 * We will synchronize the records into Flink's state during snapshot.
-	 * We have to use a global variable to communicate with Flink's source function,
-	 * because Debezium will construct the instance of {@link DatabaseHistory} itself.
-	 * Maybe we can improve this in the future.
-	 *
-	 * <p>NOTE: we just use Flink's state as a durable persistent storage as a replacement of
-	 * {@link FileDatabaseHistory} and {@link KafkaDatabaseHistory}. It doesn't need to guarantee
-	 * the exactly-once semantic for the history records. The history records shouldn't be super
-	 * large, because we only monitor the schema changes for one single table.
-	 *
-	 * @see com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction#snapshotState(FunctionSnapshotContext)
-	 */
-	public static final Map<String, ConcurrentLinkedQueue<HistoryRecord>> ALL_RECORDS = new HashMap<>();
+    /**
+     * We will synchronize the records into Flink's state during snapshot. We have to use a global
+     * variable to communicate with Flink's source function, because Debezium will construct the
+     * instance of {@link DatabaseHistory} itself. Maybe we can improve this in the future.
+     *
+     * <p>NOTE: we just use Flink's state as a durable persistent storage as a replacement of {@link
+     * FileDatabaseHistory} and {@link KafkaDatabaseHistory}. It doesn't need to guarantee the
+     * exactly-once semantic for the history records. The history records shouldn't be super large,
+     * because we only monitor the schema changes for one single table.
+     *
+     * @see
+     *     com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction#snapshotState(FunctionSnapshotContext)
+     */
+    public static final Map<String, ConcurrentLinkedQueue<HistoryRecord>> ALL_RECORDS =
+            new HashMap<>();
 
-	private ConcurrentLinkedQueue<HistoryRecord> records;
-	private String instanceName;
+    private ConcurrentLinkedQueue<HistoryRecord> records;
+    private String instanceName;
 
-	/**
-	 * Registers the given HistoryRecords into global variable under the given instance name,
-	 * in order to be accessed by instance of {@link FlinkDatabaseHistory}.
-	 */
-	public static void registerHistoryRecords(String instanceName, ConcurrentLinkedQueue<HistoryRecord> historyRecords) {
-		synchronized (FlinkDatabaseHistory.ALL_RECORDS) {
-			FlinkDatabaseHistory.ALL_RECORDS.put(instanceName, historyRecords);
-		}
-	}
+    /**
+     * Registers the given HistoryRecords into global variable under the given instance name, in
+     * order to be accessed by instance of {@link FlinkDatabaseHistory}.
+     */
+    public static void registerHistoryRecords(
+            String instanceName, ConcurrentLinkedQueue<HistoryRecord> historyRecords) {
+        synchronized (FlinkDatabaseHistory.ALL_RECORDS) {
+            FlinkDatabaseHistory.ALL_RECORDS.put(instanceName, historyRecords);
+        }
+    }
 
-	/**
-	 * Registers an empty HistoryRecords into global variable under the given instance name,
-	 * in order to be accessed by instance of {@link FlinkDatabaseHistory}.
-	 */
-	public static void registerEmptyHistoryRecord(String instanceName) {
-		registerHistoryRecords(instanceName, new ConcurrentLinkedQueue<>());
-	}
+    /**
+     * Registers an empty HistoryRecords into global variable under the given instance name, in
+     * order to be accessed by instance of {@link FlinkDatabaseHistory}.
+     */
+    public static void registerEmptyHistoryRecord(String instanceName) {
+        registerHistoryRecords(instanceName, new ConcurrentLinkedQueue<>());
+    }
 
-	/**
-	 * Gets the registered HistoryRecords under the given instance name.
-	 */
-	public static ConcurrentLinkedQueue<HistoryRecord> getRegisteredHistoryRecord(String instanceName) {
-		synchronized (ALL_RECORDS) {
-			if (ALL_RECORDS.containsKey(instanceName)) {
-				return ALL_RECORDS.get(instanceName);
-			}
-		}
-		return null;
-	}
+    /** Gets the registered HistoryRecords under the given instance name. */
+    public static ConcurrentLinkedQueue<HistoryRecord> getRegisteredHistoryRecord(
+            String instanceName) {
+        synchronized (ALL_RECORDS) {
+            if (ALL_RECORDS.containsKey(instanceName)) {
+                return ALL_RECORDS.get(instanceName);
+            }
+        }
+        return null;
+    }
 
-	@Override
-	public void configure(Configuration config, HistoryRecordComparator comparator, DatabaseHistoryListener listener, boolean useCatalogBeforeSchema) {
-		super.configure(config, comparator, listener, useCatalogBeforeSchema);
-		this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
-		this.records = getRegisteredHistoryRecord(instanceName);
-		if (records == null) {
-			throw new IllegalStateException(
-				String.format("Couldn't find engine instance %s in the global records.", instanceName));
-		}
-	}
+    @Override
+    public void configure(
+            Configuration config,
+            HistoryRecordComparator comparator,
+            DatabaseHistoryListener listener,
+            boolean useCatalogBeforeSchema) {
+        super.configure(config, comparator, listener, useCatalogBeforeSchema);
+        this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
+        this.records = getRegisteredHistoryRecord(instanceName);
+        if (records == null) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Couldn't find engine instance %s in the global records.",
+                            instanceName));
+        }
+    }
 
-	@Override
-	public void stop() {
-		super.stop();
-		if (instanceName != null) {
-			synchronized (ALL_RECORDS) {
-				// clear memory
-				ALL_RECORDS.remove(instanceName);
-			}
-		}
-	}
+    @Override
+    public void stop() {
+        super.stop();
+        if (instanceName != null) {
+            synchronized (ALL_RECORDS) {
+                // clear memory
+                ALL_RECORDS.remove(instanceName);
+            }
+        }
+    }
 
-	@Override
-	protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
-		this.records.add(record);
-	}
+    @Override
+    protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
+        this.records.add(record);
+    }
 
-	@Override
-	protected void recoverRecords(Consumer<HistoryRecord> records) {
-		this.records.forEach(records);
-	}
+    @Override
+    protected void recoverRecords(Consumer<HistoryRecord> records) {
+        this.records.forEach(records);
+    }
 
-	@Override
-	public boolean exists() {
-		return !records.isEmpty();
-	}
+    @Override
+    public boolean exists() {
+        return !records.isEmpty();
+    }
 
-	@Override
-	public boolean storageExists() {
-		return true;
-	}
+    @Override
+    public boolean storageExists() {
+        return true;
+    }
 
-	@Override
-	public String toString() {
-		return "Flink Database History";
-	}
+    @Override
+    public String toString() {
+        return "Flink Database History";
+    }
 }

@@ -36,110 +36,115 @@ import java.util.Objects;
 import static java.lang.String.format;
 import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
 
-
 /**
- * Deserialization schema from Changelog Json to Flink Table/SQL internal data structure {@link RowData}.
+ * Deserialization schema from Changelog Json to Flink Table/SQL internal data structure {@link
+ * RowData}.
  */
 public class ChangelogJsonDeserializationSchema implements DeserializationSchema<RowData> {
-	private static final long serialVersionUID = -2084214292622004460L;
+    private static final long serialVersionUID = -2084214292622004460L;
 
-	/** The deserializer to deserialize Debezium JSON data. */
-	private final JsonRowDataDeserializationSchema jsonDeserializer;
+    /** The deserializer to deserialize Debezium JSON data. */
+    private final JsonRowDataDeserializationSchema jsonDeserializer;
 
-	/** TypeInformation of the produced {@link RowData}. **/
-	private final TypeInformation<RowData> resultTypeInfo;
+    /** TypeInformation of the produced {@link RowData}. * */
+    private final TypeInformation<RowData> resultTypeInfo;
 
-	/** Flag indicating whether to ignore invalid fields/rows (default: throw an exception). */
-	private final boolean ignoreParseErrors;
+    /** Flag indicating whether to ignore invalid fields/rows (default: throw an exception). */
+    private final boolean ignoreParseErrors;
 
-	public ChangelogJsonDeserializationSchema(
-			RowType rowType,
-			TypeInformation<RowData> resultTypeInfo,
-			boolean ignoreParseErrors,
-			TimestampFormat timestampFormatOption) {
-		this.resultTypeInfo = resultTypeInfo;
-		this.ignoreParseErrors = ignoreParseErrors;
-		this.jsonDeserializer = new JsonRowDataDeserializationSchema(
-			createJsonRowType(fromLogicalToDataType(rowType)),
-			// the result type is never used, so it's fine to pass in Debezium's result type
-			resultTypeInfo,
-			false, // ignoreParseErrors already contains the functionality of failOnMissingField
-			ignoreParseErrors,
-			timestampFormatOption);
-	}
+    public ChangelogJsonDeserializationSchema(
+            RowType rowType,
+            TypeInformation<RowData> resultTypeInfo,
+            boolean ignoreParseErrors,
+            TimestampFormat timestampFormatOption) {
+        this.resultTypeInfo = resultTypeInfo;
+        this.ignoreParseErrors = ignoreParseErrors;
+        this.jsonDeserializer =
+                new JsonRowDataDeserializationSchema(
+                        createJsonRowType(fromLogicalToDataType(rowType)),
+                        // the result type is never used, so it's fine to pass in Debezium's result
+                        // type
+                        resultTypeInfo,
+                        false, // ignoreParseErrors already contains the functionality of
+                        // failOnMissingField
+                        ignoreParseErrors,
+                        timestampFormatOption);
+    }
 
-	@Override
-	public RowData deserialize(byte[] message) throws IOException {
-		throw new RuntimeException(
-			"Please invoke DeserializationSchema#deserialize(byte[], Collector<RowData>) instead.");
-	}
+    @Override
+    public RowData deserialize(byte[] message) throws IOException {
+        throw new RuntimeException(
+                "Please invoke DeserializationSchema#deserialize(byte[], Collector<RowData>) instead.");
+    }
 
-	@Override
-	public void deserialize(byte[] bytes, Collector<RowData> out) throws IOException {
-		try {
-			GenericRowData row = (GenericRowData) jsonDeserializer.deserialize(bytes);
-			GenericRowData data = (GenericRowData) row.getField(0);
-			String op = row.getString(1).toString();
-			RowKind rowKind = parseRowKind(op);
-			data.setRowKind(rowKind);
-			out.collect(data);
-		} catch (Throwable t) {
-			// a big try catch to protect the processing.
-			if (!ignoreParseErrors) {
-				throw new IOException(format(
-					"Corrupt Debezium JSON message '%s'.", new String(bytes)), t);
-			}
-		}
-	}
+    @Override
+    public void deserialize(byte[] bytes, Collector<RowData> out) throws IOException {
+        try {
+            GenericRowData row = (GenericRowData) jsonDeserializer.deserialize(bytes);
+            GenericRowData data = (GenericRowData) row.getField(0);
+            String op = row.getString(1).toString();
+            RowKind rowKind = parseRowKind(op);
+            data.setRowKind(rowKind);
+            out.collect(data);
+        } catch (Throwable t) {
+            // a big try catch to protect the processing.
+            if (!ignoreParseErrors) {
+                throw new IOException(
+                        format("Corrupt Debezium JSON message '%s'.", new String(bytes)), t);
+            }
+        }
+    }
 
-	private static RowKind parseRowKind(String op) {
-		switch (op) {
-			case "+I":
-				return RowKind.INSERT;
-			case "-U":
-				return RowKind.UPDATE_BEFORE;
-			case "+U":
-				return RowKind.UPDATE_AFTER;
-			case "-D":
-				return RowKind.DELETE;
-			default:
-				throw new UnsupportedOperationException("Unsupported operation '" + op + "' for row kind.");
-		}
-	}
+    private static RowKind parseRowKind(String op) {
+        switch (op) {
+            case "+I":
+                return RowKind.INSERT;
+            case "-U":
+                return RowKind.UPDATE_BEFORE;
+            case "+U":
+                return RowKind.UPDATE_AFTER;
+            case "-D":
+                return RowKind.DELETE;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported operation '" + op + "' for row kind.");
+        }
+    }
 
-	@Override
-	public boolean isEndOfStream(RowData rowData) {
-		return false;
-	}
+    @Override
+    public boolean isEndOfStream(RowData rowData) {
+        return false;
+    }
 
-	@Override
-	public TypeInformation<RowData> getProducedType() {
-		return resultTypeInfo;
-	}
+    @Override
+    public TypeInformation<RowData> getProducedType() {
+        return resultTypeInfo;
+    }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) {
-			return true;
-		}
-		if (o == null || getClass() != o.getClass()) {
-			return false;
-		}
-		ChangelogJsonDeserializationSchema that = (ChangelogJsonDeserializationSchema) o;
-		return ignoreParseErrors == that.ignoreParseErrors &&
-			Objects.equals(jsonDeserializer, that.jsonDeserializer) &&
-			Objects.equals(resultTypeInfo, that.resultTypeInfo);
-	}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ChangelogJsonDeserializationSchema that = (ChangelogJsonDeserializationSchema) o;
+        return ignoreParseErrors == that.ignoreParseErrors
+                && Objects.equals(jsonDeserializer, that.jsonDeserializer)
+                && Objects.equals(resultTypeInfo, that.resultTypeInfo);
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(jsonDeserializer, resultTypeInfo, ignoreParseErrors);
-	}
+    @Override
+    public int hashCode() {
+        return Objects.hash(jsonDeserializer, resultTypeInfo, ignoreParseErrors);
+    }
 
-	private static RowType createJsonRowType(DataType databaseSchema) {
-		DataType payload = DataTypes.ROW(
-			DataTypes.FIELD("data", databaseSchema),
-			DataTypes.FIELD("op", DataTypes.STRING()));
-		return (RowType) payload.getLogicalType();
-	}
+    private static RowType createJsonRowType(DataType databaseSchema) {
+        DataType payload =
+                DataTypes.ROW(
+                        DataTypes.FIELD("data", databaseSchema),
+                        DataTypes.FIELD("op", DataTypes.STRING()));
+        return (RowType) payload.getLogicalType();
+    }
 }

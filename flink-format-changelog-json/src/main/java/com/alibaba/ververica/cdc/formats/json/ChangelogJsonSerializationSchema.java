@@ -35,83 +35,85 @@ import java.util.Objects;
 import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
 
 /**
- * Serialization schema from Flink Table/SQL internal data structure {@link RowData} to Changelog Json.
+ * Serialization schema from Flink Table/SQL internal data structure {@link RowData} to Changelog
+ * Json.
  */
 public class ChangelogJsonSerializationSchema implements SerializationSchema<RowData> {
-	private static final long serialVersionUID = -3999450457829887684L;
+    private static final long serialVersionUID = -3999450457829887684L;
 
-	private static final StringData OP_INSERT = StringData.fromString("+I");
-	private static final StringData OP_UPDATE_BEFORE = StringData.fromString("-U");
-	private static final StringData OP_UPDATE_AFTER = StringData.fromString("+U");
-	private static final StringData OP_DELETE = StringData.fromString("-D");
+    private static final StringData OP_INSERT = StringData.fromString("+I");
+    private static final StringData OP_UPDATE_BEFORE = StringData.fromString("-U");
+    private static final StringData OP_UPDATE_AFTER = StringData.fromString("+U");
+    private static final StringData OP_DELETE = StringData.fromString("-D");
 
-	private final JsonRowDataSerializationSchema jsonSerializer;
+    private final JsonRowDataSerializationSchema jsonSerializer;
 
-	/** Timestamp format specification which is used to parse timestamp. */
-	private final TimestampFormat timestampFormat;
+    /** Timestamp format specification which is used to parse timestamp. */
+    private final TimestampFormat timestampFormat;
 
-	private transient GenericRowData reuse;
+    private transient GenericRowData reuse;
 
-	public ChangelogJsonSerializationSchema(
-			RowType rowType,
-			TimestampFormat timestampFormat) {
-		this.jsonSerializer = new JsonRowDataSerializationSchema(
-			createJsonRowType(fromLogicalToDataType(rowType)),
-			timestampFormat,
-			JsonOptions.MapNullKeyMode.FAIL,
-			JsonOptions.MAP_NULL_KEY_LITERAL.defaultValue());
-		this.timestampFormat = timestampFormat;
-	}
+    public ChangelogJsonSerializationSchema(RowType rowType, TimestampFormat timestampFormat) {
+        this.jsonSerializer =
+                new JsonRowDataSerializationSchema(
+                        createJsonRowType(fromLogicalToDataType(rowType)),
+                        timestampFormat,
+                        JsonOptions.MapNullKeyMode.FAIL,
+                        JsonOptions.MAP_NULL_KEY_LITERAL.defaultValue());
+        this.timestampFormat = timestampFormat;
+    }
 
-	@Override
-	public void open(InitializationContext context) throws Exception {
-		this.reuse = new GenericRowData(2);
-	}
+    @Override
+    public void open(InitializationContext context) throws Exception {
+        this.reuse = new GenericRowData(2);
+    }
 
-	@Override
-	public byte[] serialize(RowData rowData) {
-		reuse.setField(0, rowData);
-		reuse.setField(1, stringifyRowKind(rowData.getRowKind()));
-		return jsonSerializer.serialize(reuse);
-	}
+    @Override
+    public byte[] serialize(RowData rowData) {
+        reuse.setField(0, rowData);
+        reuse.setField(1, stringifyRowKind(rowData.getRowKind()));
+        return jsonSerializer.serialize(reuse);
+    }
 
-	private static StringData stringifyRowKind(RowKind rowKind) {
-		switch (rowKind) {
-			case INSERT:
-				return OP_INSERT;
-			case UPDATE_BEFORE:
-				return OP_UPDATE_BEFORE;
-			case UPDATE_AFTER:
-				return OP_UPDATE_AFTER;
-			case DELETE:
-				return OP_DELETE;
-			default:
-				throw new UnsupportedOperationException("Unsupported operation '" + rowKind + "' for row kind.");
-		}
-	}
+    private static StringData stringifyRowKind(RowKind rowKind) {
+        switch (rowKind) {
+            case INSERT:
+                return OP_INSERT;
+            case UPDATE_BEFORE:
+                return OP_UPDATE_BEFORE;
+            case UPDATE_AFTER:
+                return OP_UPDATE_AFTER;
+            case DELETE:
+                return OP_DELETE;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported operation '" + rowKind + "' for row kind.");
+        }
+    }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) {
-			return true;
-		}
-		if (o == null || getClass() != o.getClass()) {
-			return false;
-		}
-		ChangelogJsonSerializationSchema that = (ChangelogJsonSerializationSchema) o;
-		return Objects.equals(jsonSerializer, that.jsonSerializer) &&
-			timestampFormat == that.timestampFormat;
-	}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ChangelogJsonSerializationSchema that = (ChangelogJsonSerializationSchema) o;
+        return Objects.equals(jsonSerializer, that.jsonSerializer)
+                && timestampFormat == that.timestampFormat;
+    }
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(jsonSerializer, timestampFormat);
-	}
+    @Override
+    public int hashCode() {
+        return Objects.hash(jsonSerializer, timestampFormat);
+    }
 
-	private static RowType createJsonRowType(DataType databaseSchema) {
-		DataType payload = DataTypes.ROW(
-			DataTypes.FIELD("data", databaseSchema),
-			DataTypes.FIELD("op", DataTypes.STRING()));
-		return (RowType) payload.getLogicalType();
-	}
+    private static RowType createJsonRowType(DataType databaseSchema) {
+        DataType payload =
+                DataTypes.ROW(
+                        DataTypes.FIELD("data", databaseSchema),
+                        DataTypes.FIELD("op", DataTypes.STRING()));
+        return (RowType) payload.getLogicalType();
+    }
 }

@@ -20,11 +20,9 @@ package com.alibaba.ververica.cdc.debezium.internal;
 
 import org.apache.flink.annotation.Internal;
 
-/**
- * A reporter that can report errors to handler.
- */
+/** A reporter that can report errors to handler. */
 @Internal
 public interface ErrorReporter {
 
-	void reportError(Throwable error);
+    void reportError(Throwable error);
 }

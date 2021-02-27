@@ -44,91 +44,90 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Format factory for providing configured instances of Debezium JSON to RowData {@link DeserializationSchema}.
+ * Format factory for providing configured instances of Debezium JSON to RowData {@link
+ * DeserializationSchema}.
  */
-public class ChangelogJsonFormatFactory implements DeserializationFormatFactory, SerializationFormatFactory {
+public class ChangelogJsonFormatFactory
+        implements DeserializationFormatFactory, SerializationFormatFactory {
 
-	public static final String IDENTIFIER = "changelog-json";
+    public static final String IDENTIFIER = "changelog-json";
 
-	public static final ConfigOption<Boolean> IGNORE_PARSE_ERRORS = JsonOptions.IGNORE_PARSE_ERRORS;
+    public static final ConfigOption<Boolean> IGNORE_PARSE_ERRORS = JsonOptions.IGNORE_PARSE_ERRORS;
 
-	public static final ConfigOption<String> TIMESTAMP_FORMAT = JsonOptions.TIMESTAMP_FORMAT;
+    public static final ConfigOption<String> TIMESTAMP_FORMAT = JsonOptions.TIMESTAMP_FORMAT;
 
-	@Override
-	public DecodingFormat<DeserializationSchema<RowData>> createDecodingFormat(
-			DynamicTableFactory.Context context, ReadableConfig formatOptions) {
-		FactoryUtil.validateFactoryOptions(this, formatOptions);
-		final boolean ignoreParseErrors = formatOptions.get(IGNORE_PARSE_ERRORS);
-		TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
+    @Override
+    public DecodingFormat<DeserializationSchema<RowData>> createDecodingFormat(
+            DynamicTableFactory.Context context, ReadableConfig formatOptions) {
+        FactoryUtil.validateFactoryOptions(this, formatOptions);
+        final boolean ignoreParseErrors = formatOptions.get(IGNORE_PARSE_ERRORS);
+        TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
 
-		return new DecodingFormat<DeserializationSchema<RowData>>() {
-			@Override
-			public DeserializationSchema<RowData> createRuntimeDecoder(
-				DynamicTableSource.Context context, DataType producedDataType) {
-				final RowType rowType = (RowType) producedDataType.getLogicalType();
-				final TypeInformation<RowData> rowDataTypeInfo = context.createTypeInformation(producedDataType);
-				return new ChangelogJsonDeserializationSchema(
-					rowType,
-					rowDataTypeInfo,
-					ignoreParseErrors,
-					timestampFormat);
-			}
+        return new DecodingFormat<DeserializationSchema<RowData>>() {
+            @Override
+            public DeserializationSchema<RowData> createRuntimeDecoder(
+                    DynamicTableSource.Context context, DataType producedDataType) {
+                final RowType rowType = (RowType) producedDataType.getLogicalType();
+                final TypeInformation<RowData> rowDataTypeInfo =
+                        context.createTypeInformation(producedDataType);
+                return new ChangelogJsonDeserializationSchema(
+                        rowType, rowDataTypeInfo, ignoreParseErrors, timestampFormat);
+            }
 
-			@Override
-			public ChangelogMode getChangelogMode() {
-				return ChangelogMode.newBuilder()
-					.addContainedKind(RowKind.INSERT)
-					.addContainedKind(RowKind.UPDATE_BEFORE)
-					.addContainedKind(RowKind.UPDATE_AFTER)
-					.addContainedKind(RowKind.DELETE)
-					.build();
-			}
-		};
-	}
+            @Override
+            public ChangelogMode getChangelogMode() {
+                return ChangelogMode.newBuilder()
+                        .addContainedKind(RowKind.INSERT)
+                        .addContainedKind(RowKind.UPDATE_BEFORE)
+                        .addContainedKind(RowKind.UPDATE_AFTER)
+                        .addContainedKind(RowKind.DELETE)
+                        .build();
+            }
+        };
+    }
 
-	@Override
-	public EncodingFormat<SerializationSchema<RowData>> createEncodingFormat(
-			DynamicTableFactory.Context context, ReadableConfig formatOptions) {
-		FactoryUtil.validateFactoryOptions(this, formatOptions);
-		TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
+    @Override
+    public EncodingFormat<SerializationSchema<RowData>> createEncodingFormat(
+            DynamicTableFactory.Context context, ReadableConfig formatOptions) {
+        FactoryUtil.validateFactoryOptions(this, formatOptions);
+        TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
 
-		return new EncodingFormat<SerializationSchema<RowData>>() {
+        return new EncodingFormat<SerializationSchema<RowData>>() {
 
-			@Override
-			public ChangelogMode getChangelogMode() {
-				return ChangelogMode.newBuilder()
-					.addContainedKind(RowKind.INSERT)
-					.addContainedKind(RowKind.UPDATE_BEFORE)
-					.addContainedKind(RowKind.UPDATE_AFTER)
-					.addContainedKind(RowKind.DELETE)
-					.build();
-			}
+            @Override
+            public ChangelogMode getChangelogMode() {
+                return ChangelogMode.newBuilder()
+                        .addContainedKind(RowKind.INSERT)
+                        .addContainedKind(RowKind.UPDATE_BEFORE)
+                        .addContainedKind(RowKind.UPDATE_AFTER)
+                        .addContainedKind(RowKind.DELETE)
+                        .build();
+            }
 
-			@Override
-			public SerializationSchema<RowData> createRuntimeEncoder(DynamicTableSink.Context context, DataType consumedDataType) {
-				final RowType rowType = (RowType) consumedDataType.getLogicalType();
-				return new ChangelogJsonSerializationSchema(
-					rowType,
-					timestampFormat);
-			}
-		};
-	}
+            @Override
+            public SerializationSchema<RowData> createRuntimeEncoder(
+                    DynamicTableSink.Context context, DataType consumedDataType) {
+                final RowType rowType = (RowType) consumedDataType.getLogicalType();
+                return new ChangelogJsonSerializationSchema(rowType, timestampFormat);
+            }
+        };
+    }
 
-	@Override
-	public String factoryIdentifier() {
-		return IDENTIFIER;
-	}
+    @Override
+    public String factoryIdentifier() {
+        return IDENTIFIER;
+    }
 
-	@Override
-	public Set<ConfigOption<?>> requiredOptions() {
-		return Collections.emptySet();
-	}
+    @Override
+    public Set<ConfigOption<?>> requiredOptions() {
+        return Collections.emptySet();
+    }
 
-	@Override
-	public Set<ConfigOption<?>> optionalOptions() {
-		Set<ConfigOption<?>> options = new HashSet<>();
-		options.add(IGNORE_PARSE_ERRORS);
-		options.add(TIMESTAMP_FORMAT);
-		return options;
-	}
+    @Override
+    public Set<ConfigOption<?>> optionalOptions() {
+        Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(IGNORE_PARSE_ERRORS);
+        options.add(TIMESTAMP_FORMAT);
+        return options;
+    }
 }

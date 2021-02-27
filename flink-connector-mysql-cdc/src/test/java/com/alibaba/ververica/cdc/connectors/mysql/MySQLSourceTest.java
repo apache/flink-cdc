@@ -65,809 +65,858 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/**
- * Tests for {@link MySQLSource} which also heavily tests {@link DebeziumSourceFunction}.
- */
+/** Tests for {@link MySQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
 public class MySQLSourceTest extends MySQLTestBase {
 
-	private final UniqueDatabase database = new UniqueDatabase(
-		MYSQL_CONTAINER,
-		"inventory",
-		"mysqluser",
-		"mysqlpw");
-
-	@Before
-	public void before() {
-		database.createAndInitialize();
-	}
-
-	@Test
-	public void testConsumingAllEvents() throws Exception {
-		DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
-		TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
-
-		setupSource(source);
-
-		try (Connection connection = database.getJdbcConnection();
-				Statement statement = connection.createStatement()) {
-
-			// start the source
-			final CheckedThread runThread = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source.run(sourceContext);
-				}
-			};
-			runThread.start();
-
-			List<SourceRecord> records = drain(sourceContext, 9);
-			assertEquals(9, records.size());
-			for (int i = 0; i < records.size(); i++) {
-				assertInsert(records.get(i), "id", 101 + i);
-			}
-
-			statement.execute("INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
-			records = drain(sourceContext, 1);
-			assertInsert(records.get(0), "id", 110);
-
-			statement.execute("INSERT INTO products VALUES (1001,'roy','old robot',1234.56)"); // 1001
-			records = drain(sourceContext, 1);
-			assertInsert(records.get(0), "id", 1001);
-
-			// ---------------------------------------------------------------------------------------------------------------
-			// Changing the primary key of a row should result in 2 events: INSERT, DELETE (TOMBSTONE is dropped)
-			// ---------------------------------------------------------------------------------------------------------------
-			statement.execute("UPDATE products SET id=2001, description='really old robot' WHERE id=1001");
-			records = drain(sourceContext, 2);
-			assertDelete(records.get(0), "id", 1001);
-			assertInsert(records.get(1), "id", 2001);
-
-			// ---------------------------------------------------------------------------------------------------------------
-			// Simple UPDATE (with no schema changes)
-			// ---------------------------------------------------------------------------------------------------------------
-			statement.execute("UPDATE products SET weight=1345.67 WHERE id=2001");
-			records = drain(sourceContext, 1);
-			assertUpdate(records.get(0), "id", 2001);
-
-			// ---------------------------------------------------------------------------------------------------------------
-			// Change our schema with a fully-qualified name; we should still see this event
-			// ---------------------------------------------------------------------------------------------------------------
-			// Add a column with default to the 'products' table and explicitly update one record ...
-			statement.execute(String.format(
-				"ALTER TABLE %s.products ADD COLUMN volume FLOAT, ADD COLUMN alias VARCHAR(30) NULL AFTER description",
-				database.getDatabaseName()));
-			statement.execute("UPDATE products SET volume=13.5 WHERE id=2001");
-			records = drain(sourceContext, 1);
-			assertUpdate(records.get(0), "id", 2001);
-
-			// cleanup
-			source.cancel();
-			source.close();
-			runThread.sync();
-		}
-	}
-
-	@Test
-	public void testCheckpointAndRestore() throws Exception {
-		final TestingListState<byte[]> offsetState = new TestingListState<>();
-		final TestingListState<String> historyState = new TestingListState<>();
-		int prevPos = 0;
-		{
-			// ---------------------------------------------------------------------------
-			// Step-1: start the source from empty state
-			// ---------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
-			// we use blocking context to block the source to emit before last snapshot record
-			final BlockingSourceContext<SourceRecord> sourceContext = new BlockingSourceContext<>(8);
-			// setup source with empty state
-			setupSource(source, false, offsetState, historyState, true, 0, 1);
-
-			final CheckedThread runThread = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source.run(sourceContext);
-				}
-			};
-			runThread.start();
-
-			// wait until consumer is started
-			int received = drain(sourceContext, 2).size();
-			assertEquals(2, received);
-
-			// we can't perform checkpoint during DB snapshot
-			assertFalse(waitForCheckpointLock(sourceContext.getCheckpointLock(), Duration.ofSeconds(3)));
-
-			// unblock the source context to continue the processing
-			sourceContext.blocker.release();
-			// wait until the source finishes the database snapshot
-			List<SourceRecord> records = drain(sourceContext, 9 - received);
-			assertEquals(9, records.size() + received);
-
-			// state is still empty
-			assertEquals(0, offsetState.list.size());
-			assertEquals(0, historyState.list.size());
-
-			// ---------------------------------------------------------------------------
-			// Step-2: trigger checkpoint-1 after snapshot finished
-			// ---------------------------------------------------------------------------
-			synchronized (sourceContext.getCheckpointLock()) {
-				// trigger checkpoint-1
-				source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
-			}
-
-			assertHistoryState(historyState);
-			assertEquals(1, offsetState.list.size());
-			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
-			assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
-			assertFalse(state.contains("row"));
-			assertFalse(state.contains("server_id"));
-			assertFalse(state.contains("event"));
-			int pos = JsonPath.read(state, "$.sourceOffset.pos");
-			assertTrue(pos > prevPos);
-			prevPos = pos;
-
-			source.cancel();
-			source.close();
-			runThread.sync();
-		}
-
-		{
-			// ---------------------------------------------------------------------------
-			// Step-3: restore the source from state
-			// ---------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source2 = createMySqlBinlogSource();
-			final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
-			setupSource(source2, true, offsetState, historyState, true, 0, 1);
-			final CheckedThread runThread2 = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source2.run(sourceContext2);
-				}
-			};
-			runThread2.start();
-
-			// make sure there is no more events
-			assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
-
-			try (Connection connection = database.getJdbcConnection();
-					Statement statement = connection.createStatement()) {
-
-				statement.execute("INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
-				List<SourceRecord> records = drain(sourceContext2, 1);
-				assertEquals(1, records.size());
-				assertInsert(records.get(0), "id", 110);
-
-				// ---------------------------------------------------------------------------
-				// Step-4: trigger checkpoint-2 during DML operations
-				// ---------------------------------------------------------------------------
-				synchronized (sourceContext2.getCheckpointLock()) {
-					// trigger checkpoint-1
-					source2.snapshotState(new StateSnapshotContextSynchronousImpl(138, 138));
-				}
-
-				assertHistoryState(historyState); // assert the DDL is stored in the history state
-				assertEquals(1, offsetState.list.size());
-				String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-				assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
-				assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
-				assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
-				assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
-				assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
-				int pos = JsonPath.read(state, "$.sourceOffset.pos");
-				assertTrue(pos > prevPos);
-				prevPos = pos;
-
-				// execute 2 more DMLs to have more binlog
-				statement.execute("INSERT INTO products VALUES (1001,'roy','old robot',1234.56)"); // 1001
-				statement.execute("UPDATE products SET weight=1345.67 WHERE id=1001");
-			}
-
-			// cancel the source
-			source2.cancel();
-			source2.close();
-			runThread2.sync();
-		}
-
-		{
-			// ---------------------------------------------------------------------------
-			// Step-5: restore the source from checkpoint-2
-			// ---------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source3 = createMySqlBinlogSource();
-			final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
-			setupSource(source3, true, offsetState, historyState, true, 0, 1);
-
-			// restart the source
-			final CheckedThread runThread3 = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source3.run(sourceContext3);
-				}
-			};
-			runThread3.start();
-
-			// consume the unconsumed binlog
-			List<SourceRecord> records = drain(sourceContext3, 2);
-			assertInsert(records.get(0), "id", 1001);
-			assertUpdate(records.get(1), "id", 1001);
-
-			// make sure there is no more events
-			assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
-
-			// can continue to receive new events
-			try (Connection connection = database.getJdbcConnection();
-					Statement statement = connection.createStatement()) {
-				statement.execute("DELETE FROM products WHERE id=1001");
-			}
-			records = drain(sourceContext3, 1);
-			assertDelete(records.get(0), "id", 1001);
-
-			// ---------------------------------------------------------------------------
-			// Step-6: trigger checkpoint-2 to make sure we can continue to to further checkpoints
-			// ---------------------------------------------------------------------------
-			synchronized (sourceContext3.getCheckpointLock()) {
-				// checkpoint 3
-				source3.snapshotState(new StateSnapshotContextSynchronousImpl(233, 233));
-			}
-			assertHistoryState(historyState); // assert the DDL is stored in the history state
-			assertEquals(1, offsetState.list.size());
-			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
-			assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
-			assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
-			assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
-			assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
-			int pos = JsonPath.read(state, "$.sourceOffset.pos");
-			assertTrue(pos > prevPos);
-
-			source3.cancel();
-			source3.close();
-			runThread3.sync();
-		}
-
-		{
-			// ---------------------------------------------------------------------------
-			// Step-7: restore the source from checkpoint-3
-			// ---------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source4 = createMySqlBinlogSource();
-			final TestSourceContext<SourceRecord> sourceContext4 = new TestSourceContext<>();
-			setupSource(source4, true, offsetState, historyState, true, 0, 1);
-
-			// restart the source
-			final CheckedThread runThread4 = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source4.run(sourceContext4);
-				}
-			};
-			runThread4.start();
-
-			// make sure there is no more events
-			assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4));
-
-			// ---------------------------------------------------------------------------
-			// Step-8: trigger checkpoint-3 to make sure we can continue to to further checkpoints
-			// ---------------------------------------------------------------------------
-			synchronized (sourceContext4.getCheckpointLock()) {
-				// checkpoint 4
-				source4.snapshotState(new StateSnapshotContextSynchronousImpl(254, 254));
-			}
-			assertHistoryState(historyState); // assert the DDL is stored in the history state
-			assertEquals(1, offsetState.list.size());
-			String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-			assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
-			assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
-			assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
-			assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
-			assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
-			int pos = JsonPath.read(state, "$.sourceOffset.pos");
-			assertTrue(pos > prevPos);
-
-			source4.cancel();
-			source4.close();
-			runThread4.sync();
-		}
-
-	}
-
-	@Test
-	public void testRecoverFromRenameOperation() throws Exception {
-		final TestingListState<byte[]> offsetState = new TestingListState<>();
-		final TestingListState<String> historyState = new TestingListState<>();
-
-		{
-			try (Connection connection = database.getJdbcConnection();
-					Statement statement = connection.createStatement()) {
-				// Step-1: start the source from empty state
-				final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
-				final TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
-				// setup source with empty state
-				setupSource(source, false, offsetState, historyState, true, 0, 1);
-
-				final CheckedThread runThread = new CheckedThread() {
-					@Override
-					public void go() throws Exception {
-						source.run(sourceContext);
-					}
-				};
-				runThread.start();
-
-				// wait until the source finishes the database snapshot
-				List<SourceRecord> records = drain(sourceContext, 9);
-				assertEquals(9, records.size());
-
-				// state is still empty
-				assertEquals(0, offsetState.list.size());
-				assertEquals(0, historyState.list.size());
-
-				// create temporary tables which are not in the whitelist
-				statement.execute("CREATE TABLE `tp_001_ogt_products` LIKE `products`;");
-				// do some renames
-				statement.execute("RENAME TABLE `products` TO `tp_001_del_products`, `tp_001_ogt_products` TO `products`;");
-
-				statement.execute("INSERT INTO `products` VALUES (110,'robot','Toy robot',1.304)"); // 110
-				statement.execute("INSERT INTO `products` VALUES (111,'stream train','Town stream train',1.304)"); // 111
-				statement.execute("INSERT INTO `products` VALUES (112,'cargo train','City cargo train',1.304)"); // 112
-
-				int received = drain(sourceContext, 3).size();
-				assertEquals(3, received);
-
-				// Step-2: trigger a checkpoint
-				synchronized (sourceContext.getCheckpointLock()) {
-					// trigger checkpoint-1
-					source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
-				}
-
-				assertTrue(historyState.list.size() > 0);
-				assertTrue(offsetState.list.size() > 0);
-
-				source.cancel();
-				source.close();
-				runThread.sync();
-			}
-		}
-
-		{
-			// Step-3: restore the source from state
-			final DebeziumSourceFunction<SourceRecord> source2 = createMySqlBinlogSource();
-			final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
-			setupSource(source2, true, offsetState, historyState, true, 0, 1);
-			final CheckedThread runThread2 = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source2.run(sourceContext2);
-				}
-			};
-			runThread2.start();
-
-			// make sure there is no more events
-			assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
-
-			try (Connection connection = database.getJdbcConnection();
-					Statement statement = connection.createStatement()) {
-				statement.execute("INSERT INTO `products` VALUES (113,'Airplane','Toy airplane',1.304)"); // 113
-				List<SourceRecord> records = drain(sourceContext2, 1);
-				assertEquals(1, records.size());
-				assertInsert(records.get(0), "id", 113);
-
-				source2.cancel();
-				source2.close();
-				runThread2.sync();
-			}
-		}
-	}
-
-	@Test
-	public void testStartupFromSpecificOffset() throws Exception {
-		try (Connection connection = database.getJdbcConnection();
-				Statement statement = connection.createStatement()) {
-			statement.execute("INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
-		}
-
-		Tuple2<String, Integer> offset = currentMySQLLatestOffset(database, "products", 10);
-		final String offsetFile = offset.f0;
-		final int offsetPos = offset.f1;
-		final TestingListState<byte[]> offsetState = new TestingListState<>();
-		final TestingListState<String> historyState = new TestingListState<>();
-		// ---------------------------------------------------------------------------
-		// Step-3: start source from the specific offset
-		// ---------------------------------------------------------------------------
-		try (Connection connection = database.getJdbcConnection();
-				Statement statement = connection.createStatement()) {
-			statement.execute("INSERT INTO products VALUES (1001,'roy','old robot',1234.56)"); // 1001
-			statement.execute("UPDATE products SET id=2001, description='really old robot' WHERE id=1001");
-			statement.execute("UPDATE products SET weight=1345.67 WHERE id=2001");
-
-			final DebeziumSourceFunction<SourceRecord> source2 = createMySqlBinlogSource(offsetFile, offsetPos);
-			final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
-			setupSource(source2, false, offsetState, historyState, true, 0, 1);
-			final CheckedThread runThread2 = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source2.run(sourceContext2);
-				}
-			};
-			runThread2.start();
-
-			// we can continue to read binlog from specific offset
-			List<SourceRecord> records = drain(sourceContext2, 4);
-			assertEquals(4, records.size());
-			assertInsert(records.get(0), "id", 1001);
-			assertDelete(records.get(1), "id", 1001);
-			assertInsert(records.get(2), "id", 2001);
-			assertUpdate(records.get(3), "id", 2001);
-
-			// ---------------------------------------------------------------------------
-			// Step-4: trigger checkpoint-2
-			// ---------------------------------------------------------------------------
-			synchronized (sourceContext2.getCheckpointLock()) {
-				// trigger checkpoint-2
-				source2.snapshotState(new StateSnapshotContextSynchronousImpl(201, 201));
-			}
-
-			source2.cancel();
-			source2.close();
-			runThread2.sync();
-		}
-
-		try (Connection connection = database.getJdbcConnection();
-				Statement statement = connection.createStatement()) {
-
-			// --------------------------------------------------------------------------------
-			// Step-5: restore from last checkpoint to verify not restore from specific offset
-			// --------------------------------------------------------------------------------
-			final DebeziumSourceFunction<SourceRecord> source3 = createMySqlBinlogSource(offsetFile, offsetPos);
-			final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
-			setupSource(source3, true, offsetState, historyState, true, 0, 1);
-			final CheckedThread runThread3 = new CheckedThread() {
-				@Override
-				public void go() throws Exception {
-					source3.run(sourceContext3);
-				}
-			};
-			runThread3.start();
-
-			statement.execute("DELETE FROM products WHERE id=2001");
-			List<SourceRecord> records = drain(sourceContext3, 1);
-			assertEquals(1, records.size());
-			assertDelete(records.get(0), "id", 2001);
-
-			source3.cancel();
-			source3.close();
-			runThread3.sync();
-		}
-	}
-
-	private void assertHistoryState(TestingListState<String> historyState) {
-		// assert the DDL is stored in the history state
-		assertTrue(historyState.list.size() > 0);
-		boolean hasDDL = historyState.list.stream().skip(1).anyMatch(history ->
-			JsonPath.read(history, "$.source.server").equals("mysql_binlog_source")
-				&& JsonPath.read(history, "$.position.snapshot").toString().equals("true")
-				&& JsonPath.read(history, "$.ddl").toString().startsWith("CREATE TABLE `products`"));
-		assertTrue(hasDDL);
-	}
-
-	// ------------------------------------------------------------------------------------------
-	// Public Utilities
-	// ------------------------------------------------------------------------------------------
-
-	/**
-	 * Gets the latest offset of current MySQL server.
-	 */
-	public static Tuple2<String, Integer> currentMySQLLatestOffset(
-			UniqueDatabase database, String table, int expectedRecordCount) throws Exception {
-		DebeziumSourceFunction<SourceRecord> source =  MySQLSource.<SourceRecord>builder()
-				.hostname(MYSQL_CONTAINER.getHost())
-				.port(MYSQL_CONTAINER.getDatabasePort())
-				.databaseList(database.getDatabaseName())
-				.tableList(database.getDatabaseName() + "." + table)
-				.username(MYSQL_CONTAINER.getUsername())
-				.password(MYSQL_CONTAINER.getPassword())
-				.deserializer(new MySQLSourceTest.ForwardDeserializeSchema())
-				.build();
-		final TestingListState<byte[]> offsetState = new TestingListState<>();
-		final TestingListState<String> historyState = new TestingListState<>();
-
-		// ---------------------------------------------------------------------------
-		// Step-1: start source
-		// ---------------------------------------------------------------------------
-		TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
-		setupSource(source, false, offsetState, historyState, true, 0, 1);
-		final CheckedThread runThread = new CheckedThread() {
-			@Override
-			public void go() throws Exception {
-				source.run(sourceContext);
-			}
-		};
-		runThread.start();
-
-		drain(sourceContext, expectedRecordCount);
-
-		// ---------------------------------------------------------------------------
-		// Step-2: trigger checkpoint-1 after snapshot finished
-		// ---------------------------------------------------------------------------
-		synchronized (sourceContext.getCheckpointLock()) {
-			// trigger checkpoint-1
-			source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
-		}
-
-		assertEquals(1, offsetState.list.size());
-		String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-		String offsetFile = JsonPath.read(state, "$.sourceOffset.file");
-		int offsetPos = JsonPath.read(state, "$.sourceOffset.pos");
-
-		source.cancel();
-		source.close();
-		runThread.sync();
-
-		return Tuple2.of(offsetFile, offsetPos);
-	}
-
-	// ------------------------------------------------------------------------------------------
-	// Utilities
-	// ------------------------------------------------------------------------------------------
-
-	private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(String offsetFile, int offsetPos) {
-		return MySQLSource.<SourceRecord>builder()
-				.hostname(MYSQL_CONTAINER.getHost())
-				.port(MYSQL_CONTAINER.getDatabasePort())
-				.databaseList(database.getDatabaseName())
-				.tableList(database.getDatabaseName() + "." + "products") // monitor table "products"
-				.username(MYSQL_CONTAINER.getUsername())
-				.password(MYSQL_CONTAINER.getPassword())
-				.startupOptions(StartupOptions.specificOffset(offsetFile, offsetPos))
-				.deserializer(new ForwardDeserializeSchema())
-				.build();
-	}
-
-	private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
-		return MySQLSource.<SourceRecord>builder()
-			.hostname(MYSQL_CONTAINER.getHost())
-			.port(MYSQL_CONTAINER.getDatabasePort())
-			.databaseList(database.getDatabaseName())
-			.tableList(database.getDatabaseName() + "." + "products") // monitor table "products"
-			.username(MYSQL_CONTAINER.getUsername())
-			.password(MYSQL_CONTAINER.getPassword())
-			.deserializer(new ForwardDeserializeSchema())
-			.build();
-	}
-
-	private static <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount) throws Exception {
-		List<T> allRecords = new ArrayList<>();
-		LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
-		while (allRecords.size() < expectedRecordCount) {
-			StreamRecord<T> record = queue.poll(100, TimeUnit.SECONDS);
-			if (record != null) {
-				allRecords.add(record.getValue());
-			} else {
-				throw new RuntimeException("Can't receive " + expectedRecordCount + " elements before timeout.");
-			}
-		}
-
-		return allRecords;
-	}
-
-	private boolean waitForCheckpointLock(Object checkpointLock, Duration timeout) throws Exception {
-		final Semaphore semaphore = new Semaphore(0);
-		ExecutorService executor = Executors.newSingleThreadExecutor();
-		executor.execute(() -> {
-			synchronized (checkpointLock) {
-				semaphore.release();
-			}
-		});
-		boolean result = semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS);
-		executor.shutdownNow();
-		return result;
-	}
-
-	/**
-	 * Wait for a maximum amount of time until the first record is available.
-	 *
-	 * @param timeout the maximum amount of time to wait; must not be negative
-	 * @return {@code true} if records are available,
-	 * or {@code false} if the timeout occurred and no records are available
-	 */
-	private boolean waitForAvailableRecords(Duration timeout, TestSourceContext<?> sourceContext) throws InterruptedException {
-		long now = System.currentTimeMillis();
-		long stop = now + timeout.toMillis();
-		while (System.currentTimeMillis() < stop) {
-			if (!sourceContext.getCollectedOutputs().isEmpty()) {
-				break;
-			}
-			Thread.sleep(10); // save CPU
-		}
-		return !sourceContext.getCollectedOutputs().isEmpty();
-	}
-
-	private static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
-		setupSource(
-			source,
-			false,
-			null,
-			null,
-			true, // enable checkpointing; auto commit should be ignored
-			0,
-			1);
-	}
-
-	private static <T, S1, S2> void setupSource(
-			DebeziumSourceFunction<T> source,
-			boolean isRestored,
-			ListState<S1> restoredOffsetState,
-			ListState<S2> restoredHistoryState,
-			boolean isCheckpointingEnabled,
-			int subtaskIndex,
-			int totalNumSubtasks) throws Exception {
-
-		// run setup procedure in operator life cycle
-		source.setRuntimeContext(new MockStreamingRuntimeContext(isCheckpointingEnabled, totalNumSubtasks, subtaskIndex));
-		source.initializeState(new MockFunctionInitializationContext(
-			isRestored,
-			new MockOperatorStateStore(restoredOffsetState, restoredHistoryState)));
-		source.open(new Configuration());
-	}
-
-	/**
-	 * A simple implementation of {@link DebeziumDeserializationSchema} which just forward
-	 * the {@link SourceRecord}.
-	 */
-	public static class ForwardDeserializeSchema implements DebeziumDeserializationSchema<SourceRecord> {
-
-		private static final long serialVersionUID = 2975058057832211228L;
-
-		@Override
-		public void deserialize(SourceRecord record, Collector<SourceRecord> out) throws Exception {
-			out.collect(record);
-		}
-
-		@Override
-		public TypeInformation<SourceRecord> getProducedType() {
-			return TypeInformation.of(SourceRecord.class);
-		}
-	}
-
-	private static class MockOperatorStateStore implements OperatorStateStore {
-
-		private final ListState<?> restoredOffsetListState;
-		private final ListState<?> restoredHistoryListState;
-
-		private MockOperatorStateStore(
-				ListState<?> restoredOffsetListState,
-				ListState<?> restoredHistoryListState) {
-			this.restoredOffsetListState = restoredOffsetListState;
-			this.restoredHistoryListState = restoredHistoryListState;
-		}
-
-		@Override
-		@SuppressWarnings("unchecked")
-		public <S> ListState<S> getUnionListState(ListStateDescriptor<S> stateDescriptor) throws Exception {
-			if (stateDescriptor.getName().equals(DebeziumSourceFunction.OFFSETS_STATE_NAME)) {
-				return (ListState<S>) restoredOffsetListState;
-			} else if (stateDescriptor.getName().equals(DebeziumSourceFunction.HISTORY_RECORDS_STATE_NAME)) {
-				return (ListState<S>) restoredHistoryListState;
-			} else {
-				throw new IllegalStateException("Unknown state.");
-			}
-		}
-
-		@Override
-		public <K, V> BroadcastState<K, V> getBroadcastState(MapStateDescriptor<K, V> stateDescriptor) throws Exception {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public <S> ListState<S> getListState(ListStateDescriptor<S> stateDescriptor) throws Exception {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public Set<String> getRegisteredStateNames() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public Set<String> getRegisteredBroadcastStateNames() {
-			throw new UnsupportedOperationException();
-		}
-	}
-
-	private static class MockFunctionInitializationContext implements FunctionInitializationContext {
-
-		private final boolean isRestored;
-		private final OperatorStateStore operatorStateStore;
-
-		private MockFunctionInitializationContext(boolean isRestored, OperatorStateStore operatorStateStore) {
-			this.isRestored = isRestored;
-			this.operatorStateStore = operatorStateStore;
-		}
-
-		@Override
-		public boolean isRestored() {
-			return isRestored;
-		}
-
-		@Override
-		public OperatorStateStore getOperatorStateStore() {
-			return operatorStateStore;
-		}
-
-		@Override
-		public KeyedStateStore getKeyedStateStore() {
-			throw new UnsupportedOperationException();
-		}
-	}
-
-	private static class BlockingSourceContext<T> extends TestSourceContext<T> {
-
-		private final Semaphore blocker = new Semaphore(0);
-		private final int expectedCount;
-		private int currentCount = 0;
-
-		private BlockingSourceContext(int expectedCount) {
-			this.expectedCount = expectedCount;
-		}
-
-		@Override
-		public void collect(T t) {
-			super.collect(t);
-			currentCount++;
-			if (currentCount == expectedCount) {
-				try {
-					// block the source to emit records
-					blocker.acquire();
-				} catch (InterruptedException e) {
-					// ignore
-				}
-			}
-		}
-	}
-
-	private static final class TestingListState<T> implements ListState<T> {
-
-		private final List<T> list = new ArrayList<>();
-		private boolean clearCalled = false;
-
-		@Override
-		public void clear() {
-			list.clear();
-			clearCalled = true;
-		}
-
-		@Override
-		public Iterable<T> get() throws Exception {
-			return list;
-		}
-
-		@Override
-		public void add(T value) throws Exception {
-			Preconditions.checkNotNull(value, "You cannot add null to a ListState.");
-			list.add(value);
-		}
-
-		public List<T> getList() {
-			return list;
-		}
-
-		boolean isClearCalled() {
-			return clearCalled;
-		}
-
-		@Override
-		public void update(List<T> values) throws Exception {
-			clear();
-
-			addAll(values);
-		}
-
-		@Override
-		public void addAll(List<T> values) throws Exception {
-			if (values != null) {
-				values.forEach(v -> Preconditions.checkNotNull(v, "You cannot add null to a ListState."));
-
-				list.addAll(values);
-			}
-		}
-	}
-
+    private final UniqueDatabase database =
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+
+    @Before
+    public void before() {
+        database.createAndInitialize();
+    }
+
+    @Test
+    public void testConsumingAllEvents() throws Exception {
+        DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
+        TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
+
+        setupSource(source);
+
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            // start the source
+            final CheckedThread runThread =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source.run(sourceContext);
+                        }
+                    };
+            runThread.start();
+
+            List<SourceRecord> records = drain(sourceContext, 9);
+            assertEquals(9, records.size());
+            for (int i = 0; i < records.size(); i++) {
+                assertInsert(records.get(i), "id", 101 + i);
+            }
+
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
+            records = drain(sourceContext, 1);
+            assertInsert(records.get(0), "id", 110);
+
+            statement.execute(
+                    "INSERT INTO products VALUES (1001,'roy','old robot',1234.56)"); // 1001
+            records = drain(sourceContext, 1);
+            assertInsert(records.get(0), "id", 1001);
+
+            // ---------------------------------------------------------------------------------------------------------------
+            // Changing the primary key of a row should result in 2 events: INSERT, DELETE
+            // (TOMBSTONE is dropped)
+            // ---------------------------------------------------------------------------------------------------------------
+            statement.execute(
+                    "UPDATE products SET id=2001, description='really old robot' WHERE id=1001");
+            records = drain(sourceContext, 2);
+            assertDelete(records.get(0), "id", 1001);
+            assertInsert(records.get(1), "id", 2001);
+
+            // ---------------------------------------------------------------------------------------------------------------
+            // Simple UPDATE (with no schema changes)
+            // ---------------------------------------------------------------------------------------------------------------
+            statement.execute("UPDATE products SET weight=1345.67 WHERE id=2001");
+            records = drain(sourceContext, 1);
+            assertUpdate(records.get(0), "id", 2001);
+
+            // ---------------------------------------------------------------------------------------------------------------
+            // Change our schema with a fully-qualified name; we should still see this event
+            // ---------------------------------------------------------------------------------------------------------------
+            // Add a column with default to the 'products' table and explicitly update one record
+            // ...
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE %s.products ADD COLUMN volume FLOAT, ADD COLUMN alias VARCHAR(30) NULL AFTER description",
+                            database.getDatabaseName()));
+            statement.execute("UPDATE products SET volume=13.5 WHERE id=2001");
+            records = drain(sourceContext, 1);
+            assertUpdate(records.get(0), "id", 2001);
+
+            // cleanup
+            source.cancel();
+            source.close();
+            runThread.sync();
+        }
+    }
+
+    @Test
+    public void testCheckpointAndRestore() throws Exception {
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+        int prevPos = 0;
+        {
+            // ---------------------------------------------------------------------------
+            // Step-1: start the source from empty state
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
+            // we use blocking context to block the source to emit before last snapshot record
+            final BlockingSourceContext<SourceRecord> sourceContext =
+                    new BlockingSourceContext<>(8);
+            // setup source with empty state
+            setupSource(source, false, offsetState, historyState, true, 0, 1);
+
+            final CheckedThread runThread =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source.run(sourceContext);
+                        }
+                    };
+            runThread.start();
+
+            // wait until consumer is started
+            int received = drain(sourceContext, 2).size();
+            assertEquals(2, received);
+
+            // we can't perform checkpoint during DB snapshot
+            assertFalse(
+                    waitForCheckpointLock(
+                            sourceContext.getCheckpointLock(), Duration.ofSeconds(3)));
+
+            // unblock the source context to continue the processing
+            sourceContext.blocker.release();
+            // wait until the source finishes the database snapshot
+            List<SourceRecord> records = drain(sourceContext, 9 - received);
+            assertEquals(9, records.size() + received);
+
+            // state is still empty
+            assertEquals(0, offsetState.list.size());
+            assertEquals(0, historyState.list.size());
+
+            // ---------------------------------------------------------------------------
+            // Step-2: trigger checkpoint-1 after snapshot finished
+            // ---------------------------------------------------------------------------
+            synchronized (sourceContext.getCheckpointLock()) {
+                // trigger checkpoint-1
+                source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
+            }
+
+            assertHistoryState(historyState);
+            assertEquals(1, offsetState.list.size());
+            String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+            assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+            assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
+            assertFalse(state.contains("row"));
+            assertFalse(state.contains("server_id"));
+            assertFalse(state.contains("event"));
+            int pos = JsonPath.read(state, "$.sourceOffset.pos");
+            assertTrue(pos > prevPos);
+            prevPos = pos;
+
+            source.cancel();
+            source.close();
+            runThread.sync();
+        }
+
+        {
+            // ---------------------------------------------------------------------------
+            // Step-3: restore the source from state
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source2 = createMySqlBinlogSource();
+            final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
+            setupSource(source2, true, offsetState, historyState, true, 0, 1);
+            final CheckedThread runThread2 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source2.run(sourceContext2);
+                        }
+                    };
+            runThread2.start();
+
+            // make sure there is no more events
+            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
+
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+
+                statement.execute(
+                        "INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
+                List<SourceRecord> records = drain(sourceContext2, 1);
+                assertEquals(1, records.size());
+                assertInsert(records.get(0), "id", 110);
+
+                // ---------------------------------------------------------------------------
+                // Step-4: trigger checkpoint-2 during DML operations
+                // ---------------------------------------------------------------------------
+                synchronized (sourceContext2.getCheckpointLock()) {
+                    // trigger checkpoint-1
+                    source2.snapshotState(new StateSnapshotContextSynchronousImpl(138, 138));
+                }
+
+                assertHistoryState(historyState); // assert the DDL is stored in the history state
+                assertEquals(1, offsetState.list.size());
+                String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+                assertEquals(
+                        "mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+                assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
+                assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
+                assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
+                assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
+                int pos = JsonPath.read(state, "$.sourceOffset.pos");
+                assertTrue(pos > prevPos);
+                prevPos = pos;
+
+                // execute 2 more DMLs to have more binlog
+                statement.execute(
+                        "INSERT INTO products VALUES (1001,'roy','old robot',1234.56)"); // 1001
+                statement.execute("UPDATE products SET weight=1345.67 WHERE id=1001");
+            }
+
+            // cancel the source
+            source2.cancel();
+            source2.close();
+            runThread2.sync();
+        }
+
+        {
+            // ---------------------------------------------------------------------------
+            // Step-5: restore the source from checkpoint-2
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source3 = createMySqlBinlogSource();
+            final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
+            setupSource(source3, true, offsetState, historyState, true, 0, 1);
+
+            // restart the source
+            final CheckedThread runThread3 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source3.run(sourceContext3);
+                        }
+                    };
+            runThread3.start();
+
+            // consume the unconsumed binlog
+            List<SourceRecord> records = drain(sourceContext3, 2);
+            assertInsert(records.get(0), "id", 1001);
+            assertUpdate(records.get(1), "id", 1001);
+
+            // make sure there is no more events
+            assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
+
+            // can continue to receive new events
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute("DELETE FROM products WHERE id=1001");
+            }
+            records = drain(sourceContext3, 1);
+            assertDelete(records.get(0), "id", 1001);
+
+            // ---------------------------------------------------------------------------
+            // Step-6: trigger checkpoint-2 to make sure we can continue to to further checkpoints
+            // ---------------------------------------------------------------------------
+            synchronized (sourceContext3.getCheckpointLock()) {
+                // checkpoint 3
+                source3.snapshotState(new StateSnapshotContextSynchronousImpl(233, 233));
+            }
+            assertHistoryState(historyState); // assert the DDL is stored in the history state
+            assertEquals(1, offsetState.list.size());
+            String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+            assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+            assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
+            assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
+            assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
+            assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
+            int pos = JsonPath.read(state, "$.sourceOffset.pos");
+            assertTrue(pos > prevPos);
+
+            source3.cancel();
+            source3.close();
+            runThread3.sync();
+        }
+
+        {
+            // ---------------------------------------------------------------------------
+            // Step-7: restore the source from checkpoint-3
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source4 = createMySqlBinlogSource();
+            final TestSourceContext<SourceRecord> sourceContext4 = new TestSourceContext<>();
+            setupSource(source4, true, offsetState, historyState, true, 0, 1);
+
+            // restart the source
+            final CheckedThread runThread4 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source4.run(sourceContext4);
+                        }
+                    };
+            runThread4.start();
+
+            // make sure there is no more events
+            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4));
+
+            // ---------------------------------------------------------------------------
+            // Step-8: trigger checkpoint-3 to make sure we can continue to to further checkpoints
+            // ---------------------------------------------------------------------------
+            synchronized (sourceContext4.getCheckpointLock()) {
+                // checkpoint 4
+                source4.snapshotState(new StateSnapshotContextSynchronousImpl(254, 254));
+            }
+            assertHistoryState(historyState); // assert the DDL is stored in the history state
+            assertEquals(1, offsetState.list.size());
+            String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+            assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+            assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
+            assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
+            assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
+            assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
+            int pos = JsonPath.read(state, "$.sourceOffset.pos");
+            assertTrue(pos > prevPos);
+
+            source4.cancel();
+            source4.close();
+            runThread4.sync();
+        }
+    }
+
+    @Test
+    public void testRecoverFromRenameOperation() throws Exception {
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+
+        {
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                // Step-1: start the source from empty state
+                final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
+                final TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
+                // setup source with empty state
+                setupSource(source, false, offsetState, historyState, true, 0, 1);
+
+                final CheckedThread runThread =
+                        new CheckedThread() {
+                            @Override
+                            public void go() throws Exception {
+                                source.run(sourceContext);
+                            }
+                        };
+                runThread.start();
+
+                // wait until the source finishes the database snapshot
+                List<SourceRecord> records = drain(sourceContext, 9);
+                assertEquals(9, records.size());
+
+                // state is still empty
+                assertEquals(0, offsetState.list.size());
+                assertEquals(0, historyState.list.size());
+
+                // create temporary tables which are not in the whitelist
+                statement.execute("CREATE TABLE `tp_001_ogt_products` LIKE `products`;");
+                // do some renames
+                statement.execute(
+                        "RENAME TABLE `products` TO `tp_001_del_products`, `tp_001_ogt_products` TO `products`;");
+
+                statement.execute(
+                        "INSERT INTO `products` VALUES (110,'robot','Toy robot',1.304)"); // 110
+                statement.execute(
+                        "INSERT INTO `products` VALUES (111,'stream train','Town stream train',1.304)"); // 111
+                statement.execute(
+                        "INSERT INTO `products` VALUES (112,'cargo train','City cargo train',1.304)"); // 112
+
+                int received = drain(sourceContext, 3).size();
+                assertEquals(3, received);
+
+                // Step-2: trigger a checkpoint
+                synchronized (sourceContext.getCheckpointLock()) {
+                    // trigger checkpoint-1
+                    source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
+                }
+
+                assertTrue(historyState.list.size() > 0);
+                assertTrue(offsetState.list.size() > 0);
+
+                source.cancel();
+                source.close();
+                runThread.sync();
+            }
+        }
+
+        {
+            // Step-3: restore the source from state
+            final DebeziumSourceFunction<SourceRecord> source2 = createMySqlBinlogSource();
+            final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
+            setupSource(source2, true, offsetState, historyState, true, 0, 1);
+            final CheckedThread runThread2 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source2.run(sourceContext2);
+                        }
+                    };
+            runThread2.start();
+
+            // make sure there is no more events
+            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
+
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute(
+                        "INSERT INTO `products` VALUES (113,'Airplane','Toy airplane',1.304)"); // 113
+                List<SourceRecord> records = drain(sourceContext2, 1);
+                assertEquals(1, records.size());
+                assertInsert(records.get(0), "id", 113);
+
+                source2.cancel();
+                source2.close();
+                runThread2.sync();
+            }
+        }
+    }
+
+    @Test
+    public void testStartupFromSpecificOffset() throws Exception {
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
+        }
+
+        Tuple2<String, Integer> offset = currentMySQLLatestOffset(database, "products", 10);
+        final String offsetFile = offset.f0;
+        final int offsetPos = offset.f1;
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+        // ---------------------------------------------------------------------------
+        // Step-3: start source from the specific offset
+        // ---------------------------------------------------------------------------
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO products VALUES (1001,'roy','old robot',1234.56)"); // 1001
+            statement.execute(
+                    "UPDATE products SET id=2001, description='really old robot' WHERE id=1001");
+            statement.execute("UPDATE products SET weight=1345.67 WHERE id=2001");
+
+            final DebeziumSourceFunction<SourceRecord> source2 =
+                    createMySqlBinlogSource(offsetFile, offsetPos);
+            final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
+            setupSource(source2, false, offsetState, historyState, true, 0, 1);
+            final CheckedThread runThread2 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source2.run(sourceContext2);
+                        }
+                    };
+            runThread2.start();
+
+            // we can continue to read binlog from specific offset
+            List<SourceRecord> records = drain(sourceContext2, 4);
+            assertEquals(4, records.size());
+            assertInsert(records.get(0), "id", 1001);
+            assertDelete(records.get(1), "id", 1001);
+            assertInsert(records.get(2), "id", 2001);
+            assertUpdate(records.get(3), "id", 2001);
+
+            // ---------------------------------------------------------------------------
+            // Step-4: trigger checkpoint-2
+            // ---------------------------------------------------------------------------
+            synchronized (sourceContext2.getCheckpointLock()) {
+                // trigger checkpoint-2
+                source2.snapshotState(new StateSnapshotContextSynchronousImpl(201, 201));
+            }
+
+            source2.cancel();
+            source2.close();
+            runThread2.sync();
+        }
+
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            // --------------------------------------------------------------------------------
+            // Step-5: restore from last checkpoint to verify not restore from specific offset
+            // --------------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source3 =
+                    createMySqlBinlogSource(offsetFile, offsetPos);
+            final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
+            setupSource(source3, true, offsetState, historyState, true, 0, 1);
+            final CheckedThread runThread3 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source3.run(sourceContext3);
+                        }
+                    };
+            runThread3.start();
+
+            statement.execute("DELETE FROM products WHERE id=2001");
+            List<SourceRecord> records = drain(sourceContext3, 1);
+            assertEquals(1, records.size());
+            assertDelete(records.get(0), "id", 2001);
+
+            source3.cancel();
+            source3.close();
+            runThread3.sync();
+        }
+    }
+
+    private void assertHistoryState(TestingListState<String> historyState) {
+        // assert the DDL is stored in the history state
+        assertTrue(historyState.list.size() > 0);
+        boolean hasDDL =
+                historyState.list.stream()
+                        .skip(1)
+                        .anyMatch(
+                                history ->
+                                        JsonPath.read(history, "$.source.server")
+                                                        .equals("mysql_binlog_source")
+                                                && JsonPath.read(history, "$.position.snapshot")
+                                                        .toString()
+                                                        .equals("true")
+                                                && JsonPath.read(history, "$.ddl")
+                                                        .toString()
+                                                        .startsWith("CREATE TABLE `products`"));
+        assertTrue(hasDDL);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Public Utilities
+    // ------------------------------------------------------------------------------------------
+
+    /** Gets the latest offset of current MySQL server. */
+    public static Tuple2<String, Integer> currentMySQLLatestOffset(
+            UniqueDatabase database, String table, int expectedRecordCount) throws Exception {
+        DebeziumSourceFunction<SourceRecord> source =
+                MySQLSource.<SourceRecord>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(database.getDatabaseName())
+                        .tableList(database.getDatabaseName() + "." + table)
+                        .username(MYSQL_CONTAINER.getUsername())
+                        .password(MYSQL_CONTAINER.getPassword())
+                        .deserializer(new MySQLSourceTest.ForwardDeserializeSchema())
+                        .build();
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+
+        // ---------------------------------------------------------------------------
+        // Step-1: start source
+        // ---------------------------------------------------------------------------
+        TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
+        setupSource(source, false, offsetState, historyState, true, 0, 1);
+        final CheckedThread runThread =
+                new CheckedThread() {
+                    @Override
+                    public void go() throws Exception {
+                        source.run(sourceContext);
+                    }
+                };
+        runThread.start();
+
+        drain(sourceContext, expectedRecordCount);
+
+        // ---------------------------------------------------------------------------
+        // Step-2: trigger checkpoint-1 after snapshot finished
+        // ---------------------------------------------------------------------------
+        synchronized (sourceContext.getCheckpointLock()) {
+            // trigger checkpoint-1
+            source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
+        }
+
+        assertEquals(1, offsetState.list.size());
+        String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+        String offsetFile = JsonPath.read(state, "$.sourceOffset.file");
+        int offsetPos = JsonPath.read(state, "$.sourceOffset.pos");
+
+        source.cancel();
+        source.close();
+        runThread.sync();
+
+        return Tuple2.of(offsetFile, offsetPos);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Utilities
+    // ------------------------------------------------------------------------------------------
+
+    private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(
+            String offsetFile, int offsetPos) {
+        return MySQLSource.<SourceRecord>builder()
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .databaseList(database.getDatabaseName())
+                .tableList(
+                        database.getDatabaseName() + "." + "products") // monitor table "products"
+                .username(MYSQL_CONTAINER.getUsername())
+                .password(MYSQL_CONTAINER.getPassword())
+                .startupOptions(StartupOptions.specificOffset(offsetFile, offsetPos))
+                .deserializer(new ForwardDeserializeSchema())
+                .build();
+    }
+
+    private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
+        return MySQLSource.<SourceRecord>builder()
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .databaseList(database.getDatabaseName())
+                .tableList(
+                        database.getDatabaseName() + "." + "products") // monitor table "products"
+                .username(MYSQL_CONTAINER.getUsername())
+                .password(MYSQL_CONTAINER.getPassword())
+                .deserializer(new ForwardDeserializeSchema())
+                .build();
+    }
+
+    private static <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount)
+            throws Exception {
+        List<T> allRecords = new ArrayList<>();
+        LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
+        while (allRecords.size() < expectedRecordCount) {
+            StreamRecord<T> record = queue.poll(100, TimeUnit.SECONDS);
+            if (record != null) {
+                allRecords.add(record.getValue());
+            } else {
+                throw new RuntimeException(
+                        "Can't receive " + expectedRecordCount + " elements before timeout.");
+            }
+        }
+
+        return allRecords;
+    }
+
+    private boolean waitForCheckpointLock(Object checkpointLock, Duration timeout)
+            throws Exception {
+        final Semaphore semaphore = new Semaphore(0);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        executor.execute(
+                () -> {
+                    synchronized (checkpointLock) {
+                        semaphore.release();
+                    }
+                });
+        boolean result = semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        executor.shutdownNow();
+        return result;
+    }
+
+    /**
+     * Wait for a maximum amount of time until the first record is available.
+     *
+     * @param timeout the maximum amount of time to wait; must not be negative
+     * @return {@code true} if records are available, or {@code false} if the timeout occurred and
+     *     no records are available
+     */
+    private boolean waitForAvailableRecords(Duration timeout, TestSourceContext<?> sourceContext)
+            throws InterruptedException {
+        long now = System.currentTimeMillis();
+        long stop = now + timeout.toMillis();
+        while (System.currentTimeMillis() < stop) {
+            if (!sourceContext.getCollectedOutputs().isEmpty()) {
+                break;
+            }
+            Thread.sleep(10); // save CPU
+        }
+        return !sourceContext.getCollectedOutputs().isEmpty();
+    }
+
+    private static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
+        setupSource(
+                source, false, null, null,
+                true, // enable checkpointing; auto commit should be ignored
+                0, 1);
+    }
+
+    private static <T, S1, S2> void setupSource(
+            DebeziumSourceFunction<T> source,
+            boolean isRestored,
+            ListState<S1> restoredOffsetState,
+            ListState<S2> restoredHistoryState,
+            boolean isCheckpointingEnabled,
+            int subtaskIndex,
+            int totalNumSubtasks)
+            throws Exception {
+
+        // run setup procedure in operator life cycle
+        source.setRuntimeContext(
+                new MockStreamingRuntimeContext(
+                        isCheckpointingEnabled, totalNumSubtasks, subtaskIndex));
+        source.initializeState(
+                new MockFunctionInitializationContext(
+                        isRestored,
+                        new MockOperatorStateStore(restoredOffsetState, restoredHistoryState)));
+        source.open(new Configuration());
+    }
+
+    /**
+     * A simple implementation of {@link DebeziumDeserializationSchema} which just forward the
+     * {@link SourceRecord}.
+     */
+    public static class ForwardDeserializeSchema
+            implements DebeziumDeserializationSchema<SourceRecord> {
+
+        private static final long serialVersionUID = 2975058057832211228L;
+
+        @Override
+        public void deserialize(SourceRecord record, Collector<SourceRecord> out) throws Exception {
+            out.collect(record);
+        }
+
+        @Override
+        public TypeInformation<SourceRecord> getProducedType() {
+            return TypeInformation.of(SourceRecord.class);
+        }
+    }
+
+    private static class MockOperatorStateStore implements OperatorStateStore {
+
+        private final ListState<?> restoredOffsetListState;
+        private final ListState<?> restoredHistoryListState;
+
+        private MockOperatorStateStore(
+                ListState<?> restoredOffsetListState, ListState<?> restoredHistoryListState) {
+            this.restoredOffsetListState = restoredOffsetListState;
+            this.restoredHistoryListState = restoredHistoryListState;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <S> ListState<S> getUnionListState(ListStateDescriptor<S> stateDescriptor)
+                throws Exception {
+            if (stateDescriptor.getName().equals(DebeziumSourceFunction.OFFSETS_STATE_NAME)) {
+                return (ListState<S>) restoredOffsetListState;
+            } else if (stateDescriptor
+                    .getName()
+                    .equals(DebeziumSourceFunction.HISTORY_RECORDS_STATE_NAME)) {
+                return (ListState<S>) restoredHistoryListState;
+            } else {
+                throw new IllegalStateException("Unknown state.");
+            }
+        }
+
+        @Override
+        public <K, V> BroadcastState<K, V> getBroadcastState(
+                MapStateDescriptor<K, V> stateDescriptor) throws Exception {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <S> ListState<S> getListState(ListStateDescriptor<S> stateDescriptor)
+                throws Exception {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<String> getRegisteredStateNames() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<String> getRegisteredBroadcastStateNames() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class MockFunctionInitializationContext
+            implements FunctionInitializationContext {
+
+        private final boolean isRestored;
+        private final OperatorStateStore operatorStateStore;
+
+        private MockFunctionInitializationContext(
+                boolean isRestored, OperatorStateStore operatorStateStore) {
+            this.isRestored = isRestored;
+            this.operatorStateStore = operatorStateStore;
+        }
+
+        @Override
+        public boolean isRestored() {
+            return isRestored;
+        }
+
+        @Override
+        public OperatorStateStore getOperatorStateStore() {
+            return operatorStateStore;
+        }
+
+        @Override
+        public KeyedStateStore getKeyedStateStore() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static class BlockingSourceContext<T> extends TestSourceContext<T> {
+
+        private final Semaphore blocker = new Semaphore(0);
+        private final int expectedCount;
+        private int currentCount = 0;
+
+        private BlockingSourceContext(int expectedCount) {
+            this.expectedCount = expectedCount;
+        }
+
+        @Override
+        public void collect(T t) {
+            super.collect(t);
+            currentCount++;
+            if (currentCount == expectedCount) {
+                try {
+                    // block the source to emit records
+                    blocker.acquire();
+                } catch (InterruptedException e) {
+                    // ignore
+                }
+            }
+        }
+    }
+
+    private static final class TestingListState<T> implements ListState<T> {
+
+        private final List<T> list = new ArrayList<>();
+        private boolean clearCalled = false;
+
+        @Override
+        public void clear() {
+            list.clear();
+            clearCalled = true;
+        }
+
+        @Override
+        public Iterable<T> get() throws Exception {
+            return list;
+        }
+
+        @Override
+        public void add(T value) throws Exception {
+            Preconditions.checkNotNull(value, "You cannot add null to a ListState.");
+            list.add(value);
+        }
+
+        public List<T> getList() {
+            return list;
+        }
+
+        boolean isClearCalled() {
+            return clearCalled;
+        }
+
+        @Override
+        public void update(List<T> values) throws Exception {
+            clear();
+
+            addAll(values);
+        }
+
+        @Override
+        public void addAll(List<T> values) throws Exception {
+            if (values != null) {
+                values.forEach(
+                        v -> Preconditions.checkNotNull(v, "You cannot add null to a ListState."));
+
+                list.addAll(values);
+            }
+        }
+    }
 }

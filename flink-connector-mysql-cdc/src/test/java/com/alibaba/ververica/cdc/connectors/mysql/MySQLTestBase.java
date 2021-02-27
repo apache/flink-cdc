@@ -33,31 +33,34 @@ import java.sql.SQLException;
 import java.util.stream.Stream;
 
 /**
- * Basic class for testing MySQL binlog source, this contains a MySQL container which enables binlog.
+ * Basic class for testing MySQL binlog source, this contains a MySQL container which enables
+ * binlog.
  */
 public abstract class MySQLTestBase extends AbstractTestBase {
 
-	private static final Logger LOG = LoggerFactory.getLogger(MySQLTestBase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLTestBase.class);
 
-	protected static final MySQLContainer MYSQL_CONTAINER = (MySQLContainer) new MySQLContainer()
-		.withConfigurationOverride("docker/my.cnf")
-		.withSetupSQL("docker/setup.sql")
-		.withDatabaseName("flink-test")
-		.withUsername("flinkuser")
-		.withPassword("flinkpw")
-		.withLogConsumer(new Slf4jLogConsumer(LOG));
+    protected static final MySQLContainer MYSQL_CONTAINER =
+            (MySQLContainer)
+                    new MySQLContainer()
+                            .withConfigurationOverride("docker/my.cnf")
+                            .withSetupSQL("docker/setup.sql")
+                            .withDatabaseName("flink-test")
+                            .withUsername("flinkuser")
+                            .withPassword("flinkpw")
+                            .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-	@BeforeClass
-	public static void startContainers() {
-		LOG.info("Starting containers...");
-		Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
-		LOG.info("Containers are started.");
-	}
+    @BeforeClass
+    public static void startContainers() {
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
+        LOG.info("Containers are started.");
+    }
 
-	protected Connection getJdbcConnection() throws SQLException {
-		return DriverManager.getConnection(
-			MYSQL_CONTAINER.getJdbcUrl(),
-			MYSQL_CONTAINER.getUsername(),
-			MYSQL_CONTAINER.getPassword());
-	}
+    protected Connection getJdbcConnection() throws SQLException {
+        return DriverManager.getConnection(
+                MYSQL_CONTAINER.getJdbcUrl(),
+                MYSQL_CONTAINER.getUsername(),
+                MYSQL_CONTAINER.getPassword());
+    }
 }
