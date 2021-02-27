@@ -18,8 +18,6 @@
 
 package com.alibaba.ververica.cdc.debezium.internal;
 
-import org.apache.flink.runtime.state.FunctionSnapshotContext;
-
 import io.debezium.config.Configuration;
 import io.debezium.relational.history.AbstractDatabaseHistory;
 import io.debezium.relational.history.DatabaseHistory;
@@ -58,7 +56,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
      * because we only monitor the schema changes for one single table.
      *
      * @see
-     *     com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction#snapshotState(FunctionSnapshotContext)
+     *     com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction#snapshotState(org.apache.flink.runtime.state.FunctionSnapshotContext)
      */
     public static final Map<String, ConcurrentLinkedQueue<HistoryRecord>> ALL_RECORDS =
             new HashMap<>();

@@ -59,7 +59,7 @@ Include following Maven dependency (available through Maven Central):
   <groupId>com.alibaba.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>1.0.0</version>
+  <version>1.2.0</version>
 </dependency>
 ```
 

@@ -100,7 +100,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
                     .stringType()
                     .defaultValue("initial")
                     .withDescription(
-                            "Optional startup mode for Kafka consumer, valid enumerations are "
+                            "Optional startup mode for MySQL CDC consumer, valid enumerations are "
                                     + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
                                     + "or \"specific-offset\"");
 
@@ -124,18 +124,6 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription(
                             "Optional timestamp used in case of \"timestamp\" startup mode");
-
-    private static final ConfigOption<String> SOURCE_OFFSET_FILE =
-            ConfigOptions.key("source-offset-file")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("File Name of the MySQL binlog.");
-
-    private static final ConfigOption<Integer> SOURCE_OFFSET_POSITION =
-            ConfigOptions.key("source-offset-pos")
-                    .intType()
-                    .noDefaultValue()
-                    .withDescription("Position of the MySQL binlog.");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
