@@ -107,7 +107,11 @@ public class DebeziumChangeConsumer<T> implements DebeziumEngine.ChangeConsumer<
 			for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
 				SourceRecord record = event.value();
 				if (isHeartbeatEvent(record)) {
-					// drop heartbeat events
+					//keep offset update
+					synchronized (checkpointLock) {
+						debeziumOffset.setSourcePartition(record.sourcePartition());
+						debeziumOffset.setSourceOffset(record.sourceOffset());
+					}
 					continue;
 				}
 
