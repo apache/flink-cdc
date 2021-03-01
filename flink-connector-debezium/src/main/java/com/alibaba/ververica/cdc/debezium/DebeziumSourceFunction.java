@@ -242,7 +242,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
-        if (handover.isClosed()) {
+        if (handover.hasError()) {
             LOG.debug("snapshotState() called on closed source");
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
@@ -369,13 +369,15 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             debeziumConsumer.run();
 
             // on a clean exit, wait for the runner thread
-            if (handover.isClosed()) {
+            if (handover.hasError()) {
                 shutdownEngine();
                 if (executor != null) {
                     executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
                 }
-                // rethrow the error from Debezium consumer
-                ExceptionUtils.rethrow(handover.getError());
+                // rethrow the error from Debezium consumer except ClosedException
+                if (!handover.isCancelled()) {
+                    ExceptionUtils.rethrow(handover.getError());
+                }
             }
         } catch (InterruptedException e) {
             // may be the result of a wake-up interruption after an exception.
@@ -386,7 +388,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
-        if (handover.isClosed()) {
+        if (handover.hasError()) {
             LOG.debug("notifyCheckpointComplete() called on closed source");
             return;
         }
