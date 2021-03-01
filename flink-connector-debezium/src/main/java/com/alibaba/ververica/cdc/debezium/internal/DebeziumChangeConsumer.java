@@ -57,21 +57,17 @@ public class DebeziumChangeConsumer<T> implements Runnable {
 
     private final SourceFunction.SourceContext<T> sourceContext;
 
-	/**
-	 * The lock that guarantees that record emission and state updates are atomic,
-	 * from the view of taking a checkpoint.
-	 */
-	private final Object checkpointLock;
+    /**
+     * The lock that guarantees that record emission and state updates are atomic, from the view of
+     * taking a checkpoint.
+     */
+    private final Object checkpointLock;
 
-	/**
-	 * The schema to convert from Debezium's messages into Flink's objects.
-	 */
-	private final DebeziumDeserializationSchema<T> deserialization;
+    /** The schema to convert from Debezium's messages into Flink's objects. */
+    private final DebeziumDeserializationSchema<T> deserialization;
 
-	/**
-	 * A collector to emit records in batch (bundle).
-	 **/
-	private final DebeziumCollector debeziumCollector;
+    /** A collector to emit records in batch (bundle). */
+    private final DebeziumCollector debeziumCollector;
 
     private final DebeziumOffset debeziumOffset;
 
@@ -81,7 +77,7 @@ public class DebeziumChangeConsumer<T> implements Runnable {
 
     private boolean isInDbSnapshotPhase;
 
-	private final Handover handover;
+    private final Handover handover;
 
     private DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>
             currentCommitter;
@@ -93,7 +89,7 @@ public class DebeziumChangeConsumer<T> implements Runnable {
             DebeziumDeserializationSchema<T> deserialization,
             boolean isInDbSnapshotPhase,
             String heartbeatTopicPrefix,
-			Handover handover) {
+            Handover handover) {
         this.sourceContext = sourceContext;
         this.checkpointLock = sourceContext.getCheckpointLock();
         this.deserialization = deserialization;
@@ -102,18 +98,21 @@ public class DebeziumChangeConsumer<T> implements Runnable {
         this.debeziumCollector = new DebeziumCollector();
         this.debeziumOffset = new DebeziumOffset();
         this.stateSerializer = DebeziumOffsetSerializer.INSTANCE;
-		this.handover = handover;
-	}
+        this.handover = handover;
+    }
 
-	private void handleBatch() throws Exception {
-		boolean isPhaseChanged = false;
-		while (!isPhaseChanged) {
-			final Pair<RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>, List<ChangeEvent<SourceRecord, SourceRecord>>> recordPair = handover.pollNext();
+    private void handleBatch() throws Exception {
+        boolean isPhaseChanged = false;
+        while (!isPhaseChanged) {
+            final Pair<
+                            RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>,
+                            List<ChangeEvent<SourceRecord, SourceRecord>>>
+                    recordPair = handover.pollNext();
             final List<ChangeEvent<SourceRecord, SourceRecord>> events = recordPair.getRight();
             currentCommitter = recordPair.getLeft();
             if (CollectionUtils.isNotEmpty(events)) {
-				for (ChangeEvent<SourceRecord, SourceRecord> event : events) {
-					SourceRecord record = event.value();
+                for (ChangeEvent<SourceRecord, SourceRecord> event : events) {
+                    SourceRecord record = event.value();
                     if (isHeartbeatEvent(record)) {
                         // keep offset update
                         synchronized (checkpointLock) {
@@ -124,20 +123,22 @@ public class DebeziumChangeConsumer<T> implements Runnable {
                         continue;
                     }
 
-					deserialization.deserialize(record, debeziumCollector);
+                    deserialization.deserialize(record, debeziumCollector);
 
-					// emit the actual records. this also updates offset state atomically
-					emitRecordsUnderCheckpointLock(debeziumCollector.records, record.sourcePartition(),
-							record.sourceOffset());
+                    // emit the actual records. this also updates offset state atomically
+                    emitRecordsUnderCheckpointLock(
+                            debeziumCollector.records,
+                            record.sourcePartition(),
+                            record.sourceOffset());
 
-					if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
-						isInDbSnapshotPhase = false;
-						isPhaseChanged = true;
-					}
-				}
-			}
-		}
-	}
+                    if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
+                        isInDbSnapshotPhase = false;
+                        isPhaseChanged = true;
+                    }
+                }
+            }
+        }
+    }
 
     private boolean isHeartbeatEvent(SourceRecord record) {
         String topic = record.topic();
@@ -239,27 +240,28 @@ public class DebeziumChangeConsumer<T> implements Runnable {
         return sourceOffset;
     }
 
-	@Override
-	public void run() {
-		try {
-			if (isInDbSnapshotPhase) {
-				synchronized (checkpointLock) {
-					LOG.info("Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
-					handleBatch();
-				}
-				LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
-			}
+    @Override
+    public void run() {
+        try {
+            if (isInDbSnapshotPhase) {
+                synchronized (checkpointLock) {
+                    LOG.info(
+                            "Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
+                    handleBatch();
+                }
+                LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
+            }
 
-			handleBatch();
-		} catch (Throwable t) {
-			LOG.error("Error happens when consuming change messages.", t);
-			handover.reportError(t);
-		}
-	}
+            handleBatch();
+        } catch (Throwable t) {
+            LOG.error("Error happens when consuming change messages.", t);
+            handover.reportError(t);
+        }
+    }
 
-	private class DebeziumCollector implements Collector<T> {
+    private class DebeziumCollector implements Collector<T> {
 
-		private final Queue<T> records = new ArrayDeque<>();
+        private final Queue<T> records = new ArrayDeque<>();
 
         @Override
         public void collect(T record) {
