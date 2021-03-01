@@ -190,6 +190,15 @@ public class Handover implements Closeable {
     }
 
     /**
+     * Return whether there is an error.
+     *
+     * @return whether there is an error
+     */
+    public boolean hasError() {
+        return this.error != null;
+    }
+
+    /**
      * Closes the handover. Both the {@link #produce(RecordCommitter, List)} method and the {@link
      * #pollNext()} will throw a {@link ClosedException} on any currently blocking and future
      * invocations.
@@ -211,8 +220,8 @@ public class Handover implements Closeable {
         }
     }
 
-    public boolean isClosed() {
-        return error != null;
+    public boolean isCancelled() {
+        return error != null && error instanceof ClosedException;
     }
 
     /**
