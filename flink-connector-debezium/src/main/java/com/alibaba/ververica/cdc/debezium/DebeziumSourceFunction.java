@@ -357,7 +357,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         .using(
                                 (success, message, error) -> {
                                     if (!success && error != null) {
-                                        this.reportError(error);
+                                        handover.reportError(error);
                                     }
                                 })
                         .build();
