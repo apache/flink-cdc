@@ -38,9 +38,9 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
-import com.alibaba.ververica.cdc.debezium.internal.EventQueueConsumer;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
+import com.alibaba.ververica.cdc.debezium.internal.EventQueueConsumer;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import com.alibaba.ververica.cdc.debezium.internal.Handover;
@@ -113,8 +113,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     private ExecutorService executor;
     private DebeziumEngine<?> engine;
 
-	/** The consumer to fetch records from {@link DebeziumEngine}. */
-	private transient volatile DebeziumChangeConsumer<T> debeziumConsumer;
+    /** The consumer to fetch records from {@link DebeziumEngine}. */
+    private transient volatile DebeziumChangeConsumer<T> debeziumConsumer;
 
     /**
      * The offsets to restore to, if the consumer restores state from a checkpoint.
@@ -142,7 +142,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      */
     private transient String engineInstanceName;
 
-	private transient Handover handover;
+    private transient Handover handover;
 
     public DebeziumSourceFunction(
             DebeziumDeserializationSchema<T> deserializer,
@@ -153,15 +153,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         this.specificOffset = specificOffset;
     }
 
-	@Override
-	public void open(Configuration parameters) throws Exception {
-		super.open(parameters);
-		ThreadFactory threadFactory = new ThreadFactoryBuilder()
-				.setNameFormat("debezium-engine")
-				.build();
-		this.executor = Executors.newSingleThreadExecutor(threadFactory);
-		this.handover = new Handover();
-	}
+    @Override
+    public void open(Configuration parameters) throws Exception {
+        super.open(parameters);
+        ThreadFactory threadFactory =
+                new ThreadFactoryBuilder().setNameFormat("debezium-engine").build();
+        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.handover = new Handover();
+    }
 
     // ------------------------------------------------------------------------
     //  Checkpoint and restore
@@ -362,29 +361,28 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                                 })
                         .build();
 
-		// run the engine asynchronously
-		executor.execute(engine);
+        // run the engine asynchronously
+        executor.execute(engine);
 
-		try {
-			// start the real debezium consumer
-			debeziumConsumer.run();
+        try {
+            // start the real debezium consumer
+            debeziumConsumer.run();
 
-			// on a clean exit, wait for the runner thread
-			if (handover.isClosed()) {
-				shutdownEngine();
-				if (executor != null) {
-					executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-				}
-				// rethrow the error from Debezium consumer
-				ExceptionUtils.rethrow(handover.getError());
-			}
-		}
-		catch (InterruptedException e) {
-			// may be the result of a wake-up interruption after an exception.
-			// we ignore this here and only restore the interruption state
-			Thread.currentThread().interrupt();
-		}
-	}
+            // on a clean exit, wait for the runner thread
+            if (handover.isClosed()) {
+                shutdownEngine();
+                if (executor != null) {
+                    executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+                }
+                // rethrow the error from Debezium consumer
+                ExceptionUtils.rethrow(handover.getError());
+            }
+        } catch (InterruptedException e) {
+            // may be the result of a wake-up interruption after an exception.
+            // we ignore this here and only restore the interruption state
+            Thread.currentThread().interrupt();
+        }
+    }
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
@@ -451,26 +449,24 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         super.close();
     }
 
-	/**
-	 * Safely and gracefully stop the Debezium engine.
-	 */
-	private void shutdownEngine() {
-		try {
-			if (engine != null) {
-				engine.close();
-			}
-		} catch (IOException e) {
-			ExceptionUtils.rethrow(e);
-		} finally {
-			if (executor != null) {
-				executor.shutdown();
-			}
+    /** Safely and gracefully stop the Debezium engine. */
+    private void shutdownEngine() {
+        try {
+            if (engine != null) {
+                engine.close();
+            }
+        } catch (IOException e) {
+            ExceptionUtils.rethrow(e);
+        } finally {
+            if (executor != null) {
+                executor.shutdown();
+            }
 
-			if (handover != null) {
-				handover.close();
-			}
-		}
-	}
+            if (handover != null) {
+                handover.close();
+            }
+        }
+    }
 
     @Override
     public TypeInformation<T> getProducedType() {

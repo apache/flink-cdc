@@ -66,7 +66,7 @@ public class DebeziumChangeConsumer<T> implements Runnable {
     /** The schema to convert from Debezium's messages into Flink's objects. */
     private final DebeziumDeserializationSchema<T> deserialization;
 
-    /** A collector to emit records in batch (bundle). * */
+    /** A collector to emit records in batch (bundle). */
     private final DebeziumCollector debeziumCollector;
 
     private final DebeziumOffset debeziumOffset;
@@ -123,15 +123,18 @@ public class DebeziumChangeConsumer<T> implements Runnable {
 		this.handover = handover;
 	}
 
-	private void handleBatch() throws Exception {
-		boolean isPhaseChanged = false;
-		while (!isPhaseChanged) {
-			final Pair<RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>, List<ChangeEvent<SourceRecord, SourceRecord>>> recordPair = handover.pollNext();
+    private void handleBatch() throws Exception {
+        boolean isPhaseChanged = false;
+        while (!isPhaseChanged) {
+            final Pair<
+                            RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>,
+                            List<ChangeEvent<SourceRecord, SourceRecord>>>
+                    recordPair = handover.pollNext();
             final List<ChangeEvent<SourceRecord, SourceRecord>> events = recordPair.getRight();
             currentCommitter = recordPair.getLeft();
             if (CollectionUtils.isNotEmpty(events)) {
-				for (ChangeEvent<SourceRecord, SourceRecord> event : events) {
-					SourceRecord record = event.value();
+                for (ChangeEvent<SourceRecord, SourceRecord> event : events) {
+                    SourceRecord record = event.value();
                     if (isHeartbeatEvent(record)) {
                         // keep offset update
                         synchronized (checkpointLock) {
@@ -150,14 +153,14 @@ public class DebeziumChangeConsumer<T> implements Runnable {
                             record.sourcePartition(),
                             record.sourceOffset());
 
-					if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
-						isInDbSnapshotPhase = false;
-						isPhaseChanged = true;
-					}
-				}
-			}
-		}
-	}
+                    if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
+                        isInDbSnapshotPhase = false;
+                        isPhaseChanged = true;
+                    }
+                }
+            }
+        }
+    }
 
     private void updateMessageTimestamp(SourceRecord record) {
         Schema schema = record.valueSchema();
@@ -213,10 +216,9 @@ public class DebeziumChangeConsumer<T> implements Runnable {
     /** Emits a batch of records. */
     private void emitRecords(
             Queue<T> records, Map<String, ?> sourcePartition, Map<String, ?> sourceOffset) {
-        long currentTimestamp = System.currentTimeMillis();
         T record;
         while ((record = records.poll()) != null) {
-            emitDelay = currentTimestamp - messageTimestamp;
+            emitDelay = System.currentTimeMillis() - messageTimestamp;
             sourceContext.collect(record);
         }
         // update offset to state
@@ -291,23 +293,24 @@ public class DebeziumChangeConsumer<T> implements Runnable {
         return sourceOffset;
     }
 
-	@Override
-	public void run() {
-		try {
-			if (isInDbSnapshotPhase) {
-				synchronized (checkpointLock) {
-					LOG.info("Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
-					handleBatch();
-				}
-				LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
-			}
+    @Override
+    public void run() {
+        try {
+            if (isInDbSnapshotPhase) {
+                synchronized (checkpointLock) {
+                    LOG.info(
+                            "Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
+                    handleBatch();
+                }
+                LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
+            }
 
-			handleBatch();
-		} catch (Throwable t) {
-			LOG.error("Error happens when consuming change messages.", t);
-			handover.reportError(t);
-		}
-	}
+            handleBatch();
+        } catch (Throwable t) {
+            LOG.error("Error happens when consuming change messages.", t);
+            handover.reportError(t);
+        }
+    }
 
     private class DebeziumCollector implements Collector<T> {
 
