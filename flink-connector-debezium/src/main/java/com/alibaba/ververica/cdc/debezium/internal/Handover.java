@@ -22,6 +22,8 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.engine.ChangeEvent;
+import io.debezium.engine.DebeziumEngine.RecordCommitter;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +59,7 @@ public class Handover implements Closeable {
 	private static final Logger LOG = LoggerFactory.getLogger(Handover.class);
 	private final Object lock = new Object();
 
-	private List<ChangeEvent<SourceRecord, SourceRecord>> next;
+	private Pair<RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>, List<ChangeEvent<SourceRecord, SourceRecord>>> next;
 	private volatile Throwable error;
 	private boolean wakeupProducer;
 
@@ -73,13 +75,14 @@ public class Handover implements Closeable {
 	 * @throws Exception Rethrows exceptions from the {@link #reportError(Throwable)} method.
 	 */
 	@Nonnull
-	public List<ChangeEvent<SourceRecord, SourceRecord>> pollNext() throws Exception {
+	public Pair<RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>, List<ChangeEvent<SourceRecord, SourceRecord>>> pollNext()
+			throws Exception {
 		synchronized (lock) {
 			while (next == null && error == null) {
 				lock.wait();
 			}
 
-			List<ChangeEvent<SourceRecord, SourceRecord>> n = next;
+			Pair<RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>, List<ChangeEvent<SourceRecord, SourceRecord>>> n = next;
 			if (n != null) {
 				next = null;
 				lock.notifyAll();
@@ -90,7 +93,7 @@ public class Handover implements Closeable {
 				// this statement cannot be reached since the above method always throws an
 				// exception
 				// this is only here to silence the compiler and any warnings
-				return Collections.emptyList();
+				return Pair.of(null, Collections.emptyList());
 			}
 		}
 	}
@@ -102,6 +105,7 @@ public class Handover implements Closeable {
 	 *
 	 * <p>This behavior is similar to a "size one" blocking queue.
 	 *
+	 * @param committer The next element committer.
 	 * @param element The next element to hand over.
 	 * @throws InterruptedException Thrown, if the thread is interrupted while blocking for the
 	 *         Handover to be empty.
@@ -109,9 +113,11 @@ public class Handover implements Closeable {
 	 *         blocking for the Handover to be empty.
 	 * @throws ClosedException Thrown if the Handover was closed or concurrently being closed.
 	 */
-	public void produce(final List<ChangeEvent<SourceRecord, SourceRecord>> element)
+	public void produce(final RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer,
+			final List<ChangeEvent<SourceRecord, SourceRecord>> element)
 			throws InterruptedException, WakeupException, ClosedException {
 
+		checkNotNull(committer);
 		checkNotNull(element);
 
 		synchronized (lock) {
@@ -127,7 +133,7 @@ public class Handover implements Closeable {
 			}
 			// if there is no error, then this is open and can accept this element
 			else if (error == null) {
-				next = element;
+				next = Pair.of(committer, element);
 				lock.notifyAll();
 			}
 			// an error marks this as closed for the producer
@@ -141,7 +147,7 @@ public class Handover implements Closeable {
 	 * Reports an exception. The consumer will throw the given exception immediately, if it is
 	 * currently blocked in the {@link #pollNext()} method, or the next time it calls that method.
 	 *
-	 * <p>After this method has been called, no call to either {@link #produce(List)} or
+	 * <p>After this method has been called, no call to either {@link #produce(RecordCommitter, List)} or
 	 * {@link #pollNext()} will ever return regularly any more, but will always return
 	 * exceptionally.
 	 *
@@ -175,7 +181,7 @@ public class Handover implements Closeable {
 	}
 
 	/**
-	 * Closes the handover. Both the {@link #produce(List)} method and the {@link
+	 * Closes the handover. Both the {@link #produce(RecordCommitter, List)} method and the {@link
 	 * #pollNext()} will throw a {@link ClosedException} on any currently blocking and future
 	 * invocations.
 	 *
@@ -202,7 +208,7 @@ public class Handover implements Closeable {
 
 	/**
 	 * Wakes the producer thread up. If the producer thread is currently blocked in the {@link
-	 * #produce(List)} method, it will exit the method throwing a {@link
+	 * #produce(RecordCommitter, List)} method, it will exit the method throwing a {@link
 	 * WakeupException}.
 	 */
 	public void wakeupProducer() {
@@ -216,7 +222,7 @@ public class Handover implements Closeable {
 
 	/**
 	 * An exception thrown by the Handover in the {@link #pollNext()} or {@link
-	 * #produce(List)} method, after the Handover was closed via {@link #close()}.
+	 * #produce(RecordCommitter, List)} method, after the Handover was closed via {@link #close()}.
 	 */
 	public static final class ClosedException extends Exception {
 
@@ -224,7 +230,7 @@ public class Handover implements Closeable {
 	}
 
 	/**
-	 * A special exception thrown bv the Handover in the {@link #produce(List)} method
+	 * A special exception thrown bv the Handover in the {@link #produce(RecordCommitter, List)} method
 	 * when the producer is woken up from a blocking call via {@link #wakeupProducer()}.
 	 */
 	public static final class WakeupException extends Exception {

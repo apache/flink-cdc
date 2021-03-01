@@ -43,7 +43,7 @@ public class EventQueueConsumer implements DebeziumEngine.ChangeConsumer<ChangeE
 	public void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> events,
 			RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> recordCommitter) throws InterruptedException {
 		try {
-			handover.produce(events);
+			handover.produce(recordCommitter, events);
 		} catch (Throwable e) {
 			// this will hold this exception in handover and trigger consumer exit loop
 			handover.reportError(e);

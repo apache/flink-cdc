@@ -52,7 +52,6 @@ import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.relational.history.HistoryRecord;
 import org.apache.commons.collections.map.LinkedMap;
-import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +66,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * The {@link DebeziumSourceFunction} is a streaming data source that pulls captured change data
@@ -359,7 +357,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         .using(
                                 (success, message, error) -> {
                                     if (!success && error != null) {
-                                        this.reportError(error);
+                                        handover.reportError(error);
                                     }
                                 })
                         .build();

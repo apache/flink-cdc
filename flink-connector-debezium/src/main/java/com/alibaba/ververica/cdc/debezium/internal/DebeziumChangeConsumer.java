@@ -28,7 +28,9 @@ import io.debezium.data.Envelope;
 import io.debezium.embedded.EmbeddedEngineChangeEvent;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
+import io.debezium.engine.DebeziumEngine.RecordCommitter;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -106,8 +108,10 @@ public class DebeziumChangeConsumer<T> implements Runnable {
 	private void handleBatch() throws Exception {
 		boolean isPhaseChanged = false;
 		while (!isPhaseChanged) {
-			final List<ChangeEvent<SourceRecord, SourceRecord>> events = handover.pollNext();
-			if (CollectionUtils.isNotEmpty(events)) {
+			final Pair<RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>, List<ChangeEvent<SourceRecord, SourceRecord>>> recordPair = handover.pollNext();
+            final List<ChangeEvent<SourceRecord, SourceRecord>> events = recordPair.getRight();
+            currentCommitter = recordPair.getLeft();
+            if (CollectionUtils.isNotEmpty(events)) {
 				for (ChangeEvent<SourceRecord, SourceRecord> event : events) {
 					SourceRecord record = event.value();
                     if (isHeartbeatEvent(record)) {
