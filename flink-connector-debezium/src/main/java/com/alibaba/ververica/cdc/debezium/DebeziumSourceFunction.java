@@ -265,7 +265,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             }
         } else {
             byte[] currentState = consumer.snapshotCurrentState();
-            if (currentState == null) {
+            if (currentState == null && restoredOffsetState != null) {
                 // the consumer has been initialized, but has not yet received any data,
                 // which means we need to return the originally restored offsets
                 serializedOffset = restoredOffsetState.getBytes(StandardCharsets.UTF_8);
