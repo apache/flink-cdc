@@ -20,6 +20,7 @@ package com.alibaba.ververica.cdc.debezium.internal;
 
 import org.apache.flink.annotation.Internal;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.DeserializationFeature;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -38,6 +39,7 @@ public class DebeziumOffsetSerializer {
 
     public DebeziumOffset deserialize(byte[] bytes) throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.enable(DeserializationFeature.USE_LONG_FOR_INTS);
         return objectMapper.readValue(bytes, DebeziumOffset.class);
     }
 }
