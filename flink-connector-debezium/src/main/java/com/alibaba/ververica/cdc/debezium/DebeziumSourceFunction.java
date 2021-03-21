@@ -117,6 +117,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** Flag indicating whether the consumer is still running. */
     private volatile boolean running = true;
 
+    /** Flag indicating whether the Debezium Engine is started. */
+    private volatile boolean debeziumStarted = false;
+
     /** The consumer to fetch records from {@link DebeziumEngine}. */
     private transient volatile DebeziumChangeConsumer<T> debeziumConsumer;
 
@@ -368,6 +371,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
         // run the engine asynchronously
         executor.execute(engine);
+        debeziumStarted = true;
 
         // on a clean exit, wait for the runner thread
         try {
@@ -475,6 +479,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             if (executor != null) {
                 executor.shutdown();
             }
+            debeziumStarted = false;
         }
     }
 
@@ -486,5 +491,10 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     @VisibleForTesting
     public LinkedMap getPendingOffsetsToCommit() {
         return pendingOffsetsToCommit;
+    }
+
+    @VisibleForTesting
+    public boolean getDebeziumStarted() {
+        return debeziumStarted;
     }
 }

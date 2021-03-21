@@ -563,6 +563,90 @@ public class MySQLSourceTest extends MySQLTestBase {
         }
     }
 
+    @Test
+    public void testConsumingEmptyTable() throws Exception {
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+        int prevPos = 0;
+        {
+            // ---------------------------------------------------------------------------
+            // Step-1: start the source from empty state
+            // ---------------------------------------------------------------------------
+            DebeziumSourceFunction<SourceRecord> source =
+                    basicSourceBuilder()
+                            .tableList(database.getDatabaseName() + "." + "category")
+                            .build();
+            // we use blocking context to block the source to emit before last snapshot record
+            final BlockingSourceContext<SourceRecord> sourceContext =
+                    new BlockingSourceContext<>(8);
+            // setup source with empty state
+            setupSource(source, false, offsetState, historyState, true, 0, 1);
+
+            final CheckedThread runThread =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source.run(sourceContext);
+                        }
+                    };
+            runThread.start();
+
+            // wait until Debezium is started
+            while (!source.getDebeziumStarted()) {
+                Thread.sleep(100);
+            }
+            // ---------------------------------------------------------------------------
+            // Step-2: trigger checkpoint-1
+            // ---------------------------------------------------------------------------
+            synchronized (sourceContext.getCheckpointLock()) {
+                source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
+            }
+
+            // state is still empty
+            assertEquals(0, offsetState.list.size());
+
+            // make sure there is no more events
+            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext));
+
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+
+                statement.execute("INSERT INTO category VALUES (1, 'book')");
+                statement.execute("INSERT INTO category VALUES (2, 'shoes')");
+                statement.execute("UPDATE category SET category_name='books' WHERE id=1");
+                List<SourceRecord> records = drain(sourceContext, 3);
+                assertEquals(3, records.size());
+                assertInsert(records.get(0), "id", 1);
+                assertInsert(records.get(1), "id", 2);
+                assertUpdate(records.get(2), "id", 1);
+
+                // ---------------------------------------------------------------------------
+                // Step-4: trigger checkpoint-2 during DML operations
+                // ---------------------------------------------------------------------------
+                synchronized (sourceContext.getCheckpointLock()) {
+                    // trigger checkpoint-1
+                    source.snapshotState(new StateSnapshotContextSynchronousImpl(138, 138));
+                }
+
+                assertHistoryState(historyState); // assert the DDL is stored in the history state
+                assertEquals(1, offsetState.list.size());
+                String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+                assertEquals(
+                        "mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+                assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
+                assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
+                assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
+                assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
+                int pos = JsonPath.read(state, "$.sourceOffset.pos");
+                assertTrue(pos > prevPos);
+            }
+
+            source.cancel();
+            source.close();
+            runThread.sync();
+        }
+    }
+
     private void assertHistoryState(TestingListState<String> historyState) {
         // assert the DDL is stored in the history state
         assertTrue(historyState.list.size() > 0);
@@ -644,20 +728,16 @@ public class MySQLSourceTest extends MySQLTestBase {
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(
             String offsetFile, int offsetPos) {
-        return MySQLSource.<SourceRecord>builder()
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
-                .databaseList(database.getDatabaseName())
-                .tableList(
-                        database.getDatabaseName() + "." + "products") // monitor table "products"
-                .username(MYSQL_CONTAINER.getUsername())
-                .password(MYSQL_CONTAINER.getPassword())
+        return basicSourceBuilder()
                 .startupOptions(StartupOptions.specificOffset(offsetFile, offsetPos))
-                .deserializer(new ForwardDeserializeSchema())
                 .build();
     }
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
+        return basicSourceBuilder().build();
+    }
+
+    private MySQLSource.Builder<SourceRecord> basicSourceBuilder() {
         return MySQLSource.<SourceRecord>builder()
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
@@ -666,8 +746,7 @@ public class MySQLSourceTest extends MySQLTestBase {
                         database.getDatabaseName() + "." + "products") // monitor table "products"
                 .username(MYSQL_CONTAINER.getUsername())
                 .password(MYSQL_CONTAINER.getPassword())
-                .deserializer(new ForwardDeserializeSchema())
-                .build();
+                .deserializer(new ForwardDeserializeSchema());
     }
 
     private static <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount)

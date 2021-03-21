@@ -86,3 +86,8 @@ VALUES (default, '2016-01-16', 1001, 1, 102),
        (default, '2016-02-18', 1004, 3, 109),
        (default, '2016-02-19', 1002, 2, 106),
        (default, '16-02-21', 1003, 1, 107);
+
+CREATE TABLE category (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    category_name VARCHAR(255)
+);
