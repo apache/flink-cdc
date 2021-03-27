@@ -29,6 +29,8 @@ import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -372,6 +374,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         // run the engine asynchronously
         executor.execute(engine);
         debeziumStarted = true;
+
+        // initialize metrics
+        MetricGroup metricGroup = getRuntimeContext().getMetricGroup();
+        metricGroup.gauge(
+                "currentFetchEventTimeLag", (Gauge<Long>) () -> debeziumConsumer.getFetchDelay());
+        metricGroup.gauge(
+                "currentEmitEventTimeLag", (Gauge<Long>) () -> debeziumConsumer.getEmitDelay());
+        metricGroup.gauge("sourceIdleTime", (Gauge<Long>) () -> debeziumConsumer.getIdleTime());
 
         // on a clean exit, wait for the runner thread
         try {

@@ -80,6 +80,28 @@ public class DebeziumChangeConsumer<T>
 
     private boolean lockHold = false;
 
+    // ---------------------------------------------------------------------------------------
+    // Metrics
+    // ---------------------------------------------------------------------------------------
+
+    /** Timestamp of change event. If the event is a snapshot event, the timestamp is 0L. */
+    private volatile long messageTimestamp = 0L;
+
+    /** The last record processing time. */
+    private volatile long processTime = 0L;
+
+    /**
+     * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
+     * record fetched into the source operator.
+     */
+    private volatile long fetchDelay = 0L;
+
+    /**
+     * emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the
+     * source operator.
+     */
+    private volatile long emitDelay = 0L;
+
     private DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>
             currentCommitter;
 
@@ -108,9 +130,13 @@ public class DebeziumChangeConsumer<T>
             DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer)
             throws InterruptedException {
         this.currentCommitter = committer;
+        this.processTime = System.currentTimeMillis();
         try {
             for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
                 SourceRecord record = event.value();
+                updateMessageTimestamp(record);
+                fetchDelay = processTime - messageTimestamp;
+
                 if (isHeartbeatEvent(record)) {
                     // keep offset update
                     synchronized (checkpointLock) {
@@ -145,6 +171,24 @@ public class DebeziumChangeConsumer<T>
         } catch (Exception e) {
             LOG.error("Error happens when consuming change messages.", e);
             errorReporter.reportError(e);
+        }
+    }
+
+    private void updateMessageTimestamp(SourceRecord record) {
+        Schema schema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        if (schema.field(Envelope.FieldName.SOURCE) == null) {
+            return;
+        }
+
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        if (source.schema().field(Envelope.FieldName.TIMESTAMP) == null) {
+            return;
+        }
+
+        Long tsMs = source.getInt64(Envelope.FieldName.TIMESTAMP);
+        if (tsMs != null) {
+            this.messageTimestamp = tsMs;
         }
     }
 
@@ -184,8 +228,10 @@ public class DebeziumChangeConsumer<T>
     /** Emits a batch of records. */
     private void emitRecords(
             Queue<T> records, Map<String, ?> sourcePartition, Map<String, ?> sourceOffset) {
+        long currentTimestamp = System.currentTimeMillis();
         T record;
         while ((record = records.poll()) != null) {
+            emitDelay = currentTimestamp - messageTimestamp;
             sourceContext.collect(record);
         }
         // update offset to state
@@ -228,6 +274,18 @@ public class DebeziumChangeConsumer<T>
                 new EmbeddedEngineChangeEvent<>(null, recordWrapper, recordWrapper);
         currentCommitter.markProcessed(changeEvent);
         currentCommitter.markBatchFinished();
+    }
+
+    public long getFetchDelay() {
+        return fetchDelay;
+    }
+
+    public long getEmitDelay() {
+        return emitDelay;
+    }
+
+    public long getIdleTime() {
+        return System.currentTimeMillis() - processTime;
     }
 
     /**
