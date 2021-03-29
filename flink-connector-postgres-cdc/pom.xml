@@ -21,7 +21,7 @@ under the License.
     <parent>
         <artifactId>flink-cdc-connectors</artifactId>
         <groupId>com.alibaba.ververica</groupId>
-        <version>1.3-SNAPSHOT</version>
+        <version>1.4-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -167,7 +167,9 @@ under the License.
                 <configuration>
                     <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
                     <forkCount>1</forkCount>
-                    <argLine>-Xms256m -Xmx2048m -Dlog4j.configurationFile=${log4j.configuration} -Dmvn.forkNumber=${surefire.forkNumber} -XX:-UseGCOverheadLimit</argLine>
+                    <argLine>-Xms256m -Xmx2048m -Dlog4j.configurationFile=${log4j.configuration}
+                        -Dmvn.forkNumber=${surefire.forkNumber} -XX:-UseGCOverheadLimit
+                    </argLine>
                 </configuration>
             </plugin>
         </plugins>
