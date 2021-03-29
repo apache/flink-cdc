@@ -29,7 +29,7 @@ under the License.
 
     <groupId>com.alibaba.ververica</groupId>
     <artifactId>flink-cdc-connectors</artifactId>
-    <version>1.3-SNAPSHOT</version>
+    <version>1.3.0</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -154,12 +154,15 @@ under the License.
                             specific language governing permissions and limitations
                             under the License.
                         -->
-                        <license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
-                            <licenseFamilyCategory>AL2 </licenseFamilyCategory>
+                        <license
+                                implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+                            <licenseFamilyCategory>AL2</licenseFamilyCategory>
                             <licenseFamilyName>Apache License 2.0</licenseFamilyName>
-                            <notes />
+                            <notes/>
                             <patterns>
-                                <pattern>Licensed to the Apache Software Foundation (ASF) under one</pattern>
+                                <pattern>Licensed to the Apache Software Foundation (ASF) under
+                                    one
+                                </pattern>
                             </patterns>
                         </license>
                     </licenses>
@@ -199,10 +202,11 @@ under the License.
 
                         <!-- \# refers to the static imports -->
                         <importOrder>
-                            <order>org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#</order>
+                            <order>org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#
+                            </order>
                         </importOrder>
 
-                        <removeUnusedImports />
+                        <removeUnusedImports/>
                     </java>
                 </configuration>
                 <executions>
@@ -321,7 +325,9 @@ under the License.
                             <shadeTestJar>true</shadeTestJar>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
-                            <dependencyReducedPomLocation>${project.basedir}/target/dependency-reduced-pom.xml</dependencyReducedPomLocation>
+                            <dependencyReducedPomLocation>
+                                ${project.basedir}/target/dependency-reduced-pom.xml
+                            </dependencyReducedPomLocation>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
