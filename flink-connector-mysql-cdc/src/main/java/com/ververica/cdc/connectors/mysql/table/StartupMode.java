@@ -32,5 +32,7 @@ public enum StartupMode {
 
     SPECIFIC_OFFSETS,
 
+    SPECIFIC_GTID,
+
     TIMESTAMP
 }
