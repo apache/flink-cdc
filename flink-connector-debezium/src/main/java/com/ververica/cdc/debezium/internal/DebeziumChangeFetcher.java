@@ -34,7 +34,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 
 /**
  * A Handler that convert change messages from {@link DebeziumEngine} to data in Flink. Considering
@@ -262,14 +266,14 @@ public class DebeziumChangeFetcher<T> {
             return record.sourceOffset();
         }
 
-        Struct source =  value.getStruct(Envelope.FieldName.SOURCE);
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         if (source.schema().field("gtid") != null) {
             String gtid = source.getString("gtid");
             Map<String, Object> newSourceOffset = new HashMap<>();
             for (Map.Entry<String, ?> entry : record.sourceOffset().entrySet()) {
-                newSourceOffset.put(entry.getKey(),entry.getValue());
+                newSourceOffset.put(entry.getKey(), entry.getValue());
             }
-            newSourceOffset.put("gtid",gtid);
+            newSourceOffset.put("gtid", gtid);
             return newSourceOffset;
         }
         return record.sourceOffset();
