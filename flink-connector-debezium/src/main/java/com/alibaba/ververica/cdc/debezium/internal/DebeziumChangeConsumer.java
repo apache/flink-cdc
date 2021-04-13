@@ -35,10 +35,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 
 /**
  * A consumer that consumes change messages from {@link DebeziumEngine}.
@@ -136,12 +133,13 @@ public class DebeziumChangeConsumer<T>
                 SourceRecord record = event.value();
                 updateMessageTimestamp(record);
                 fetchDelay = processTime - messageTimestamp;
+                Map<String, ?> newSourceOffset = addSourceOffsetFields(record);
 
                 if (isHeartbeatEvent(record)) {
                     // keep offset update
                     synchronized (checkpointLock) {
                         debeziumOffset.setSourcePartition(record.sourcePartition());
-                        debeziumOffset.setSourceOffset(record.sourceOffset());
+                        debeziumOffset.setSourceOffset(newSourceOffset);
                     }
                     // drop heartbeat events
                     continue;
@@ -166,12 +164,32 @@ public class DebeziumChangeConsumer<T>
 
                 // emit the actual records. this also updates offset state atomically
                 emitRecordsUnderCheckpointLock(
-                        debeziumCollector.records, record.sourcePartition(), record.sourceOffset());
+                        debeziumCollector.records, record.sourcePartition(), newSourceOffset);
             }
         } catch (Exception e) {
             LOG.error("Error happens when consuming change messages.", e);
             errorReporter.reportError(e);
         }
+    }
+
+    private Map<String, ?> addSourceOffsetFields(SourceRecord record) {
+        Schema schema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        if (schema.field(Envelope.FieldName.SOURCE) == null) {
+            return record.sourceOffset();
+        }
+
+        Struct source =  value.getStruct(Envelope.FieldName.SOURCE);
+        if (source.schema().field("gtid") != null) {
+            String gtid = source.getString("gtid");
+            Map<String, Object> newSourceOffset = new HashMap<>();
+            for (Map.Entry<String, ?> entry : record.sourceOffset().entrySet()) {
+                newSourceOffset.put(entry.getKey(),entry.getValue());
+            }
+            newSourceOffset.put("gtid",gtid);
+            return newSourceOffset;
+        }
+        return record.sourceOffset();
     }
 
     private void updateMessageTimestamp(SourceRecord record) {

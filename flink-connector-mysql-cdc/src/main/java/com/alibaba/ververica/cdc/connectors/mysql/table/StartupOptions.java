@@ -28,13 +28,14 @@ public final class StartupOptions {
     public final String specificOffsetFile;
     public final Integer specificOffsetPos;
     public final Long startupTimestampMillis;
+    public final String specificGtid;
 
     /**
      * Performs an initial snapshot on the monitored database tables upon first startup, and
      * continue to read the latest binlog.
      */
     public static StartupOptions initial() {
-        return new StartupOptions(StartupMode.INITIAL, null, null, null);
+        return new StartupOptions(StartupMode.INITIAL, null, null, null, null);
     }
 
     /**
@@ -43,7 +44,7 @@ public final class StartupOptions {
      * binlog is guaranteed to contain the entire history of the database.
      */
     public static StartupOptions earliest() {
-        return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null);
+        return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null, null);
     }
 
     /**
@@ -51,7 +52,7 @@ public final class StartupOptions {
      * the end of the binlog which means only have the changes since the connector was started.
      */
     public static StartupOptions latest() {
-        return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null);
+        return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null, null);
     }
 
     /**
@@ -60,7 +61,11 @@ public final class StartupOptions {
      */
     public static StartupOptions specificOffset(String specificOffsetFile, int specificOffsetPos) {
         return new StartupOptions(
-                StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null);
+                StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null, null);
+    }
+
+    public static StartupOptions specificGtid(String specificGtid) {
+        return new StartupOptions(StartupMode.SPECIFIC_GTID, null, null, null, specificGtid);
     }
 
     /**
@@ -73,18 +78,20 @@ public final class StartupOptions {
      * @param startupTimestampMillis timestamp for the startup offsets, as milliseconds from epoch.
      */
     public static StartupOptions timestamp(long startupTimestampMillis) {
-        return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis);
+        return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis, null);
     }
 
     private StartupOptions(
             StartupMode startupMode,
             String specificOffsetFile,
             Integer specificOffsetPos,
-            Long startupTimestampMillis) {
+            Long startupTimestampMillis,
+            String specificGtid) {
         this.startupMode = startupMode;
         this.specificOffsetFile = specificOffsetFile;
         this.specificOffsetPos = specificOffsetPos;
         this.startupTimestampMillis = startupTimestampMillis;
+        this.specificGtid = specificGtid;
 
         switch (startupMode) {
             case INITIAL:
@@ -94,6 +101,9 @@ public final class StartupOptions {
             case SPECIFIC_OFFSETS:
                 checkNotNull(specificOffsetFile, "specificOffsetFile shouldn't be null");
                 checkNotNull(specificOffsetPos, "specificOffsetPos shouldn't be null");
+                break;
+            case SPECIFIC_GTID:
+                checkNotNull(specificGtid, "specificGtid shouldn't be null");
                 break;
             case TIMESTAMP:
                 checkNotNull(startupTimestampMillis, "startupTimestampMillis shouldn't be null");
