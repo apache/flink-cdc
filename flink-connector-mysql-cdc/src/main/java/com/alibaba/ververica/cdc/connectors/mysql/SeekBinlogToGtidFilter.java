@@ -1,9 +1,10 @@
 package com.alibaba.ververica.cdc.connectors.mysql;
 
-import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import io.debezium.data.Envelope;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.util.Collector;
+
+import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -50,7 +51,9 @@ public class SeekBinlogToGtidFilter<T> implements DebeziumDeserializationSchema<
         } else {
             filtered++;
             if (filtered % 10000 == 0) {
-                LOG.info("Seeking binlog to specific gtid with filtered {} change events.", filtered);
+                LOG.info(
+                        "Seeking binlog to specific gtid with filtered {} change events.",
+                        filtered);
             }
         }
     }
