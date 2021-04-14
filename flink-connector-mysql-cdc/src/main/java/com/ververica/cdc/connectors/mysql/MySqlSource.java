@@ -21,7 +21,6 @@ package com.ververica.cdc.connectors.mysql;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.internal.DebeziumOffset;
 import io.debezium.connector.mysql.MySqlConnector;
 
@@ -226,9 +225,8 @@ public class MySqlSource {
                 case SPECIFIC_GTID:
                     checkNotNull(deserializer);
                     props.setProperty("snapshot.mode", "never");
-                    deserializer = new SeekBinlogToGtidFilter<>(
-                            startupOptions.specificGtid,
-                            deserializer);
+                    deserializer =
+                            new SeekBinlogToGtidFilter<>(startupOptions.specificGtid, deserializer);
                     break;
 
                 case TIMESTAMP:
