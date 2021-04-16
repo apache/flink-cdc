@@ -54,6 +54,7 @@ public class DebeziumChangeConsumer<T>
 
     public static final String LAST_COMPLETELY_PROCESSED_LSN_KEY = "lsn_proc";
     public static final String LAST_COMMIT_LSN_KEY = "lsn_commit";
+    public static final String GTID_KEY = "gtid";
 
     private final SourceFunction.SourceContext<T> sourceContext;
 
@@ -184,13 +185,13 @@ public class DebeziumChangeConsumer<T>
         }
 
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-        if (source.schema().field("gtid") != null) {
-            String gtid = source.getString("gtid");
+        if (source.schema().field(GTID_KEY) != null) {
+            String gtid = source.getString(GTID_KEY);
             Map<String, Object> newSourceOffset = new HashMap<>();
             for (Map.Entry<String, ?> entry : record.sourceOffset().entrySet()) {
                 newSourceOffset.put(entry.getKey(), entry.getValue());
             }
-            newSourceOffset.put("gtid", gtid);
+            newSourceOffset.put(GTID_KEY, gtid);
             return newSourceOffset;
         }
         return record.sourceOffset();
