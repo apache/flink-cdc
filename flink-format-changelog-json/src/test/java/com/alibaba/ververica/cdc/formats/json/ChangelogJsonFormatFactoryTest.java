@@ -21,11 +21,13 @@ package com.alibaba.ververica.cdc.formats.json;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.formats.json.TimestampFormat;
+import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.TableSchema;
-import org.apache.flink.table.catalog.CatalogTableImpl;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.data.RowData;
@@ -42,10 +44,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -53,14 +58,17 @@ import static org.junit.Assert.assertTrue;
 public class ChangelogJsonFormatFactoryTest extends TestLogger {
     @Rule public ExpectedException thrown = ExpectedException.none();
 
-    private static final TableSchema SCHEMA =
-            TableSchema.builder()
-                    .field("a", DataTypes.STRING())
-                    .field("b", DataTypes.INT())
-                    .field("c", DataTypes.BOOLEAN())
-                    .build();
+    private static final ResolvedSchema SCHEMA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("a", DataTypes.STRING()),
+                            Column.physical("b", DataTypes.STRING()),
+                            Column.physical("c", DataTypes.BOOLEAN())),
+                    new ArrayList<>(),
+                    null);
 
-    private static final RowType ROW_TYPE = (RowType) SCHEMA.toRowDataType().getLogicalType();
+    private static final RowType ROW_TYPE =
+            (RowType) fromResolvedSchema(SCHEMA).toRowDataType().getLogicalType();
 
     @Test
     public void testSeDeSchema() {
@@ -79,7 +87,8 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 
         DeserializationSchema<RowData> actualDeser =
                 scanSourceMock.valueFormat.createRuntimeDecoder(
-                        ScanRuntimeProviderContext.INSTANCE, SCHEMA.toRowDataType());
+                        ScanRuntimeProviderContext.INSTANCE,
+                        fromResolvedSchema(SCHEMA).toRowDataType());
 
         assertEquals(expectedDeser, actualDeser);
 
@@ -90,7 +99,8 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 
         SerializationSchema<RowData> actualSer =
                 sinkMock.valueFormat.createRuntimeEncoder(
-                        new SinkRuntimeProviderContext(false), SCHEMA.toRowDataType());
+                        new SinkRuntimeProviderContext(false),
+                        fromResolvedSchema(SCHEMA).toRowDataType());
 
         assertEquals(expectedSer, actualSer);
     }
@@ -142,7 +152,13 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
         return FactoryUtil.createTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
-                new CatalogTableImpl(SCHEMA, options, "mock source"),
+                new ResolvedCatalogTable(
+                        CatalogTable.of(
+                                fromResolvedSchema(SCHEMA).toSchema(),
+                                "mock source",
+                                new ArrayList<>(),
+                                options),
+                        SCHEMA),
                 new Configuration(),
                 ChangelogJsonFormatFactoryTest.class.getClassLoader(),
                 false);
@@ -152,7 +168,13 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
         return FactoryUtil.createTableSink(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
-                new CatalogTableImpl(SCHEMA, options, "mock sink"),
+                new ResolvedCatalogTable(
+                        CatalogTable.of(
+                                fromResolvedSchema(SCHEMA).toSchema(),
+                                "mock source",
+                                new ArrayList<>(),
+                                options),
+                        SCHEMA),
                 new Configuration(),
                 ChangelogJsonFormatFactoryTest.class.getClassLoader(),
                 false);
