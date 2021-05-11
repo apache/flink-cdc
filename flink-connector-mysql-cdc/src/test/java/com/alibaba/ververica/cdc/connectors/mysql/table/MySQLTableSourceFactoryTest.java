@@ -21,9 +21,12 @@ package com.alibaba.ververica.cdc.connectors.mysql.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.TableSchema;
-import org.apache.flink.table.catalog.CatalogTableImpl;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
@@ -33,25 +36,30 @@ import org.apache.flink.util.ExceptionUtils;
 import org.junit.Test;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Test for {@link MySQLTableSource} created by {@link MySQLTableSourceFactory}. */
 public class MySQLTableSourceFactoryTest {
-    private static final TableSchema SCHEMA =
-            TableSchema.builder()
-                    .field("aaa", DataTypes.INT().notNull())
-                    .field("bbb", DataTypes.STRING().notNull())
-                    .field("ccc", DataTypes.DOUBLE())
-                    .field("ddd", DataTypes.DECIMAL(31, 18))
-                    .field("eee", DataTypes.TIMESTAMP(3))
-                    .primaryKey("bbb", "aaa")
-                    .build();
+
+    private static final ResolvedSchema SCHEMA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("aaa", DataTypes.INT().notNull()),
+                            Column.physical("bbb", DataTypes.STRING().notNull()),
+                            Column.physical("ccc", DataTypes.DOUBLE()),
+                            Column.physical("ddd", DataTypes.DECIMAL(31, 18)),
+                            Column.physical("eee", DataTypes.TIMESTAMP(3))),
+                    new ArrayList<>(),
+                    UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
 
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
@@ -68,7 +76,7 @@ public class MySQLTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySQLTableSource expectedSource =
                 new MySQLTableSource(
-                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -95,7 +103,7 @@ public class MySQLTableSourceFactoryTest {
         dbzProperties.put("snapshot.mode", "never");
         MySQLTableSource expectedSource =
                 new MySQLTableSource(
-                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3307,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -124,7 +132,7 @@ public class MySQLTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(options);
         MySQLTableSource expectedSource =
                 new MySQLTableSource(
-                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3307,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -147,7 +155,7 @@ public class MySQLTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySQLTableSource expectedSource =
                 new MySQLTableSource(
-                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -170,7 +178,7 @@ public class MySQLTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySQLTableSource expectedSource =
                 new MySQLTableSource(
-                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -193,7 +201,7 @@ public class MySQLTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySQLTableSource expectedSource =
                 new MySQLTableSource(
-                        TableSchemaUtils.getPhysicalSchema(SCHEMA),
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -299,7 +307,13 @@ public class MySQLTableSourceFactoryTest {
         return FactoryUtil.createTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
-                new CatalogTableImpl(SCHEMA, options, "mock source"),
+                new ResolvedCatalogTable(
+                        CatalogTable.of(
+                                fromResolvedSchema(SCHEMA).toSchema(),
+                                "mock source",
+                                new ArrayList<>(),
+                                options),
+                        SCHEMA),
                 new Configuration(),
                 MySQLTableSourceFactoryTest.class.getClassLoader(),
                 false);

@@ -19,9 +19,9 @@
 package com.alibaba.ververica.cdc.formats.json;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonOptions;
 import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
-import org.apache.flink.formats.json.TimestampFormat;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
@@ -59,7 +59,8 @@ public class ChangelogJsonSerializationSchema implements SerializationSchema<Row
                         createJsonRowType(fromLogicalToDataType(rowType)),
                         timestampFormat,
                         JsonOptions.MapNullKeyMode.FAIL,
-                        JsonOptions.MAP_NULL_KEY_LITERAL.defaultValue());
+                        JsonOptions.MAP_NULL_KEY_LITERAL.defaultValue(),
+                        JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.defaultValue());
         this.timestampFormat = timestampFormat;
     }
 

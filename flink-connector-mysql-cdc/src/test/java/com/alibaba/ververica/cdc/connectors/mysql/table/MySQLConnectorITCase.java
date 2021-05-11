@@ -24,10 +24,12 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
+import org.apache.flink.table.utils.LegacyRowResource;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Test;
 
 import java.sql.Connection;
@@ -57,6 +59,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
             StreamTableEnvironment.create(
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+
+    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
     @Before
     public void before() {
