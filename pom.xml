@@ -29,7 +29,7 @@ under the License.
 
     <groupId>com.alibaba.ververica</groupId>
     <artifactId>flink-cdc-connectors</artifactId>
-    <version>1.4-SNAPSHOT</version>
+    <version>1.4.0</version>
     <packaging>pom</packaging>
 
     <modules>
