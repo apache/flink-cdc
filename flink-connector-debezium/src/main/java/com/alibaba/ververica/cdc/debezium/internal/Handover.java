@@ -28,7 +28,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.Closeable;
@@ -45,9 +44,6 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  *
  * <p>This class is used in the Flink Debezium Engine Consumer to hand over data and exceptions
  * between the thread that runs the DebeziumEngine class and the main thread.
- *
- * <p>The Handover has the notion of "waking up" the producer thread with a {@link WakeupException}
- * rather than a thread interrupt.
  *
  * <p>The Handover can also be "closed", signalling from one thread to the other that it the thread
  * has terminated.
@@ -77,7 +73,6 @@ public class Handover implements Closeable {
      * @throws ClosedException Thrown if the Handover was {@link #close() closed}.
      * @throws Exception Rethrows exceptions from the {@link #reportError(Throwable)} method.
      */
-    @Nonnull
     public Pair<
                     RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>,
                     List<ChangeEvent<SourceRecord, SourceRecord>>>
@@ -99,8 +94,7 @@ public class Handover implements Closeable {
                 ExceptionUtils.rethrow(error, error.getMessage());
 
                 // this statement cannot be reached since the above method always throws an
-                // exception
-                // this is only here to silence the compiler and any warnings
+                // exception this is only here to silence the compiler and any warnings
                 return Pair.of(null, Collections.emptyList());
             }
         }
@@ -117,14 +111,11 @@ public class Handover implements Closeable {
      * @param element The next element to hand over.
      * @throws InterruptedException Thrown, if the thread is interrupted while blocking for the
      *     Handover to be empty.
-     * @throws WakeupException Thrown, if the {@link #wakeupProducer()} method is called while
-     *     blocking for the Handover to be empty.
-     * @throws ClosedException Thrown if the Handover was closed or concurrently being closed.
      */
     public void produce(
             final RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> committer,
             final List<ChangeEvent<SourceRecord, SourceRecord>> element)
-            throws InterruptedException, WakeupException, ClosedException {
+            throws InterruptedException {
 
         checkNotNull(committer);
         checkNotNull(element);
@@ -136,18 +127,13 @@ public class Handover implements Closeable {
 
             wakeupProducer = false;
 
-            // if there is still an element, we must have been woken up
-            if (next != null) {
-                throw new WakeupException();
-            }
-            // if there is no error, then this is open and can accept this element
-            else if (error == null) {
+            // an error marks this as closed for the producer
+            if (error != null) {
+                ExceptionUtils.rethrow(error, error.getMessage());
+            } else {
+                // if there is no error, then this is open and can accept this element
                 next = Pair.of(committer, element);
                 lock.notifyAll();
-            }
-            // an error marks this as closed for the producer
-            else {
-                ExceptionUtils.rethrow(error, error.getMessage());
             }
         }
     }
@@ -220,20 +206,8 @@ public class Handover implements Closeable {
         }
     }
 
-    public boolean isCancelled() {
+    public boolean isClosed() {
         return error != null && error instanceof ClosedException;
-    }
-
-    /**
-     * Wakes the producer thread up. If the producer thread is currently blocked in the {@link
-     * #produce(RecordCommitter, List)} method, it will exit the method throwing a {@link
-     * WakeupException}.
-     */
-    public void wakeupProducer() {
-        synchronized (lock) {
-            wakeupProducer = true;
-            lock.notifyAll();
-        }
     }
 
     // ------------------------------------------------------------------------
@@ -243,15 +217,6 @@ public class Handover implements Closeable {
      * #produce(RecordCommitter, List)} method, after the Handover was closed via {@link #close()}.
      */
     public static final class ClosedException extends Exception {
-
-        private static final long serialVersionUID = 1L;
-    }
-
-    /**
-     * A special exception thrown bv the Handover in the {@link #produce(RecordCommitter, List)}
-     * method when the producer is woken up from a blocking call via {@link #wakeupProducer()}.
-     */
-    public static final class WakeupException extends Exception {
 
         private static final long serialVersionUID = 1L;
     }
