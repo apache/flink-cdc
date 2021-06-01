@@ -128,9 +128,9 @@ public final class RowDataDebeziumDeserializeSchema
     }
 
     private GenericRowData extractBeforeRow(Struct value, Schema valueSchema) throws Exception {
-        Schema afterSchema = valueSchema.field(Envelope.FieldName.BEFORE).schema();
-        Struct after = value.getStruct(Envelope.FieldName.BEFORE);
-        return (GenericRowData) runtimeConverter.convert(after, afterSchema);
+        Schema beforeSchema = valueSchema.field(Envelope.FieldName.BEFORE).schema();
+        Struct before = value.getStruct(Envelope.FieldName.BEFORE);
+        return (GenericRowData) runtimeConverter.convert(before, beforeSchema);
     }
 
     @Override
