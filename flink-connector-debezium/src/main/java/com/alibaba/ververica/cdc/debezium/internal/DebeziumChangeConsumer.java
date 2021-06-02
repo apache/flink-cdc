@@ -41,7 +41,8 @@ public class DebeziumChangeConsumer
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumChangeConsumer.class);
 
     private final Handover handover;
-    private RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> currentCommitter;
+    // keep the modification is visible to the source function
+    private volatile RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> currentCommitter;
 
     public DebeziumChangeConsumer(Handover handover) {
         this.handover = handover;
@@ -52,7 +53,7 @@ public class DebeziumChangeConsumer
             List<ChangeEvent<SourceRecord, SourceRecord>> events,
             RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>> recordCommitter) {
         try {
-            this.currentCommitter = recordCommitter;
+            currentCommitter = recordCommitter;
             handover.produce(events);
         } catch (Throwable e) {
             // Hold this exception in handover and trigger the fetcher to exit
@@ -62,9 +63,11 @@ public class DebeziumChangeConsumer
 
     @SuppressWarnings("unchecked")
     public void commitOffset(DebeziumOffset offset) throws InterruptedException {
+        // Although the committer is read/write by multi-thread, the committer will be not changed
+        // frequently.
         if (currentCommitter == null) {
             LOG.info(
-                    "commitOffset() called on Debezium ChangeHandler which doesn't receive records yet.");
+                    "commitOffset() called on Debezium change consumer which doesn't receive records yet.");
             return;
         }
 

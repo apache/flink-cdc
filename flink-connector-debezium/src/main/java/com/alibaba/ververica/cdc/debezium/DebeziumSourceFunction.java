@@ -114,7 +114,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** The maximum number of pending non-committed checkpoints to track, to avoid memory leaks. */
     public static final int MAX_NUM_PENDING_CHECKPOINTS = 100;
 
-    // -------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------
+    // Properties
+    // ---------------------------------------------------------------------------------------
 
     /** The schema to convert from Debezium's messages into Flink's objects. */
     private final DebeziumDeserializationSchema<T> deserializer;
@@ -128,14 +130,12 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** Data for pending but uncommitted offsets. */
     private final LinkedMap pendingOffsetsToCommit = new LinkedMap();
 
-    private ExecutorService executor;
-    private DebeziumEngine<?> engine;
-
     /** Flag indicating whether the Debezium Engine is started. */
     private volatile boolean debeziumStarted = false;
 
-    /** The consumer to fetch records from {@link DebeziumEngine}. */
-    private transient volatile DebeziumChangeFetcher<T> debeziumChangeFetcher;
+    // ---------------------------------------------------------------------------------------
+    // State
+    // ---------------------------------------------------------------------------------------
 
     /**
      * The offsets to restore to, if the consumer restores state from a checkpoint.
@@ -150,8 +150,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** Accessor for state in the operator state backend. */
     private transient ListState<byte[]> offsetState;
 
-    private transient DebeziumChangeConsumer changeConsumer;
-
     /**
      * State to store the history records, i.e. schema changes.
      *
@@ -159,13 +157,28 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      */
     private transient ListState<String> historyRecordsState;
 
+    // ---------------------------------------------------------------------------------------
+    // Worker
+    // ---------------------------------------------------------------------------------------
+
+    private ExecutorService executor;
+    private DebeziumEngine<?> engine;
     /**
      * Unique name of this Debezium Engine instance across all the jobs. Currently we randomly
      * generate a UUID for it. This is used for {@link FlinkDatabaseHistory}.
      */
     private transient String engineInstanceName;
 
+    /** Consume the events from the engine and commit the offset to the engine. */
+    private transient DebeziumChangeConsumer changeConsumer;
+
+    /** The consumer to fetch records from {@link Handover}. */
+    private transient volatile DebeziumChangeFetcher<T> debeziumChangeFetcher;
+
+    /** Buffer the events from the source and record the errors from the debezium. */
     private transient Handover handover;
+
+    // ---------------------------------------------------------------------------------------
 
     public DebeziumSourceFunction(
             DebeziumDeserializationSchema<T> deserializer,
@@ -375,7 +388,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         this.engine =
                 DebeziumEngine.create(Connect.class)
                         .using(properties)
-                        .notifying(new DebeziumChangeConsumer(handover))
+                        .notifying(changeConsumer)
                         .using(OffsetCommitPolicy.always())
                         .using(
                                 (success, message, error) -> {

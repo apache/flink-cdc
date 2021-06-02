@@ -146,7 +146,7 @@ public class DebeziumChangeFetcher<T> {
                 LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
             }
 
-            handleBatchInStreamingMode();
+            handleBatchInNonSnapshotMode();
         } catch (Handover.ClosedException e) {
             // ignore
         }
@@ -188,7 +188,7 @@ public class DebeziumChangeFetcher<T> {
         }
     }
 
-    private void handleBatchInStreamingMode() throws Exception {
+    private void handleBatchInNonSnapshotMode() throws Exception {
         while (isRunning) {
             // If the handover is closed or has errors, exit.
             // If there is no streaming phase, the handover will be closed by the engine.
