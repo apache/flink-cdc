@@ -6,13 +6,13 @@
 
 package io.debezium.embedded;
 
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeHandler;
+import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeFetcher;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.RecordChangeEvent;
 import org.apache.kafka.connect.source.SourceRecord;
 
 /**
- * Copied from Debezium project. Make it public to be accessible from {@link DebeziumChangeHandler}.
+ * Copied from Debezium project. Make it public to be accessible from {@link DebeziumChangeFetcher}.
  */
 public class EmbeddedEngineChangeEvent<K, V> implements ChangeEvent<K, V>, RecordChangeEvent<V> {
 

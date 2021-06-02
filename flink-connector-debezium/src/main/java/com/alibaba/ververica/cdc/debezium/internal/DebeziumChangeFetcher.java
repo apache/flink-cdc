@@ -25,12 +25,9 @@ import org.apache.flink.util.Collector;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
-import io.debezium.embedded.EmbeddedEngineChangeEvent;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;
-import io.debezium.engine.DebeziumEngine.RecordCommitter;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -52,12 +49,9 @@ import java.util.Queue;
  * @param <T> The type of elements produced by the handler.
  */
 @Internal
-public class DebeziumChangeHandler<T> {
+public class DebeziumChangeFetcher<T> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DebeziumChangeHandler.class);
-
-    public static final String LAST_COMPLETELY_PROCESSED_LSN_KEY = "lsn_proc";
-    public static final String LAST_COMMIT_LSN_KEY = "lsn_commit";
+    private static final Logger LOG = LoggerFactory.getLogger(DebeziumChangeFetcher.class);
 
     private final SourceFunction.SourceContext<T> sourceContext;
 
@@ -79,9 +73,11 @@ public class DebeziumChangeHandler<T> {
 
     private final String heartbeatTopicPrefix;
 
-    private ExecutionMode executionMode;
+    private boolean isInDbSnapshotPhase;
 
     private final Handover handover;
+
+    private volatile boolean isRunning = true;
 
     // ---------------------------------------------------------------------------------------
     // Metrics
@@ -105,48 +101,23 @@ public class DebeziumChangeHandler<T> {
      */
     private volatile long emitDelay = 0L;
 
-    private DebeziumEngine.RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>
-            currentCommitter;
-
     // ------------------------------------------------------------------------
 
-    public DebeziumChangeHandler(
+    public DebeziumChangeFetcher(
             SourceFunction.SourceContext<T> sourceContext,
             DebeziumDeserializationSchema<T> deserialization,
-            ExecutionMode executionMode,
+            boolean isInDbSnapshotPhase,
             String heartbeatTopicPrefix,
             Handover handover) {
         this.sourceContext = sourceContext;
         this.checkpointLock = sourceContext.getCheckpointLock();
         this.deserialization = deserialization;
-        this.executionMode = executionMode;
+        this.isInDbSnapshotPhase = isInDbSnapshotPhase;
         this.heartbeatTopicPrefix = heartbeatTopicPrefix;
         this.debeziumCollector = new DebeziumCollector();
         this.debeziumOffset = new DebeziumOffset();
         this.stateSerializer = DebeziumOffsetSerializer.INSTANCE;
         this.handover = handover;
-    }
-
-    @SuppressWarnings("unchecked")
-    public void commitOffset(DebeziumOffset offset) throws InterruptedException {
-        if (currentCommitter == null) {
-            LOG.info(
-                    "commitOffset() called on Debezium ChangeHandler which doesn't receive records yet.");
-            return;
-        }
-
-        // only the offset is used
-        SourceRecord recordWrapper =
-                new SourceRecord(
-                        offset.sourcePartition,
-                        adjustSourceOffset((Map<String, Object>) offset.sourceOffset),
-                        "DUMMY",
-                        Schema.BOOLEAN_SCHEMA,
-                        true);
-        EmbeddedEngineChangeEvent<SourceRecord, SourceRecord> changeEvent =
-                new EmbeddedEngineChangeEvent<>(null, recordWrapper, recordWrapper);
-        currentCommitter.markProcessed(changeEvent);
-        currentCommitter.markBatchFinished();
     }
 
     /**
@@ -168,20 +139,21 @@ public class DebeziumChangeHandler<T> {
      * Process change messages from the {@link Handover} and collect the processed messages by
      * {@link Collector}.
      */
-    public void execute() {
+    public void runFetchLoop() throws Exception {
         try {
-            if (executionMode.equals(ExecutionMode.SNAPSHOT)) {
+            if (isInDbSnapshotPhase) {
                 handleBatchInSnapshotPhase();
                 LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
             }
 
             handleBatchInStreamingMode();
-        } catch (Throwable t) {
-            if (!(t.getCause() instanceof Handover.ClosedException)) {
-                LOG.error("Error happens when consuming change messages.", t);
-                handover.reportError(t);
-            }
+        } catch (Handover.ClosedException e) {
+            // ignore
         }
+    }
+
+    public void close() {
+        isRunning = false;
     }
 
     // ---------------------------------------------------------------------------------------
@@ -205,46 +177,30 @@ public class DebeziumChangeHandler<T> {
     // ---------------------------------------------------------------------------------------
 
     private void handleBatchInSnapshotPhase() throws Exception {
-        Pair<
-                        RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>,
-                        List<ChangeEvent<SourceRecord, SourceRecord>>>
-                recordPair;
-        List<ChangeEvent<SourceRecord, SourceRecord>> events;
-
-        do {
-            recordPair = handover.pollNext();
-            events = recordPair.getRight();
-            currentCommitter = recordPair.getLeft();
-        } while (!CollectionUtils.isNotEmpty(events));
+        List<ChangeEvent<SourceRecord, SourceRecord>> events = handover.pollNext();
 
         synchronized (checkpointLock) {
-            LOG.debug("Snapshot phase begins.");
-            handleBatch(recordPair);
-            while (executionMode.equals(ExecutionMode.SNAPSHOT)) {
+            LOG.info("Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
+            handleBatch(events);
+            while (isRunning && isInDbSnapshotPhase) {
                 handleBatch(handover.pollNext());
             }
         }
     }
 
     private void handleBatchInStreamingMode() throws Exception {
-        while (true) {
+        while (isRunning) {
             // If the handover is closed or has errors, exit.
             // If there is no streaming phase, the handover will be closed by the engine.
             handleBatch(handover.pollNext());
         }
     }
 
-    public void handleBatch(
-            Pair<
-                            RecordCommitter<ChangeEvent<SourceRecord, SourceRecord>>,
-                            List<ChangeEvent<SourceRecord, SourceRecord>>>
-                    committerAndRecords)
+    public void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents)
             throws Exception {
-        List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents = committerAndRecords.getRight();
         if (CollectionUtils.isEmpty(changeEvents)) {
             return;
         }
-        this.currentCommitter = committerAndRecords.getLeft();
         this.processTime = System.currentTimeMillis();
 
         for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
@@ -266,7 +222,7 @@ public class DebeziumChangeHandler<T> {
 
             if (!isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");
-                executionMode = ExecutionMode.STREAMING;
+                isInDbSnapshotPhase = false;
             }
 
             // emit the actual records. this also updates offset state atomically
@@ -276,17 +232,19 @@ public class DebeziumChangeHandler<T> {
     }
 
     private void emitRecordsUnderCheckpointLock(
-            Queue<T> records, Map<String, ?> sourcePartition, Map<String, ?> sourceOffset)
-            throws InterruptedException {
-        if (executionMode.equals(ExecutionMode.SNAPSHOT)) {
-            // lockHolderThread holds the lock, don't need to hold it again
-            emitRecords(records, sourcePartition, sourceOffset);
-        } else {
-            // emit the records, using the checkpoint lock to guarantee
-            // atomicity of record emission and offset state update
-            synchronized (checkpointLock) {
-                emitRecords(records, sourcePartition, sourceOffset);
+            Queue<T> records, Map<String, ?> sourcePartition, Map<String, ?> sourceOffset) {
+        // Emit the records. Use the checkpoint lock to guarantee
+        // atomicity of record emission and offset state update.
+        // The synchronized checkpointLock is reentrant. It's safe to sync again in snapshot mode.
+        synchronized (checkpointLock) {
+            T record;
+            while ((record = records.poll()) != null) {
+                emitDelay = System.currentTimeMillis() - messageTimestamp;
+                sourceContext.collect(record);
             }
+            // update offset to state
+            debeziumOffset.setSourcePartition(sourcePartition);
+            debeziumOffset.setSourceOffset(sourceOffset);
         }
     }
 
@@ -324,37 +282,6 @@ public class DebeziumChangeHandler<T> {
             return SnapshotRecord.TRUE == snapshotRecord;
         }
         return false;
-    }
-
-    /** Emits a batch of records. */
-    private void emitRecords(
-            Queue<T> records, Map<String, ?> sourcePartition, Map<String, ?> sourceOffset) {
-        T record;
-        while ((record = records.poll()) != null) {
-            emitDelay = System.currentTimeMillis() - messageTimestamp;
-            sourceContext.collect(record);
-        }
-        // update offset to state
-        debeziumOffset.setSourcePartition(sourcePartition);
-        debeziumOffset.setSourceOffset(sourceOffset);
-    }
-
-    /**
-     * We have to adjust type of LSN values to Long, because it might be Integer after
-     * deserialization, however {@code
-     * io.debezium.connector.postgresql.PostgresStreamingChangeEventSource#commitOffset(java.util.Map)}
-     * requires Long.
-     */
-    private Map<String, Object> adjustSourceOffset(Map<String, Object> sourceOffset) {
-        if (sourceOffset.containsKey(LAST_COMPLETELY_PROCESSED_LSN_KEY)) {
-            String value = sourceOffset.get(LAST_COMPLETELY_PROCESSED_LSN_KEY).toString();
-            sourceOffset.put(LAST_COMPLETELY_PROCESSED_LSN_KEY, Long.parseLong(value));
-        }
-        if (sourceOffset.containsKey(LAST_COMMIT_LSN_KEY)) {
-            String value = sourceOffset.get(LAST_COMMIT_LSN_KEY).toString();
-            sourceOffset.put(LAST_COMMIT_LSN_KEY, Long.parseLong(value));
-        }
-        return sourceOffset;
     }
 
     // ---------------------------------------------------------------------------------------
