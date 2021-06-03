@@ -44,13 +44,18 @@ import com.jayway.jsonpath.JsonPath;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -60,16 +65,29 @@ import java.util.concurrent.TimeUnit;
 
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
+import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertRead;
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertUpdate;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link MySQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
+@RunWith(Parameterized.class)
 public class MySQLSourceTest extends MySQLTestBase {
 
     private final UniqueDatabase database =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+
+    private final boolean useLegacyImplementation;
+
+    @Parameterized.Parameters(name = "UseLegacyImplementation: {0}")
+    public static Collection<Boolean> parameters() {
+        return Arrays.asList(false, true);
+    }
+
+    public MySQLSourceTest(boolean useLegacyImplementation) {
+        this.useLegacyImplementation = useLegacyImplementation;
+    }
 
     @Before
     public void before() {
@@ -99,7 +117,7 @@ public class MySQLSourceTest extends MySQLTestBase {
             List<SourceRecord> records = drain(sourceContext, 9);
             assertEquals(9, records.size());
             for (int i = 0; i < records.size(); i++) {
-                assertInsert(records.get(i), "id", 101 + i);
+                assertRead(records.get(i), "id", 101 + i);
             }
 
             statement.execute(
@@ -738,6 +756,11 @@ public class MySQLSourceTest extends MySQLTestBase {
     }
 
     private MySQLSource.Builder<SourceRecord> basicSourceBuilder() {
+        Properties debeziumProps = new Properties();
+        if (useLegacyImplementation) {
+            debeziumProps.put("internal.implementation", "legacy");
+        }
+
         return MySQLSource.<SourceRecord>builder()
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
@@ -746,7 +769,8 @@ public class MySQLSourceTest extends MySQLTestBase {
                         database.getDatabaseName() + "." + "products") // monitor table "products"
                 .username(MYSQL_CONTAINER.getUsername())
                 .password(MYSQL_CONTAINER.getPassword())
-                .deserializer(new ForwardDeserializeSchema());
+                .deserializer(new ForwardDeserializeSchema())
+                .debeziumProperties(debeziumProps);
     }
 
     private static <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount)

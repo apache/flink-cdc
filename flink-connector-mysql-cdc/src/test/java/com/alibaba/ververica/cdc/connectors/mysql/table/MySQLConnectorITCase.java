@@ -31,11 +31,14 @@ import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -45,6 +48,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for MySQL binlog SQL source. */
+@RunWith(Parameterized.class)
 public class MySQLConnectorITCase extends MySQLTestBase {
 
     private final UniqueDatabase inventoryDatabase =
@@ -59,8 +63,18 @@ public class MySQLConnectorITCase extends MySQLTestBase {
             StreamTableEnvironment.create(
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+    private final String implementation;
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+
+    public MySQLConnectorITCase(String implementation) {
+        this.implementation = implementation;
+    }
+
+    @Parameterized.Parameters(name = "implementation: {0}")
+    public static Collection<String> parameters() {
+        return Arrays.asList("non-legacy", "legacy");
+    }
 
     @Before
     public void before() {
@@ -86,14 +100,16 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
                         inventoryDatabase.getUsername(),
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
-                        "products");
+                        "products",
+                        implementation);
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -212,14 +228,16 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
                         fullTypesDatabase.getUsername(),
                         fullTypesDatabase.getPassword(),
                         fullTypesDatabase.getDatabaseName(),
-                        "full_types");
+                        "full_types",
+                        implementation);
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id INT NOT NULL,\n"
@@ -332,7 +350,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'specific-offset',"
                                 + " 'scan.startup.specific-offset.file' = '%s',"
-                                + " 'scan.startup.specific-offset.pos' = '%s'"
+                                + " 'scan.startup.specific-offset.pos' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -341,7 +360,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         offset.f0,
-                        offset.f1);
+                        offset.f1,
+                        implementation);
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -401,14 +421,16 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.startup.mode' = 'earliest-offset'"
+                                + " 'scan.startup.mode' = 'earliest-offset',"
+                                + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
                         inventoryDatabase.getUsername(),
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
-                        "products");
+                        "products",
+                        implementation);
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -477,14 +499,16 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.startup.mode' = 'latest-offset'"
+                                + " 'scan.startup.mode' = 'latest-offset',"
+                                + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
                         inventoryDatabase.getUsername(),
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
-                        "products");
+                        "products",
+                        implementation);
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -542,7 +566,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'timestamp',"
-                                + " 'scan.startup.timestamp-millis' = '%s'"
+                                + " 'scan.startup.timestamp-millis' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -550,7 +575,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        System.currentTimeMillis());
+                        System.currentTimeMillis(),
+                        implementation);
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
