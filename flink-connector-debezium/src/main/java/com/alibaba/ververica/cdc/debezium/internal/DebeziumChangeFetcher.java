@@ -141,12 +141,27 @@ public class DebeziumChangeFetcher<T> {
      */
     public void runFetchLoop() throws Exception {
         try {
+            // begin snapshot database phase
             if (isInDbSnapshotPhase) {
-                handleBatchInSnapshotPhase();
+                List<ChangeEvent<SourceRecord, SourceRecord>> events = handover.pollNext();
+
+                synchronized (checkpointLock) {
+                    LOG.info(
+                            "Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
+                    handleBatch(events);
+                    while (isRunning && isInDbSnapshotPhase) {
+                        handleBatch(handover.pollNext());
+                    }
+                }
                 LOG.info("Received record from streaming binlog phase, released checkpoint lock.");
             }
 
-            handleBatchInNonSnapshotMode();
+            // begin streaming binlog phase
+            while (isRunning) {
+                // If the handover is closed or has errors, exit.
+                // If there is no streaming phase, the handover will be closed by the engine.
+                handleBatch(handover.pollNext());
+            }
         } catch (Handover.ClosedException e) {
             // ignore
         }
@@ -154,6 +169,7 @@ public class DebeziumChangeFetcher<T> {
 
     public void close() {
         isRunning = false;
+        handover.close();
     }
 
     // ---------------------------------------------------------------------------------------
@@ -176,27 +192,7 @@ public class DebeziumChangeFetcher<T> {
     // Helper
     // ---------------------------------------------------------------------------------------
 
-    private void handleBatchInSnapshotPhase() throws Exception {
-        List<ChangeEvent<SourceRecord, SourceRecord>> events = handover.pollNext();
-
-        synchronized (checkpointLock) {
-            LOG.info("Database snapshot phase can't perform checkpoint, acquired Checkpoint lock.");
-            handleBatch(events);
-            while (isRunning && isInDbSnapshotPhase) {
-                handleBatch(handover.pollNext());
-            }
-        }
-    }
-
-    private void handleBatchInNonSnapshotMode() throws Exception {
-        while (isRunning) {
-            // If the handover is closed or has errors, exit.
-            // If there is no streaming phase, the handover will be closed by the engine.
-            handleBatch(handover.pollNext());
-        }
-    }
-
-    public void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents)
+    private void handleBatch(List<ChangeEvent<SourceRecord, SourceRecord>> changeEvents)
             throws Exception {
         if (CollectionUtils.isEmpty(changeEvents)) {
             return;

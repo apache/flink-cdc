@@ -26,6 +26,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.Closeable;
@@ -53,9 +54,12 @@ public class Handover implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(Handover.class);
     private final Object lock = new Object();
 
+    @GuardedBy("lock")
     private List<ChangeEvent<SourceRecord, SourceRecord>> next;
-    // The visibility is guaranteed by synchronized keyword
+
+    @GuardedBy("lock")
     private Throwable error;
+
     private boolean wakeupProducer;
 
     /**

@@ -161,8 +161,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     // Worker
     // ---------------------------------------------------------------------------------------
 
-    private ExecutorService executor;
-    private DebeziumEngine<?> engine;
+    private transient ExecutorService executor;
+    private transient DebeziumEngine<?> engine;
     /**
      * Unique name of this Debezium Engine instance across all the jobs. Currently we randomly
      * generate a UUID for it. This is used for {@link FlinkDatabaseHistory}.
@@ -173,7 +173,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     private transient DebeziumChangeConsumer changeConsumer;
 
     /** The consumer to fetch records from {@link Handover}. */
-    private transient volatile DebeziumChangeFetcher<T> debeziumChangeFetcher;
+    private transient DebeziumChangeFetcher<T> debeziumChangeFetcher;
 
     /** Buffer the events from the source and record the errors from the debezium. */
     private transient Handover handover;
@@ -392,7 +392,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         .using(OffsetCommitPolicy.always())
                         .using(
                                 (success, message, error) -> {
-                                    debeziumChangeFetcher.close();
                                     if (success) {
                                         // Close the handover and prepare to exit.
                                         handover.close();
@@ -495,7 +494,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             ExceptionUtils.rethrow(e);
         } finally {
             if (executor != null) {
-                executor.shutdown();
+                executor.shutdownNow();
             }
 
             debeziumStarted = false;
