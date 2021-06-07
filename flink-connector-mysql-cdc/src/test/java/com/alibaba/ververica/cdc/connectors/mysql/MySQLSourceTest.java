@@ -117,7 +117,11 @@ public class MySQLSourceTest extends MySQLTestBase {
             List<SourceRecord> records = drain(sourceContext, 9);
             assertEquals(9, records.size());
             for (int i = 0; i < records.size(); i++) {
-                assertRead(records.get(i), "id", 101 + i);
+                if (this.useLegacyImplementation) {
+                    assertInsert(records.get(i), "id", 101 + i);
+                } else {
+                    assertRead(records.get(i), "id", 101 + i);
+                }
             }
 
             statement.execute(
@@ -759,6 +763,11 @@ public class MySQLSourceTest extends MySQLTestBase {
         Properties debeziumProps = new Properties();
         if (useLegacyImplementation) {
             debeziumProps.put("internal.implementation", "legacy");
+            // check legacy mysql record type
+            debeziumProps.put("transforms", "snapshotasinsert");
+            debeziumProps.put(
+                    "transforms.snapshotasinsert.type",
+                    "io.debezium.connector.mysql.transforms.ReadToInsertEvent");
         }
 
         return MySQLSource.<SourceRecord>builder()
