@@ -117,10 +117,10 @@ public class MySQLSourceTest extends MySQLTestBase {
             List<SourceRecord> records = drain(sourceContext, 9);
             assertEquals(9, records.size());
             for (int i = 0; i < records.size(); i++) {
-                if(this.useLegacyImplementation) {
-                      assertRead(records.get(i), "id", 101 + i);
-                } else{
-                      assertInsert(records.get(i), "id", 101 + i);
+                if (this.useLegacyImplementation) {
+                    assertRead(records.get(i), "id", 101 + i);
+                } else {
+                    assertInsert(records.get(i), "id", 101 + i);
                 }
             }
 
