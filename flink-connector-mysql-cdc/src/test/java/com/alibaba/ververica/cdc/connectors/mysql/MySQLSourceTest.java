@@ -764,7 +764,9 @@ public class MySQLSourceTest extends MySQLTestBase {
         if (useLegacyImplementation) {
             debeziumProps.put("internal.implementation", "legacy");
             debeziumProps.put("transforms", "snapshotasinsert");
-            debeziumProps.put("transforms.snapshotasinsert.type", "io.debezium.connector.mysql.transforms.ReadToInsertEvent");
+            debeziumProps.put(
+                    "transforms.snapshotasinsert.type",
+                    "io.debezium.connector.mysql.transforms.ReadToInsertEvent");
         }
 
         return MySQLSource.<SourceRecord>builder()
