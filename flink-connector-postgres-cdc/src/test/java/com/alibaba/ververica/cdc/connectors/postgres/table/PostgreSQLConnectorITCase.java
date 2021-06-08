@@ -98,7 +98,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
+                        + " 'sink-expected-messages-num' = '21'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
@@ -124,9 +124,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
+            statement.execute(
+                    "INSERT INTO inventory.products(id, description, weight) VALUES (default, 'Go go go', 0.1);");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", 21);
 
         // The final database table looks like this:
         //
@@ -155,6 +157,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         // 22.2 |
         // | 110 | jacket             | new water resistent white wind breaker                  |
         // 0.5 |
+        // | 111 | flink              | Go go go                                                |
+        // 0.1 |
         // +-----+--------------------+---------------------------------------------------------+--------+
 
         String[] expected =
@@ -165,7 +169,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "hammer,2.625",
                     "rocks,5.100",
                     "jacket,0.600",
-                    "spare tire,22.200"
+                    "spare tire,22.200",
+                    "flink,0.100"
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");

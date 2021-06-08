@@ -44,6 +44,7 @@ import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeFetcher;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
 import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
+import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import com.alibaba.ververica.cdc.debezium.internal.Handover;
 import io.debezium.document.DocumentReader;
@@ -52,6 +53,7 @@ import io.debezium.embedded.Connect;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
+import io.debezium.relational.history.DatabaseHistory;
 import io.debezium.relational.history.HistoryRecord;
 import org.apache.commons.collections.map.LinkedMap;
 import org.slf4j.Logger;
@@ -61,9 +63,14 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -114,6 +121,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** The maximum number of pending non-committed checkpoints to track, to avoid memory leaks. */
     public static final int MAX_NUM_PENDING_CHECKPOINTS = 100;
 
+    private static final String LEGACY_IMPLEMENTATION_KEY = "internal.implementation";
+    private static final String LEGACY_IMPLEMENTATION_VALUE = "legacy";
+
     // ---------------------------------------------------------------------------------------
     // Properties
     // ---------------------------------------------------------------------------------------
@@ -136,6 +146,13 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     // ---------------------------------------------------------------------------------------
     // State
     // ---------------------------------------------------------------------------------------
+
+    /**
+     * Structure to maintain the current schema history. The content in {@link HistoryRecord} is up
+     * to the implementation of the {@link DatabaseHistory}.
+     */
+    private static final ConcurrentMap<String, Collection<HistoryRecord>> HISTORY =
+            new ConcurrentHashMap<>();
 
     /**
      * The offsets to restore to, if the consumer restores state from a checkpoint.
@@ -254,7 +271,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private void restoreHistoryRecordsState() throws Exception {
         DocumentReader reader = DocumentReader.defaultReader();
-        ConcurrentLinkedQueue<HistoryRecord> historyRecords = new ConcurrentLinkedQueue<>();
+        List<HistoryRecord> historyRecords = new ArrayList<>();
         int recordsCount = 0;
         boolean firstEntry = true;
         for (String record : historyRecordsState.get()) {
@@ -263,12 +280,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 this.engineInstanceName = record;
                 firstEntry = false;
             } else {
+                // Put the records into the state. The database history should read, reorganize and
+                // register the state.
                 historyRecords.add(new HistoryRecord(reader.read(record)));
                 recordsCount++;
             }
         }
         if (engineInstanceName != null) {
-            FlinkDatabaseHistory.registerHistoryRecords(engineInstanceName, historyRecords);
+            StateUtils.registerHistory(engineInstanceName, historyRecords);
         }
         LOG.info(
                 "Consumer subtask {} restored history records state: {} with {} records.",
@@ -328,13 +347,11 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
         if (engineInstanceName != null) {
             historyRecordsState.add(engineInstanceName);
-            ConcurrentLinkedQueue<HistoryRecord> historyRecords =
-                    FlinkDatabaseHistory.getRegisteredHistoryRecord(engineInstanceName);
-            if (historyRecords != null) {
-                DocumentWriter writer = DocumentWriter.defaultWriter();
-                for (HistoryRecord record : historyRecords) {
-                    historyRecordsState.add(writer.write(record.document()));
-                }
+
+            Collection<HistoryRecord> records = StateUtils.retrieveHistory(engineInstanceName);
+            DocumentWriter writer = DocumentWriter.defaultWriter();
+            for (HistoryRecord record : records) {
+                historyRecordsState.add(writer.write(record.document()));
             }
         }
     }
@@ -356,20 +373,19 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         properties.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
         properties.setProperty("tombstones.on.delete", "false");
+        if (engineInstanceName == null) {
+            // not restore from recovery
+            engineInstanceName = UUID.randomUUID().toString();
+        }
+        // history instance name to initialize FlinkDatabaseHistory
+        properties.setProperty(
+                FlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME, engineInstanceName);
         // we have to use a persisted DatabaseHistory implementation, otherwise, recovery can't
         // continue to read binlog
         // see
         // https://stackoverflow.com/questions/57147584/debezium-error-schema-isnt-know-to-this-connector
         // and https://debezium.io/blog/2018/03/16/note-on-database-history-topic-configuration/
-        properties.setProperty("database.history", FlinkDatabaseHistory.class.getCanonicalName());
-        if (engineInstanceName == null) {
-            // not restore from recovery
-            engineInstanceName = UUID.randomUUID().toString();
-            FlinkDatabaseHistory.registerEmptyHistoryRecord(engineInstanceName);
-        }
-        // history instance name to initialize FlinkDatabaseHistory
-        properties.setProperty(
-                FlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME, engineInstanceName);
+        properties.setProperty("database.history", determineDatabase().getCanonicalName());
 
         // we have to filter out the heartbeat events, otherwise the deserializer will fail
         String dbzHeartbeatPrefix =
@@ -518,5 +534,47 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     @VisibleForTesting
     public boolean getDebeziumStarted() {
         return debeziumStarted;
+    }
+
+    private Class<?> determineDatabase() {
+        boolean isCompatibleWithLegacy =
+                FlinkDatabaseHistory.isCompatible(StateUtils.retrieveHistory(engineInstanceName));
+        if (LEGACY_IMPLEMENTATION_VALUE.equals(properties.get(LEGACY_IMPLEMENTATION_KEY))) {
+            // specifies the legacy implementation but the state may be incompatible
+            if (isCompatibleWithLegacy) {
+                return FlinkDatabaseHistory.class;
+            } else {
+                throw new IllegalStateException(
+                        "Use the legacy implementation of the database history but FlnkDatabaseHistory can't load the state.");
+            }
+        } else if (FlinkDatabaseSchemaHistory.isCompatible(
+                StateUtils.retrieveHistory(engineInstanceName))) {
+            // tries the non-legacy and checks the state is compatible
+            return FlinkDatabaseSchemaHistory.class;
+        } else if (isCompatibleWithLegacy) {
+            // starts from the state created before
+            return FlinkDatabaseHistory.class;
+        } else {
+            // impossible
+            throw new IllegalStateException("Can't determine which DatabaseHistory to use.");
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+
+    /** Utils to get/put/remove the history. */
+    public static final class StateUtils {
+        public static void registerHistory(
+                String engineName, Collection<HistoryRecord> engineHistory) {
+            HISTORY.put(engineName, engineHistory);
+        }
+
+        public static Collection<HistoryRecord> retrieveHistory(String engineName) {
+            return HISTORY.getOrDefault(engineName, Collections.emptyList());
+        }
+
+        public static void removeHistory(String engineName) {
+            HISTORY.remove(engineName);
+        }
     }
 }

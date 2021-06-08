@@ -63,17 +63,17 @@ public class MySQLConnectorITCase extends MySQLTestBase {
             StreamTableEnvironment.create(
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
-    private final String implementation;
+    private final boolean useLegacyImplementation;
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    public MySQLConnectorITCase(String implementation) {
-        this.implementation = implementation;
+    public MySQLConnectorITCase(boolean useLegacyImplementation) {
+        this.useLegacyImplementation = useLegacyImplementation;
     }
 
-    @Parameterized.Parameters(name = "implementation: {0}")
-    public static Collection<String> parameters() {
-        return Arrays.asList("non-legacy", "legacy");
+    @Parameterized.Parameters(name = "useLegacyImplementation: {0}")
+    public static Collection<Boolean> parameters() {
+        return Arrays.asList(false, true);
     }
 
     @Before
@@ -109,7 +109,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -118,7 +118,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
+                        + " 'sink-expected-messages-num' = '21'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
@@ -144,9 +144,11 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                     "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
+            statement.execute(
+                    "INSERT INTO products(id, description, weight) VALUES (default, 'Go go go', 0.1);");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", 21);
 
         // The final database table looks like this:
         //
@@ -175,6 +177,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
         // 22.2 |
         // | 110 | jacket             | new water resistent white wind breaker                  |
         // 0.5 |
+        // | 111 | flink              | Go go go                                                |
+        // 0.1 |
         // +-----+--------------------+---------------------------------------------------------+--------+
 
         String[] expected =
@@ -185,7 +189,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                     "hammer,2.625",
                     "rocks,5.100",
                     "jacket,0.600",
-                    "spare tire,22.200"
+                    "spare tire,22.200",
+                    "flink,0.100"
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
@@ -237,7 +242,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         fullTypesDatabase.getPassword(),
                         fullTypesDatabase.getDatabaseName(),
                         "full_types",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id INT NOT NULL,\n"
@@ -331,7 +336,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
         }
-        Tuple2<String, Integer> offset = currentMySQLLatestOffset(inventoryDatabase, "products", 9);
+        Tuple2<String, Integer> offset =
+                currentMySQLLatestOffset(inventoryDatabase, "products", 9, useLegacyImplementation);
 
         String sourceDDL =
                 String.format(
@@ -361,7 +367,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         "products",
                         offset.f0,
                         offset.f1,
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -430,7 +436,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -508,7 +514,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -576,7 +582,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -616,6 +622,14 @@ public class MySQLConnectorITCase extends MySQLTestBase {
     }
 
     // ------------------------------------------------------------------------------------
+
+    private String getImplementation() {
+        if (useLegacyImplementation) {
+            return "legacy";
+        } else {
+            return "non-legacy";
+        }
+    }
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
         while (sinkSize(sinkName) == 0) {

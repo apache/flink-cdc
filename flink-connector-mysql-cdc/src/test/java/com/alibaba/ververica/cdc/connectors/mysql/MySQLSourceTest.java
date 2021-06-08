@@ -40,7 +40,17 @@ import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.connectors.utils.TestSourceContext;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.jayway.jsonpath.JsonPath;
+import io.debezium.document.Document;
+import io.debezium.document.DocumentWriter;
+import io.debezium.relational.Column;
+import io.debezium.relational.Table;
+import io.debezium.relational.TableEditor;
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.HistoryRecord;
+import io.debezium.relational.history.JsonTableChangeSerializer;
+import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
 import org.junit.Test;
@@ -54,7 +64,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -70,6 +82,7 @@ import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertUpdat
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /** Tests for {@link MySQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
 @RunWith(Parameterized.class)
@@ -401,6 +414,89 @@ public class MySQLSourceTest extends MySQLTestBase {
             source4.close();
             runThread4.sync();
         }
+
+        {
+            // ---------------------------------------------------------------------------
+            // Step-9: insert partial and alter table
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source5 = createMySqlBinlogSource();
+            final TestSourceContext<SourceRecord> sourceContext5 = new TestSourceContext<>();
+            setupSource(source5, true, offsetState, historyState, true, 0, 1);
+
+            // restart the source
+            final CheckedThread runThread5 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source5.run(sourceContext5);
+                        }
+                    };
+            runThread5.start();
+
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+
+                statement.execute(
+                        "INSERT INTO products(id, description, weight) VALUES (default, 'Go go go', 111.1)");
+                statement.execute(
+                        "ALTER TABLE products ADD comment_col VARCHAR(100) DEFAULT 'cdc'");
+                List<SourceRecord> records = drain(sourceContext5, 1);
+                assertInsert(records.get(0), "id", 1002);
+            }
+
+            // ---------------------------------------------------------------------------
+            // Step-10: trigger checkpoint-4
+            // ---------------------------------------------------------------------------
+            synchronized (sourceContext5.getCheckpointLock()) {
+                // trigger checkpoint-4
+                source5.snapshotState(new StateSnapshotContextSynchronousImpl(300, 300));
+            }
+            assertHistoryState(historyState); // assert the DDL is stored in the history state
+            assertEquals(1, offsetState.list.size());
+            String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+            assertEquals("mysql_binlog_source", JsonPath.read(state, "$.sourcePartition.server"));
+            assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
+            assertEquals("1", JsonPath.read(state, "$.sourceOffset.row").toString());
+            assertEquals("223344", JsonPath.read(state, "$.sourceOffset.server_id").toString());
+            assertEquals("2", JsonPath.read(state, "$.sourceOffset.event").toString());
+            int pos = JsonPath.read(state, "$.sourceOffset.pos");
+            assertTrue(pos > prevPos);
+
+            source5.cancel();
+            source5.close();
+            runThread5.sync();
+        }
+
+        {
+            // ---------------------------------------------------------------------------
+            // Step-11: restore from the checkpoint-4 and insert the partial value
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source6 = createMySqlBinlogSource();
+            final TestSourceContext<SourceRecord> sourceContext6 = new TestSourceContext<>();
+            setupSource(source6, true, offsetState, historyState, true, 0, 1);
+
+            // restart the source
+            final CheckedThread runThread6 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source6.run(sourceContext6);
+                        }
+                    };
+            runThread6.start();
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+
+                statement.execute(
+                        "INSERT INTO products(id, description, weight) VALUES (default, 'Run!', 22.2)");
+                List<SourceRecord> records = drain(sourceContext6, 1);
+                assertInsert(records.get(0), "id", 1003);
+            }
+
+            source6.cancel();
+            source6.close();
+            runThread6.sync();
+        }
     }
 
     @Test
@@ -505,7 +601,8 @@ public class MySQLSourceTest extends MySQLTestBase {
                     "INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
         }
 
-        Tuple2<String, Integer> offset = currentMySQLLatestOffset(database, "products", 10);
+        Tuple2<String, Integer> offset =
+                currentMySQLLatestOffset(database, "products", 10, useLegacyImplementation);
         final String offsetFile = offset.f0;
         final int offsetPos = offset.f1;
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -669,23 +766,86 @@ public class MySQLSourceTest extends MySQLTestBase {
         }
     }
 
-    private void assertHistoryState(TestingListState<String> historyState) {
-        // assert the DDL is stored in the history state
-        assertTrue(historyState.list.size() > 0);
-        boolean hasDDL =
-                historyState.list.stream()
-                        .skip(1)
-                        .anyMatch(
-                                history ->
-                                        JsonPath.read(history, "$.source.server")
-                                                        .equals("mysql_binlog_source")
-                                                && JsonPath.read(history, "$.position.snapshot")
-                                                        .toString()
-                                                        .equals("true")
-                                                && JsonPath.read(history, "$.ddl")
-                                                        .toString()
-                                                        .startsWith("CREATE TABLE `products`"));
-        assertTrue(hasDDL);
+    @Test
+    public void testChooseDatabase() throws Exception {
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+
+        historyState.add("engine-name");
+        DocumentWriter writer = DocumentWriter.defaultWriter();
+        if (useLegacyImplementation) {
+            // build a non-legacy state
+            JsonTableChangeSerializer tableChangesSerializer = new JsonTableChangeSerializer();
+            historyState.add(
+                    writer.write(
+                            tableChangesSerializer.toDocument(
+                                    new TableChanges.TableChange(
+                                            TableChanges.TableChangeType.CREATE,
+                                            MockedTable.INSTANCE))));
+        } else {
+            // build a legacy state
+            Document document =
+                    new HistoryRecord(
+                                    Collections.emptyMap(),
+                                    Collections.emptyMap(),
+                                    "test",
+                                    "test",
+                                    "CREATE TABLE test(a int)",
+                                    null)
+                            .document();
+            historyState.add(writer.write(document));
+        }
+
+        final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
+        setupSource(source, true, offsetState, historyState, true, 0, 1);
+
+        TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
+
+        final CheckedThread runThread =
+                new CheckedThread() {
+                    @Override
+                    public void go() throws Exception {
+                        source.run(sourceContext);
+                    }
+                };
+        runThread.start();
+        if (useLegacyImplementation) {
+            // should fail because user specifies to use the legacy implementation
+            try {
+                runThread.sync();
+                fail("Should fail.");
+            } catch (Exception e) {
+                assertTrue(e instanceof IllegalStateException);
+                assertEquals(
+                        "Use the legacy implementation of the database history but FlnkDatabaseHistory can't load the state.",
+                        e.getMessage());
+            }
+        } else {
+            // check the debezium status to verify
+            waitDebeziumStartWithTimeout(source, 5_000L);
+
+            source.cancel();
+            source.close();
+            runThread.sync();
+        }
+    }
+
+    @Test
+    public void testLoadIllegalState() throws Exception {
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+
+        historyState.add("engine-name");
+        historyState.add("IllegalState");
+
+        final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
+        try {
+            setupSource(source, true, offsetState, historyState, true, 0, 1);
+            fail("Should fail.");
+        } catch (Exception e) {
+            assertTrue(e instanceof JsonParseException);
+            assertTrue(e.getMessage().contains("Unrecognized token 'IllegalState'"));
+        }
     }
 
     // ------------------------------------------------------------------------------------------
@@ -694,7 +854,11 @@ public class MySQLSourceTest extends MySQLTestBase {
 
     /** Gets the latest offset of current MySQL server. */
     public static Tuple2<String, Integer> currentMySQLLatestOffset(
-            UniqueDatabase database, String table, int expectedRecordCount) throws Exception {
+            UniqueDatabase database,
+            String table,
+            int expectedRecordCount,
+            boolean useLegacyImplementation)
+            throws Exception {
         DebeziumSourceFunction<SourceRecord> source =
                 MySQLSource.<SourceRecord>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
@@ -704,6 +868,7 @@ public class MySQLSourceTest extends MySQLTestBase {
                         .username(MYSQL_CONTAINER.getUsername())
                         .password(MYSQL_CONTAINER.getPassword())
                         .deserializer(new MySQLSourceTest.ForwardDeserializeSchema())
+                        .debeziumProperties(createDebeziumProperties(useLegacyImplementation))
                         .build();
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
@@ -744,9 +909,71 @@ public class MySQLSourceTest extends MySQLTestBase {
         return Tuple2.of(offsetFile, offsetPos);
     }
 
+    private static Properties createDebeziumProperties(boolean useLegacyImplementation) {
+        Properties debeziumProps = new Properties();
+        if (useLegacyImplementation) {
+            debeziumProps.put("internal.implementation", "legacy");
+            // check legacy mysql record type
+            debeziumProps.put("transforms", "snapshotasinsert");
+            debeziumProps.put(
+                    "transforms.snapshotasinsert.type",
+                    "io.debezium.connector.mysql.transforms.ReadToInsertEvent");
+        }
+        return debeziumProps;
+    }
+
     // ------------------------------------------------------------------------------------------
     // Utilities
     // ------------------------------------------------------------------------------------------
+
+    private void waitDebeziumStartWithTimeout(
+            DebeziumSourceFunction<SourceRecord> source, Long timeout) throws Exception {
+        long start = System.currentTimeMillis();
+        long end = start + timeout;
+        while (!source.getDebeziumStarted()) {
+            Thread.sleep(100);
+            long now = System.currentTimeMillis();
+            if (now > end) {
+                fail("Should fail.");
+            }
+        }
+    }
+
+    private void assertHistoryState(TestingListState<String> historyState) {
+        assertTrue(historyState.list.size() > 0);
+        // assert the DDL is stored in the history state
+        if (!useLegacyImplementation) {
+            boolean hasTable =
+                    historyState.list.stream()
+                            .skip(1)
+                            .anyMatch(
+                                    history ->
+                                            !((Map<?, ?>) JsonPath.read(history, "$.table"))
+                                                            .isEmpty()
+                                                    && (JsonPath.read(history, "$.type")
+                                                                    .toString()
+                                                                    .equals("CREATE")
+                                                            || JsonPath.read(history, "$.type")
+                                                                    .toString()
+                                                                    .equals("ALTER")));
+            assertTrue(hasTable);
+        } else {
+            boolean hasDDL =
+                    historyState.list.stream()
+                            .skip(1)
+                            .anyMatch(
+                                    history ->
+                                            JsonPath.read(history, "$.source.server")
+                                                            .equals("mysql_binlog_source")
+                                                    && JsonPath.read(history, "$.position.snapshot")
+                                                            .toString()
+                                                            .equals("true")
+                                                    && JsonPath.read(history, "$.ddl")
+                                                            .toString()
+                                                            .startsWith("CREATE TABLE `products`"));
+            assertTrue(hasDDL);
+        }
+    }
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(
             String offsetFile, int offsetPos) {
@@ -760,16 +987,7 @@ public class MySQLSourceTest extends MySQLTestBase {
     }
 
     private MySQLSource.Builder<SourceRecord> basicSourceBuilder() {
-        Properties debeziumProps = new Properties();
-        if (useLegacyImplementation) {
-            debeziumProps.put("internal.implementation", "legacy");
-            // check legacy mysql record type
-            debeziumProps.put("transforms", "snapshotasinsert");
-            debeziumProps.put(
-                    "transforms.snapshotasinsert.type",
-                    "io.debezium.connector.mysql.transforms.ReadToInsertEvent");
-        }
-
+        Properties debeziumProps = createDebeziumProperties(useLegacyImplementation);
         return MySQLSource.<SourceRecord>builder()
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
@@ -1029,6 +1247,45 @@ public class MySQLSourceTest extends MySQLTestBase {
 
                 list.addAll(values);
             }
+        }
+    }
+
+    private static class MockedTable implements Table {
+        private static final Table INSTANCE = new MockedTable();
+
+        @Override
+        public TableId id() {
+            return TableId.parse("Test");
+        }
+
+        @Override
+        public List<String> primaryKeyColumnNames() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<String> retrieveColumnNames() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<Column> columns() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Column columnWithName(String name) {
+            throw new UnsupportedOperationException("Not implemented.");
+        }
+
+        @Override
+        public String defaultCharsetName() {
+            return "UTF-8";
+        }
+
+        @Override
+        public TableEditor edit() {
+            throw new UnsupportedOperationException("Not implemented.");
         }
     }
 }
