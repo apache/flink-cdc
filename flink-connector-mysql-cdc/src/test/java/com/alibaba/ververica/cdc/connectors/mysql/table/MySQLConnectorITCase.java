@@ -63,6 +63,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
             StreamTableEnvironment.create(
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+    // use legacy debezium mysql connector or not
     private final boolean useLegacyImplementation;
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
@@ -118,7 +119,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '21'"
+                        + " 'sink-expected-messages-num' = '20'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
@@ -144,42 +145,31 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                     "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
-            statement.execute(
-                    "INSERT INTO products(id, description, weight) VALUES (default, 'Go go go', 0.1);");
         }
 
-        waitForSinkSize("sink", 21);
+        waitForSinkSize("sink", 20);
 
-        // The final database table looks like this:
-        //
-        // > SELECT * FROM products;
-        // +-----+--------------------+---------------------------------------------------------+--------+
-        // | id  | name               | description                                             |
-        // weight |
-        // +-----+--------------------+---------------------------------------------------------+--------+
-        // | 101 | scooter            | Small 2-wheel scooter                                   |
-        // 3.14 |
-        // | 102 | car battery        | 12V car battery                                         |
-        // 8.1 |
-        // | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |
-        // 0.8 |
-        // | 104 | hammer             | 12oz carpenter's hammer                                 |
-        // 0.75 |
-        // | 105 | hammer             | 14oz carpenter's hammer                                 |
-        // 0.875 |
-        // | 106 | hammer             | 18oz carpenter hammer                                   |
-        //   1 |
-        // | 107 | rocks              | box of assorted rocks                                   |
-        // 5.1 |
-        // | 108 | jacket             | water resistent black wind breaker                      |
-        // 0.1 |
-        // | 109 | spare tire         | 24 inch spare tire                                      |
-        // 22.2 |
-        // | 110 | jacket             | new water resistent white wind breaker                  |
-        // 0.5 |
-        // | 111 | flink              | Go go go                                                |
-        // 0.1 |
-        // +-----+--------------------+---------------------------------------------------------+--------+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | id  | name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
 
         String[] expected =
                 new String[] {
@@ -189,8 +179,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                     "hammer,2.625",
                     "rocks,5.100",
                     "jacket,0.600",
-                    "spare tire,22.200",
-                    "flink,0.100"
+                    "spare tire,22.200"
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
@@ -624,11 +613,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
     // ------------------------------------------------------------------------------------
 
     private String getImplementation() {
-        if (useLegacyImplementation) {
-            return "legacy";
-        } else {
-            return "non-legacy";
-        }
+        return useLegacyImplementation ? "legacy" : "";
     }
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {

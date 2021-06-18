@@ -63,7 +63,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
         this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
         this.records = getRegisteredHistoryRecord(instanceName);
 
-        // register the change into state
+        // register the schema changes into state
         // every change should be visible to the source function
         StateUtils.registerHistory(instanceName, records);
     }
@@ -99,7 +99,9 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
         return "Flink Database History";
     }
 
-    /** Determine the {@link FlinkDatabaseHistory} is compatible with the specified state. */
+    /**
+     * Determine whether the {@link FlinkDatabaseHistory} is compatible with the specified state.
+     */
     public static boolean isCompatible(Collection<HistoryRecord> records) {
         for (HistoryRecord record : records) {
             // check the source/position/ddl is not null
@@ -107,6 +109,8 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
                     || isNullValue(record.document(), HistoryRecord.Fields.SOURCE)
                     || isNullValue(record.document(), HistoryRecord.Fields.DDL_STATEMENTS)) {
                 return false;
+            } else {
+                break;
             }
         }
         return true;

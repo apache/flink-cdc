@@ -545,14 +545,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 return FlinkDatabaseHistory.class;
             } else {
                 throw new IllegalStateException(
-                        "Use the legacy implementation of the database history but FlnkDatabaseHistory can't load the state.");
+                        "The configured option 'debezium.internal.implementation' is 'legacy', but the state of source is incompatible with this implementation, you should remove the the option.");
             }
         } else if (FlinkDatabaseSchemaHistory.isCompatible(
                 StateUtils.retrieveHistory(engineInstanceName))) {
-            // tries the non-legacy and checks the state is compatible
+            // tries the non-legacy first
             return FlinkDatabaseSchemaHistory.class;
         } else if (isCompatibleWithLegacy) {
-            // starts from the state created before
+            // fallback to legacy if possible
             return FlinkDatabaseHistory.class;
         } else {
             // impossible
@@ -562,8 +562,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     // ---------------------------------------------------------------------------------------
 
-    /** Utils to get/put/remove the history. */
+    /** Utils to get/put/remove the history of schema. */
     public static final class StateUtils {
+
         public static void registerHistory(
                 String engineName, Collection<HistoryRecord> engineHistory) {
             HISTORY.put(engineName, engineHistory);

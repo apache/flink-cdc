@@ -817,7 +817,7 @@ public class MySQLSourceTest extends MySQLTestBase {
             } catch (Exception e) {
                 assertTrue(e instanceof IllegalStateException);
                 assertEquals(
-                        "Use the legacy implementation of the database history but FlnkDatabaseHistory can't load the state.",
+                        "The configured option 'debezium.internal.implementation' is 'legacy', but the state of source is incompatible with this implementation, you should remove the the option.",
                         e.getMessage());
             }
         } else {
@@ -1251,7 +1251,10 @@ public class MySQLSourceTest extends MySQLTestBase {
     }
 
     private static class MockedTable implements Table {
+
         private static final Table INSTANCE = new MockedTable();
+
+        private MockedTable() {}
 
         @Override
         public TableId id() {

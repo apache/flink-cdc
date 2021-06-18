@@ -41,14 +41,14 @@ import java.util.concurrent.ConcurrentMap;
 import static io.debezium.relational.history.TableChanges.TableChange;
 
 /**
- * The {@link FlinkDatabaseSchemaHistory} only stores the snapshot of the current schema of the
- * monitored tables. When recovering from the checkpoint, it should apply all the table to the
- * {@link DatabaseSchema}, which doesn't need to replay the history anymore.
+ * The {@link FlinkDatabaseSchemaHistory} only stores the latest schema of the monitored tables.
+ * When recovering from the checkpoint, it should apply all the tables to the {@link
+ * DatabaseSchema}, which doesn't need to replay the history anymore.
  *
  * <p>Considering the data structure maintained in the {@link FlinkDatabaseSchemaHistory} is much
  * different from the {@link FlinkDatabaseHistory}, it's not compatible with the {@link
- * FlinkDatabaseHistory}. Because it only maintains the snapshot of the tables, it's more efficient
- * to use the memory.
+ * FlinkDatabaseHistory}. Because it only maintains the latest schema of the table rather than all
+ * history DDLs, it's useful to prevent OOM when meet massive history DDLs.
  */
 public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
 
@@ -179,7 +179,10 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
         return skipUnparseableDDL;
     }
 
-    /** Determine the {@link FlinkDatabaseSchemaHistory} is compatible with the specified state. */
+    /**
+     * Determine whether the {@link FlinkDatabaseSchemaHistory} is compatible with the specified
+     * state.
+     */
     public static boolean isCompatible(Collection<HistoryRecord> records) {
         for (HistoryRecord record : records) {
             // Try to deserialize the record
@@ -189,6 +192,8 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
                 // No table change in the state
                 if (tableChange.getId() == null) {
                     return false;
+                } else {
+                    break;
                 }
             } catch (Exception e) {
                 // Failed to deserialize the table from the state.
