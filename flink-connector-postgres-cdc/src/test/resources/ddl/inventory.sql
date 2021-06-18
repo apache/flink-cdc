@@ -21,7 +21,7 @@ SET search_path TO inventory;
 -- Create and populate our products using a single insert with many rows
 CREATE TABLE products (
   id SERIAL NOT NULL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
   description VARCHAR(512),
   weight FLOAT
 );
