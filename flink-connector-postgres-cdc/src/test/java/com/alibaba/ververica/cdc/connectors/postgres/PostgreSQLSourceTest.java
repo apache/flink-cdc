@@ -18,6 +18,7 @@
 
 package com.alibaba.ververica.cdc.connectors.postgres;
 
+import com.alibaba.ververica.cdc.debezium.internal.Interceptor;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.KeyedStateStore;
 import org.apache.flink.api.common.state.ListState;
@@ -41,6 +42,8 @@ import com.jayway.jsonpath.JsonPath;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -72,6 +75,8 @@ import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 /** Tests for {@link PostgreSQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
 public class PostgreSQLSourceTest extends PostgresTestBase {
     private static final String SLOT_NAME = "flink";
+
+    private static final Logger LOG = LoggerFactory.getLogger(PostgreSQLSourceTest.class);
 
     @Before
     public void before() {
@@ -536,6 +541,26 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 .password(POSTGERS_CONTAINER.getPassword())
                 .schemaList("inventory")
                 .tableList("inventory.products")
+                .interceptors(new Interceptor() {
+                    @Override
+                    public void init(Configuration configuration) {
+                        LOG.debug("init is invoked");
+                    }
+
+                    @Override
+                    public void pre(Context context) {
+                        for (String key : context) {
+                            LOG.debug("key : {} -> value : {}", key, context.get(key));
+                        }
+                    }
+
+                    @Override
+                    public void post(Context context) {
+                        for (String key : context) {
+                            LOG.debug("key : {} -> value : {}", key, context.get(key));
+                        }
+                    }
+                })
                 .deserializer(new ForwardDeserializeSchema())
                 .debeziumProperties(properties)
                 .build();

@@ -18,6 +18,7 @@
 
 package com.alibaba.ververica.cdc.debezium;
 
+import com.alibaba.ververica.cdc.debezium.internal.*;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.state.CheckpointListener;
@@ -39,13 +40,6 @@ import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeConsumer;
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeFetcher;
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffsetSerializer;
-import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
-import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
-import com.alibaba.ververica.cdc.debezium.internal.Handover;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
@@ -54,6 +48,7 @@ import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.relational.history.HistoryRecord;
 import org.apache.commons.collections.map.LinkedMap;
+import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +56,8 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -68,6 +65,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The {@link DebeziumSourceFunction} is a streaming data source that pulls captured change data
@@ -170,7 +169,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     private transient String engineInstanceName;
 
     /** Consume the events from the engine and commit the offset to the engine. */
-    private transient DebeziumChangeConsumer changeConsumer;
+    private transient DelegatedChangeConsumer<SourceRecord, SourceRecord> changeConsumer;
 
     /** The consumer to fetch records from {@link Handover}. */
     private transient DebeziumChangeFetcher<T> debeziumChangeFetcher;
@@ -178,15 +177,22 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** Buffer the events from the source and record the errors from the debezium. */
     private transient Handover handover;
 
+    /** interceptor for consumer */
+    private List<Interceptor> interceptors = new ArrayList<>();
+
     // ---------------------------------------------------------------------------------------
 
     public DebeziumSourceFunction(
             DebeziumDeserializationSchema<T> deserializer,
             Properties properties,
-            @Nullable DebeziumOffset specificOffset) {
+            @Nullable DebeziumOffset specificOffset,
+            Interceptor... interceptors) {
         this.deserializer = deserializer;
         this.properties = properties;
         this.specificOffset = specificOffset;
+        if (interceptors != null) {
+            this.interceptors = Stream.of(interceptors).collect(Collectors.toList());
+        }
     }
 
     @Override
@@ -196,7 +202,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 new ThreadFactoryBuilder().setNameFormat("debezium-engine").build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
         this.handover = new Handover();
-        this.changeConsumer = new DebeziumChangeConsumer(handover);
+        this.changeConsumer = new DelegatedChangeConsumer<>(new DebeziumChangeConsumer(handover), interceptors.toArray(new Interceptor[0]));
     }
 
     // ------------------------------------------------------------------------

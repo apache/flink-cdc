@@ -20,10 +20,14 @@ package com.alibaba.ververica.cdc.connectors.postgres;
 
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.alibaba.ververica.cdc.debezium.internal.Interceptor;
 import io.debezium.connector.postgresql.PostgresConnector;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -53,6 +57,7 @@ public class PostgreSQLSource {
         private String[] tableList;
         private Properties dbzProperties;
         private DebeziumDeserializationSchema<T> deserializer;
+        private List<Interceptor> interceptors;
 
         /**
          * The name of the Postgres logical decoding plug-in installed on the server. Supported
@@ -99,6 +104,16 @@ public class PostgreSQLSource {
          */
         public Builder<T> tableList(String... tableList) {
             this.tableList = tableList;
+            return this;
+        }
+
+        /**
+         * An optional list of interceptors.
+         * @param interceptors the interceptors
+         * @return this instance
+         */
+        public Builder<T> interceptors(Interceptor... interceptors) {
+            this.interceptors = Stream.of(interceptors).collect(Collectors.toList());
             return this;
         }
 
@@ -177,7 +192,7 @@ public class PostgreSQLSource {
                 dbzProperties.forEach(props::put);
             }
 
-            return new DebeziumSourceFunction<>(deserializer, props, null);
+            return new DebeziumSourceFunction<>(deserializer, props, null, interceptors.toArray(new Interceptor[0]));
         }
     }
 }
