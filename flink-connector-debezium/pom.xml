@@ -34,12 +34,12 @@ under the License.
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-api</artifactId>
-            <version>${debezium.version}</version>
+            <version>1.5.0.Final</version>
         </dependency>
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-embedded</artifactId>
-            <version>${debezium.version}</version>
+            <version>1.5.0.Final</version>
             <exclusions>
                 <exclusion>
                     <artifactId>kafka-log4j-appender</artifactId>
