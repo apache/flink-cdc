@@ -50,6 +50,13 @@ under the License.
             <version>${debezium.version}</version>
         </dependency>
 
+        <!--  Flink dependencies  -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-runtime-blink_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+
         <!-- test dependencies on Debezium -->
 
         <dependency>

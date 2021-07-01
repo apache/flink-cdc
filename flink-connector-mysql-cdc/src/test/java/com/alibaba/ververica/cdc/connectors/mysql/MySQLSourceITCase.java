@@ -21,7 +21,7 @@ package com.alibaba.ververica.cdc.connectors.mysql;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
+import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;

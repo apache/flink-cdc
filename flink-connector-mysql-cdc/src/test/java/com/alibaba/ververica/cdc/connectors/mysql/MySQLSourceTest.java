@@ -35,8 +35,8 @@ import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
+import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.connectors.mysql.table.StartupOptions;
-import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.connectors.utils.TestSourceContext;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
