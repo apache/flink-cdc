@@ -27,7 +27,7 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
-import com.alibaba.ververica.cdc.connectors.mysql.utils.UniqueDatabase;
+import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;

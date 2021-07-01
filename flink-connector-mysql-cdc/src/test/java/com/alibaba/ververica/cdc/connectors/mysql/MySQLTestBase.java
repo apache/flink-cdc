@@ -20,7 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
-import com.alibaba.ververica.cdc.connectors.mysql.utils.MySQLContainer;
+import com.alibaba.ververica.cdc.connectors.mysql.source.utils.MySQLContainer;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
