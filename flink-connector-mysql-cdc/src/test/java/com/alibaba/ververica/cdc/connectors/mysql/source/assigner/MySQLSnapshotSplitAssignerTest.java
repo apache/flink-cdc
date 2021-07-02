@@ -26,6 +26,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -35,72 +36,113 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
+import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
 
-/** Tests for {@link MySQLSnapshotSplitAssigner}. */
+/**
+ * Tests for {@link MySQLSnapshotSplitAssigner}.
+ */
 public class MySQLSnapshotSplitAssignerTest extends MySQLTestBase {
 
-    private final UniqueDatabase customDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
+    private static final UniqueDatabase customDatabase =
+        new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
+
+    @BeforeClass
+    public static void init() {
+        customDatabase.createAndInitialize();
+    }
 
     @Test
-    public void testAssignSnapshotSplits() {
-        customDatabase.createAndInitialize();
-        Map<String, String> properties = new HashMap<>();
-        properties.put("database.server.name", "test");
-        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        properties.put("database.user", customDatabase.getUsername());
-        properties.put("database.password", customDatabase.getPassword());
-        properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id-range", "1001, 1002");
-        properties.put("scan.split.size", "10");
-        properties.put("scan.fetch.size", "2");
-        properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
-        properties.put("snapshot.mode", "initial");
-        properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", "flink-embedded-database-history");
+    public void testAssignSingleTableSplits() {
+        String[] expected = new String[]{
+            "customers SNAPSHOT null [109]",
+            "customers SNAPSHOT [109] [118]",
+            "customers SNAPSHOT [118] [1009]",
+            "customers SNAPSHOT [1009] [1012]",
+            "customers SNAPSHOT [1012] [1015]",
+            "customers SNAPSHOT [1015] [1018]",
+            "customers SNAPSHOT [1018] [2000]",
+            "customers SNAPSHOT [2000] null"
+        };
+        List<String> splits = testAssignSnapshotSplits(new String[]{"customers"});
+        assertArrayEquals(expected, splits.toArray());
+    }
 
-        Configuration configuration = Configuration.fromMap(properties);
+    @Test
+    public void testAssignMultipleTableSplits() {
+        String[] expected = new String[]{
+            "customers SNAPSHOT null [109]",
+            "customers SNAPSHOT [109] [118]",
+            "customers SNAPSHOT [118] [1009]",
+            "customers SNAPSHOT [1009] [1012]",
+            "customers SNAPSHOT [1012] [1015]",
+            "customers SNAPSHOT [1015] [1018]",
+            "customers SNAPSHOT [1018] [2000]",
+            "customers SNAPSHOT [2000] null",
+            "customers_1 SNAPSHOT null [109]",
+            "customers_1 SNAPSHOT [109] [118]",
+            "customers_1 SNAPSHOT [118] [1009]",
+            "customers_1 SNAPSHOT [1009] [1012]",
+            "customers_1 SNAPSHOT [1012] [1015]",
+            "customers_1 SNAPSHOT [1015] [1018]",
+            "customers_1 SNAPSHOT [1018] [2000]",
+            "customers_1 SNAPSHOT [2000] null"
+        };
+        List<String> splits = testAssignSnapshotSplits(new String[]{"customers", "customers_1"});
+        assertArrayEquals(expected, splits.toArray());
+    }
+
+    private List<String> testAssignSnapshotSplits(String[] captureTables) {
+        Configuration configuration = getConfig();
+        List<String> captureTableIds = Arrays.stream(captureTables)
+            .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
+            .collect(Collectors.toList());
+        configuration.setString("table.whitelist", String.join(",", captureTableIds));
+
         final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
+            (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         MySQLSnapshotSplitAssigner assigner =
-                new MySQLSnapshotSplitAssigner(
-                        configuration, pkType, new ArrayList<>(), new ArrayList<>());
+            new MySQLSnapshotSplitAssigner(
+                configuration, pkType, new ArrayList<>(), new ArrayList<>());
 
         assigner.open();
-        List<MySQLSplit> mySQLSplitList = new ArrayList<>();
+        List<MySQLSplit> sqlSplits = new ArrayList<>();
         while (true) {
             Optional<MySQLSplit> mySQLSplit = assigner.getNext(null);
             if (mySQLSplit.isPresent()) {
-                mySQLSplitList.add(mySQLSplit.get());
+                sqlSplits.add(mySQLSplit.get());
             } else {
                 break;
             }
         }
 
-        String[] expected =
-                new String[] {
-                    "SNAPSHOT null [1009]",
-                    "SNAPSHOT [1009] [1018]",
-                    "SNAPSHOT [1018] [2000]",
-                    "SNAPSHOT [2000] null"
-                };
-        assertEquals(expected.length, mySQLSplitList.size());
-        String[] actual = new String[expected.length];
-        for (int i = 0; i < expected.length; i++) {
-            MySQLSplit mySQLSplit = mySQLSplitList.get(i);
-            String item =
-                    mySQLSplit.getSplitKind()
-                            + " "
-                            + Arrays.toString(mySQLSplit.getSplitBoundaryStart())
-                            + " "
-                            + Arrays.toString(mySQLSplit.getSplitBoundaryEnd());
-            actual[i] = item;
-        }
-        assertArrayEquals(expected, actual);
-        assigner.close();
+        return sqlSplits.stream().map(
+            split ->
+                split.getTableId().table() + " " +
+                    split.getSplitKind() + " " +
+                    Arrays.toString(split.getSplitBoundaryStart()) + " " +
+                    Arrays.toString(split.getSplitBoundaryEnd())
+        ).collect(Collectors.toList());
+    }
+
+    private Configuration getConfig() {
+        Map<String, String> properties = new HashMap<>();
+        properties.put("database.server.name", "embedded-test");
+        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
+        properties.put("database.whitelist", customDatabase.getDatabaseName());
+        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        properties.put("database.user", customDatabase.getUsername());
+        properties.put("database.password", customDatabase.getPassword());
+        properties.put("database.history.skip.unparseable.ddl", "true");
+        properties.put("server-id.range", "1001,1004");
+        properties.put("scan.split.size", "4");
+        properties.put("scan.fetch.size", "2");
+        properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
+        properties.put("snapshot.mode", "initial");
+        properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
+        return Configuration.fromMap(properties);
     }
 }

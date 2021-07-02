@@ -172,11 +172,6 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
         rowRowConverter.open(Thread.currentThread().getContextClassLoader());
         records.stream()
                 // filter signal event
-                .map(
-                        record -> {
-                            System.out.println(record);
-                            return record;
-                        })
                 .filter(r -> !isWatermarkEvent(r))
                 .forEach(
                         r -> {
