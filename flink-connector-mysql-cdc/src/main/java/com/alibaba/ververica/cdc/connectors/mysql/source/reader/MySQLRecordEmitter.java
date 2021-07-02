@@ -82,7 +82,6 @@ public final class MySQLRecordEmitter<T>
                         new HistoryRecord(TABLE_CHANGE_SERIALIZER.toDocument(tableChange)));
             }
         } else if (isDataChangeRecord(element)) {
-            System.out.println(element);
             BinlogPosition position = getBinlogPosition(element);
             splitState.setOffsetState(position);
             debeziumDeserializationSchema.deserialize(
