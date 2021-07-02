@@ -57,7 +57,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
     private final JsonTableChangeSerializer tableChangesSerializer =
             new JsonTableChangeSerializer();
 
-    private ConcurrentMap<TableId, HistoryRecord> tables;
+    private ConcurrentMap<TableId, SchemaRecord> latestTables;
     private String instanceName;
     private DatabaseHistoryListener listener;
     private boolean storeOnlyMonitoredTablesDdl;
@@ -77,16 +77,16 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
         this.useCatalogBeforeSchema = useCatalogBeforeSchema;
 
         // recover
-        this.tables = new ConcurrentHashMap<>();
-        for (HistoryRecord record : StateUtils.retrieveHistory(instanceName)) {
+        this.latestTables = new ConcurrentHashMap<>();
+        for (SchemaRecord schemaRecord : StateUtils.retrieveHistory(instanceName)) {
             // validate here
             TableChange tableChange =
                     JsonTableChangeSerializer.fromDocument(
-                            record.document(), useCatalogBeforeSchema);
-            tables.put(tableChange.getId(), record);
+                            schemaRecord.toDocument(), useCatalogBeforeSchema);
+            latestTables.put(tableChange.getId(), schemaRecord);
         }
         // register
-        StateUtils.registerHistory(instanceName, tables.values());
+        StateUtils.registerHistory(instanceName, latestTables.values());
     }
 
     @Override
@@ -99,7 +99,11 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
             Map<String, ?> source, Map<String, ?> position, String databaseName, String ddl)
             throws DatabaseHistoryException {
         throw new UnsupportedOperationException(
-                "The FlinkDatabaseSchemaHistory needs debezium provides the schema.");
+                String.format(
+                        "The %s cannot work with 'debezium.internal.implementation' = 'legacy',"
+                                + "please use %s",
+                        FlinkDatabaseSchemaHistory.class.getCanonicalName(),
+                        FlinkDatabaseHistory.class.getCanonicalName()));
     }
 
     @Override
@@ -111,18 +115,16 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
             String ddl,
             TableChanges changes)
             throws DatabaseHistoryException {
-        final HistoryRecord record =
-                new HistoryRecord(source, position, databaseName, schemaName, ddl, changes);
         for (TableChanges.TableChange change : changes) {
             switch (change.getType()) {
                 case CREATE:
                 case ALTER:
-                    tables.put(
+                    latestTables.put(
                             change.getId(),
-                            new HistoryRecord(tableChangesSerializer.toDocument(change)));
+                            new SchemaRecord(tableChangesSerializer.toDocument(change)));
                     break;
                 case DROP:
-                    tables.remove(change.getId());
+                    latestTables.remove(change.getId());
                     break;
                 default:
                     // impossible
@@ -130,17 +132,18 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
                             String.format("Unknown change type: %s.", change.getType()));
             }
         }
-        listener.onChangeApplied(record);
+        listener.onChangeApplied(
+                new HistoryRecord(source, position, databaseName, schemaName, ddl, changes));
     }
 
     @Override
     public void recover(
             Map<String, ?> source, Map<String, ?> position, Tables schema, DdlParser ddlParser) {
         listener.recoveryStarted();
-        for (HistoryRecord record : tables.values()) {
+        for (SchemaRecord record : latestTables.values()) {
             TableChange tableChange =
                     JsonTableChangeSerializer.fromDocument(
-                            record.document(), useCatalogBeforeSchema);
+                            record.getTableChangeDoc(), useCatalogBeforeSchema);
             schema.overwriteTable(tableChange.getTable());
         }
         listener.recoveryStopped();
@@ -156,7 +159,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
 
     @Override
     public boolean exists() {
-        return tables != null && !tables.isEmpty();
+        return latestTables != null && !latestTables.isEmpty();
     }
 
     @Override
@@ -183,21 +186,12 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
      * Determine whether the {@link FlinkDatabaseSchemaHistory} is compatible with the specified
      * state.
      */
-    public static boolean isCompatible(Collection<HistoryRecord> records) {
-        for (HistoryRecord record : records) {
-            // Try to deserialize the record
-            try {
-                TableChange tableChange =
-                        JsonTableChangeSerializer.fromDocument(record.document(), false);
-                // No table change in the state
-                if (tableChange.getId() == null) {
-                    return false;
-                } else {
-                    break;
-                }
-            } catch (Exception e) {
-                // Failed to deserialize the table from the state.
+    public static boolean isCompatible(Collection<SchemaRecord> records) {
+        for (SchemaRecord record : records) {
+            if (!record.isTableChangeRecord()) {
                 return false;
+            } else {
+                break;
             }
         }
         return true;

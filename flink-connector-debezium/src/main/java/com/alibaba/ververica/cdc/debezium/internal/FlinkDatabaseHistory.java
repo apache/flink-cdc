@@ -20,8 +20,6 @@ package com.alibaba.ververica.cdc.debezium.internal;
 
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.StateUtils;
 import io.debezium.config.Configuration;
-import io.debezium.document.Document;
-import io.debezium.document.Value;
 import io.debezium.relational.history.AbstractDatabaseHistory;
 import io.debezium.relational.history.DatabaseHistoryException;
 import io.debezium.relational.history.DatabaseHistoryListener;
@@ -44,12 +42,12 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
     public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
 
-    private ConcurrentLinkedQueue<HistoryRecord> records;
+    private ConcurrentLinkedQueue<SchemaRecord> schemaRecords;
     private String instanceName;
 
     /** Gets the registered HistoryRecords under the given instance name. */
-    private ConcurrentLinkedQueue<HistoryRecord> getRegisteredHistoryRecord(String instanceName) {
-        Collection<HistoryRecord> historyRecords = StateUtils.retrieveHistory(instanceName);
+    private ConcurrentLinkedQueue<SchemaRecord> getRegisteredHistoryRecord(String instanceName) {
+        Collection<SchemaRecord> historyRecords = StateUtils.retrieveHistory(instanceName);
         return new ConcurrentLinkedQueue<>(historyRecords);
     }
 
@@ -61,11 +59,11 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
             boolean useCatalogBeforeSchema) {
         super.configure(config, comparator, listener, useCatalogBeforeSchema);
         this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
-        this.records = getRegisteredHistoryRecord(instanceName);
+        this.schemaRecords = getRegisteredHistoryRecord(instanceName);
 
         // register the schema changes into state
         // every change should be visible to the source function
-        StateUtils.registerHistory(instanceName, records);
+        StateUtils.registerHistory(instanceName, schemaRecords);
     }
 
     @Override
@@ -76,17 +74,17 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
     @Override
     protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
-        this.records.add(record);
+        this.schemaRecords.add(new SchemaRecord(record));
     }
 
     @Override
     protected void recoverRecords(Consumer<HistoryRecord> records) {
-        this.records.forEach(records);
+        this.schemaRecords.stream().map(SchemaRecord::getHistoryRecord).forEach(records);
     }
 
     @Override
     public boolean exists() {
-        return !records.isEmpty();
+        return !schemaRecords.isEmpty();
     }
 
     @Override
@@ -102,21 +100,15 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     /**
      * Determine whether the {@link FlinkDatabaseHistory} is compatible with the specified state.
      */
-    public static boolean isCompatible(Collection<HistoryRecord> records) {
-        for (HistoryRecord record : records) {
+    public static boolean isCompatible(Collection<SchemaRecord> records) {
+        for (SchemaRecord record : records) {
             // check the source/position/ddl is not null
-            if (isNullValue(record.document(), HistoryRecord.Fields.POSITION)
-                    || isNullValue(record.document(), HistoryRecord.Fields.SOURCE)
-                    || isNullValue(record.document(), HistoryRecord.Fields.DDL_STATEMENTS)) {
+            if (!record.isHistoryRecord()) {
                 return false;
             } else {
                 break;
             }
         }
         return true;
-    }
-
-    private static boolean isNullValue(Document document, CharSequence field) {
-        return document.getField(field).getValue().equals(Value.nullValue());
     }
 }

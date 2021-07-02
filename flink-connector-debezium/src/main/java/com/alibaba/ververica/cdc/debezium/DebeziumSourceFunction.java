@@ -47,6 +47,7 @@ import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
 import com.alibaba.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import com.alibaba.ververica.cdc.debezium.internal.Handover;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
@@ -54,7 +55,6 @@ import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.relational.history.DatabaseHistory;
-import io.debezium.relational.history.HistoryRecord;
 import org.apache.commons.collections.map.LinkedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,8 +121,14 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** The maximum number of pending non-committed checkpoints to track, to avoid memory leaks. */
     public static final int MAX_NUM_PENDING_CHECKPOINTS = 100;
 
-    private static final String LEGACY_IMPLEMENTATION_KEY = "internal.implementation";
-    private static final String LEGACY_IMPLEMENTATION_VALUE = "legacy";
+    /**
+     * The configuration represents the Debezium MySQL Connector uses the legacy implementation or
+     * not.
+     */
+    public static final String LEGACY_IMPLEMENTATION_KEY = "internal.implementation";
+
+    /** The configuration value represents legacy implementation. */
+    public static final String LEGACY_IMPLEMENTATION_VALUE = "legacy";
 
     // ---------------------------------------------------------------------------------------
     // Properties
@@ -148,10 +154,10 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     // ---------------------------------------------------------------------------------------
 
     /**
-     * Structure to maintain the current schema history. The content in {@link HistoryRecord} is up
+     * Structure to maintain the current schema history. The content in {@link SchemaRecord} is up
      * to the implementation of the {@link DatabaseHistory}.
      */
-    private static final ConcurrentMap<String, Collection<HistoryRecord>> HISTORY =
+    private static final ConcurrentMap<String, Collection<SchemaRecord>> HISTORY =
             new ConcurrentHashMap<>();
 
     /**
@@ -171,8 +177,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      * State to store the history records, i.e. schema changes.
      *
      * @see FlinkDatabaseHistory
+     * @see FlinkDatabaseSchemaHistory
      */
-    private transient ListState<String> historyRecordsState;
+    private transient ListState<String> schemaRecordsState;
 
     // ---------------------------------------------------------------------------------------
     // Worker
@@ -228,7 +235,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         new ListStateDescriptor<>(
                                 OFFSETS_STATE_NAME,
                                 PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO));
-        this.historyRecordsState =
+        this.schemaRecordsState =
                 stateStore.getUnionListState(
                         new ListStateDescriptor<>(
                                 HISTORY_RECORDS_STATE_NAME, BasicTypeInfo.STRING_TYPE_INFO));
@@ -271,10 +278,10 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private void restoreHistoryRecordsState() throws Exception {
         DocumentReader reader = DocumentReader.defaultReader();
-        List<HistoryRecord> historyRecords = new ArrayList<>();
+        List<SchemaRecord> historyRecords = new ArrayList<>();
         int recordsCount = 0;
         boolean firstEntry = true;
-        for (String record : historyRecordsState.get()) {
+        for (String record : schemaRecordsState.get()) {
             if (firstEntry) {
                 // we store the engine instance name in the first element
                 this.engineInstanceName = record;
@@ -282,7 +289,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             } else {
                 // Put the records into the state. The database history should read, reorganize and
                 // register the state.
-                historyRecords.add(new HistoryRecord(reader.read(record)));
+                historyRecords.add(new SchemaRecord(reader.read(record)));
                 recordsCount++;
             }
         }
@@ -343,15 +350,15 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     }
 
     private void snapshotHistoryRecordsState() throws Exception {
-        historyRecordsState.clear();
+        schemaRecordsState.clear();
 
         if (engineInstanceName != null) {
-            historyRecordsState.add(engineInstanceName);
+            schemaRecordsState.add(engineInstanceName);
 
-            Collection<HistoryRecord> records = StateUtils.retrieveHistory(engineInstanceName);
+            Collection<SchemaRecord> records = StateUtils.retrieveHistory(engineInstanceName);
             DocumentWriter writer = DocumentWriter.defaultWriter();
-            for (HistoryRecord record : records) {
-                historyRecordsState.add(writer.write(record.document()));
+            for (SchemaRecord record : records) {
+                schemaRecordsState.add(writer.write(record.toDocument()));
             }
         }
     }
@@ -566,11 +573,11 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public static final class StateUtils {
 
         public static void registerHistory(
-                String engineName, Collection<HistoryRecord> engineHistory) {
+                String engineName, Collection<SchemaRecord> engineHistory) {
             HISTORY.put(engineName, engineHistory);
         }
 
-        public static Collection<HistoryRecord> retrieveHistory(String engineName) {
+        public static Collection<SchemaRecord> retrieveHistory(String engineName) {
             return HISTORY.getOrDefault(engineName, Collections.emptyList());
         }
 
