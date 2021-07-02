@@ -18,18 +18,15 @@
 
 package com.alibaba.ververica.cdc.debezium.internal;
 
+import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.StateUtils;
 import io.debezium.config.Configuration;
 import io.debezium.relational.history.AbstractDatabaseHistory;
-import io.debezium.relational.history.DatabaseHistory;
 import io.debezium.relational.history.DatabaseHistoryException;
 import io.debezium.relational.history.DatabaseHistoryListener;
-import io.debezium.relational.history.FileDatabaseHistory;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
-import io.debezium.relational.history.KafkaDatabaseHistory;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
@@ -45,53 +42,13 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
     public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
 
-    /**
-     * We will synchronize the records into Flink's state during snapshot. We have to use a global
-     * variable to communicate with Flink's source function, because Debezium will construct the
-     * instance of {@link DatabaseHistory} itself. Maybe we can improve this in the future.
-     *
-     * <p>NOTE: we just use Flink's state as a durable persistent storage as a replacement of {@link
-     * FileDatabaseHistory} and {@link KafkaDatabaseHistory}. It doesn't need to guarantee the
-     * exactly-once semantic for the history records. The history records shouldn't be super large,
-     * because we only monitor the schema changes for one single table.
-     *
-     * @see
-     *     com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction#snapshotState(org.apache.flink.runtime.state.FunctionSnapshotContext)
-     */
-    public static final Map<String, ConcurrentLinkedQueue<HistoryRecord>> ALL_RECORDS =
-            new HashMap<>();
-
-    private ConcurrentLinkedQueue<HistoryRecord> records;
+    private ConcurrentLinkedQueue<SchemaRecord> schemaRecords;
     private String instanceName;
 
-    /**
-     * Registers the given HistoryRecords into global variable under the given instance name, in
-     * order to be accessed by instance of {@link FlinkDatabaseHistory}.
-     */
-    public static void registerHistoryRecords(
-            String instanceName, ConcurrentLinkedQueue<HistoryRecord> historyRecords) {
-        synchronized (FlinkDatabaseHistory.ALL_RECORDS) {
-            FlinkDatabaseHistory.ALL_RECORDS.put(instanceName, historyRecords);
-        }
-    }
-
-    /**
-     * Registers an empty HistoryRecords into global variable under the given instance name, in
-     * order to be accessed by instance of {@link FlinkDatabaseHistory}.
-     */
-    public static void registerEmptyHistoryRecord(String instanceName) {
-        registerHistoryRecords(instanceName, new ConcurrentLinkedQueue<>());
-    }
-
     /** Gets the registered HistoryRecords under the given instance name. */
-    public static ConcurrentLinkedQueue<HistoryRecord> getRegisteredHistoryRecord(
-            String instanceName) {
-        synchronized (ALL_RECORDS) {
-            if (ALL_RECORDS.containsKey(instanceName)) {
-                return ALL_RECORDS.get(instanceName);
-            }
-        }
-        return null;
+    private ConcurrentLinkedQueue<SchemaRecord> getRegisteredHistoryRecord(String instanceName) {
+        Collection<SchemaRecord> historyRecords = StateUtils.retrieveHistory(instanceName);
+        return new ConcurrentLinkedQueue<>(historyRecords);
     }
 
     @Override
@@ -102,39 +59,32 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
             boolean useCatalogBeforeSchema) {
         super.configure(config, comparator, listener, useCatalogBeforeSchema);
         this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
-        this.records = getRegisteredHistoryRecord(instanceName);
-        if (records == null) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Couldn't find engine instance %s in the global records.",
-                            instanceName));
-        }
+        this.schemaRecords = getRegisteredHistoryRecord(instanceName);
+
+        // register the schema changes into state
+        // every change should be visible to the source function
+        StateUtils.registerHistory(instanceName, schemaRecords);
     }
 
     @Override
     public void stop() {
         super.stop();
-        if (instanceName != null) {
-            synchronized (ALL_RECORDS) {
-                // clear memory
-                ALL_RECORDS.remove(instanceName);
-            }
-        }
+        StateUtils.removeHistory(instanceName);
     }
 
     @Override
     protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
-        this.records.add(record);
+        this.schemaRecords.add(new SchemaRecord(record));
     }
 
     @Override
     protected void recoverRecords(Consumer<HistoryRecord> records) {
-        this.records.forEach(records);
+        this.schemaRecords.stream().map(SchemaRecord::getHistoryRecord).forEach(records);
     }
 
     @Override
     public boolean exists() {
-        return !records.isEmpty();
+        return !schemaRecords.isEmpty();
     }
 
     @Override
@@ -145,5 +95,20 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     @Override
     public String toString() {
         return "Flink Database History";
+    }
+
+    /**
+     * Determine whether the {@link FlinkDatabaseHistory} is compatible with the specified state.
+     */
+    public static boolean isCompatible(Collection<SchemaRecord> records) {
+        for (SchemaRecord record : records) {
+            // check the source/position/ddl is not null
+            if (!record.isHistoryRecord()) {
+                return false;
+            } else {
+                break;
+            }
+        }
+        return true;
     }
 }

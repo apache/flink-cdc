@@ -357,7 +357,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4));
 
             // ---------------------------------------------------------------------------
-            // Step-6: trigger checkpoint-2 to make sure we can continue to to further checkpoints
+            // Step-8: trigger checkpoint-2 to make sure we can continue to to further checkpoints
             // ---------------------------------------------------------------------------
             synchronized (sourceContext4.getCheckpointLock()) {
                 // checkpoint 3
@@ -371,10 +371,94 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertFalse(state.contains("snapshot"));
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
             assertTrue(lsn > prevLsn);
+            prevLsn = lsn;
 
             source4.cancel();
             source4.close();
             runThread4.sync();
+        }
+
+        {
+            // ---------------------------------------------------------------------------
+            // Step-9: insert partial and alter table
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source5 =
+                    createPostgreSqlSourceWithHeartbeatDisabled();
+            final TestSourceContext<SourceRecord> sourceContext5 = new TestSourceContext<>();
+            setupSource(source5, true, offsetState, historyState, true, 0, 1);
+
+            // restart the source
+            final CheckedThread runThread5 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source5.run(sourceContext5);
+                        }
+                    };
+            runThread5.start();
+
+            try (Connection connection = getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+
+                statement.execute(
+                        "INSERT INTO inventory.products(id, description, weight) VALUES (default, 'Go go go', 111.1)");
+                statement.execute(
+                        "ALTER TABLE inventory.products ADD comment_col VARCHAR(100) DEFAULT 'cdc'");
+                List<SourceRecord> records = drain(sourceContext5, 1);
+                assertInsert(records.get(0), "id", 111);
+            }
+
+            // ---------------------------------------------------------------------------
+            // Step-10: trigger checkpoint-4
+            // ---------------------------------------------------------------------------
+            synchronized (sourceContext5.getCheckpointLock()) {
+                // trigger checkpoint-4
+                source5.snapshotState(new StateSnapshotContextSynchronousImpl(300, 300));
+            }
+            assertEquals(1, offsetState.list.size());
+            String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+            assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
+            assertEquals("562", JsonPath.read(state, "$.sourceOffset.txId").toString());
+            assertTrue(state.contains("ts_usec"));
+            assertFalse(state.contains("snapshot"));
+            int pos = JsonPath.read(state, "$.sourceOffset.lsn");
+            assertTrue(pos > prevLsn);
+
+            source5.cancel();
+            source5.close();
+            runThread5.sync();
+        }
+
+        {
+            // ---------------------------------------------------------------------------
+            // Step-11: restore from the checkpoint-4 and insert the partial value
+            // ---------------------------------------------------------------------------
+            final DebeziumSourceFunction<SourceRecord> source6 =
+                    createPostgreSqlSourceWithHeartbeatDisabled();
+            final TestSourceContext<SourceRecord> sourceContext6 = new TestSourceContext<>();
+            setupSource(source6, true, offsetState, historyState, true, 0, 1);
+
+            // restart the source
+            final CheckedThread runThread6 =
+                    new CheckedThread() {
+                        @Override
+                        public void go() throws Exception {
+                            source6.run(sourceContext6);
+                        }
+                    };
+            runThread6.start();
+            try (Connection connection = getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+
+                statement.execute(
+                        "INSERT INTO inventory.products(id, description, weight) VALUES (default, 'Run!', 22.2)");
+                List<SourceRecord> records = drain(sourceContext6, 1);
+                assertInsert(records.get(0), "id", 112);
+            }
+
+            source6.cancel();
+            source6.close();
+            runThread6.sync();
         }
     }
 

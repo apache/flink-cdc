@@ -63,17 +63,18 @@ public class MySQLConnectorITCase extends MySQLTestBase {
             StreamTableEnvironment.create(
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
-    private final String implementation;
+    // use legacy debezium mysql connector or not
+    private final boolean useLegacyImplementation;
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    public MySQLConnectorITCase(String implementation) {
-        this.implementation = implementation;
+    public MySQLConnectorITCase(boolean useLegacyImplementation) {
+        this.useLegacyImplementation = useLegacyImplementation;
     }
 
-    @Parameterized.Parameters(name = "implementation: {0}")
-    public static Collection<String> parameters() {
-        return Arrays.asList("non-legacy", "legacy");
+    @Parameterized.Parameters(name = "useLegacyImplementation: {0}")
+    public static Collection<Boolean> parameters() {
+        return Arrays.asList(false, true);
     }
 
     @Before
@@ -109,7 +110,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -148,34 +149,27 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
         waitForSinkSize("sink", 20);
 
-        // The final database table looks like this:
-        //
-        // > SELECT * FROM products;
-        // +-----+--------------------+---------------------------------------------------------+--------+
-        // | id  | name               | description                                             |
-        // weight |
-        // +-----+--------------------+---------------------------------------------------------+--------+
-        // | 101 | scooter            | Small 2-wheel scooter                                   |
-        // 3.14 |
-        // | 102 | car battery        | 12V car battery                                         |
-        // 8.1 |
-        // | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |
-        // 0.8 |
-        // | 104 | hammer             | 12oz carpenter's hammer                                 |
-        // 0.75 |
-        // | 105 | hammer             | 14oz carpenter's hammer                                 |
-        // 0.875 |
-        // | 106 | hammer             | 18oz carpenter hammer                                   |
-        //   1 |
-        // | 107 | rocks              | box of assorted rocks                                   |
-        // 5.1 |
-        // | 108 | jacket             | water resistent black wind breaker                      |
-        // 0.1 |
-        // | 109 | spare tire         | 24 inch spare tire                                      |
-        // 22.2 |
-        // | 110 | jacket             | new water resistent white wind breaker                  |
-        // 0.5 |
-        // +-----+--------------------+---------------------------------------------------------+--------+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | id  | name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
 
         String[] expected =
                 new String[] {
@@ -237,7 +231,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         fullTypesDatabase.getPassword(),
                         fullTypesDatabase.getDatabaseName(),
                         "full_types",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id INT NOT NULL,\n"
@@ -331,7 +325,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
         }
-        Tuple2<String, Integer> offset = currentMySQLLatestOffset(inventoryDatabase, "products", 9);
+        Tuple2<String, Integer> offset =
+                currentMySQLLatestOffset(inventoryDatabase, "products", 9, useLegacyImplementation);
 
         String sourceDDL =
                 String.format(
@@ -361,7 +356,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         "products",
                         offset.f0,
                         offset.f1,
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -430,7 +425,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -508,7 +503,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -576,7 +571,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),
-                        implementation);
+                        getImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -616,6 +611,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
     }
 
     // ------------------------------------------------------------------------------------
+
+    private String getImplementation() {
+        return useLegacyImplementation ? "legacy" : "";
+    }
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
         while (sinkSize(sinkName) == 0) {

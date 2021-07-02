@@ -20,13 +20,13 @@
 -- Create and populate our products using a single insert with many rows
 CREATE TABLE products (
   id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
   description VARCHAR(512),
   weight FLOAT
 );
 ALTER TABLE products AUTO_INCREMENT = 101;
 
-INSERT INTO products 
+INSERT INTO products
 VALUES (default,"scooter","Small 2-wheel scooter",3.14),
        (default,"car battery","12V car battery",8.1),
        (default,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3",0.8),
@@ -80,7 +80,7 @@ CREATE TABLE orders (
   FOREIGN KEY ordered_product (product_id) REFERENCES products(id)
 ) AUTO_INCREMENT = 10001;
 
-INSERT INTO orders 
+INSERT INTO orders
 VALUES (default, '2016-01-16', 1001, 1, 102),
        (default, '2016-01-17', 1002, 2, 105),
        (default, '2016-02-18', 1004, 3, 109),
