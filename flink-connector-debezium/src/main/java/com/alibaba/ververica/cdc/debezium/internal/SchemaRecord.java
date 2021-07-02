@@ -20,7 +20,6 @@ package com.alibaba.ververica.cdc.debezium.internal;
 
 import io.debezium.document.Document;
 import io.debezium.relational.history.HistoryRecord;
-import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import javax.annotation.Nullable;
@@ -34,9 +33,6 @@ import javax.annotation.Nullable;
  * FlinkDatabaseSchemaHistory} which keeps the latest latest table change for each table.
  */
 public class SchemaRecord {
-
-    private static final JsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
-            new JsonTableChangeSerializer();
 
     @Nullable private final HistoryRecord historyRecord;
 
