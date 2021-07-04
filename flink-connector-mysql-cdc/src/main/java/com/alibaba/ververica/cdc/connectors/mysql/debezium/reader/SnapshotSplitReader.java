@@ -140,12 +140,16 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
                         } else {
                             throw new IllegalStateException(
                                     String.format(
-                                            "read snapshot for mysql split %s fail",
+                                            "Read snapshot for mysql split %s fail",
                                             currentTableSplit));
                         }
                     } catch (Exception e) {
                         currentTaskRunning = false;
-                        e.printStackTrace();
+                        LOGGER.error(
+                                String.format(
+                                        "Execute snapshot read task for mysql split %s fail",
+                                        currentTableSplit),
+                                e);
                     }
                 });
     }

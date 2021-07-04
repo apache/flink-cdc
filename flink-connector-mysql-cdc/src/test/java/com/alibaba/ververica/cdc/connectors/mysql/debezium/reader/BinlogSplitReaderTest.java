@@ -35,6 +35,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabase
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
@@ -48,7 +49,6 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.sql.SQLException;
@@ -73,22 +73,22 @@ import static org.junit.Assert.assertEquals;
 /** Tests for {@link BinlogSplitReader}. */
 public class BinlogSplitReaderTest extends MySQLTestBase {
 
-    private static final UniqueDatabase customDatabase =
+    private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
 
-    private static final RowType pkType =
-            (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-
-    @BeforeClass
-    public static void init() {
-        customDatabase.createAndInitialize();
-    }
-
     @Test
-    public void testReadSingleBinlogSplits() throws Exception {
-        Configuration configuration = getConfig();
+    public void testReadSingleBinlogSplit() throws Exception {
+        customDatabase.createAndInitialize();
+        Configuration configuration = getConfig(new String[] {"customers"});
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        final RowType pkType =
+                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
-
         String[] expected =
                 new String[] {
                     "+I[101, user_1, Shanghai, 123567891234]",
@@ -107,13 +107,23 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                     "+I[121, user_8, Shanghai, 123567891234]",
                     "+I[123, user_9, Shanghai, 123567891234]"
                 };
-        List<String> actual = readBinlogSplits(splits, configuration, 1, expected.length);
+        List<String> actual =
+                readBinlogSplits(splits, dataType, pkType, configuration, 1, expected.length);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
     @Test
-    public void testReadAllBinlogSplits() throws Exception {
-        Configuration configuration = getConfig();
+    public void testReadAllBinlogSplitsForOneTable() throws Exception {
+        customDatabase.createAndInitialize();
+        Configuration configuration = getConfig(new String[] {"customers"});
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        final RowType pkType =
+                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
@@ -152,24 +162,112 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual =
-                readBinlogSplits(splits, configuration, splits.size(), expected.length);
+                readBinlogSplits(
+                        splits, dataType, pkType, configuration, splits.size(), expected.length);
+        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+    }
+
+    @Test
+    public void testReadAllBinlogForTableWithSingleLine() throws Exception {
+        customDatabase.createAndInitialize();
+        Configuration configuration = getConfig(new String[] {"customer_card_single_line"});
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                        DataTypes.FIELD("level", DataTypes.STRING()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("note", DataTypes.STRING()));
+        final RowType pkType =
+                (RowType)
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                                        DataTypes.FIELD("level", DataTypes.STRING()))
+                                .getLogicalType();
+        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
+
+        String[] expected =
+                new String[] {
+                    "+I[20000, LEVEL_1, user_1, user with level 1]",
+                    "+I[20001, LEVEL_1, user_1, user with level 1]",
+                    "+I[20001, LEVEL_2, user_2, user with level 2]",
+                    "+I[20002, LEVEL_3, user_3, user with level 3]"
+                };
+
+        List<String> actual =
+                readBinlogSplits(
+                        splits, dataType, pkType, configuration, splits.size(), expected.length);
+        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+    }
+
+    @Test
+    public void testReadAllBinlogSplitsForTables() throws Exception {
+        customDatabase.createAndInitialize();
+        Configuration configuration =
+                getConfig(new String[] {"customer_card", "customer_card_single_line"});
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                        DataTypes.FIELD("level", DataTypes.STRING()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("note", DataTypes.STRING()));
+        final RowType pkType =
+                (RowType)
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                                        DataTypes.FIELD("level", DataTypes.STRING()))
+                                .getLogicalType();
+        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
+        String[] expected =
+                new String[] {
+                    "+I[20000, LEVEL_1, user_1, user with level 1]",
+                    "+I[20001, LEVEL_1, user_1, user with level 1]",
+                    "+I[20001, LEVEL_2, user_2, user with level 2]",
+                    "+I[20002, LEVEL_3, user_3, user with level 3]",
+                    "+I[20001, LEVEL_4, user_1, user with level 4]",
+                    "+I[20002, LEVEL_4, user_2, user with level 4]",
+                    "+I[20003, LEVEL_4, user_3, user with level 4]",
+                    "+I[20004, LEVEL_1, user_4, user with level 4]",
+                    "+I[20004, LEVEL_2, user_4, user with level 4]",
+                    "+I[20004, LEVEL_3, user_4, user with level 4]",
+                    "+I[20004, LEVEL_4, user_4, user with level 4]",
+                    "+I[30006, LEVEL_3, user_5, user with level 3]",
+                    "+I[30007, LEVEL_3, user_6, user with level 3]",
+                    "+I[30008, LEVEL_3, user_7, user with level 3]",
+                    "+I[30009, LEVEL_1, user_8, user with level 3]",
+                    "+I[30009, LEVEL_2, user_8, user with level 3]",
+                    "+I[30009, LEVEL_3, user_8, user with level 3]",
+                    "+I[40001, LEVEL_2, user_9, user with level 2]",
+                    "+I[40002, LEVEL_2, user_10, user with level 2]",
+                    "+I[40003, LEVEL_2, user_11, user with level 2]",
+                    "+I[50001, LEVEL_1, user_12, user with level 1]",
+                    "+I[50002, LEVEL_1, user_13, user with level 1]",
+                    "+I[50003, LEVEL_1, user_14, user with level 1]"
+                };
+        List<String> actual =
+                readBinlogSplits(
+                        splits, dataType, pkType, configuration, splits.size(), expected.length);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
     private List<String> readBinlogSplits(
             List<MySQLSplit> sqlSplits,
+            DataType dataType,
+            RowType pkType,
             Configuration configuration,
             int scanSplitsNum,
             int expectedSize)
             throws Exception {
         final BinaryLogClient binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
         final MySqlConnection mySqlConnection = StatefulTaskContext.getConnection(configuration);
-        StatefulTaskContext statefulTaskContext =
+        final StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
-        SnapshotSplitReader snapshotSplitReader = new SnapshotSplitReader(statefulTaskContext, 0);
+        final SnapshotSplitReader snapshotSplitReader =
+                new SnapshotSplitReader(statefulTaskContext, 0);
 
         // step-1: read snapshot splits firstly
-        List<SourceRecord> snapshotRecords = new ArrayList<>();
+        List<SourceRecord> fetchedRecords = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
             MySQLSplit sqlSplit = sqlSplits.get(i);
             if (snapshotSplitReader.isIdle()) {
@@ -179,14 +277,14 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
             while ((res = snapshotSplitReader.pollSplitRecords()) != null) {
                 while (res.hasNext()) {
                     SourceRecord sourceRecord = res.next();
-                    snapshotRecords.add(sourceRecord);
+                    fetchedRecords.add(sourceRecord);
                 }
             }
         }
 
         // step-2: create binlog split according the finished snapshot splits
         List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
-                getFinishedSplitsInfo(sqlSplits, snapshotRecords);
+                getFinishedSplitsInfo(sqlSplits, fetchedRecords);
         BinlogPosition startOffset = getStartOffsetOfBinlogSplit(finishedSplitsInfo);
         Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
         TableId tableId = null;
@@ -214,18 +312,21 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         binlogReader.submitSplit(binlogSplit);
 
         // step-4: make some binlog events
-        makeBinlogEvents(
-                statefulTaskContext.getConnection(), tableId.toString(), scanSplitsNum == 1);
+        if (tableId.table().contains("customers")) {
+            makeCustomersBinlogEvents(
+                    statefulTaskContext.getConnection(), tableId.toString(), scanSplitsNum == 1);
+        } else {
+            makeCustomerCardsBinlogEvents(statefulTaskContext.getConnection(), tableId.toString());
+        }
 
-        // step-5: read all produced data and compare
-
+        // step-5: fetched all produced binlog data and format them
         List<String> actual = new ArrayList<>();
         Iterator<SourceRecord> recordIterator;
         while ((recordIterator = binlogReader.pollSplitRecords()) != null) {
             while (recordIterator.hasNext()) {
-                snapshotRecords.add(recordIterator.next());
+                fetchedRecords.add(recordIterator.next());
             }
-            actual = formatResult(snapshotRecords);
+            actual = formatResult(fetchedRecords, dataType);
             if (actual.size() >= expectedSize) {
                 break;
             }
@@ -233,53 +334,99 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         return actual;
     }
 
-    private void makeBinlogEvents(
-            JdbcConnection jdbcConnection, String tableId, boolean firstSplitOnly)
-            throws SQLException {
+    private void makeCustomersBinlogEvents(
+            JdbcConnection connection, String tableId, boolean firstSplitOnly) throws SQLException {
         // make binlog events for the first split
-        jdbcConnection.execute(
+        connection.execute(
                 "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
                 "DELETE FROM " + tableId + " where id = 102",
                 "INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')",
                 "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
-        jdbcConnection.commit();
+        connection.commit();
 
         if (!firstSplitOnly) {
             // make binlog events for split-1
-            jdbcConnection.execute("UPDATE " + tableId + " SET name = 'Hangzhou' where id = 1010");
-            jdbcConnection.commit();
+            connection.execute("UPDATE " + tableId + " SET name = 'Hangzhou' where id = 1010");
+            connection.commit();
 
             // make binlog events for the last split
-            jdbcConnection.execute(
+            connection.execute(
                     "INSERT INTO "
                             + tableId
                             + " VALUES(2001, 'user_22','Shanghai','123567891234')");
-            jdbcConnection.commit();
+            connection.commit();
 
             // make schema change binlog events
-            jdbcConnection.execute(
+            connection.execute(
                     "ALTER TABLE "
                             + tableId
                             + " ADD COLUMN email VARCHAR(128) DEFAULT 'user@flink.apache.org'");
-            jdbcConnection.commit();
+            connection.commit();
 
             // make binlog events after schema changed
-            jdbcConnection.execute(
+            connection.execute(
                     "INSERT INTO "
                             + tableId
                             + " VALUES(2002, 'user_23','Shanghai','123567891234', 'test1@gmail.com')");
-            jdbcConnection.commit();
-
-            // recover the schema
-            jdbcConnection.execute("ALTER TABLE " + tableId + " DROP COLUMN email");
-            jdbcConnection.commit();
+            connection.commit();
 
             // make binlog again
-            jdbcConnection.execute(
+            connection.execute(
                     "INSERT INTO "
                             + tableId
-                            + " VALUES(2003, 'user_24','Shanghai','123567891234')");
-            jdbcConnection.commit();
+                            + " VALUES(2003, 'user_24','Shanghai','123567891234', 'test2@gmail.com')");
+            connection.commit();
+        }
+    }
+
+    private void makeCustomerCardsBinlogEvents(JdbcConnection connection, String tableId)
+            throws SQLException {
+        if (tableId.endsWith("customer_card_single_line")) {
+            // make binlog events for the first split
+            connection.execute(
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(20000, 'LEVEL_1', 'user_1', 'user with level 1')");
+            connection.commit();
+
+            // make binlog events for the last split
+            connection.execute(
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(20001, 'LEVEL_2', 'user_2', 'user with level 2')",
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(20002, 'LEVEL_3', 'user_3', 'user with level 3')");
+
+            connection.commit();
+        } else {
+            // make binlog events for the first split
+            connection.execute(
+                    "UPDATE " + tableId + " SET level = 'LEVEL_3' where user_id = 'user_1')",
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(20002, 'LEVEL_5', 'user_15', 'user with level 15')");
+            connection.commit();
+
+            // make binlog events for middle split
+            connection.execute(
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(40000, 'LEVEL_1', 'user_16', 'user with level 1')",
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(40004, 'LEVEL_2', 'user_17', 'user with level 2')");
+            connection.commit();
+
+            // make binlog events for the last split
+            connection.execute(
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(50004, 'LEVEL_1', 'user_18', 'user with level 1')",
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(50005, 'LEVEL_2', 'user_19', 'user with level 2')");
+            connection.commit();
         }
     }
 
@@ -302,13 +449,8 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         return finishedSplitsInfo;
     }
 
-    private List<String> formatResult(List<SourceRecord> records) {
-        final DataType dataType =
-                DataTypes.ROW(
-                        DataTypes.FIELD("id", DataTypes.BIGINT()),
-                        DataTypes.FIELD("name", DataTypes.STRING()),
-                        DataTypes.FIELD("address", DataTypes.STRING()),
-                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+    private List<String> formatResult(List<SourceRecord> records, DataType dataType)
+            throws Exception {
         final RowType rowType = (RowType) dataType.getLogicalType();
         final TypeInformation<RowData> typeInfo =
                 (TypeInformation<RowData>) TypeConversions.fromDataTypeToLegacyInfo(dataType);
@@ -318,19 +460,15 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         SimpleCollector collector = new SimpleCollector();
         RowRowConverter rowRowConverter = RowRowConverter.create(dataType);
         rowRowConverter.open(Thread.currentThread().getContextClassLoader());
-        records.stream()
-                // filter signal event
-                .filter(r -> !isWatermarkEvent(r))
-                // filter schema change event
-                .filter(r -> !isSchemaChangeEvent(r))
-                .forEach(
-                        r -> {
-                            try {
-                                deserializationSchema.deserialize(r, collector);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                        });
+        // filter signal event
+        // filter schema change event
+        for (SourceRecord r : records) {
+            if (!isWatermarkEvent(r)) {
+                if (!isSchemaChangeEvent(r)) {
+                    deserializationSchema.deserialize(r, collector);
+                }
+            }
+        }
         return collector.list.stream()
                 .map(rowRowConverter::toExternal)
                 .map(Row::toString)
@@ -339,7 +477,7 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
     }
 
     private List<MySQLSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
-        MySQLSnapshotSplitAssigner assigner =
+        final MySQLSnapshotSplitAssigner assigner =
                 new MySQLSnapshotSplitAssigner(
                         configuration, pkType, new ArrayList<>(), new ArrayList<>());
         assigner.open();
@@ -356,13 +494,14 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         return mySQLSplits;
     }
 
-    private Configuration getConfig() {
+    private Configuration getConfig(String[] captureTables) {
         Map<String, String> properties = new HashMap<>();
         properties.put("database.server.name", "embedded-test");
         properties.put("database.hostname", MYSQL_CONTAINER.getHost());
         properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
         properties.put("database.user", customDatabase.getUsername());
         properties.put("database.password", customDatabase.getPassword());
+        properties.put("database.whitelist", customDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
         properties.put("server-id-range", "1001, 1002");
         properties.put("scan.split.size", "10");
@@ -371,6 +510,11 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
         properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
+        List<String> captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
+                        .collect(Collectors.toList());
+        properties.put("table.whitelist", String.join(",", captureTableIds));
         return Configuration.fromMap(properties);
     }
 

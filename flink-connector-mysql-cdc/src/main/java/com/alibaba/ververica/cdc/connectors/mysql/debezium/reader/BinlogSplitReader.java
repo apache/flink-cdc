@@ -29,7 +29,6 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.Stateful
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
-import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
@@ -51,7 +50,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getPrimaryKey;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 
@@ -64,7 +63,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
     private static final Logger LOGGER = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executor;
-    private final String logicalName;
 
     private volatile boolean currentTaskRunning;
     private volatile ChangeEventQueue<DataChangeEvent> queue;
@@ -72,17 +70,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
     private MySQLSplit currentTableSplit;
     // tableId -> List[splitKeyStart, splitKeyEnd, splitHighWatermark]
     private Map<TableId, List<Tuple3<Object[], Object[], BinlogPosition>>> finishedSplitsInfo;
-    private MySqlDatabaseSchema databaseSchema;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
-        this.logicalName =
-                statefulTaskContext
-                        .getSchemaNameAdjuster()
-                        .adjust(statefulTaskContext.getConnectorConfig().getLogicalName());
         this.currentTaskRunning = false;
     }
 
@@ -91,7 +84,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
         configureFilter();
         statefulTaskContext.configure(currentTableSplit);
         this.queue = statefulTaskContext.getQueue();
-        this.databaseSchema = statefulTaskContext.getDatabaseSchema();
         final MySqlOffsetContext mySqlOffsetContext = statefulTaskContext.getOffsetContext();
         mySqlOffsetContext.setBinlogStartPoint(
                 currentTableSplit.getOffset().getFilename(),
@@ -119,7 +111,11 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
                         binlogSplitReadTask.execute(new BinlogSplitChangeEventSourceContextImpl());
                     } catch (Exception e) {
                         currentTaskRunning = false;
-                        LOGGER.error("execute task error", e);
+                        LOGGER.error(
+                                String.format(
+                                        "Execute binlog read task for mysql split %s fail",
+                                        currentTableSplit),
+                                e);
                         e.printStackTrace();
                     }
                 });
@@ -171,7 +167,11 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
     private boolean shouldEmit(SourceRecord sourceRecord) {
         if (isDataChangeRecord(sourceRecord)) {
             TableId tableId = getTableId(sourceRecord);
-            Object[] key = getPrimaryKey(sourceRecord, databaseSchema.schemaFor(tableId));
+            Object[] key =
+                    getSplitKey(
+                            currentTableSplit.getSplitBoundaryType(),
+                            sourceRecord,
+                            statefulTaskContext.getSchemaNameAdjuster());
             BinlogPosition position = getBinlogPosition(sourceRecord);
             for (Tuple3<Object[], Object[], BinlogPosition> splitInfo :
                     finishedSplitsInfo.get(tableId)) {

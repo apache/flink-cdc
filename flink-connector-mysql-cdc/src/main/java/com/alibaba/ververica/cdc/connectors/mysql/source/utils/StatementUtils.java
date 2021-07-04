@@ -18,8 +18,11 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.Preconditions;
 
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
@@ -35,18 +38,44 @@ public class StatementUtils {
 
     private StatementUtils() {}
 
+    /**
+     * Returns the split key, the split key should always single field。
+     *
+     * <p>The split key is primary key when primary key contains single field, the split key will be
+     * inferred when the primary key contains multiple field.
+     *
+     * @param pkType the primary key type
+     * @return
+     */
+    public static RowType getSplitKey(Configuration configuration, RowType pkType) {
+        Preconditions.checkState(
+                pkType.getFieldCount() >= 1, "The primary key is required in table definition.");
+        if (pkType.getFieldCount() == 1) {
+            return pkType;
+        } else {
+            String splitColumnName = configuration.getString(MySQLSourceOptions.SCAN_SPLIT_COLUMN);
+            Preconditions.checkState(
+                    splitColumnName != null,
+                    "The 'scan.split.column' option is required if the primary key contains multiple fields");
+            return new RowType(
+                    pkType.getFields().stream()
+                            .filter(r -> splitColumnName.equalsIgnoreCase(r.getName()))
+                            .collect(Collectors.toList()));
+        }
+    }
+
     public static String buildSplitBoundaryQuery(
             TableId tableId,
             RowType pkRowType,
             boolean isFirstSplit,
             boolean isLastSplit,
             int maxSplitSize) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, maxSplitSize, true);
+        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, maxSplitSize, false);
     }
 
     public static String buildSplitScanQuery(
             TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, false);
+        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
     }
 
     private static String buildSplitQuery(
@@ -55,15 +84,17 @@ public class StatementUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             int limitSize,
-            boolean onlyScanBoundary) {
+            boolean isScanningData) {
         String condition = null;
 
         if (isFirstSplit) {
             final StringBuilder sql = new StringBuilder();
             addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?");
-            sql.append(" AND NOT (");
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?");
-            sql.append(")");
+            if (isScanningData) {
+                sql.append(" AND NOT (");
+                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?");
+                sql.append(")");
+            }
             condition = sql.toString();
         } else if (isLastSplit) {
             final StringBuilder sql = new StringBuilder();
@@ -72,7 +103,7 @@ public class StatementUtils {
         } else {
             final StringBuilder sql = new StringBuilder();
             addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ?");
-            if (!onlyScanBoundary) {
+            if (isScanningData) {
                 sql.append(" AND NOT (");
                 addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?");
                 sql.append(")");
@@ -83,7 +114,10 @@ public class StatementUtils {
         }
 
         final String orderBy = pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
-        if (onlyScanBoundary) {
+        if (isScanningData) {
+            return buildSelectWithRowLimits(
+                    tableId, limitSize, "*", Optional.ofNullable(condition), orderBy);
+        } else {
             return buildSelectWithBoundaryRowLimits(
                     tableId,
                     limitSize,
@@ -91,9 +125,6 @@ public class StatementUtils {
                     getMaxPrimaryKeyColumnsProjection(pkRowType),
                     Optional.ofNullable(condition),
                     orderBy);
-        } else {
-            return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), orderBy);
         }
     }
 
@@ -111,7 +142,6 @@ public class StatementUtils {
             if (isFirstSplit) {
                 for (int i = 0; i < primaryKeyNum; i++) {
                     statement.setObject(i + 1, maxPrimaryKey[i]);
-                    statement.setObject(i + 1 + primaryKeyNum, maxPrimaryKey[i]);
                 }
             } else if (isLastSplit) {
                 for (int i = 0; i < primaryKeyNum; i++) {

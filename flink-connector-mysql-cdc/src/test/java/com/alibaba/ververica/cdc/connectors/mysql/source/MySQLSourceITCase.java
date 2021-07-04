@@ -58,96 +58,96 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkD
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 
-/**
- * Tests class for {@link MySQLSource}.
- */
+/** IT tests for {@link MySQLSource}. */
 public class MySQLSourceITCase extends MySQLTestBase {
 
     private UniqueDatabase customDatabase =
-        new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
-        testReadMySQLTable(1, new String[]{"customers"});
+        testReadMySQLTable(1, new String[] {"customers"});
     }
 
     @Test
     public void testReadSingleTableWithMultipleParallelism() throws Exception {
-        testReadMySQLTable(4, new String[]{"customers"});
+        testReadMySQLTable(4, new String[] {"customers"});
     }
 
     @Test
     public void testReadMultipleTableWithSingleParallelism() throws Exception {
-        testReadMySQLTable(1, new String[]{"customers", "customers_1"});
+        testReadMySQLTable(1, new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testReadMultipleTableWithMultipleParallelism() throws Exception {
-        testReadMySQLTable(4, new String[]{"customers", "customers_1"});
+        testReadMySQLTable(4, new String[] {"customers", "customers_1"});
     }
 
     public void testReadMySQLTable(int parallelism, String[] captureTables) throws Exception {
         customDatabase.createAndInitialize();
         final DataType dataType =
-            DataTypes.ROW(
-                DataTypes.FIELD("id", DataTypes.BIGINT()),
-                DataTypes.FIELD("name", DataTypes.STRING()),
-                DataTypes.FIELD("address", DataTypes.STRING()),
-                DataTypes.FIELD("phone_number", DataTypes.STRING()));
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
         final RowType pkType =
-            (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
+                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         final DebeziumDeserializationSchema<Row> deserializer = getDeserializationSchema(dataType);
 
         final Configuration configuration = getConfig();
-        List<String> captureTableIds = Arrays.stream(captureTables)
-            .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
-            .collect(Collectors.toList());
+        List<String> captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
+                        .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
         MySQLSource<Row> source = new MySQLSource<>(pkType, deserializer, configuration);
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
         DataStream<Row> stream =
-            env.fromSource(
-                source,
-                WatermarkStrategy.noWatermarks(),
-                "mysql-cdc-parallel-source")
-                // set source readers
-                .setParallelism(parallelism);
+                env.fromSource(
+                                source,
+                                WatermarkStrategy.noWatermarks(),
+                                "mysql-cdc-parallel-source")
+                        // set source readers
+                        .setParallelism(parallelism);
         final CloseableIterator<Row> iterator = stream.executeAndCollect();
 
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
-            new String[]{
-                "+I[101, user_1, Shanghai, 123567891234]",
-                "+I[102, user_2, Shanghai, 123567891234]",
-                "+I[103, user_3, Shanghai, 123567891234]",
-                "+I[109, user_4, Shanghai, 123567891234]",
-                "+I[110, user_5, Shanghai, 123567891234]",
-                "+I[111, user_6, Shanghai, 123567891234]",
-                "+I[118, user_7, Shanghai, 123567891234]",
-                "+I[121, user_8, Shanghai, 123567891234]",
-                "+I[123, user_9, Shanghai, 123567891234]",
-                "+I[1009, user_10, Shanghai, 123567891234]",
-                "+I[1010, user_11, Shanghai, 123567891234]",
-                "+I[1011, user_12, Shanghai, 123567891234]",
-                "+I[1012, user_13, Shanghai, 123567891234]",
-                "+I[1013, user_14, Shanghai, 123567891234]",
-                "+I[1014, user_15, Shanghai, 123567891234]",
-                "+I[1015, user_16, Shanghai, 123567891234]",
-                "+I[1016, user_17, Shanghai, 123567891234]",
-                "+I[1017, user_18, Shanghai, 123567891234]",
-                "+I[1018, user_19, Shanghai, 123567891234]",
-                "+I[1019, user_20, Shanghai, 123567891234]",
-                "+I[2000, user_21, Shanghai, 123567891234]"
-            };
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
 
         List<String> expectedSnapshotData = new ArrayList<>();
         for (int i = 0; i < captureTables.length; i++) {
             expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
         }
         String[] expectedSnapshot = expectedSnapshotData.toArray(new String[0]);
-        assertThat(fetchRow(iterator, expectedSnapshot.length), containsInAnyOrder(expectedSnapshot));
+        assertThat(
+                fetchRow(iterator, expectedSnapshot.length), containsInAnyOrder(expectedSnapshot));
 
         // second step: check the binlog data
         MySqlConnection connection = StatefulTaskContext.getConnection(configuration);
@@ -157,19 +157,19 @@ public class MySQLSourceITCase extends MySQLTestBase {
         }
 
         String[] binlogForSingleTable =
-            new String[]{
-                "-U[103, user_3, Shanghai, 123567891234]",
-                "+U[103, user_3, Hangzhou, 123567891234]",
-                "-D[102, user_2, Shanghai, 123567891234]",
-                "+I[102, user_2, Shanghai, 123567891234]",
-                "-U[103, user_3, Hangzhou, 123567891234]",
-                "+U[103, user_3, Shanghai, 123567891234]",
-                "-U[1010, user_11, Shanghai, 123567891234]",
-                "+U[1010, user_11, Hangzhou, 123567891234]",
-                "+I[2001, user_22, Shanghai, 123567891234]",
-                "+I[2002, user_23, Shanghai, 123567891234]",
-                "+I[2003, user_24, Shanghai, 123567891234]"
-            };
+                new String[] {
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-D[102, user_2, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]",
+                    "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+U[1010, user_11, Hangzhou, 123567891234]",
+                    "+I[2001, user_22, Shanghai, 123567891234]",
+                    "+I[2002, user_23, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]"
+                };
         List<String> expectedBinlogData = new ArrayList<>();
         for (int i = 0; i < captureTables.length; i++) {
             expectedBinlogData.addAll(Arrays.asList(binlogForSingleTable));
@@ -189,30 +189,28 @@ public class MySQLSourceITCase extends MySQLTestBase {
         return rows;
     }
 
-    private void makeBinlogEvents(JdbcConnection connection, String tableId)
-        throws SQLException {
+    private void makeBinlogEvents(JdbcConnection connection, String tableId) throws SQLException {
         // make binlog events for the first split
         try {
             connection.setAutoCommit(false);
             connection.execute(
-                "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                "DELETE FROM " + tableId + " where id = 102",
-                "INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')",
-                "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId + " where id = 102",
+                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
             connection.commit();
 
             // make binlog events for split-1
-            connection.execute(
-                "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 1010");
+            connection.execute("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 1010");
             connection.commit();
 
             // make binlog events for the last split
             connection.execute(
-                "INSERT INTO "
-                    + tableId
-                    + " VALUES(2001, 'user_22','Shanghai','123567891234'),"
-                    + " (2002, 'user_23','Shanghai','123567891234'),"
-                    + "(2003, 'user_24','Shanghai','123567891234')");
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(2001, 'user_22','Shanghai','123567891234'),"
+                            + " (2002, 'user_23','Shanghai','123567891234'),"
+                            + "(2003, 'user_24','Shanghai','123567891234')");
             connection.commit();
         } finally {
             connection.close();
@@ -234,8 +232,8 @@ public class MySQLSourceITCase extends MySQLTestBase {
     }
 
     /**
-     * A {@link DebeziumDeserializationSchema} that deserializes {@link SourceRecord}
-     * to {@link Row}.
+     * A {@link DebeziumDeserializationSchema} that deserializes {@link SourceRecord} to {@link
+     * Row}.
      *
      * <p>This schema is used in test to format the result to be readable.
      */

@@ -19,6 +19,7 @@
 package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 
 import org.apache.flink.api.java.tuple.Tuple5;
+import org.apache.flink.table.types.logical.RowType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
@@ -26,9 +27,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
-import io.debezium.relational.TableSchema;
 import io.debezium.relational.history.HistoryRecord;
-import org.apache.kafka.connect.data.Field;
+import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -56,6 +56,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /** Utility class to deal record. */
 public class RecordUtils {
+
+    private RecordUtils() {}
 
     public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
             "io.debezium.connector.mysql.SchemaChangeKey";
@@ -281,14 +283,12 @@ public class RecordUtils {
         return new TableId(dbName, null, tableName);
     }
 
-    public static Object[] getPrimaryKey(SourceRecord dataRecord, TableSchema tableSchema) {
-        List<Field> keyFields = tableSchema.keySchema().fields();
-        Object[] key = new Object[keyFields.size()];
-        Struct keyStruct = (Struct) dataRecord.key();
-        for (int i = 0; i < keyFields.size(); i++) {
-            key[i] = keyStruct.get(keyFields.get(i));
-        }
-        return key;
+    public static Object[] getSplitKey(
+            RowType splitBoundaryType, SourceRecord dataRecord, SchemaNameAdjuster nameAdjuster) {
+        // the split key field contains single field now
+        String splitFieldName = nameAdjuster.adjust(splitBoundaryType.getFieldNames().get(0));
+        Struct key = (Struct) dataRecord.key();
+        return new Object[] {key.get(splitFieldName)};
     }
 
     public static BinlogPosition getBinlogPosition(SourceRecord dataRecord) {

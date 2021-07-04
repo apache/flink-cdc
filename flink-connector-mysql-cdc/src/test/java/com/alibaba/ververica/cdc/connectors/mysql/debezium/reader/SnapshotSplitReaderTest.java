@@ -32,6 +32,7 @@ import org.apache.flink.util.Collector;
 import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -70,8 +71,14 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
 
     @Test
     public void testReadSingleSnapshotSplit() throws Exception {
-        Configuration configuration = getConfig();
-        RowType pkType =
+        Configuration configuration = getConfig(new String[] {"customers"});
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
 
@@ -87,14 +94,20 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                     "+I[121, user_8, Shanghai, 123567891234]",
                     "+I[123, user_9, Shanghai, 123567891234]"
                 };
-        List<String> actual = readTableSnapshotSplits(mySQLSplits, configuration, 1);
+        List<String> actual = readTableSnapshotSplits(mySQLSplits, configuration, 1, dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
     @Test
-    public void testReadAllSnapshotSplits() throws Exception {
-        Configuration configuration = getConfig();
-        RowType pkType =
+    public void testReadAllSnapshotSplitsForOneTable() throws Exception {
+        Configuration configuration = getConfig(new String[] {"customers"});
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
 
@@ -123,15 +136,89 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
         List<String> actual =
-                readTableSnapshotSplits(mySQLSplits, configuration, mySQLSplits.size());
+                readTableSnapshotSplits(mySQLSplits, configuration, mySQLSplits.size(), dataType);
+        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+    }
+
+    @Test
+    public void testReadAllSplitForTableWithSingleLine() throws Exception {
+        Configuration configuration = getConfig(new String[] {"customer_card_single_line"});
+        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                        DataTypes.FIELD("level", DataTypes.STRING()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("note", DataTypes.STRING()));
+        final RowType pkType =
+                (RowType)
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                                        DataTypes.FIELD("level", DataTypes.STRING()))
+                                .getLogicalType();
+        List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
+        String[] expected = new String[] {"+I[20001, LEVEL_1, user_1, user with level 1]"};
+        List<String> actual =
+                readTableSnapshotSplits(mySQLSplits, configuration, mySQLSplits.size(), dataType);
+        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+    }
+
+    @Test
+    public void testReadAllSnapshotSplitsForTables() throws Exception {
+        Configuration configuration =
+                getConfig(new String[] {"customer_card", "customer_card_single_line"});
+        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                        DataTypes.FIELD("level", DataTypes.STRING()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("note", DataTypes.STRING()));
+        RowType pkType =
+                (RowType)
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                                        DataTypes.FIELD("level", DataTypes.STRING()))
+                                .getLogicalType();
+        List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
+
+        String[] expected =
+                new String[] {
+                    "+I[20001, LEVEL_1, user_1, user with level 1]",
+                    "+I[20001, LEVEL_4, user_1, user with level 4]",
+                    "+I[20002, LEVEL_4, user_2, user with level 4]",
+                    "+I[20003, LEVEL_4, user_3, user with level 4]",
+                    "+I[20004, LEVEL_1, user_4, user with level 4]",
+                    "+I[20004, LEVEL_2, user_4, user with level 4]",
+                    "+I[20004, LEVEL_3, user_4, user with level 4]",
+                    "+I[20004, LEVEL_4, user_4, user with level 4]",
+                    "+I[30006, LEVEL_3, user_5, user with level 3]",
+                    "+I[30007, LEVEL_3, user_6, user with level 3]",
+                    "+I[30008, LEVEL_3, user_7, user with level 3]",
+                    "+I[30009, LEVEL_1, user_8, user with level 3]",
+                    "+I[30009, LEVEL_2, user_8, user with level 3]",
+                    "+I[30009, LEVEL_3, user_8, user with level 3]",
+                    "+I[40001, LEVEL_2, user_9, user with level 2]",
+                    "+I[40002, LEVEL_2, user_10, user with level 2]",
+                    "+I[40003, LEVEL_2, user_11, user with level 2]",
+                    "+I[50001, LEVEL_1, user_12, user with level 1]",
+                    "+I[50002, LEVEL_1, user_13, user with level 1]",
+                    "+I[50003, LEVEL_1, user_14, user with level 1]",
+                };
+        List<String> actual =
+                readTableSnapshotSplits(mySQLSplits, configuration, mySQLSplits.size(), dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
     private List<String> readTableSnapshotSplits(
-            List<MySQLSplit> mySQLSplits, Configuration configuration, int scanSplitsNum)
+            List<MySQLSplit> mySQLSplits,
+            Configuration configuration,
+            int scanSplitsNum,
+            DataType dataType)
             throws Exception {
         final BinaryLogClient binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
         final MySqlConnection mySqlConnection = StatefulTaskContext.getConnection(configuration);
+
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
         SnapshotSplitReader snapshotSplitReader = new SnapshotSplitReader(statefulTaskContext, 0);
@@ -151,16 +238,10 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
             }
         }
 
-        return formatResult(result);
+        return formatResult(result, dataType);
     }
 
-    private List<String> formatResult(List<SourceRecord> records) {
-        final DataType dataType =
-                DataTypes.ROW(
-                        DataTypes.FIELD("id", DataTypes.BIGINT()),
-                        DataTypes.FIELD("name", DataTypes.STRING()),
-                        DataTypes.FIELD("address", DataTypes.STRING()),
-                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+    private List<String> formatResult(List<SourceRecord> records, DataType dataType) {
         final RowType rowType = (RowType) dataType.getLogicalType();
         final TypeInformation<RowData> typeInfo =
                 (TypeInformation<RowData>) TypeConversions.fromDataTypeToLegacyInfo(dataType);
@@ -178,7 +259,7 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                             try {
                                 deserializationSchema.deserialize(r, collector);
                             } catch (Exception e) {
-                                e.printStackTrace();
+                                throw new RuntimeException(e);
                             }
                         });
         return collector.list.stream()
@@ -206,13 +287,14 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
         return mySQLSplitList;
     }
 
-    private Configuration getConfig() {
+    private Configuration getConfig(String[] captureTables) {
         Map<String, String> properties = new HashMap<>();
         properties.put("database.server.name", "embedded-test");
         properties.put("database.hostname", MYSQL_CONTAINER.getHost());
         properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
         properties.put("database.user", customDatabase.getUsername());
         properties.put("database.password", customDatabase.getPassword());
+        properties.put("database.whitelist", customDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
         properties.put("server-id-range", "1001, 1002");
         properties.put("scan.split.size", "10");
@@ -221,6 +303,11 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
         properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
+        List<String> captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
+                        .collect(Collectors.toList());
+        properties.put("table.whitelist", String.join(",", captureTableIds));
         return Configuration.fromMap(properties);
     }
 

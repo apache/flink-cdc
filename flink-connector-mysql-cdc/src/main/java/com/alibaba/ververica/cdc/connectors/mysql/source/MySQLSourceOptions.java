@@ -106,6 +106,16 @@ public class MySQLSourceOptions {
                     .defaultValue(8096)
                     .withDescription("The split size used to cut splits for table.");
 
+    public static final ConfigOption<String> SCAN_SPLIT_COLUMN =
+            ConfigOptions.key("scan.split.column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The single column used to cut splits for table,"
+                                    + " the default value is primary key. If the primary key contains"
+                                    + " multiple columns, this option is required to configure,"
+                                    + " the configured column should make the splits as small as possible.");
+
     public static final ConfigOption<Integer> SCAN_FETCH_SIZE =
             ConfigOptions.key("scan.fetch.size")
                     .intType()
