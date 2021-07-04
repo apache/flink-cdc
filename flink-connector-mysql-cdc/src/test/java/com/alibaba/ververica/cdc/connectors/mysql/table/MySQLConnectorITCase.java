@@ -201,6 +201,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + "    small_un_c INT,\n"
                                 + "    int_c INT ,\n"
                                 + "    int_un_c BIGINT,\n"
+                                + "    int11_c BIGINT,\n"
                                 + "    big_c BIGINT,\n"
                                 + "    varchar_c STRING,\n"
                                 + "    char_c STRING,\n"
@@ -241,6 +242,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         + "    small_un_c INT,\n"
                         + "    int_c INT ,\n"
                         + "    int_un_c BIGINT,\n"
+                        + "    int11_c BIGINT,\n"
                         + "    big_c BIGINT,\n"
                         + "    varchar_c STRING,\n"
                         + "    char_c STRING,\n"
@@ -272,6 +274,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + "small_un_c,\n"
                                 + "int_c,\n"
                                 + "int_un_c,\n"
+                                + "int11_c,\n"
                                 + "big_c,\n"
                                 + "varchar_c,\n"
                                 + "char_c,\n"
@@ -300,13 +303,13 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(1,127,255,32767,65535,2147483647,4294967295,9223372036854775807,Hello World,abc,"
+                        "+I(1,127,255,32767,65535,2147483647,4294967295,2147483647,9223372036854775807,Hello World,abc,"
                                 + "123.102,404.4443,123.4567,346,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,"
                                 + "2020-07-17T18:00:22.123456,2020-07-17T18:00:22,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)",
-                        "-U(1,127,255,32767,65535,2147483647,4294967295,9223372036854775807,Hello World,abc,"
+                        "-U(1,127,255,32767,65535,2147483647,4294967295,2147483647,9223372036854775807,Hello World,abc,"
                                 + "123.102,404.4443,123.4567,346,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,"
                                 + "2020-07-17T18:00:22.123456,2020-07-17T18:00:22,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)",
-                        "+U(1,127,255,32767,65535,2147483647,4294967295,9223372036854775807,Hello World,abc,"
+                        "+U(1,127,255,32767,65535,2147483647,4294967295,2147483647,9223372036854775807,Hello World,abc,"
                                 + "123.102,404.4443,123.4567,346,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,"
                                 + "2020-07-17T18:00:22.123456,2020-07-17T18:33:22,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
