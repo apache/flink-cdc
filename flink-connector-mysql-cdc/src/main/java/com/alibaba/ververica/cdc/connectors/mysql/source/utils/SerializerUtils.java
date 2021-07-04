@@ -36,6 +36,8 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogP
 /** Utils for serialization/deserialization. */
 public class SerializerUtils {
 
+    private SerializerUtils() {}
+
     public static void writeBinlogPosition(BinlogPosition offset, DataOutputSerializer out)
             throws IOException {
         out.writeBoolean(offset != null);

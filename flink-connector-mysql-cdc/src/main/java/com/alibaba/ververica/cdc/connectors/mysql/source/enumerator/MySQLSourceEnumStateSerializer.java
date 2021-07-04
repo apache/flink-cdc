@@ -198,6 +198,7 @@ public class MySQLSourceEnumStateSerializer
         for (int i = 0; i < size; i++) {
             int splitBytesLen = in.readInt();
             byte[] splitBytes = new byte[splitBytesLen];
+            in.read(splitBytes);
             MySQLSplit mySQLSplit = splitSerializer.deserialize(getVersion(), splitBytes);
             mySQLSplits.add(mySQLSplit);
         }

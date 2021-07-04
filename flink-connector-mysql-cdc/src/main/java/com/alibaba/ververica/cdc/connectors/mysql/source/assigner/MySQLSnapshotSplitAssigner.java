@@ -20,6 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.assigner;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
@@ -57,6 +58,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.S
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.rowToArray;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMaxPrimaryKeyQuery;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildSplitBoundaryQuery;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.getSplitKey;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.readTableSplitStatement;
 
@@ -69,14 +71,14 @@ public class MySQLSnapshotSplitAssigner {
             new JsonTableChangeSerializer();
     private final Collection<TableId> alreadyProcessedTables;
     private final Collection<MySQLSplit> remainingSplits;
-    private final RowType pkRowType;
     private final Configuration configuration;
     private final int splitSize;
+    private final RowType splitKeyType;
 
     private Collection<TableId> capturedTables;
     private TableId currentTableId;
     private int currentTableSplitSeq;
-    private Object[] currentTableMaxPrimaryKey;
+    private Object[] currentTableMaxSplitKey;
     private RelationalTableFilters tableFilters;
     private MySqlConnection jdbc;
     private Map<TableId, HistoryRecord> cachedTableSchemas;
@@ -88,10 +90,15 @@ public class MySQLSnapshotSplitAssigner {
             Collection<TableId> alreadyProcessedTables,
             Collection<MySQLSplit> remainingSplits) {
         this.configuration = configuration;
-        this.pkRowType = pkRowType;
+        this.splitKeyType = getSplitKey(configuration, pkRowType);
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.splitSize = configuration.getInteger(MySQLSourceOptions.SCAN_SPLIT_SIZE);
+        Preconditions.checkState(
+                splitSize > 1,
+                String.format(
+                        "The value of option 'scan.split.size' must bigger than 1, but is %d",
+                        splitSize));
         this.cachedTableSchemas = new HashMap<>();
     }
 
@@ -151,6 +158,7 @@ public class MySQLSnapshotSplitAssigner {
         while ((nextSplit = getNextSplit(prevSplit)) != null) {
             remainingSplits.add(nextSplit);
             prevSplit = nextSplit;
+            splitCnt++;
             if (splitCnt % 100 == 0) {
                 try {
                     Thread.sleep(3_000);
@@ -162,7 +170,6 @@ public class MySQLSnapshotSplitAssigner {
                 }
                 LOGGER.info("Has analyze {} splits for table {} ", splitCnt, currentTableId);
             }
-            splitCnt++;
         }
         LOGGER.info("Finish to analyze splits for table {} ", currentTableId);
 
@@ -176,14 +183,14 @@ public class MySQLSnapshotSplitAssigner {
         Object[] prevSplitEnd;
         if (isFirstSplit) {
             try {
-                currentTableMaxPrimaryKey =
+                currentTableMaxSplitKey =
                         jdbc.queryAndMap(
-                                buildMaxPrimaryKeyQuery(currentTableId, pkRowType),
+                                buildMaxPrimaryKeyQuery(currentTableId, splitKeyType),
                                 rs -> {
                                     if (!rs.next()) {
                                         return null;
                                     }
-                                    return rowToArray(rs, pkRowType.getFieldCount());
+                                    return rowToArray(rs, splitKeyType.getFieldCount());
                                 });
             } catch (SQLException e) {
                 LOGGER.error(
@@ -193,7 +200,7 @@ public class MySQLSnapshotSplitAssigner {
             prevSplitEnd = null;
         } else {
             prevSplitEnd = prevSplit.getSplitBoundaryEnd();
-            if (Arrays.equals(prevSplitEnd, currentTableMaxPrimaryKey)) {
+            if (Arrays.equals(prevSplitEnd, currentTableMaxSplitKey)) {
                 isLastSplit = true;
             }
 
@@ -203,49 +210,63 @@ public class MySQLSnapshotSplitAssigner {
             }
         }
 
-        String splitBoundaryQuery =
-                buildSplitBoundaryQuery(
-                        currentTableId, pkRowType, isFirstSplit, isLastSplit, splitSize);
-
-        try (PreparedStatement statement =
-                        readTableSplitStatement(
-                                jdbc,
-                                splitBoundaryQuery,
-                                isFirstSplit,
-                                isLastSplit,
-                                currentTableMaxPrimaryKey,
-                                prevSplitEnd,
-                                pkRowType.getFieldCount(),
-                                1);
-                ResultSet rs = statement.executeQuery()) {
-            if (!rs.next()) {
-                return null;
+        Object[] splitEnd = null;
+        int stepSize = splitSize;
+        while (true) {
+            String splitBoundaryQuery =
+                    buildSplitBoundaryQuery(
+                            currentTableId, splitKeyType, isFirstSplit, isLastSplit, stepSize);
+            try (PreparedStatement statement =
+                            readTableSplitStatement(
+                                    jdbc,
+                                    splitBoundaryQuery,
+                                    isFirstSplit,
+                                    isLastSplit,
+                                    currentTableMaxSplitKey,
+                                    prevSplitEnd,
+                                    splitKeyType.getFieldCount(),
+                                    1);
+                    ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                splitEnd = isLastSplit ? null : rowToArray(rs, splitKeyType.getFieldCount());
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Read split end of table  " + currentTableId + " failed", e);
             }
-            Object[] splitEnd = isLastSplit ? null : rowToArray(rs, pkRowType.getFieldCount());
-            Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
-            // cache for optimization
-            if (!cachedTableSchemas.containsKey(currentTableId)) {
-                cachedTableSchemas.putAll(getTableSchema());
+            // if the primary key contains multiple field, the the split key may duplicated,
+            // try to find a valid key.
+            if (isFirstSplit || isLastSplit) {
+                break;
+            } else if (Arrays.equals(prevSplitEnd, splitEnd)) {
+                stepSize = stepSize + splitSize;
+                continue;
+            } else {
+                break;
             }
-            databaseHistory.put(currentTableId, cachedTableSchemas.get(currentTableId));
-
-            return new MySQLSplit(
-                    MySQLSplitKind.SNAPSHOT,
-                    currentTableId,
-                    createSplitId(),
-                    pkRowType,
-                    prevSplitEnd,
-                    splitEnd,
-                    null,
-                    null,
-                    false,
-                    INITIAL_OFFSET,
-                    new ArrayList<>(),
-                    databaseHistory);
-        } catch (Exception e) {
-            throw new IllegalStateException(
-                    "Read split end of table  " + currentTableId + " failed", e);
         }
+
+        Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
+        // cache for optimization
+        if (!cachedTableSchemas.containsKey(currentTableId)) {
+            cachedTableSchemas.putAll(getTableSchema());
+        }
+        databaseHistory.put(currentTableId, cachedTableSchemas.get(currentTableId));
+
+        return new MySQLSplit(
+                MySQLSplitKind.SNAPSHOT,
+                currentTableId,
+                createSplitId(),
+                splitKeyType,
+                prevSplitEnd,
+                splitEnd,
+                null,
+                null,
+                false,
+                INITIAL_OFFSET,
+                new ArrayList<>(),
+                databaseHistory);
     }
 
     private String createSplitId() {

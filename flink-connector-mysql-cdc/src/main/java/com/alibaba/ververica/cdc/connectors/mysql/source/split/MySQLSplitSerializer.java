@@ -58,8 +58,6 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
     private static final ThreadLocal<DocumentReader> DOCUMENT_READER =
             ThreadLocal.withInitial(DocumentReader::defaultReader);
 
-    private MySQLSplitSerializer() {}
-
     @Override
     public int getVersion() {
         return VERSION;
