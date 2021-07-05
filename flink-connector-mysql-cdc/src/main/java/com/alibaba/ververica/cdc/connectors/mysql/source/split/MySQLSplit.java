@@ -23,8 +23,8 @@ import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 
 import javax.annotation.Nullable;
 
@@ -56,7 +56,7 @@ public class MySQLSplit implements SourceSplit {
     // TODO: The databaseHistory can be shared in splitReader for all snapshot splits
     //  rather than here. In that way, we can deal schema change well even during
     //  snapshotting phase. Now, both snapshot split and binlog split need this field.
-    private final Map<TableId, HistoryRecord> databaseHistory;
+    private final Map<TableId, SchemaRecord> databaseHistory;
     /**
      * The splits are frequently serialized into checkpoints. Caching the byte representation makes
      * repeated serialization cheap. This field is used by {@link MySQLSplitSerializer}.
@@ -75,7 +75,7 @@ public class MySQLSplit implements SourceSplit {
             boolean snapshotReadFinished,
             @Nullable BinlogPosition offset,
             List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo,
-            Map<TableId, HistoryRecord> databaseHistory) {
+            Map<TableId, SchemaRecord> databaseHistory) {
         this.splitKind = splitKind;
         this.tableId = tableId;
         this.splitId = splitId;
@@ -144,7 +144,7 @@ public class MySQLSplit implements SourceSplit {
         return finishedSplitsInfo;
     }
 
-    public Map<TableId, HistoryRecord> getDatabaseHistory() {
+    public Map<TableId, SchemaRecord> getDatabaseHistory() {
         return databaseHistory;
     }
 

@@ -19,8 +19,8 @@
 package com.alibaba.ververica.cdc.connectors.mysql.source.split;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 
 import javax.annotation.Nullable;
 
@@ -38,7 +38,7 @@ public final class MySQLSplitState extends MySQLSplit {
     private BinlogPosition offsetState;
     private boolean snapshotReadFinishedState;
 
-    @Nullable private Map<TableId, HistoryRecord> databaseHistoryState;
+    @Nullable private Map<TableId, SchemaRecord> databaseHistoryState;
 
     public MySQLSplitState(MySQLSplit split) {
         super(
@@ -79,11 +79,11 @@ public final class MySQLSplitState extends MySQLSplit {
     }
 
     @Nullable
-    public Map<TableId, HistoryRecord> getDatabaseHistoryState() {
+    public Map<TableId, SchemaRecord> getDatabaseHistoryState() {
         return databaseHistoryState;
     }
 
-    public void recordSchemaHistory(TableId tableId, HistoryRecord latestSchemaChange) {
+    public void recordSchemaHistory(TableId tableId, SchemaRecord latestSchemaChange) {
         this.databaseHistoryState.put(tableId, latestSchemaChange);
     }
 

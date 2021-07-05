@@ -19,10 +19,13 @@
 package com.alibaba.ververica.cdc.debezium.internal;
 
 import io.debezium.document.Document;
+import io.debezium.document.DocumentWriter;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import javax.annotation.Nullable;
+
+import java.io.IOException;
 
 /**
  * The Record represents a schema change event, it contains either one {@link HistoryRecord} or
@@ -30,7 +33,7 @@ import javax.annotation.Nullable;
  *
  * <p>The {@link HistoryRecord} will be used by {@link FlinkDatabaseHistory} which keeps full
  * history of table change events for all tables, the {@link TableChange} will be used by {@link
- * FlinkDatabaseSchemaHistory} which keeps the latest latest table change for each table.
+ * FlinkDatabaseSchemaHistory} which keeps the latest table change for each table.
  */
 public class SchemaRecord {
 
@@ -76,6 +79,15 @@ public class SchemaRecord {
             return historyRecord.document();
         } else {
             return tableChangeDoc;
+        }
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return DocumentWriter.defaultWriter().write(toDocument());
+        } catch (IOException e) {
+            return super.toString();
         }
     }
 

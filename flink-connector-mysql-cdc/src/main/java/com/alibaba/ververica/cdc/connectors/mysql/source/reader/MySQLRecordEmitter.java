@@ -25,6 +25,7 @@ import org.apache.flink.util.Collector;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.JsonTableChangeSerializer;
@@ -79,7 +80,7 @@ public final class MySQLRecordEmitter<T>
             for (TableChanges.TableChange tableChange : changes) {
                 splitState.recordSchemaHistory(
                         tableChange.getId(),
-                        new HistoryRecord(TABLE_CHANGE_SERIALIZER.toDocument(tableChange)));
+                        new SchemaRecord(TABLE_CHANGE_SERIALIZER.toDocument(tableChange)));
             }
         } else if (isDataChangeRecord(element)) {
             BinlogPosition position = getBinlogPosition(element);

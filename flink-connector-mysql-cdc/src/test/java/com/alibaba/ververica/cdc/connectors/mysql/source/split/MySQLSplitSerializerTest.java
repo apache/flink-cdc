@@ -24,10 +24,10 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.VarCharType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -97,7 +97,7 @@ public class MySQLSplitSerializerTest {
                         null,
                         new BinlogPosition("mysql-bin.000001", 800L)));
 
-        final Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
+        final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         databaseHistory.put(tableId, getTestHistoryRecord());
 
         final MySQLSplit split =
@@ -145,7 +145,7 @@ public class MySQLSplitSerializerTest {
         return sqlSplitSerializer.deserializeV1(serialized);
     }
 
-    public static HistoryRecord getTestHistoryRecord() throws Exception {
+    public static SchemaRecord getTestHistoryRecord() throws Exception {
         // the json string of a TableChange
         final String tableChangeJsonStr =
                 "{\"type\":\"CREATE\",\"id\":\"\\\"test_db\\\".\\\"test_table\\\"\","
@@ -163,7 +163,7 @@ public class MySQLSplitSerializerTest {
                         + "\"typeExpression\":\"VARCHAR\",\"charsetName\":\"latin1\",\"length\":1024,"
                         + "\"position\":4,\"optional\":true,\"autoIncremented\":false,\"generated\":false}]}}";
         final Document tableChange = DocumentReader.defaultReader().read(tableChangeJsonStr);
-        return new HistoryRecord(tableChange);
+        return new SchemaRecord(tableChange);
     }
 
     public static void assertSplitsEqual(MySQLSplit expected, MySQLSplit actual) {

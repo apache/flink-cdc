@@ -24,6 +24,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabase
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -47,7 +48,6 @@ import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.AbstractDatabaseHistory;
-import io.debezium.relational.history.HistoryRecord;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
@@ -78,7 +78,7 @@ public class StatefulTaskContext {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(StatefulTaskContext.class);
     private static final Clock clock = Clock.SYSTEM;
-    private static final ConcurrentMap<String, Collection<HistoryRecord>> SCHEMA_HISTORY =
+    private static final ConcurrentMap<String, Collection<SchemaRecord>> SCHEMA_HISTORY =
             new ConcurrentHashMap<>();
 
     private final io.debezium.config.Configuration dezConf;
@@ -350,11 +350,11 @@ public class StatefulTaskContext {
     public static final class SchemaStateUtils {
 
         public static void registerHistory(
-                String engineName, Collection<HistoryRecord> engineHistory) {
+                String engineName, Collection<SchemaRecord> engineHistory) {
             SCHEMA_HISTORY.put(engineName, engineHistory);
         }
 
-        public static Collection<HistoryRecord> retrieveHistory(String engineName) {
+        public static Collection<SchemaRecord> retrieveHistory(String engineName) {
             return SCHEMA_HISTORY.getOrDefault(engineName, Collections.emptyList());
         }
 

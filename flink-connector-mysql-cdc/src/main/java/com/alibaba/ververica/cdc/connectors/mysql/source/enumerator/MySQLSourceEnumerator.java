@@ -31,8 +31,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorReques
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.SourceReaderReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -196,7 +196,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
 
         final List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> snapshotSplits =
                 new ArrayList<>();
-        final Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
+        final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
 
         BinlogPosition minBinlogOffset = receiveSnapshotSplits.get(0).f1;
         for (int i = 0; i < assignedSnapshotSplit.size(); i++) {
