@@ -26,10 +26,11 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
+import io.debezium.document.DocumentWriter;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,6 +55,9 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
     private static final ThreadLocal<DataInputDeserializer> DESERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataInputDeserializer());
+
+    private static final ThreadLocal<DocumentWriter> DOCUMENT_WRITER =
+            ThreadLocal.withInitial(DocumentWriter::defaultWriter);
 
     private static final ThreadLocal<DocumentReader> DOCUMENT_READER =
             ThreadLocal.withInitial(DocumentReader::defaultReader);
@@ -134,7 +138,7 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
             BinlogPosition lowWatermark = readBinlogPosition(in);
             BinlogPosition highWatermark = readBinlogPosition(in);
             boolean isSnapshotReadFinished = in.readBoolean();
-            Map<TableId, HistoryRecord> databaseHistory = readDatabaseHistory(in);
+            Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
 
             in.releaseArrays();
             return new MySQLSplit(
@@ -154,7 +158,7 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
             BinlogPosition offset = readBinlogPosition(in);
             List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
                     readFinishedSplitsInfo(in);
-            Map<TableId, HistoryRecord> databaseHistory = readDatabaseHistory(in);
+            Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
             in.releaseArrays();
             return new MySQLSplit(
                     splitKind,
@@ -173,24 +177,24 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
     }
 
     private static void writeDatabaseHistory(
-            Map<TableId, HistoryRecord> databaseHistory, DataOutputSerializer out)
+            Map<TableId, SchemaRecord> databaseHistory, DataOutputSerializer out)
             throws IOException {
         final int size = databaseHistory.size();
         out.writeInt(size);
-        for (Map.Entry<TableId, HistoryRecord> entry : databaseHistory.entrySet()) {
+        for (Map.Entry<TableId, SchemaRecord> entry : databaseHistory.entrySet()) {
             out.writeUTF(entry.getKey().toString());
-            out.writeUTF(entry.getValue().toString());
+            out.writeUTF(DOCUMENT_WRITER.get().write(entry.getValue().toDocument()));
         }
     }
 
-    private static Map<TableId, HistoryRecord> readDatabaseHistory(DataInputDeserializer in)
+    private static Map<TableId, SchemaRecord> readDatabaseHistory(DataInputDeserializer in)
             throws IOException {
-        Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
+        Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             TableId tableId = TableId.parse(in.readUTF());
             Document document = DOCUMENT_READER.get().read(in.readUTF());
-            HistoryRecord historyRecord = new HistoryRecord(document);
+            SchemaRecord historyRecord = new SchemaRecord(document);
             databaseHistory.put(tableId, historyRecord);
         }
         return databaseHistory;

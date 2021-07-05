@@ -28,8 +28,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializer;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -160,7 +160,7 @@ public class MySQLSourceEnumStateSerializerTest {
                         null,
                         new BinlogPosition("mysql-bin.000001", 400L)));
 
-        final Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
+        final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         databaseHistory.put(tableId, getTestHistoryRecord());
         return new MySQLSplit(
                 MySQLSplitKind.BINLOG,

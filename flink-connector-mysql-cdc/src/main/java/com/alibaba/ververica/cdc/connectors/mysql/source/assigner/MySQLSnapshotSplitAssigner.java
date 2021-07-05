@@ -26,13 +26,13 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.Stateful
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.schema.SchemaChangeEvent;
@@ -81,7 +81,7 @@ public class MySQLSnapshotSplitAssigner {
     private Object[] currentTableMaxSplitKey;
     private RelationalTableFilters tableFilters;
     private MySqlConnection jdbc;
-    private Map<TableId, HistoryRecord> cachedTableSchemas;
+    private Map<TableId, SchemaRecord> cachedTableSchemas;
     private MySqlDatabaseSchema databaseSchema;
 
     public MySQLSnapshotSplitAssigner(
@@ -247,7 +247,7 @@ public class MySQLSnapshotSplitAssigner {
             }
         }
 
-        Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
+        Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         // cache for optimization
         if (!cachedTableSchemas.containsKey(currentTableId)) {
             cachedTableSchemas.putAll(getTableSchema());
@@ -375,8 +375,8 @@ public class MySQLSnapshotSplitAssigner {
         }
     }
 
-    private Map<TableId, HistoryRecord> getTableSchema() {
-        Map<TableId, HistoryRecord> historyRecords = new HashMap<>();
+    private Map<TableId, SchemaRecord> getTableSchema() {
+        Map<TableId, SchemaRecord> historyRecords = new HashMap<>();
         try {
 
             jdbc.query(
@@ -397,10 +397,10 @@ public class MySQLSnapshotSplitAssigner {
                             for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
                                 for (TableChanges.TableChange tableChange :
                                         schemaChangeEvent.getTableChanges()) {
-                                    HistoryRecord historyRecord =
-                                            new HistoryRecord(
+                                    SchemaRecord schemaRecord =
+                                            new SchemaRecord(
                                                     tableChangesSerializer.toDocument(tableChange));
-                                    historyRecords.put(currentTableId, historyRecord);
+                                    historyRecords.put(currentTableId, schemaRecord);
                                 }
                             }
                         }

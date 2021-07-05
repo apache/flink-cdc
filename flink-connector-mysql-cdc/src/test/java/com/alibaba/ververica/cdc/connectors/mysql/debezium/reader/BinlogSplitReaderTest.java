@@ -41,12 +41,12 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.HistoryRecord;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
@@ -286,7 +286,7 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
                 getFinishedSplitsInfo(sqlSplits, fetchedRecords);
         BinlogPosition startOffset = getStartOffsetOfBinlogSplit(finishedSplitsInfo);
-        Map<TableId, HistoryRecord> databaseHistory = new HashMap<>();
+        Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         TableId tableId = null;
         for (MySQLSplit mySQLSplit : sqlSplits) {
             databaseHistory.putAll(mySQLSplit.getDatabaseHistory());

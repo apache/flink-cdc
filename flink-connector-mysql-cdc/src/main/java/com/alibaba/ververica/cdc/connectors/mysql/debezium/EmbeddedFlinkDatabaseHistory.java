@@ -20,6 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.debezium;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
+import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -51,7 +52,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     private final JsonTableChangeSerializer tableChangesSerializer =
             new JsonTableChangeSerializer();
 
-    private ConcurrentMap<TableId, HistoryRecord> tables;
+    private ConcurrentMap<TableId, SchemaRecord> latestTables;
     private String instanceName;
     private DatabaseHistoryListener listener;
     private boolean storeOnlyMonitoredTablesDdl;
@@ -71,15 +72,15 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
         this.useCatalogBeforeSchema = useCatalogBeforeSchema;
 
         // recover
-        this.tables = new ConcurrentHashMap<>();
-        for (HistoryRecord record : retrieveHistory(instanceName)) {
+        this.latestTables = new ConcurrentHashMap<>();
+        for (SchemaRecord record : retrieveHistory(instanceName)) {
             TableChanges.TableChange tableChange =
                     JsonTableChangeSerializer.fromDocument(
-                            record.document(), useCatalogBeforeSchema);
-            tables.put(tableChange.getId(), record);
+                            record.toDocument(), useCatalogBeforeSchema);
+            latestTables.put(tableChange.getId(), record);
         }
         // register
-        registerHistory(instanceName, tables.values());
+        registerHistory(instanceName, latestTables.values());
     }
 
     @Override
@@ -110,12 +111,12 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
             switch (change.getType()) {
                 case CREATE:
                 case ALTER:
-                    tables.put(
+                    latestTables.put(
                             change.getId(),
-                            new HistoryRecord(tableChangesSerializer.toDocument(change)));
+                            new SchemaRecord(tableChangesSerializer.toDocument(change)));
                     break;
                 case DROP:
-                    tables.remove(change.getId());
+                    latestTables.remove(change.getId());
                     break;
                 default:
                     // impossible
@@ -130,10 +131,10 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     public void recover(
             Map<String, ?> source, Map<String, ?> position, Tables schema, DdlParser ddlParser) {
         listener.recoveryStarted();
-        for (HistoryRecord record : tables.values()) {
+        for (SchemaRecord record : latestTables.values()) {
             TableChanges.TableChange tableChange =
                     JsonTableChangeSerializer.fromDocument(
-                            record.document(), useCatalogBeforeSchema);
+                            record.toDocument(), useCatalogBeforeSchema);
             schema.overwriteTable(tableChange.getTable());
         }
         listener.recoveryStopped();
@@ -149,7 +150,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
 
     @Override
     public boolean exists() {
-        return tables != null && !tables.isEmpty();
+        return latestTables != null && !latestTables.isEmpty();
     }
 
     @Override
