@@ -38,8 +38,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.MySQLSourceTest.currentMySQLLatestOffset;
@@ -63,24 +63,37 @@ public class MySQLConnectorITCase extends MySQLTestBase {
             StreamTableEnvironment.create(
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
-    // use legacy debezium mysql connector or not
-    private final boolean useLegacyImplementation;
+    // the debezium mysql connector use legacy implementation or not
+    private final boolean useLegacyDezMySQL;
+
+    // enable the parallelRead(i.e: The new source MySQLParallelSource)
+    private final boolean parallelRead;
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    public MySQLConnectorITCase(boolean useLegacyImplementation) {
-        this.useLegacyImplementation = useLegacyImplementation;
+    public MySQLConnectorITCase(boolean useLegacyDezMySQL, boolean parallelRead) {
+        this.useLegacyDezMySQL = useLegacyDezMySQL;
+        this.parallelRead = parallelRead;
     }
 
-    @Parameterized.Parameters(name = "useLegacyImplementation: {0}")
-    public static Collection<Boolean> parameters() {
-        return Arrays.asList(false, true);
+    @Parameterized.Parameters(name = "useLegacyDezImpl: {0}, parallelRead: {1}")
+    public static Object[] parameters() {
+        return new Object[][] {
+            //            new Object[] {true, false},
+            //            new Object[] {false, false},
+            // the parallel read is base on new Debezium implementation
+            new Object[] {false, true}
+        };
     }
 
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.setParallelism(1);
+        if (parallelRead) {
+            env.setParallelism(4);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     @Test
@@ -93,7 +106,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -102,7 +116,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.internal.implementation' = '%s'"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'snapshot.parallel-scan' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.split.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -110,7 +127,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        getImplementation());
+                        getDezImplementation(),
+                        parallelRead,
+                        getServerId(),
+                        getSplitSize());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -215,7 +235,8 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + "    datetime3_c TIMESTAMP(3),\n"
                                 + "    datetime6_c TIMESTAMP(6),\n"
                                 + "    timestamp_c TIMESTAMP(0),\n"
-                                + "    file_uuid BYTES\n"
+                                + "    file_uuid BYTES,\n"
+                                + "    primary key (id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -224,7 +245,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.internal.implementation' = '%s'"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'snapshot.parallel-scan' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.split.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -232,7 +256,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         fullTypesDatabase.getPassword(),
                         fullTypesDatabase.getDatabaseName(),
                         "full_types",
-                        getImplementation());
+                        getDezImplementation(),
+                        parallelRead,
+                        getServerId(),
+                        getSplitSize());
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id INT NOT NULL,\n"
@@ -320,6 +347,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
     @Test
     public void testStartupFromSpecificOffset() throws Exception {
+        if (parallelRead) {
+            // not support yet
+            return;
+        }
         inventoryDatabase.createAndInitialize();
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
@@ -329,7 +360,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
         }
         Tuple2<String, Integer> offset =
-                currentMySQLLatestOffset(inventoryDatabase, "products", 9, useLegacyImplementation);
+                currentMySQLLatestOffset(inventoryDatabase, "products", 9, useLegacyDezMySQL);
 
         String sourceDDL =
                 String.format(
@@ -359,7 +390,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         "products",
                         offset.f0,
                         offset.f1,
-                        getImplementation());
+                        getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -403,6 +434,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
     @Test
     public void testStartupFromEarliestOffset() throws Exception {
+        if (parallelRead) {
+            // not support yet
+            return;
+        }
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -428,7 +463,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        getImplementation());
+                        getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -481,6 +516,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
     @Test
     public void testStartupFromLatestOffset() throws Exception {
+        if (parallelRead) {
+            // not support yet
+            return;
+        }
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -506,7 +545,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        getImplementation());
+                        getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -547,6 +586,10 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
     @Test
     public void testStartupFromTimestamp() throws Exception {
+        if (parallelRead) {
+            // not support yet
+            return;
+        }
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -574,7 +617,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),
-                        getImplementation());
+                        getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -615,8 +658,25 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
     // ------------------------------------------------------------------------------------
 
-    private String getImplementation() {
-        return useLegacyImplementation ? "legacy" : "";
+    private String getDezImplementation() {
+        return useLegacyDezMySQL ? "legacy" : "";
+    }
+
+    private String getServerId() {
+        final Random random = new Random();
+        int serverIdStart = random.nextInt(100) + 5400;
+        if (parallelRead) {
+            return serverIdStart + "," + (serverIdStart + env.getParallelism());
+        }
+        return String.valueOf(serverIdStart);
+    }
+
+    private int getSplitSize() {
+        if (parallelRead) {
+            // test parallel read
+            return 4;
+        }
+        return 0;
     }
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {

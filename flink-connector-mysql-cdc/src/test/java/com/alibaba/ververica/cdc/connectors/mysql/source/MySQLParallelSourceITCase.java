@@ -58,8 +58,8 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkD
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 
-/** IT tests for {@link MySQLSource}. */
-public class MySQLSourceITCase extends MySQLTestBase {
+/** IT tests for {@link MySQLParallelSource}. */
+public class MySQLParallelSourceITCase extends MySQLTestBase {
 
     private UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
@@ -92,7 +92,7 @@ public class MySQLSourceITCase extends MySQLTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        final RowType pkType =
+        final RowType splitKeyType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         final DebeziumDeserializationSchema<Row> deserializer = getDeserializationSchema(dataType);
 
@@ -103,7 +103,8 @@ public class MySQLSourceITCase extends MySQLTestBase {
                         .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
-        MySQLSource<Row> source = new MySQLSource<>(pkType, deserializer, configuration);
+        MySQLParallelSource<Row> source =
+                new MySQLParallelSource<>(splitKeyType, deserializer, configuration);
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
         DataStream<Row> stream =

@@ -64,6 +64,9 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
     private static final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
 
+    private final UniqueDatabase fullTypesDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
+
     @BeforeClass
     public static void init() {
         customDatabase.createAndInitialize();

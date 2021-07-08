@@ -42,6 +42,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SNAPSHOT_PARALLEL_SCAN;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -86,6 +89,41 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         null,
+                        SNAPSHOT_PARALLEL_SCAN.defaultValue(),
+                        SCAN_SPLIT_SIZE.defaultValue(),
+                        SCAN_FETCH_SIZE.defaultValue(),
+                        null,
+                        StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testEnableParallelReadSource() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("snapshot.parallel-scan", "true");
+        properties.put("server-id", "123,126");
+        properties.put("scan.split.column", "aaa");
+        properties.put("scan.split.size", "8000");
+        properties.put("scan.fetch.size", "100");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        "123,126",
+                        true,
+                        8000,
+                        100,
+                        "aaa",
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -112,7 +150,11 @@ public class MySQLTableSourceFactoryTest {
                         MY_PASSWORD,
                         ZoneId.of("Asia/Shanghai"),
                         dbzProperties,
-                        4321,
+                        "4321",
+                        SNAPSHOT_PARALLEL_SCAN.defaultValue(),
+                        SCAN_SPLIT_SIZE.defaultValue(),
+                        SCAN_FETCH_SIZE.defaultValue(),
+                        null,
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -141,7 +183,11 @@ public class MySQLTableSourceFactoryTest {
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
                         PROPERTIES,
-                        4321,
+                        "4321",
+                        SNAPSHOT_PARALLEL_SCAN.defaultValue(),
+                        SCAN_SPLIT_SIZE.defaultValue(),
+                        SCAN_FETCH_SIZE.defaultValue(),
+                        null,
                         StartupOptions.specificOffset(offsetFile, offsetPos));
         assertEquals(expectedSource, actualSource);
     }
@@ -164,6 +210,10 @@ public class MySQLTableSourceFactoryTest {
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
                         PROPERTIES,
+                        null,
+                        SNAPSHOT_PARALLEL_SCAN.defaultValue(),
+                        SCAN_SPLIT_SIZE.defaultValue(),
+                        SCAN_FETCH_SIZE.defaultValue(),
                         null,
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
@@ -188,6 +238,10 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         null,
+                        SNAPSHOT_PARALLEL_SCAN.defaultValue(),
+                        SCAN_SPLIT_SIZE.defaultValue(),
+                        SCAN_FETCH_SIZE.defaultValue(),
+                        null,
                         StartupOptions.earliest());
         assertEquals(expectedSource, actualSource);
     }
@@ -210,6 +264,10 @@ public class MySQLTableSourceFactoryTest {
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
                         PROPERTIES,
+                        null,
+                        SNAPSHOT_PARALLEL_SCAN.defaultValue(),
+                        SCAN_SPLIT_SIZE.defaultValue(),
+                        SCAN_FETCH_SIZE.defaultValue(),
                         null,
                         StartupOptions.latest());
         assertEquals(expectedSource, actualSource);
@@ -241,7 +299,55 @@ public class MySQLTableSourceFactoryTest {
         } catch (Throwable t) {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'server-id'.")
+                                    t,
+                                    "The 'server.id' should contains single numeric ID, but is 123b")
+                            .isPresent());
+        }
+
+        // validate illegal server id range
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("snapshot.parallel-scan", "true");
+            properties.put("server-id", "123");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The server id should be a range syntax like '5400,5404' when enable 'snapshot.parallel-scan' to 'true', but actual is 123")
+                            .isPresent());
+        }
+
+        // validate split key when use combined primary key
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("snapshot.parallel-scan", "true");
+            properties.put("server-id", "123,126");
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The 'scan.split.column' option is required if the primary key contains multiple fields")
+                            .isPresent());
+        }
+
+        // validate split key must belong to primary key
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("snapshot.parallel-scan", "true");
+            properties.put("server-id", "123,126");
+            properties.put("scan.split.column", "ddd");
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The 'scan.split.column' value ddd should be one field of the primary key [bbb, aaa], but it does not.")
                             .isPresent());
         }
 

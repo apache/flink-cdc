@@ -19,16 +19,22 @@
 package com.alibaba.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
+import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLParallelSource;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
@@ -36,10 +42,17 @@ import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema
 import javax.annotation.Nullable;
 
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 
+import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.DATABASE_SERVER_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_COLUMN;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SERVER_ID;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -54,10 +67,14 @@ public class MySQLTableSource implements ScanTableSource {
     private final String database;
     private final String username;
     private final String password;
-    private final Integer serverId;
+    private final String serverId;
     private final String tableName;
     private final ZoneId serverTimeZone;
     private final Properties dbzProperties;
+    private final boolean enableParallelRead;
+    private final int splitSize;
+    private final int fetchSize;
+    private final String splitColumn;
     private final StartupOptions startupOptions;
 
     public MySQLTableSource(
@@ -70,7 +87,11 @@ public class MySQLTableSource implements ScanTableSource {
             String password,
             ZoneId serverTimeZone,
             Properties dbzProperties,
-            @Nullable Integer serverId,
+            @Nullable String serverId,
+            boolean enableParallelRead,
+            int splitSize,
+            int fetchSize,
+            @Nullable String splitColumn,
             StartupOptions startupOptions) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -82,6 +103,10 @@ public class MySQLTableSource implements ScanTableSource {
         this.serverId = serverId;
         this.serverTimeZone = serverTimeZone;
         this.dbzProperties = dbzProperties;
+        this.enableParallelRead = enableParallelRead;
+        this.splitSize = splitSize;
+        this.fetchSize = fetchSize;
+        this.splitColumn = splitColumn;
         this.startupOptions = startupOptions;
     }
 
@@ -103,22 +128,85 @@ public class MySQLTableSource implements ScanTableSource {
         DebeziumDeserializationSchema<RowData> deserializer =
                 new RowDataDebeziumDeserializeSchema(
                         rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
-        MySQLSource.Builder<RowData> builder =
-                MySQLSource.<RowData>builder()
-                        .hostname(hostname)
-                        .port(port)
-                        .databaseList(database)
-                        .tableList(database + "." + tableName)
-                        .username(username)
-                        .password(password)
-                        .serverTimeZone(serverTimeZone.toString())
-                        .debeziumProperties(dbzProperties)
-                        .startupOptions(startupOptions)
-                        .deserializer(deserializer);
-        Optional.ofNullable(serverId).ifPresent(builder::serverId);
-        DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+        if (enableParallelRead) {
+            RowType pkRowType = getPkType(physicalSchema);
+            Configuration configuration = getParallelSourceConf(pkRowType);
+            MySQLParallelSource<RowData> parallelSource =
+                    new MySQLParallelSource<>(pkRowType, deserializer, configuration);
+            return SourceProvider.of(parallelSource);
+        } else {
+            MySQLSource.Builder<RowData> builder =
+                    MySQLSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .databaseList(database)
+                            .tableList(database + "." + tableName)
+                            .username(username)
+                            .password(password)
+                            .serverTimeZone(serverTimeZone.toString())
+                            .debeziumProperties(dbzProperties)
+                            .startupOptions(startupOptions)
+                            .deserializer(deserializer);
+            Optional.ofNullable(serverId)
+                    .ifPresent(
+                            serverId -> builder.serverId(MySQLSourceOptions.getServerId(serverId)));
+            DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+            return SourceFunctionProvider.of(sourceFunction, false);
+        }
+    }
 
-        return SourceFunctionProvider.of(sourceFunction, false);
+    private RowType getPkType(TableSchema tableSchema) {
+        List<String> pkFieldNames = physicalSchema.getPrimaryKey().get().getColumns();
+        LogicalType[] pkFieldTypes =
+                pkFieldNames.stream()
+                        .map(
+                                fieldName ->
+                                        tableSchema
+                                                .getFieldDataType(fieldName)
+                                                .get()
+                                                .getLogicalType())
+                        .toArray(LogicalType[]::new);
+        return RowType.of(pkFieldTypes, pkFieldNames.toArray(new String[0]));
+    }
+
+    private Configuration getParallelSourceConf(RowType pkRowType) {
+        Map<String, String> properties = new HashMap<>();
+        properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
+        properties.put("database.hostname", checkNotNull(hostname));
+        properties.put("database.user", checkNotNull(username));
+        properties.put("database.password", checkNotNull(password));
+        properties.put("database.port", String.valueOf(port));
+        properties.put("database.history.skip.unparseable.ddl", String.valueOf(true));
+        properties.put("database.server.name", DATABASE_SERVER_NAME);
+
+        /**
+         * The server id is required, it will be replaced to 'database.server.id' when build {@Link
+         * MySQLSplitReader}
+         */
+        properties.put(SERVER_ID.key(), serverId);
+        properties.put("scan.split.size", String.valueOf(splitSize));
+        properties.put("scan.fetch.size", String.valueOf(fetchSize));
+
+        if (database != null) {
+            properties.put("database.whitelist", database);
+        }
+        if (tableName != null) {
+            properties.put("table.whitelist", database + "." + tableName);
+        }
+        if (serverTimeZone != null) {
+            properties.put("database.serverTimezone", serverTimeZone.toString());
+        }
+
+        // set mode
+        properties.put("snapshot.mode", "initial");
+
+        // set split key
+        if (pkRowType.getFieldCount() > 1) {
+            properties.put(SCAN_SPLIT_COLUMN.key(), splitColumn);
+        }
+
+        return Configuration.fromMap(properties);
     }
 
     @Override
@@ -134,6 +222,10 @@ public class MySQLTableSource implements ScanTableSource {
                 serverTimeZone,
                 dbzProperties,
                 serverId,
+                enableParallelRead,
+                splitSize,
+                fetchSize,
+                splitColumn,
                 startupOptions);
     }
 
@@ -142,11 +234,14 @@ public class MySQLTableSource implements ScanTableSource {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof MySQLTableSource)) {
             return false;
         }
         MySQLTableSource that = (MySQLTableSource) o;
         return port == that.port
+                && enableParallelRead == that.enableParallelRead
+                && splitSize == that.splitSize
+                && fetchSize == that.fetchSize
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
@@ -156,6 +251,7 @@ public class MySQLTableSource implements ScanTableSource {
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(serverTimeZone, that.serverTimeZone)
                 && Objects.equals(dbzProperties, that.dbzProperties)
+                && Objects.equals(splitColumn, that.splitColumn)
                 && Objects.equals(startupOptions, that.startupOptions);
     }
 
@@ -172,6 +268,10 @@ public class MySQLTableSource implements ScanTableSource {
                 tableName,
                 serverTimeZone,
                 dbzProperties,
+                enableParallelRead,
+                splitSize,
+                fetchSize,
+                splitColumn,
                 startupOptions);
     }
 

@@ -19,7 +19,6 @@
 package com.alibaba.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.ValidationException;
@@ -27,6 +26,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
+import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
 
@@ -34,96 +34,29 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.DATABASE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.HOSTNAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.PASSWORD;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.PORT;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_COLUMN;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_MODE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SERVER_ID;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SERVER_TIME_ZONE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SNAPSHOT_PARALLEL_SCAN;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.TABLE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.USERNAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.validateAndGetServerId;
 import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 
 /** Factory for creating configured instance of {@link MySQLTableSource}. */
 public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "mysql-cdc";
-
-    private static final ConfigOption<String> HOSTNAME =
-            ConfigOptions.key("hostname")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("IP address or hostname of the MySQL database server.");
-
-    private static final ConfigOption<Integer> PORT =
-            ConfigOptions.key("port")
-                    .intType()
-                    .defaultValue(3306)
-                    .withDescription("Integer port number of the MySQL database server.");
-
-    private static final ConfigOption<String> USERNAME =
-            ConfigOptions.key("username")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Name of the MySQL database to use when connecting to the MySQL database server.");
-
-    private static final ConfigOption<String> PASSWORD =
-            ConfigOptions.key("password")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Password to use when connecting to the MySQL database server.");
-
-    private static final ConfigOption<String> DATABASE_NAME =
-            ConfigOptions.key("database-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Database name of the MySQL server to monitor.");
-
-    private static final ConfigOption<String> TABLE_NAME =
-            ConfigOptions.key("table-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Table name of the MySQL database to monitor.");
-
-    private static final ConfigOption<String> SERVER_TIME_ZONE =
-            ConfigOptions.key("server-time-zone")
-                    .stringType()
-                    .defaultValue("UTC")
-                    .withDescription("The session time zone in database server.");
-
-    private static final ConfigOption<Integer> SERVER_ID =
-            ConfigOptions.key("server-id")
-                    .intType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "A numeric ID of this database client, which must be unique across all "
-                                    + "currently-running database processes in the MySQL cluster. This connector joins the "
-                                    + "MySQL database cluster as another server (with this unique ID) so it can read the binlog. "
-                                    + "By default, a random number is generated between 5400 and 6400, though we recommend setting an explicit value.");
-
-    public static final ConfigOption<String> SCAN_STARTUP_MODE =
-            ConfigOptions.key("scan.startup.mode")
-                    .stringType()
-                    .defaultValue("initial")
-                    .withDescription(
-                            "Optional startup mode for MySQL CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
-                                    + "or \"specific-offset\"");
-
-    public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_FILE =
-            ConfigOptions.key("scan.startup.specific-offset.file")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional offsets used in case of \"specific-offset\" startup mode");
-
-    public static final ConfigOption<Integer> SCAN_STARTUP_SPECIFIC_OFFSET_POS =
-            ConfigOptions.key("scan.startup.specific-offset.pos")
-                    .intType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional offsets used in case of \"specific-offset\" startup mode");
-
-    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
-            ConfigOptions.key("scan.startup.timestamp-millis")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional timestamp used in case of \"timestamp\" startup mode");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -138,11 +71,21 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         int port = config.get(PORT);
-        Integer serverId = config.getOptional(SERVER_ID).orElse(null);
+        int splitSize = config.get(SCAN_SPLIT_SIZE);
+        int fetchSize = config.get(SCAN_FETCH_SIZE);
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
-        StartupOptions startupOptions = getStartupOptions(config);
+
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+        String serverId = validateAndGetServerId(config);
+        boolean enableParallelRead = config.get(SNAPSHOT_PARALLEL_SCAN);
+        String splitColumn = null;
+        StartupOptions startupOptions = getStartupOptions(config);
+        if (enableParallelRead) {
+            validatePrimaryKeyIfEnableParallel(physicalSchema);
+            splitColumn = validateAndGetSplitColumn(config.get(SCAN_SPLIT_COLUMN), physicalSchema);
+            validateStartupOptionIfEnableParallel(startupOptions);
+        }
 
         return new MySQLTableSource(
                 physicalSchema,
@@ -155,6 +98,10 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
                 serverTimeZone,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 serverId,
+                enableParallelRead,
+                splitSize,
+                fetchSize,
+                splitColumn,
                 startupOptions);
     }
 
@@ -184,6 +131,10 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
+        options.add(SNAPSHOT_PARALLEL_SCAN);
+        options.add(SCAN_SPLIT_SIZE);
+        options.add(SCAN_FETCH_SIZE);
+        options.add(SCAN_SPLIT_COLUMN);
         return options;
     }
 
@@ -227,5 +178,59 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
         }
+    }
+
+    private void validatePrimaryKeyIfEnableParallel(TableSchema physicalSchema) {
+        if (!physicalSchema.getPrimaryKey().isPresent()) {
+            throw new ValidationException(
+                    "The primary key is necessary when enable 'snapshot.parallel-scan' to 'true'");
+        }
+    }
+
+    private String validateAndGetSplitColumn(String splitColumn, TableSchema physicalSchema) {
+        String validatedSplitColumn = splitColumn;
+        if (physicalSchema.getPrimaryKey().isPresent()) {
+            int pkSize = physicalSchema.getPrimaryKey().get().getColumns().size();
+            if (pkSize > 1) {
+                Preconditions.checkState(
+                        splitColumn != null,
+                        "The 'scan.split.column' option is required if the primary key contains multiple fields");
+                Preconditions.checkState(
+                        physicalSchema.getPrimaryKey().get().getColumns().contains(splitColumn),
+                        String.format(
+                                "The 'scan.split.column' value %s should be one field of the primary key %s, but it does not.",
+                                splitColumn, physicalSchema.getPrimaryKey().get().getColumns()));
+                return splitColumn;
+            }
+            // single primary key field
+            else {
+                // use primary key by default
+                if (splitColumn == null) {
+                    validatedSplitColumn = physicalSchema.getPrimaryKey().get().getColumns().get(0);
+                } else {
+                    // validate configured split column
+                    Preconditions.checkState(
+                            physicalSchema.getPrimaryKey().get().getColumns().contains(splitColumn),
+                            String.format(
+                                    "The 'scan.split.column' value %s should be one field of the primary key %s, but it does not.",
+                                    splitColumn,
+                                    physicalSchema.getPrimaryKey().get().getColumns()));
+                }
+            }
+        } else {
+            throw new ValidationException(
+                    "The primary key is necessary when enable 'snapshot.parallel-scan' to 'true'");
+        }
+        return validatedSplitColumn;
+    }
+
+    private void validateStartupOptionIfEnableParallel(StartupOptions startupOptions) {
+        // validate mode
+        Preconditions.checkState(
+                startupOptions.startupMode == StartupMode.INITIAL,
+                String.format(
+                        "MySQL Parallel Source only supports startup mode 'initial' now,"
+                                + " but actual is %s",
+                        startupOptions.startupMode));
     }
 }
