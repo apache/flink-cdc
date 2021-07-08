@@ -44,6 +44,7 @@ import javax.annotation.Nullable;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,6 +155,7 @@ public class MySQLSnapshotSplitAssigner {
         MySQLSplit prevSplit = null;
         MySQLSplit nextSplit;
         int splitCnt = 0;
+        long start = System.currentTimeMillis();
         LOGGER.info("Begin to analyze splits for table {} ", currentTableId);
         while ((nextSplit = getNextSplit(prevSplit)) != null) {
             remainingSplits.add(nextSplit);
@@ -171,9 +173,11 @@ public class MySQLSnapshotSplitAssigner {
                 LOGGER.info("Has analyze {} splits for table {} ", splitCnt, currentTableId);
             }
         }
-        LOGGER.info("Finish to analyze splits for table {} ", currentTableId);
-
-        LOGGER.info("The captured table {} have been assigned success.", currentTableId);
+        long end = System.currentTimeMillis();
+        LOGGER.info(
+                "Finish to analyze splits for table {}, time cost:{} ",
+                currentTableId,
+                Duration.ofMillis(end - start));
     }
 
     private MySQLSplit getNextSplit(MySQLSplit prevSplit) {

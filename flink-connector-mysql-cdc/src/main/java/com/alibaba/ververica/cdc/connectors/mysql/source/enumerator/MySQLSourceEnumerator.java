@@ -91,6 +91,10 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
             recordAssignedSplits(split.get(), subtaskId);
             LOGGER.info("Assign snapshot split {} for subtask {}", split.get(), subtaskId);
         }
+        // no more snapshot split, try notify no more splits
+        else if (couldNotifyNoMoreSplits(subtaskId)) {
+            context.signalNoMoreSplits(subtaskId);
+        }
         // no more snapshot split, try assign binlog split
         else if (couldAssignBinlogSplit(subtaskId)) {
             assignBinlogSplit(subtaskId);
@@ -167,9 +171,23 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
         this.snapshotSplitAssigner.close();
     }
 
+    private boolean couldNotifyNoMoreSplits(int subtaskId) {
+        final List<MySQLSplit> assignedSplit = assignedSplits.get(subtaskId);
+        if (assignedSplit == null) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private boolean hasAssignedBinlogSplit(int subtaskId) {
         final List<MySQLSplit> assignedSplit = assignedSplits.get(subtaskId);
-        return assignedSplit.stream().anyMatch(r -> r.getSplitKind().equals(MySQLSplitKind.BINLOG));
+        if (assignedSplit != null) {
+            return assignedSplit.stream()
+                    .anyMatch(r -> r.getSplitKind().equals(MySQLSplitKind.BINLOG));
+        } else {
+            return false;
+        }
     }
 
     private boolean couldAssignBinlogSplit(int subtaskId) {

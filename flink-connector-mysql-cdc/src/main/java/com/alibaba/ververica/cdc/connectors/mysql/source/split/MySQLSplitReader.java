@@ -28,7 +28,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.BinlogSplitRea
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSource;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLParallelSource;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -45,7 +45,7 @@ import java.util.Queue;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getBinaryClient;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getConnection;
 
-/** The {@link SplitReader} implementation for the {@link MySQLSource}. */
+/** The {@link SplitReader} implementation for the {@link MySQLParallelSource}. */
 public class MySQLSplitReader implements SplitReader<SourceRecord, MySQLSplit> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MySQLSplitReader.class);

@@ -54,9 +54,6 @@ public class StatementUtils {
             return pkType;
         } else {
             String splitColumnName = configuration.getString(MySQLSourceOptions.SCAN_SPLIT_COLUMN);
-            Preconditions.checkState(
-                    splitColumnName != null,
-                    "The 'scan.split.column' option is required if the primary key contains multiple fields");
             return new RowType(
                     pkType.getFields().stream()
                             .filter(r -> splitColumnName.equalsIgnoreCase(r.getName()))

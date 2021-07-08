@@ -32,8 +32,8 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.Preconditions;
 
+import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumStateSerializer;
@@ -44,11 +44,12 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializer;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import io.debezium.connector.mysql.legacy.BinlogReader.BinlogPosition;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.Supplier;
+
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.getServerIdForSubTask;
 
 /**
  * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithms which supports parallel
@@ -62,18 +63,18 @@ import java.util.function.Supplier;
  *
  * @param <T> The record type.
  */
-public class MySQLSource<T>
+public class MySQLParallelSource<T>
         implements Source<T, MySQLSplit, MySQLSourceEnumState>, ResultTypeQueryable<T> {
 
-    private final RowType pkRowType;
+    private final RowType splitKeyRowType;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
     private final Configuration config;
 
-    public MySQLSource(
-            RowType pkRowType,
+    public MySQLParallelSource(
+            RowType splitKeyRowType,
             DebeziumDeserializationSchema<T> deserializationSchema,
             Configuration config) {
-        this.pkRowType = pkRowType;
+        this.splitKeyRowType = splitKeyRowType;
         this.deserializationSchema = deserializationSchema;
         this.config = config;
     }
@@ -89,17 +90,20 @@ public class MySQLSource<T>
         FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple2<T, BinlogPosition>>>
                 elementsQueue = new FutureCompletingBlockingQueue<>();
 
-        int serverIdForReader = getBinlogClientServerId(config, readerContext.getIndexOfSubtask());
-        Configuration configuration = config.clone();
-        configuration.set(MySQLSourceOptions.SERVER_ID, serverIdForReader);
+        // set the server id for reader
+        Configuration readerConfiguration = config.clone();
+        readerConfiguration.removeConfig(MySQLSourceOptions.SERVER_ID);
+        readerConfiguration.setString(
+                "database.server.id",
+                getServerIdForSubTask(config, readerContext.getIndexOfSubtask()));
 
         Supplier<MySQLSplitReader> splitReaderSupplier =
-                () -> new MySQLSplitReader(configuration, readerContext.getIndexOfSubtask());
+                () -> new MySQLSplitReader(readerConfiguration, readerContext.getIndexOfSubtask());
         return new MySQLSourceReader(
                 elementsQueue,
                 splitReaderSupplier,
                 new MySQLRecordEmitter(deserializationSchema),
-                configuration,
+                readerConfiguration,
                 readerContext);
     }
 
@@ -108,7 +112,7 @@ public class MySQLSource<T>
             SplitEnumeratorContext<MySQLSplit> enumContext) throws Exception {
         final MySQLSnapshotSplitAssigner splitAssigner =
                 new MySQLSnapshotSplitAssigner(
-                        config, this.pkRowType, new ArrayList<>(), new ArrayList<>());
+                        config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>());
         return new MySQLSourceEnumerator(
                 enumContext, splitAssigner, new HashMap<>(), new HashMap<>());
     }
@@ -120,7 +124,7 @@ public class MySQLSource<T>
         final MySQLSnapshotSplitAssigner splitAssigner =
                 new MySQLSnapshotSplitAssigner(
                         config,
-                        this.pkRowType,
+                        this.splitKeyRowType,
                         checkpoint.getAlreadyProcessedTables(),
                         checkpoint.getRemainingSplits());
         return new MySQLSourceEnumerator(
@@ -143,18 +147,5 @@ public class MySQLSource<T>
     @Override
     public TypeInformation<T> getProducedType() {
         return deserializationSchema.getProducedType();
-    }
-
-    private int getBinlogClientServerId(Configuration configuration, int subtaskId) {
-        String serverIdRange = configuration.getString(MySQLSourceOptions.SERVER_ID_RANGE);
-        int serverIdStart = Integer.parseInt(serverIdRange.split(",")[0].trim());
-        int serverIdEnd = Integer.parseInt(serverIdRange.split(",")[1].trim());
-        int serverId = serverIdStart + subtaskId;
-        Preconditions.checkState(
-                serverIdStart <= serverId && serverId <= serverIdEnd,
-                String.format(
-                        "The server id %s in task %d is out of server id range %s, please keep the job parallelism same with server id num of server id range.",
-                        serverId, subtaskId, serverIdRange));
-        return serverId;
     }
 }

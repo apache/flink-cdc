@@ -47,7 +47,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 /** Tests for {@link MySQLSourceEnumStateSerializer}. */
-public class MySQLSourceEnumStateSerializerTest {
+public class MySQLParallelSourceEnumStateSerializerTest {
 
     @Test
     public void testsSerializeAndDeserialize() throws Exception {
