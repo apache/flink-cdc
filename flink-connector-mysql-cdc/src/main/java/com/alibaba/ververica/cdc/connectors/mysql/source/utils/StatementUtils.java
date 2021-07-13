@@ -110,11 +110,12 @@ public class StatementUtils {
             condition = sql.toString();
         }
 
-        final String orderBy = pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
         if (isScanningData) {
             return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), orderBy);
+                    tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
         } else {
+            final String orderBy =
+                    pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
             return buildSelectWithBoundaryRowLimits(
                     tableId,
                     limitSize,
@@ -189,15 +190,22 @@ public class StatementUtils {
         }
     }
 
-    public static String buildMaxPrimaryKeyQuery(TableId tableId, RowType pkRowType) {
+    public static String buildMaxSplitKeyQuery(TableId tableId, RowType splitKeyRowType) {
         final String orderBy =
-                pkRowType.getFieldNames().stream().collect(Collectors.joining(" DESC, ")) + " DESC";
+                splitKeyRowType.getFieldNames().stream().collect(Collectors.joining(" DESC, "))
+                        + " DESC";
         return buildSelectWithRowLimits(
                 tableId,
                 1,
-                pkRowType.getFieldNames().stream().collect(Collectors.joining(",")),
+                splitKeyRowType.getFieldNames().stream().collect(Collectors.joining(",")),
                 Optional.empty(),
-                orderBy);
+                Optional.of(orderBy));
+    }
+
+    public static String buildMinMaxSplitKeyQuery(TableId tableId, String splitKeyFieldName) {
+        final String projection =
+                String.format("MIN(%s), MAX(%s)", splitKeyFieldName, splitKeyFieldName);
+        return buildSelectWithRowLimits(tableId, 1, projection, Optional.empty(), Optional.empty());
     }
 
     public static String quote(String dbOrTableName) {
@@ -257,14 +265,16 @@ public class StatementUtils {
             int limit,
             String projection,
             Optional<String> condition,
-            String orderBy) {
+            Optional<String> orderBy) {
         final StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(projection).append(" FROM ");
         sql.append(quotedTableIdString(tableId));
         if (condition.isPresent()) {
             sql.append(" WHERE ").append(condition.get());
         }
-        sql.append(" ORDER BY ").append(orderBy);
+        if (orderBy.isPresent()) {
+            sql.append(" ORDER BY ").append(orderBy.get());
+        }
         if (limit > 0) {
             sql.append(" LIMIT ").append(limit);
         }

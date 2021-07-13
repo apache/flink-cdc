@@ -19,6 +19,7 @@
 package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 
 import org.apache.flink.api.java.tuple.Tuple5;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
@@ -331,6 +332,15 @@ public class RecordUtils {
                     && (Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
                             && Arrays.stream(upperBoundRes).allMatch(value -> value <= 0));
         }
+    }
+
+    /**
+     * Return the split key type can use integral optimization or not.
+     */
+    public static boolean isOptimizedKeyType(LogicalTypeRoot typeRoot) {
+        return typeRoot == LogicalTypeRoot.BIGINT
+                || typeRoot == LogicalTypeRoot.INTEGER
+                || typeRoot == LogicalTypeRoot.DECIMAL;
     }
 
     private static int compareObjects(Object o1, Object o2) {

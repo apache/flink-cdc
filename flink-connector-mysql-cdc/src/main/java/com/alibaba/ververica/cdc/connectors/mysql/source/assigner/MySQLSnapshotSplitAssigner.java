@@ -41,6 +41,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -56,8 +58,10 @@ import java.util.Optional;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition.INITIAL_OFFSET;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isOptimizedKeyType;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.rowToArray;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMaxPrimaryKeyQuery;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMaxSplitKeyQuery;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMinMaxSplitKeyQuery;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildSplitBoundaryQuery;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.getSplitKey;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
@@ -75,6 +79,7 @@ public class MySQLSnapshotSplitAssigner {
     private final Configuration configuration;
     private final int splitSize;
     private final RowType splitKeyType;
+    private final boolean enableIntegralOptimization;
 
     private Collection<TableId> capturedTables;
     private TableId currentTableId;
@@ -100,6 +105,8 @@ public class MySQLSnapshotSplitAssigner {
                 String.format(
                         "The value of option 'scan.split.size' must bigger than 1, but is %d",
                         splitSize));
+        this.enableIntegralOptimization =
+                configuration.getBoolean(MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY);
         this.cachedTableSchemas = new HashMap<>();
     }
 
@@ -150,27 +157,60 @@ public class MySQLSnapshotSplitAssigner {
     }
 
     private void analyzeSplitsForCurrentTable() {
-        // TODO: This is the general case, for numeric primary key case,
-        //  we can optimize the analysis with numeric range like : 0-1000, 1001-2000...
         MySQLSplit prevSplit = null;
         MySQLSplit nextSplit;
         int splitCnt = 0;
         long start = System.currentTimeMillis();
         LOGGER.info("Begin to analyze splits for table {} ", currentTableId);
-        while ((nextSplit = getNextSplit(prevSplit)) != null) {
-            remainingSplits.add(nextSplit);
-            prevSplit = nextSplit;
-            splitCnt++;
-            if (splitCnt % 100 == 0) {
-                try {
-                    Thread.sleep(3_000);
-                } catch (InterruptedException e) {
-                    LOGGER.error(
-                            "Interrupted when analyze splits for table {}, exception {}",
-                            currentTableId,
-                            e);
+        // optimization for integral, bigDecimal type
+        if (enableIntegralOptimization
+                && isOptimizedKeyType(splitKeyType.getTypeAt(0).getTypeRoot())) {
+            String splitKeyFieldName = splitKeyType.getFieldNames().get(0);
+            Object[] minMaxSplitKey = new Object[2];
+            try {
+                minMaxSplitKey =
+                        jdbc.queryAndMap(
+                                buildMinMaxSplitKeyQuery(currentTableId, splitKeyFieldName),
+                                rs -> {
+                                    if (!rs.next()) {
+                                        return null;
+                                    }
+                                    return rowToArray(rs, 2);
+                                });
+            } catch (SQLException e) {
+                LOGGER.error(
+                        String.format(
+                                "Read max value and min value of split key from table %s failed.",
+                                currentTableId),
+                        e);
+            }
+            Object prevSplitEnd = null;
+            do {
+                Object splitEnd = getOptimizedSplitEnd(prevSplitEnd, minMaxSplitKey);
+                remainingSplits.add(
+                        createSnapshotSplit(
+                                prevSplitEnd == null ? null : new Object[] {prevSplitEnd},
+                                splitEnd == null ? null : new Object[] {splitEnd}));
+                prevSplitEnd = splitEnd;
+            } while (prevSplitEnd != null);
+        }
+        // general case
+        else {
+            while ((nextSplit = getNextSplit(prevSplit)) != null) {
+                remainingSplits.add(nextSplit);
+                prevSplit = nextSplit;
+                splitCnt++;
+                if (splitCnt % 100 == 0) {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        LOGGER.error(
+                                "Interrupted when analyze splits for table {}, exception {}",
+                                currentTableId,
+                                e);
+                    }
+                    LOGGER.info("Has analyze {} splits for table {} ", splitCnt, currentTableId);
                 }
-                LOGGER.info("Has analyze {} splits for table {} ", splitCnt, currentTableId);
             }
         }
         long end = System.currentTimeMillis();
@@ -178,6 +218,38 @@ public class MySQLSnapshotSplitAssigner {
                 "Finish to analyze splits for table {}, time cost:{} ",
                 currentTableId,
                 Duration.ofMillis(end - start));
+    }
+
+    public Object getOptimizedSplitEnd(Object prevSplitEnd, Object[] minMaxSplitKey) {
+        // first split
+        if (prevSplitEnd == null) {
+            return minMaxSplitKey[0];
+        }
+        // last split
+        else if (prevSplitEnd.equals(minMaxSplitKey[1])) {
+            return null;
+        } else {
+            if (prevSplitEnd instanceof Integer) {
+                return Math.min(
+                        ((Integer) prevSplitEnd + splitSize), ((Integer) minMaxSplitKey[1]));
+            } else if (prevSplitEnd instanceof Long) {
+                return Math.min(((Long) prevSplitEnd + splitSize), ((Long) minMaxSplitKey[1]));
+            }
+            // BigDecimal
+            else if (prevSplitEnd instanceof BigInteger) {
+                BigInteger splitEnd =
+                        ((BigInteger) prevSplitEnd).add(BigInteger.valueOf(splitSize));
+                BigInteger splitMax = ((BigInteger) minMaxSplitKey[1]);
+                return splitEnd.compareTo(splitMax) >= 0 ? splitMax : splitEnd;
+            } else if (prevSplitEnd instanceof BigDecimal) {
+                BigDecimal splitEnd =
+                        ((BigDecimal) prevSplitEnd).add(BigDecimal.valueOf(splitSize));
+                BigDecimal splitMax = ((BigDecimal) minMaxSplitKey[1]);
+                return splitEnd.compareTo(splitMax) >= 0 ? splitMax : splitEnd;
+            } else {
+                throw new IllegalStateException("Unsupported type for numeric split optimization");
+            }
+        }
     }
 
     private MySQLSplit getNextSplit(MySQLSplit prevSplit) {
@@ -189,7 +261,7 @@ public class MySQLSnapshotSplitAssigner {
             try {
                 currentTableMaxSplitKey =
                         jdbc.queryAndMap(
-                                buildMaxPrimaryKeyQuery(currentTableId, splitKeyType),
+                                buildMaxSplitKeyQuery(currentTableId, splitKeyType),
                                 rs -> {
                                     if (!rs.next()) {
                                         return null;
@@ -250,7 +322,10 @@ public class MySQLSnapshotSplitAssigner {
                 break;
             }
         }
+        return createSnapshotSplit(prevSplitEnd, splitEnd);
+    }
 
+    private MySQLSplit createSnapshotSplit(Object[] splitStart, Object[] splitEnd) {
         Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         // cache for optimization
         if (!cachedTableSchemas.containsKey(currentTableId)) {
@@ -263,7 +338,7 @@ public class MySQLSnapshotSplitAssigner {
                 currentTableId,
                 createSplitId(),
                 splitKeyType,
-                prevSplitEnd,
+                splitStart,
                 splitEnd,
                 null,
                 null,

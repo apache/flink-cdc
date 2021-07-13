@@ -288,9 +288,9 @@ public class MySQLParallelSourceITCase extends MySQLTestBase {
         properties.put("database.user", customDatabase.getUsername());
         properties.put("database.password", customDatabase.getPassword());
         properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id.range", "1001,1004");
-        properties.put("scan.split.size", "4");
-        properties.put("scan.fetch.size", "2");
+        properties.put("server-id", "1001,1004");
+        properties.put("scan.split.size", "1024");
+        properties.put("scan.fetch.size", "512");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());

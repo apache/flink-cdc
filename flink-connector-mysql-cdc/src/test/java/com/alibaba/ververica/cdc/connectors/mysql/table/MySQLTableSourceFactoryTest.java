@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_SIZE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SNAPSHOT_PARALLEL_SCAN;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
@@ -89,6 +90,7 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         null,
+                        SCAN_OPTIMIZE_INTEGRAL_KEY.defaultValue(),
                         SNAPSHOT_PARALLEL_SCAN.defaultValue(),
                         SCAN_SPLIT_SIZE.defaultValue(),
                         SCAN_FETCH_SIZE.defaultValue(),
@@ -120,6 +122,40 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         "123,126",
+                        SCAN_OPTIMIZE_INTEGRAL_KEY.defaultValue(),
+                        true,
+                        8000,
+                        100,
+                        "aaa",
+                        StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testDisableIntegralOptimization() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("snapshot.parallel-scan", "true");
+        properties.put("server-id", "123,126");
+        properties.put("scan.split.column", "aaa");
+        properties.put("scan.split.size", "8000");
+        properties.put("scan.fetch.size", "100");
+        properties.put("scan.optimize.integral-key", "false");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySQLTableSource expectedSource =
+                new MySQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        "123,126",
+                        false,
                         true,
                         8000,
                         100,
@@ -151,6 +187,7 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("Asia/Shanghai"),
                         dbzProperties,
                         "4321",
+                        SCAN_OPTIMIZE_INTEGRAL_KEY.defaultValue(),
                         SNAPSHOT_PARALLEL_SCAN.defaultValue(),
                         SCAN_SPLIT_SIZE.defaultValue(),
                         SCAN_FETCH_SIZE.defaultValue(),
@@ -184,6 +221,7 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         "4321",
+                        SCAN_OPTIMIZE_INTEGRAL_KEY.defaultValue(),
                         SNAPSHOT_PARALLEL_SCAN.defaultValue(),
                         SCAN_SPLIT_SIZE.defaultValue(),
                         SCAN_FETCH_SIZE.defaultValue(),
@@ -211,6 +249,7 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         null,
+                        SCAN_OPTIMIZE_INTEGRAL_KEY.defaultValue(),
                         SNAPSHOT_PARALLEL_SCAN.defaultValue(),
                         SCAN_SPLIT_SIZE.defaultValue(),
                         SCAN_FETCH_SIZE.defaultValue(),
@@ -238,6 +277,7 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         null,
+                        SCAN_OPTIMIZE_INTEGRAL_KEY.defaultValue(),
                         SNAPSHOT_PARALLEL_SCAN.defaultValue(),
                         SCAN_SPLIT_SIZE.defaultValue(),
                         SCAN_FETCH_SIZE.defaultValue(),
@@ -265,6 +305,7 @@ public class MySQLTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         null,
+                        SCAN_OPTIMIZE_INTEGRAL_KEY.defaultValue(),
                         SNAPSHOT_PARALLEL_SCAN.defaultValue(),
                         SCAN_SPLIT_SIZE.defaultValue(),
                         SCAN_FETCH_SIZE.defaultValue(),

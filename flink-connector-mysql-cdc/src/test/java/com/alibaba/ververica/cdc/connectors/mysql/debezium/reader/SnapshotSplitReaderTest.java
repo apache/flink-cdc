@@ -43,10 +43,13 @@ import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -55,17 +58,32 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link SnapshotSplitReader}. */
+@RunWith(Parameterized.class)
 public class SnapshotSplitReaderTest extends MySQLTestBase {
 
     private static final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
 
-    private final UniqueDatabase fullTypesDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
+    private final boolean useIntegralTypeOptimization;
+    private final BinaryLogClient binaryLogClient;
+    private final MySqlConnection mySqlConnection;
+
+    @Parameterized.Parameters(name = "useIntegralTypeOptimization: {0}")
+    public static Collection<Boolean> parameters() {
+        return Arrays.asList(false, true);
+    }
+
+    public SnapshotSplitReaderTest(boolean useIntegralTypeOptimization) {
+        this.useIntegralTypeOptimization = useIntegralTypeOptimization;
+        Configuration configuration = getConfig(new String[] {"customers"});
+        this.binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
+        this.mySqlConnection = StatefulTaskContext.getConnection(configuration);
+    }
 
     @BeforeClass
     public static void init() {
@@ -86,17 +104,19 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
         List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
-                new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]"
-                };
+                useIntegralTypeOptimization
+                        ? new String[] {}
+                        : new String[] {
+                            "+I[101, user_1, Shanghai, 123567891234]",
+                            "+I[102, user_2, Shanghai, 123567891234]",
+                            "+I[103, user_3, Shanghai, 123567891234]",
+                            "+I[109, user_4, Shanghai, 123567891234]",
+                            "+I[110, user_5, Shanghai, 123567891234]",
+                            "+I[111, user_6, Shanghai, 123567891234]",
+                            "+I[118, user_7, Shanghai, 123567891234]",
+                            "+I[121, user_8, Shanghai, 123567891234]",
+                            "+I[123, user_9, Shanghai, 123567891234]"
+                        };
         List<String> actual = readTableSnapshotSplits(mySQLSplits, configuration, 1, dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
@@ -219,8 +239,6 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
             int scanSplitsNum,
             DataType dataType)
             throws Exception {
-        final BinaryLogClient binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        final MySqlConnection mySqlConnection = StatefulTaskContext.getConnection(configuration);
 
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
@@ -241,6 +259,12 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
             }
         }
 
+        if (mySqlConnection != null) {
+            mySqlConnection.close();
+        }
+        if (binaryLogClient != null) {
+            binaryLogClient.disconnect();
+        }
         return formatResult(result, dataType);
     }
 
@@ -300,8 +324,6 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
         properties.put("database.whitelist", customDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
         properties.put("server-id-range", "1001, 1002");
-        properties.put("scan.split.size", "10");
-        properties.put("scan.fetch.size", "2");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
@@ -311,6 +333,15 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                         .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         properties.put("table.whitelist", String.join(",", captureTableIds));
+        properties.put(
+                SCAN_OPTIMIZE_INTEGRAL_KEY.key(), String.valueOf(useIntegralTypeOptimization));
+        if (useIntegralTypeOptimization) {
+            properties.put("scan.split.size", "1000");
+            properties.put("scan.fetch.size", "1024");
+        } else {
+            properties.put("scan.split.size", "10");
+            properties.put("scan.fetch.size", "2");
+        }
         return Configuration.fromMap(properties);
     }
 
