@@ -151,7 +151,7 @@ public class MySQLSourceOptions {
                     .booleanType()
                     .defaultValue(true)
                     .withDescription(
-                            "Optimization to calculate the boundary of table snapshot split base on integral value rather than querying the DB,"
+                            "Optimization to calculate the boundary of table snapshot split base on numeric value rather than querying the DB,"
                                     + " by default this option is enabled.");
 
     // utils

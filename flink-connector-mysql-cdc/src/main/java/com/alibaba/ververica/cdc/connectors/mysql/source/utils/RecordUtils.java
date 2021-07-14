@@ -334,9 +334,7 @@ public class RecordUtils {
         }
     }
 
-    /**
-     * Return the split key type can use integral optimization or not.
-     */
+    /** Return the split key type can use numeric optimization or not. */
     public static boolean isOptimizedKeyType(LogicalTypeRoot typeRoot) {
         return typeRoot == LogicalTypeRoot.BIGINT
                 || typeRoot == LogicalTypeRoot.INTEGER
