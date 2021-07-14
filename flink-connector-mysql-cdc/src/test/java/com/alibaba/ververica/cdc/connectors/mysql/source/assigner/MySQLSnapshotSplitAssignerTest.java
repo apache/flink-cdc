@@ -107,10 +107,10 @@ public class MySQLSnapshotSplitAssignerTest extends MySQLTestBase {
     public void testEnableIntegralKeyOptimization() {
         String[] expected =
                 new String[] {
-                    "customers SNAPSHOT [null] [101]",
+                    "customers SNAPSHOT null [101]",
                     "customers SNAPSHOT [101] [1101]",
                     "customers SNAPSHOT [1101] [2000]",
-                    "customers SNAPSHOT [2000] [null]"
+                    "customers SNAPSHOT [2000] null"
                 };
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.INT())).getLogicalType();
@@ -123,14 +123,14 @@ public class MySQLSnapshotSplitAssignerTest extends MySQLTestBase {
     public void testEnableIntegralKeyOptimizationWithMultipleTable() {
         String[] expected =
                 new String[] {
-                    "customers SNAPSHOT [null] [101]",
+                    "customers SNAPSHOT null [101]",
                     "customers SNAPSHOT [101] [1101]",
                     "customers SNAPSHOT [1101] [2000]",
-                    "customers SNAPSHOT [2000] [null]",
-                    "customers_1 SNAPSHOT [null] [101]",
+                    "customers SNAPSHOT [2000] null",
+                    "customers_1 SNAPSHOT null [101]",
                     "customers_1 SNAPSHOT [101] [1101]",
                     "customers_1 SNAPSHOT [1101] [2000]",
-                    "customers_1 SNAPSHOT [2000] [null]"
+                    "customers_1 SNAPSHOT [2000] null"
                 };
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.INT())).getLogicalType();
@@ -144,10 +144,10 @@ public class MySQLSnapshotSplitAssignerTest extends MySQLTestBase {
     public void testEnableBigIntKeyOptimization() {
         String[] expected =
                 new String[] {
-                    "shopping_cart_big SNAPSHOT [null] [9223372036854773807]",
+                    "shopping_cart_big SNAPSHOT null [9223372036854773807]",
                     "shopping_cart_big SNAPSHOT [9223372036854773807] [9223372036854774807]",
                     "shopping_cart_big SNAPSHOT [9223372036854774807] [9223372036854775807]",
-                    "shopping_cart_big SNAPSHOT [9223372036854775807] [null]"
+                    "shopping_cart_big SNAPSHOT [9223372036854775807] null"
                 };
         // MySQL BIGINT UNSIGNED <=> Flink DECIMAL(20, 0)
         final RowType pkType =
@@ -163,11 +163,11 @@ public class MySQLSnapshotSplitAssignerTest extends MySQLTestBase {
     public void testEnableDecimalKeyOptimization() {
         String[] expected =
                 new String[] {
-                    "shopping_cart_dec SNAPSHOT [null] [123456.1230]",
+                    "shopping_cart_dec SNAPSHOT null [123456.1230]",
                     "shopping_cart_dec SNAPSHOT [123456.1230] [124456.1230]",
                     "shopping_cart_dec SNAPSHOT [124456.1230] [125456.1230]",
                     "shopping_cart_dec SNAPSHOT [125456.1230] [125489.6789]",
-                    "shopping_cart_dec SNAPSHOT [125489.6789] [null]"
+                    "shopping_cart_dec SNAPSHOT [125489.6789] null"
                 };
         final RowType pkType =
                 (RowType)
