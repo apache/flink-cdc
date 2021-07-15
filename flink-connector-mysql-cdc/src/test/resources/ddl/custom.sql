@@ -144,3 +144,31 @@ VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
        (401, 'KIND_007', 'user_5', 'leo list'),
        (404, 'KIND_008', 'user_5', 'leo list'),
        (600, 'KIND_009', 'user_6', 'my shopping cart');
+
+-- table has bigint unsigned primary key
+CREATE TABLE shopping_cart_big (
+  product_no BIGINT UNSIGNED NOT NULL,
+  product_kind VARCHAR(255),
+  user_id VARCHAR(255) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  PRIMARY KEY(product_no)
+);
+
+insert into shopping_cart_big
+VALUES (9223372036854773807, 'KIND_001', 'user_1', 'my shopping cart'),
+       (9223372036854774807, 'KIND_002', 'user_1', 'my shopping cart'),
+       (9223372036854775807, 'KIND_003', 'user_1', 'my shopping cart');
+
+-- table has decimal primary key
+CREATE TABLE shopping_cart_dec (
+  product_no DECIMAL(10, 4) NOT NULL,
+  product_kind VARCHAR(255),
+  user_id VARCHAR(255) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  PRIMARY KEY(product_no)
+);
+
+insert into shopping_cart_dec
+VALUES (123456.123, 'KIND_001', 'user_1', 'my shopping cart'),
+       (124456.456, 'KIND_002', 'user_1', 'my shopping cart'),
+       (125489.6789, 'KIND_003', 'user_1', 'my shopping cart');

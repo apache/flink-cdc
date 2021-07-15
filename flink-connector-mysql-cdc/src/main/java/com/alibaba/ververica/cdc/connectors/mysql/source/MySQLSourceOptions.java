@@ -146,6 +146,14 @@ public class MySQLSourceOptions {
                     .withDescription(
                             "Optional timestamp used in case of \"timestamp\" startup mode");
 
+    public static final ConfigOption<Boolean> SCAN_OPTIMIZE_INTEGRAL_KEY =
+            ConfigOptions.key("scan.optimize.integral-key")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Optimization to calculate the boundary of table snapshot split base on numeric value rather than querying the DB,"
+                                    + " by default this option is enabled.");
+
     // utils
     public static String validateAndGetServerId(ReadableConfig configuration) {
         final String serverIdValue = configuration.get(MySQLSourceOptions.SERVER_ID);

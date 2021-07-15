@@ -51,6 +51,7 @@ import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.DATABASE_SERVER_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_COLUMN;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SERVER_ID;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -71,6 +72,7 @@ public class MySQLTableSource implements ScanTableSource {
     private final String tableName;
     private final ZoneId serverTimeZone;
     private final Properties dbzProperties;
+    private final boolean enableIntegralOptimization;
     private final boolean enableParallelRead;
     private final int splitSize;
     private final int fetchSize;
@@ -88,6 +90,7 @@ public class MySQLTableSource implements ScanTableSource {
             ZoneId serverTimeZone,
             Properties dbzProperties,
             @Nullable String serverId,
+            boolean enableIntegralOptimization,
             boolean enableParallelRead,
             int splitSize,
             int fetchSize,
@@ -103,6 +106,7 @@ public class MySQLTableSource implements ScanTableSource {
         this.serverId = serverId;
         this.serverTimeZone = serverTimeZone;
         this.dbzProperties = dbzProperties;
+        this.enableIntegralOptimization = enableIntegralOptimization;
         this.enableParallelRead = enableParallelRead;
         this.splitSize = splitSize;
         this.fetchSize = fetchSize;
@@ -201,6 +205,9 @@ public class MySQLTableSource implements ScanTableSource {
         // set mode
         properties.put("snapshot.mode", "initial");
 
+        properties.put(
+                SCAN_OPTIMIZE_INTEGRAL_KEY.key(), String.valueOf(enableIntegralOptimization));
+
         // set split key
         if (pkRowType.getFieldCount() > 1) {
             properties.put(SCAN_SPLIT_COLUMN.key(), splitColumn);
@@ -222,6 +229,7 @@ public class MySQLTableSource implements ScanTableSource {
                 serverTimeZone,
                 dbzProperties,
                 serverId,
+                enableIntegralOptimization,
                 enableParallelRead,
                 splitSize,
                 fetchSize,
@@ -239,6 +247,7 @@ public class MySQLTableSource implements ScanTableSource {
         }
         MySQLTableSource that = (MySQLTableSource) o;
         return port == that.port
+                && enableIntegralOptimization == that.enableIntegralOptimization
                 && enableParallelRead == that.enableParallelRead
                 && splitSize == that.splitSize
                 && fetchSize == that.fetchSize
@@ -268,6 +277,7 @@ public class MySQLTableSource implements ScanTableSource {
                 tableName,
                 serverTimeZone,
                 dbzProperties,
+                enableIntegralOptimization,
                 enableParallelRead,
                 splitSize,
                 fetchSize,

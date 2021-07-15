@@ -39,6 +39,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptio
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.PASSWORD;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.PORT;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_COLUMN;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_SIZE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_MODE;
@@ -78,6 +79,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
         String serverId = validateAndGetServerId(config);
+        boolean enableIntegralOptimization = config.get(SCAN_OPTIMIZE_INTEGRAL_KEY);
         boolean enableParallelRead = config.get(SNAPSHOT_PARALLEL_SCAN);
         String splitColumn = null;
         StartupOptions startupOptions = getStartupOptions(config);
@@ -98,6 +100,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
                 serverTimeZone,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 serverId,
+                enableIntegralOptimization,
                 enableParallelRead,
                 splitSize,
                 fetchSize,
@@ -135,6 +138,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_SPLIT_SIZE);
         options.add(SCAN_FETCH_SIZE);
         options.add(SCAN_SPLIT_COLUMN);
+        options.add(SCAN_OPTIMIZE_INTEGRAL_KEY);
         return options;
     }
 
