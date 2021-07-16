@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.postgres;
 
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.Validator;
 import io.debezium.connector.postgresql.PostgresConnector;
 
 import java.time.Duration;
@@ -177,7 +178,8 @@ public class PostgreSQLSource {
                 dbzProperties.forEach(props::put);
             }
 
-            return new DebeziumSourceFunction<>(deserializer, props, null);
+            return new DebeziumSourceFunction<>(
+                    deserializer, props, null, Validator.getDefaultValidator());
         }
     }
 }

@@ -79,6 +79,14 @@ public class UniqueDatabase {
         this.password = password;
     }
 
+    public String getHost() {
+        return container.getHost();
+    }
+
+    public int getDatabasePort() {
+        return container.getDatabasePort();
+    }
+
     public String getDatabaseName() {
         return databaseName;
     }

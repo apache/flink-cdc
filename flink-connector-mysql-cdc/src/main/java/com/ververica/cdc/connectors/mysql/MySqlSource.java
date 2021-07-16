@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql;
 
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -227,7 +228,8 @@ public class MySqlSource {
                 }
             }
 
-            return new DebeziumSourceFunction<>(deserializer, props, specificOffset);
+            return new DebeziumSourceFunction<>(
+                    deserializer, props, specificOffset, new MySqlValidator(props));
         }
     }
 }

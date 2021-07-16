@@ -45,7 +45,11 @@ public class MySqlContainer extends JdbcDatabaseContainer {
     private String password = "test";
 
     public MySqlContainer() {
-        super(IMAGE + ":" + DEFAULT_TAG);
+        this(DEFAULT_TAG);
+    }
+
+    public MySqlContainer(String tag) {
+        super(IMAGE + ":" + tag);
         addExposedPort(MYSQL_PORT);
     }
 
