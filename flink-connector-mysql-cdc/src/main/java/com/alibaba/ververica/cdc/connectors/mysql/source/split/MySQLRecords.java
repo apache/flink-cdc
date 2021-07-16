@@ -88,4 +88,19 @@ public final class MySQLRecords implements RecordsWithSplitIds<SourceRecord> {
         return new MySQLRecords(
                 splitId, Collections.emptySet().iterator(), Collections.singleton(splitId));
     }
+
+    @Override
+    public String toString() {
+        return "MySQLRecords{"
+                + "splitId='"
+                + splitId
+                + '\''
+                + ", recordsForCurrentSplit="
+                + recordsForCurrentSplit
+                + ", recordsForSplit="
+                + recordsForSplit
+                + ", finishedSnapshotSplits="
+                + finishedSnapshotSplits
+                + '}';
+    }
 }
