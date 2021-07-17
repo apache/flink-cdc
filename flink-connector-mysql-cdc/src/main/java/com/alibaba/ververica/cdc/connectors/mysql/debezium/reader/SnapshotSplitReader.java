@@ -188,6 +188,20 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
         return null;
     }
 
+    @Override
+    public void close() {
+        try {
+            if (statefulTaskContext.getConnection() != null) {
+                statefulTaskContext.getConnection().close();
+            }
+            if (statefulTaskContext.getBinaryLogClient() != null) {
+                statefulTaskContext.getBinaryLogClient().disconnect();
+            }
+        } catch (Exception e) {
+            LOGGER.error("Close snapshot reader error", e);
+        }
+    }
+
     /**
      * {@link ChangeEventSource.ChangeEventSourceContext} implementation that keeps low/high
      * watermark for each {@link MySQLSplit}.

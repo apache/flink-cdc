@@ -112,7 +112,14 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
         String[] expected =
                 useIntegralTypeOptimization
-                        ? new String[] {}
+                        ? new String[] {
+                            "+U[103, user_3, Hangzhou, 123567891234]",
+                            "+U[103, user_3, Shanghai, 123567891234]",
+                            "-D[102, user_2, Shanghai, 123567891234]",
+                            "+I[102, user_2, Shanghai, 123567891234]",
+                            "-U[103, user_3, Hangzhou, 123567891234]",
+                            "-U[103, user_3, Shanghai, 123567891234]"
+                        }
                         : new String[] {
                             "+I[101, user_1, Shanghai, 123567891234]",
                             "+I[102, user_2, Shanghai, 123567891234]",
