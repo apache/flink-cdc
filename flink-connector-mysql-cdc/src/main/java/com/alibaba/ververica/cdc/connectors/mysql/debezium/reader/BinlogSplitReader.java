@@ -70,7 +70,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
     private MySQLSplit currentTableSplit;
     // tableId -> List[splitKeyStart, splitKeyEnd, splitHighWatermark]
     private Map<TableId, List<Tuple3<Object[], Object[], BinlogPosition>>> finishedSplitsInfo;
-    private Map<TableId, BinlogPosition> tableMaxHighWatermarkMap;
+    // tableId -> the max splitHighWatermark
+    private Map<TableId, BinlogPosition> maxSplitHighWatermarkMap;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
@@ -184,7 +185,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
             TableId tableId = getTableId(sourceRecord);
             BinlogPosition position = getBinlogPosition(sourceRecord);
             // aligned, all snapshot splits of the table has reached max highWatermark
-            if (position.isAtOrBefore(tableMaxHighWatermarkMap.get(tableId))) {
+            if (position.isAtOrBefore(maxSplitHighWatermarkMap.get(tableId))) {
                 return true;
             }
             Object[] key =
@@ -229,6 +230,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
             }
         }
         this.finishedSplitsInfo = splitsInfoMap;
-        this.tableMaxHighWatermarkMap = tableIdBinlogPositionMap;
+        this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
     }
 }

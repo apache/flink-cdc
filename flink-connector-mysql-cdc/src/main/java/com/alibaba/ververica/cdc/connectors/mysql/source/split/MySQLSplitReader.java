@@ -96,7 +96,9 @@ public class MySQLSplitReader implements SplitReader<SourceRecord, MySQLSplit> {
     @Override
     public void close() throws Exception {
         if (currentReader != null) {
-            LOGGER.info("Close current reader");
+            LOGGER.info(
+                    "Close current debezium reader {}",
+                    currentReader.getClass().getCanonicalName());
             currentReader.close();
             currentSplitId = null;
         }
