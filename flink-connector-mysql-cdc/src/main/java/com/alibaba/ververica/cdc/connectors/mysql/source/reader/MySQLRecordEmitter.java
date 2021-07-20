@@ -22,7 +22,7 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
@@ -65,7 +65,7 @@ public final class MySQLRecordEmitter<T>
     public void emitRecord(SourceRecord element, SourceOutput<T> output, MySQLSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
-            BinlogPosition watermark = getWatermark(element);
+            BinlogOffset watermark = getWatermark(element);
             if (isHighWatermarkEvent(element)) {
                 splitState.setHighWatermarkState(watermark);
                 splitState.setSnapshotReadFinishedState(true);
@@ -83,7 +83,7 @@ public final class MySQLRecordEmitter<T>
                         new SchemaRecord(TABLE_CHANGE_SERIALIZER.toDocument(tableChange)));
             }
         } else if (isDataChangeRecord(element)) {
-            BinlogPosition position = getBinlogPosition(element);
+            BinlogOffset position = getBinlogPosition(element);
             splitState.setOffsetState(position);
             debeziumDeserializationSchema.deserialize(
                     element,

@@ -20,10 +20,10 @@ package com.alibaba.ververica.cdc.connectors.mysql.debezium.reader;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySQLBinlogSplitReadTask;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySQLSnapshotSplitReadTask;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
@@ -209,22 +209,22 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
     public class SnapshotSplitChangeEventSourceContextImpl
             implements ChangeEventSource.ChangeEventSourceContext {
 
-        private BinlogPosition lowWatermark;
-        private BinlogPosition highWatermark;
+        private BinlogOffset lowWatermark;
+        private BinlogOffset highWatermark;
 
-        public BinlogPosition getLowWatermark() {
+        public BinlogOffset getLowWatermark() {
             return lowWatermark;
         }
 
-        public void setLowWatermark(BinlogPosition lowWatermark) {
+        public void setLowWatermark(BinlogOffset lowWatermark) {
             this.lowWatermark = lowWatermark;
         }
 
-        public BinlogPosition getHighWatermark() {
+        public BinlogOffset getHighWatermark() {
             return highWatermark;
         }
 
-        public void setHighWatermark(BinlogPosition highWatermark) {
+        public void setHighWatermark(BinlogOffset highWatermark) {
             this.highWatermark = highWatermark;
         }
 

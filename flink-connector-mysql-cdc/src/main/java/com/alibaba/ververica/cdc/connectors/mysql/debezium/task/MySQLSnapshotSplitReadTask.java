@@ -20,8 +20,8 @@ package com.alibaba.ververica.cdc.connectors.mysql.debezium.task;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils;
 import io.debezium.DebeziumException;
@@ -129,7 +129,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         final RelationalSnapshotChangeEventSource.RelationalSnapshotContext ctx =
                 (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
 
-        final BinlogPosition lowWatermark = getCurrentBinlogPosition();
+        final BinlogOffset lowWatermark = getCurrentBinlogPosition();
         LOGGER.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
@@ -149,7 +149,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
 
         LOGGER.info("Snapshot step 2 - Snapshotting data");
         createDataEvents(ctx, mySQLSplit.getTableId());
-        final BinlogPosition highWatermark = getCurrentBinlogPosition();
+        final BinlogOffset highWatermark = getCurrentBinlogPosition();
         LOGGER.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
@@ -276,9 +276,9 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         return Threads.timer(clock, LOG_INTERVAL);
     }
 
-    private BinlogPosition getCurrentBinlogPosition() {
-        AtomicReference<BinlogPosition> currentBinlogPosition =
-                new AtomicReference<>(BinlogPosition.INITIAL_OFFSET);
+    private BinlogOffset getCurrentBinlogPosition() {
+        AtomicReference<BinlogOffset> currentBinlogPosition =
+                new AtomicReference<>(BinlogOffset.INITIAL_OFFSET);
         try {
             jdbcConnection.setAutoCommit(false);
             String showMasterStmt = "SHOW MASTER STATUS";
@@ -289,7 +289,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                             String binlogFilename = rs.getString(1);
                             long binlogPosition = rs.getLong(2);
                             currentBinlogPosition.set(
-                                    new BinlogPosition(binlogFilename, binlogPosition));
+                                    new BinlogOffset(binlogFilename, binlogPosition));
                             LOGGER.info(
                                     "Read binlog '{}' at position '{}'",
                                     binlogFilename,

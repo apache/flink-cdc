@@ -33,11 +33,11 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.types.logical.RowType;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumStateSerializer;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumerator;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySQLRecordEmitter;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySQLSourceReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
@@ -87,8 +87,8 @@ public class MySQLParallelSource<T>
     @Override
     public SourceReader<T, MySQLSplit> createReader(SourceReaderContext readerContext)
             throws Exception {
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple2<T, BinlogPosition>>>
-                elementsQueue = new FutureCompletingBlockingQueue<>();
+        FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple2<T, BinlogOffset>>> elementsQueue =
+                new FutureCompletingBlockingQueue<>();
 
         // set the server id for reader
         Configuration readerConfiguration = config.clone();

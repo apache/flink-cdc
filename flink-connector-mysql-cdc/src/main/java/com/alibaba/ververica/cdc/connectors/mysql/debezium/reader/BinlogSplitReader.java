@@ -23,9 +23,9 @@ import org.apache.flink.api.java.tuple.Tuple5;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySQLBinlogSplitReadTask;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -69,9 +69,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
     private MySQLBinlogSplitReadTask binlogSplitReadTask;
     private MySQLSplit currentTableSplit;
     // tableId -> List[splitKeyStart, splitKeyEnd, splitHighWatermark]
-    private Map<TableId, List<Tuple3<Object[], Object[], BinlogPosition>>> finishedSplitsInfo;
+    private Map<TableId, List<Tuple3<Object[], Object[], BinlogOffset>>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
-    private Map<TableId, BinlogPosition> maxSplitHighWatermarkMap;
+    private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
@@ -183,7 +183,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
     private boolean shouldEmit(SourceRecord sourceRecord) {
         if (isDataChangeRecord(sourceRecord)) {
             TableId tableId = getTableId(sourceRecord);
-            BinlogPosition position = getBinlogPosition(sourceRecord);
+            BinlogOffset position = getBinlogPosition(sourceRecord);
             // aligned, all snapshot splits of the table has reached max highWatermark
             if (position.isAtOrBefore(maxSplitHighWatermarkMap.get(tableId))) {
                 return true;
@@ -193,7 +193,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
                             currentTableSplit.getSplitBoundaryType(),
                             sourceRecord,
                             statefulTaskContext.getSchemaNameAdjuster());
-            for (Tuple3<Object[], Object[], BinlogPosition> splitInfo :
+            for (Tuple3<Object[], Object[], BinlogOffset> splitInfo :
                     finishedSplitsInfo.get(tableId)) {
                 if (RecordUtils.splitKeyRangeContains(key, splitInfo.f0, splitInfo.f1)
                         && position.isAtOrBefore(splitInfo.f2)) {
@@ -209,22 +209,22 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
     }
 
     private void configureFilter() {
-        List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
+        List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                 currentTableSplit.getFinishedSplitsInfo();
-        Map<TableId, List<Tuple3<Object[], Object[], BinlogPosition>>> splitsInfoMap =
+        Map<TableId, List<Tuple3<Object[], Object[], BinlogOffset>>> splitsInfoMap =
                 new HashMap<>();
-        Map<TableId, BinlogPosition> tableIdBinlogPositionMap = new HashMap<>();
+        Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
 
-        for (Tuple5<TableId, String, Object[], Object[], BinlogPosition> finishedSplitInfo :
+        for (Tuple5<TableId, String, Object[], Object[], BinlogOffset> finishedSplitInfo :
                 finishedSplitsInfo) {
             TableId tableId = finishedSplitInfo.f0;
-            List<Tuple3<Object[], Object[], BinlogPosition>> list =
+            List<Tuple3<Object[], Object[], BinlogOffset>> list =
                     splitsInfoMap.getOrDefault(tableId, new ArrayList<>());
             list.add(Tuple3.of(finishedSplitInfo.f2, finishedSplitInfo.f3, finishedSplitInfo.f4));
             splitsInfoMap.put(tableId, list);
 
-            BinlogPosition highWatermark = finishedSplitInfo.f4;
-            BinlogPosition maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
+            BinlogOffset highWatermark = finishedSplitInfo.f4;
+            BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
             if (maxHighWatermark == null || highWatermark.isAtOrBefore(maxHighWatermark)) {
                 tableIdBinlogPositionMap.put(tableId, highWatermark);
             }

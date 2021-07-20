@@ -23,7 +23,7 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import io.debezium.relational.TableId;
 
@@ -97,59 +97,59 @@ public class MySQLSourceEnumStateSerializer
         final Collection<MySQLSplit> splits = readMySQLSplits(in);
         final Collection<TableId> tableIds = readTableIds(in);
         final Map<Integer, List<MySQLSplit>> assignedSplits = readAssignedSplits(in);
-        final Map<Integer, List<Tuple2<String, BinlogPosition>>> finishedSnapshotSplits =
+        final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits =
                 readFinishedSnapshotSplits(in);
         in.releaseArrays();
         return new MySQLSourceEnumState(splits, tableIds, assignedSplits, finishedSnapshotSplits);
     }
 
     private void writeFinishedSnapshotSplits(
-            Map<Integer, List<Tuple2<String, BinlogPosition>>> finishedSnapshotSplits,
+            Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits,
             DataOutputSerializer out)
             throws IOException {
         final int size = finishedSnapshotSplits.size();
         out.writeInt(size);
-        for (Map.Entry<Integer, List<Tuple2<String, BinlogPosition>>> entry :
+        for (Map.Entry<Integer, List<Tuple2<String, BinlogOffset>>> entry :
                 finishedSnapshotSplits.entrySet()) {
             int subtaskId = entry.getKey();
             out.writeInt(subtaskId);
-            List<Tuple2<String, BinlogPosition>> splitsInfo = entry.getValue();
+            List<Tuple2<String, BinlogOffset>> splitsInfo = entry.getValue();
             writeSplitsInfo(splitsInfo, out);
         }
     }
 
-    private Map<Integer, List<Tuple2<String, BinlogPosition>>> readFinishedSnapshotSplits(
+    private Map<Integer, List<Tuple2<String, BinlogOffset>>> readFinishedSnapshotSplits(
             DataInputDeserializer in) throws IOException {
-        Map<Integer, List<Tuple2<String, BinlogPosition>>> finishedSnapshotSplits = new HashMap<>();
+        Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             int subtaskId = in.readInt();
-            List<Tuple2<String, BinlogPosition>> splitsInfo = readSplitsInfo(in);
+            List<Tuple2<String, BinlogOffset>> splitsInfo = readSplitsInfo(in);
             finishedSnapshotSplits.put(subtaskId, splitsInfo);
         }
         return finishedSnapshotSplits;
     }
 
     private void writeSplitsInfo(
-            List<Tuple2<String, BinlogPosition>> splitsInfo, DataOutputSerializer out)
+            List<Tuple2<String, BinlogOffset>> splitsInfo, DataOutputSerializer out)
             throws IOException {
         final int size = splitsInfo.size();
         out.writeInt(size);
         for (int i = 0; i < size; i++) {
-            Tuple2<String, BinlogPosition> splitInfo = splitsInfo.get(i);
+            Tuple2<String, BinlogOffset> splitInfo = splitsInfo.get(i);
             out.writeUTF(splitInfo.f0);
             writeBinlogPosition(splitInfo.f1, out);
         }
     }
 
-    private List<Tuple2<String, BinlogPosition>> readSplitsInfo(DataInputDeserializer in)
+    private List<Tuple2<String, BinlogOffset>> readSplitsInfo(DataInputDeserializer in)
             throws IOException {
-        List<Tuple2<String, BinlogPosition>> splitsInfo = new ArrayList<>();
+        List<Tuple2<String, BinlogOffset>> splitsInfo = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             String splitId = in.readUTF();
-            BinlogPosition binlogPosition = readBinlogPosition(in);
-            splitsInfo.add(Tuple2.of(splitId, binlogPosition));
+            BinlogOffset binlogOffset = readBinlogPosition(in);
+            splitsInfo.add(Tuple2.of(splitId, binlogOffset));
         }
         return splitsInfo;
     }

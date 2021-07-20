@@ -23,7 +23,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
@@ -217,11 +217,11 @@ public class RecordUtils {
         return false;
     }
 
-    public static BinlogPosition getWatermark(SourceRecord watermarkEvent) {
+    public static BinlogOffset getWatermark(SourceRecord watermarkEvent) {
         Struct value = (Struct) watermarkEvent.value();
         String file = value.getString(BINLOG_FILENAME_OFFSET_KEY);
         Long position = value.getInt64(BINLOG_POSITION_OFFSET_KEY);
-        return new BinlogPosition(file, position);
+        return new BinlogOffset(file, position);
     }
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
@@ -238,7 +238,7 @@ public class RecordUtils {
      * @return [splitId, splitStart, splitEnd, highWatermark], the information will be used to
      *     filter binlog events when read binlog of table.
      */
-    public static Tuple5<TableId, String, Object[], Object[], BinlogPosition> getSnapshotSplitInfo(
+    public static Tuple5<TableId, String, Object[], Object[], BinlogOffset> getSnapshotSplitInfo(
             MySQLSplit split, SourceRecord highWatermark) {
         Struct value = (Struct) highWatermark.value();
         String splitId = value.getString(SPLIT_ID_KEY);
@@ -249,18 +249,18 @@ public class RecordUtils {
                 splitId,
                 split.getSplitBoundaryStart(),
                 split.getSplitBoundaryEnd(),
-                new BinlogPosition(file, position));
+                new BinlogOffset(file, position));
     }
 
     /** Returns the start offset of the binlog split. */
-    public static BinlogPosition getStartOffsetOfBinlogSplit(
-            List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>>
+    public static BinlogOffset getStartOffsetOfBinlogSplit(
+            List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>>
                     finishedSnapshotSplits) {
-        BinlogPosition startOffset =
+        BinlogOffset startOffset =
                 finishedSnapshotSplits.isEmpty()
-                        ? new BinlogPosition("", 0)
+                        ? new BinlogOffset("", 0)
                         : finishedSnapshotSplits.get(0).f4;
-        for (Tuple5<TableId, String, Object[], Object[], BinlogPosition> finishedSnapshotSplit :
+        for (Tuple5<TableId, String, Object[], Object[], BinlogOffset> finishedSnapshotSplit :
                 finishedSnapshotSplits) {
             if (!finishedSnapshotSplit.f4.isAtOrBefore(startOffset)) {
                 startOffset = finishedSnapshotSplit.f4;
@@ -292,12 +292,12 @@ public class RecordUtils {
         return new Object[] {key.get(splitFieldName)};
     }
 
-    public static BinlogPosition getBinlogPosition(SourceRecord dataRecord) {
+    public static BinlogOffset getBinlogPosition(SourceRecord dataRecord) {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String fileName = (String) source.get(BINLOG_FILENAME_OFFSET_KEY);
         Long position = (Long) (source.get(BINLOG_POSITION_OFFSET_KEY));
-        return new BinlogPosition(fileName, position);
+        return new BinlogOffset(fileName, position);
     }
 
     /** Returns the specific key contains in the split key range or not. */

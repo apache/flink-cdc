@@ -18,7 +18,7 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.split;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
 
@@ -33,9 +33,9 @@ import java.util.Map;
  */
 public final class MySQLSplitState extends MySQLSplit {
 
-    private BinlogPosition lowWatermarkState;
-    private BinlogPosition highWatermarkState;
-    private BinlogPosition offsetState;
+    private BinlogOffset lowWatermarkState;
+    private BinlogOffset highWatermarkState;
+    private BinlogOffset offsetState;
     private boolean snapshotReadFinishedState;
 
     @Nullable private Map<TableId, SchemaRecord> databaseHistoryState;
@@ -62,15 +62,15 @@ public final class MySQLSplitState extends MySQLSplit {
                 split.getDatabaseHistory() == null ? new HashMap<>() : split.getDatabaseHistory();
     }
 
-    public void setLowWatermarkState(BinlogPosition lowWatermarkState) {
+    public void setLowWatermarkState(BinlogOffset lowWatermarkState) {
         this.lowWatermarkState = lowWatermarkState;
     }
 
-    public void setHighWatermarkState(BinlogPosition highWatermarkState) {
+    public void setHighWatermarkState(BinlogOffset highWatermarkState) {
         this.highWatermarkState = highWatermarkState;
     }
 
-    public void setOffsetState(BinlogPosition offsetState) {
+    public void setOffsetState(BinlogOffset offsetState) {
         this.offsetState = offsetState;
     }
 
@@ -87,16 +87,16 @@ public final class MySQLSplitState extends MySQLSplit {
         this.databaseHistoryState.put(tableId, latestSchemaChange);
     }
 
-    public BinlogPosition getLowWatermarkState() {
+    public BinlogOffset getLowWatermarkState() {
         return lowWatermarkState;
     }
 
-    public BinlogPosition getHighWatermarkState() {
+    public BinlogOffset getHighWatermarkState() {
         return highWatermarkState;
     }
 
     @Nullable
-    public BinlogPosition getOffsetState() {
+    public BinlogOffset getOffsetState() {
         return offsetState;
     }
 
