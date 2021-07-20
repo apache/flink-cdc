@@ -55,7 +55,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
  */
 public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSplit> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(SnapshotSplitReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executor;
 
@@ -145,7 +145,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
                         }
                     } catch (Exception e) {
                         currentTaskRunning = false;
-                        LOGGER.error(
+                        LOG.error(
                                 String.format(
                                         "Execute snapshot read task for mysql split %s fail",
                                         currentTableSplit),
@@ -198,7 +198,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
         } catch (Exception e) {
-            LOGGER.error("Close snapshot reader error", e);
+            LOG.error("Close snapshot reader error", e);
         }
     }
 

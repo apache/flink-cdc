@@ -54,7 +54,7 @@ import java.util.stream.Collectors;
  */
 public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLSourceEnumState> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MySQLSourceEnumerator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLSourceEnumerator.class);
     private final SplitEnumeratorContext<MySQLSplit> context;
     private final MySQLSnapshotSplitAssigner snapshotSplitAssigner;
 
@@ -89,19 +89,19 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
             context.assignSplit(split.get(), subtaskId);
             // record assigned splits
             recordAssignedSplits(split.get(), subtaskId);
-            LOGGER.info("Assign snapshot split {} for subtask {}", split.get(), subtaskId);
+            LOG.info("Assign snapshot split {} for subtask {}", split.get(), subtaskId);
             return;
         } else {
             // no more snapshot split, try assign binlog split
             if (couldAssignBinlogSplit()) {
                 assignBinlogSplit(subtaskId);
-                LOGGER.info("Assign binlog split for subtask {}", subtaskId);
+                LOG.info("Assign binlog split for subtask {}", subtaskId);
                 return;
             }
             // no more snapshot split, try notify no more splits
             else if (couldNotifyNoMoreSplits(subtaskId)) {
                 context.signalNoMoreSplits(subtaskId);
-                LOGGER.info("No available split for subtask {}", subtaskId);
+                LOG.info("No available split for subtask {}", subtaskId);
                 return;
             }
             // the binlog split may can not assign due to snapshot splits report is
@@ -124,7 +124,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
                             .size();
             if (assignedSnapshotSplitSize > ackSpitsForReader.size()) {
                 context.sendEventToSourceReader(subtaskId, new EnumeratorRequestReportEvent());
-                LOGGER.info(
+                LOG.info(
                         "The enumerator call subtask {} to report its finished splits.", subtaskId);
             }
         }
@@ -141,7 +141,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
     @Override
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
         if (sourceEvent instanceof SourceReaderReportEvent) {
-            LOGGER.info(
+            LOG.info(
                     "The enumerator receive snapshot finished report event {} from subtask {}.",
                     sourceEvent,
                     subtaskId);

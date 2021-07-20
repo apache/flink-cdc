@@ -70,7 +70,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementU
 /** A split assigner that assign table snapshot splits to readers. */
 public class MySQLSnapshotSplitAssigner {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MySQLSnapshotSplitAssigner.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLSnapshotSplitAssigner.class);
 
     private static final JsonTableChangeSerializer tableChangesSerializer =
             new JsonTableChangeSerializer();
@@ -161,7 +161,7 @@ public class MySQLSnapshotSplitAssigner {
         MySQLSplit nextSplit;
         int splitCnt = 0;
         long start = System.currentTimeMillis();
-        LOGGER.info("Begin to analyze splits for table {} ", currentTableId);
+        LOG.info("Begin to analyze splits for table {} ", currentTableId);
         // optimization for integral, bigDecimal type
         if (enableIntegralOptimization
                 && isOptimizedKeyType(splitKeyType.getTypeAt(0).getTypeRoot())) {
@@ -178,7 +178,7 @@ public class MySQLSnapshotSplitAssigner {
                                     return rowToArray(rs, 2);
                                 });
             } catch (SQLException e) {
-                LOGGER.error(
+                LOG.error(
                         String.format(
                                 "Read max value and min value of split key from table %s failed.",
                                 currentTableId),
@@ -204,17 +204,17 @@ public class MySQLSnapshotSplitAssigner {
                     try {
                         Thread.sleep(100);
                     } catch (InterruptedException e) {
-                        LOGGER.error(
+                        LOG.error(
                                 "Interrupted when analyze splits for table {}, exception {}",
                                 currentTableId,
                                 e);
                     }
-                    LOGGER.info("Has analyze {} splits for table {} ", splitCnt, currentTableId);
+                    LOG.info("Has analyze {} splits for table {} ", splitCnt, currentTableId);
                 }
             }
         }
         long end = System.currentTimeMillis();
-        LOGGER.info(
+        LOG.info(
                 "Finish to analyze splits for table {}, time cost:{} ",
                 currentTableId,
                 Duration.ofMillis(end - start));
@@ -269,7 +269,7 @@ public class MySQLSnapshotSplitAssigner {
                                     return rowToArray(rs, splitKeyType.getFieldCount());
                                 });
             } catch (SQLException e) {
-                LOGGER.error(
+                LOG.error(
                         String.format("Read max primary key from table %s failed.", currentTableId),
                         e);
             }
@@ -359,7 +359,7 @@ public class MySQLSnapshotSplitAssigner {
             try {
                 jdbc.close();
             } catch (SQLException e) {
-                LOGGER.error("Close jdbc connection error", e);
+                LOG.error("Close jdbc connection error", e);
             }
         }
     }
@@ -384,7 +384,7 @@ public class MySQLSnapshotSplitAssigner {
     private Collection<TableId> getCapturedTables() {
         final List<TableId> capturedTableIds = new ArrayList<>();
         try {
-            LOGGER.info("Read list of available databases。");
+            LOG.info("Read list of available databases。");
             final List<String> databaseNames = new ArrayList<>();
 
             jdbc.query(
@@ -394,9 +394,9 @@ public class MySQLSnapshotSplitAssigner {
                             databaseNames.add(rs.getString(1));
                         }
                     });
-            LOGGER.info("The list of available databases is: {}", databaseNames);
+            LOG.info("The list of available databases is: {}", databaseNames);
 
-            LOGGER.info("Read list of available tables in each database");
+            LOG.info("Read list of available tables in each database");
 
             for (String dbName : databaseNames) {
                 jdbc.query(
@@ -406,15 +406,15 @@ public class MySQLSnapshotSplitAssigner {
                                 TableId tableId = new TableId(dbName, null, rs.getString(1));
                                 if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
                                     capturedTableIds.add(tableId);
-                                    LOGGER.info("Add table '{}' to capture", tableId);
+                                    LOG.info("Add table '{}' to capture", tableId);
                                 } else {
-                                    LOGGER.info("Table '{}' is filtered out of capturing", tableId);
+                                    LOG.info("Table '{}' is filtered out of capturing", tableId);
                                 }
                             }
                         });
             }
         } catch (Exception e) {
-            LOGGER.error("Obtain available tables fail.", e);
+            LOG.error("Obtain available tables fail.", e);
             this.close();
         }
         return capturedTableIds;
@@ -450,7 +450,7 @@ public class MySQLSnapshotSplitAssigner {
         try {
             jdbc.connect();
         } catch (SQLException e) {
-            LOGGER.error("connect to mysql error", e);
+            LOG.error("connect to mysql error", e);
         }
     }
 
@@ -485,7 +485,7 @@ public class MySQLSnapshotSplitAssigner {
                         }
                     });
         } catch (SQLException e) {
-            LOGGER.error("Get table schema error.", e);
+            LOG.error("Get table schema error.", e);
         }
         return historyRecords;
     }
