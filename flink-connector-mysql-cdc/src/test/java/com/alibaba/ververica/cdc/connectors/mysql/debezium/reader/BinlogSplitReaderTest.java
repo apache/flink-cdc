@@ -78,8 +78,8 @@ import static org.junit.Assert.assertEquals;
 @RunWith(Parameterized.class)
 public class BinlogSplitReaderTest extends MySqlTestBase {
 
-    private final UniqueDatabase customDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
+    private final UniqueDatabase customerDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
     private final BinaryLogClient binaryLogClient;
     private final MySqlConnection mySqlConnection;
@@ -99,7 +99,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
 
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
-        customDatabase.createAndInitialize();
+        customerDatabase.createAndInitialize();
         Configuration configuration = getConfig(new String[] {"customers"});
         final DataType dataType =
                 DataTypes.ROW(
@@ -144,7 +144,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
 
     @Test
     public void testReadAllBinlogSplitsForOneTable() throws Exception {
-        customDatabase.createAndInitialize();
+        customerDatabase.createAndInitialize();
         Configuration configuration = getConfig(new String[] {"customers"});
         final DataType dataType =
                 DataTypes.ROW(
@@ -199,7 +199,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
 
     @Test
     public void testReadAllBinlogForTableWithSingleLine() throws Exception {
-        customDatabase.createAndInitialize();
+        customerDatabase.createAndInitialize();
         Configuration configuration = getConfig(new String[] {"customer_card_single_line"});
         final DataType dataType =
                 DataTypes.ROW(
@@ -232,7 +232,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
 
     @Test
     public void testReadAllBinlogSplitsForTables() throws Exception {
-        customDatabase.createAndInitialize();
+        customerDatabase.createAndInitialize();
         Configuration configuration =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
         final DataType dataType =
@@ -527,9 +527,9 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         properties.put("database.server.name", "embedded-test");
         properties.put("database.hostname", MYSQL_CONTAINER.getHost());
         properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        properties.put("database.user", customDatabase.getUsername());
-        properties.put("database.password", customDatabase.getPassword());
-        properties.put("database.whitelist", customDatabase.getDatabaseName());
+        properties.put("database.user", customerDatabase.getUsername());
+        properties.put("database.password", customerDatabase.getPassword());
+        properties.put("database.whitelist", customerDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
         properties.put("server-id-range", "1001, 1002");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
@@ -538,7 +538,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
         List<String> captureTableIds =
                 Arrays.stream(captureTables)
-                        .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         properties.put("table.whitelist", String.join(",", captureTableIds));
         properties.put(

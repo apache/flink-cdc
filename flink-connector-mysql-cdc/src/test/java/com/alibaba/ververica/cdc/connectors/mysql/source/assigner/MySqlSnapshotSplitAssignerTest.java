@@ -48,12 +48,12 @@ import static org.junit.Assert.fail;
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
 public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
 
-    private static final UniqueDatabase customDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
+    private static final UniqueDatabase customerDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
     @BeforeClass
     public static void init() {
-        customDatabase.createAndInitialize();
+        customerDatabase.createAndInitialize();
     }
 
     @Test
@@ -193,7 +193,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         configuration.setBoolean(SCAN_OPTIMIZE_INTEGRAL_KEY.key(), enableIntegralOptimization);
         List<String> captureTableIds =
                 Arrays.stream(captureTables)
-                        .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
@@ -364,10 +364,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         Map<String, String> properties = new HashMap<>();
         properties.put("database.server.name", "embedded-test");
         properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.whitelist", customDatabase.getDatabaseName());
+        properties.put("database.whitelist", customerDatabase.getDatabaseName());
         properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        properties.put("database.user", customDatabase.getUsername());
-        properties.put("database.password", customDatabase.getPassword());
+        properties.put("database.user", customerDatabase.getUsername());
+        properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.history.skip.unparseable.ddl", "true");
         properties.put("server-id.range", "1001,1004");
         properties.put("scan.fetch.size", "2");

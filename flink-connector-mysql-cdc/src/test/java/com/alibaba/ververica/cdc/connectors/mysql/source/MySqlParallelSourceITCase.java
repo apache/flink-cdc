@@ -61,8 +61,8 @@ import static org.junit.Assert.assertThat;
 /** IT tests for {@link MySqlParallelSource}. */
 public class MySqlParallelSourceITCase extends MySqlTestBase {
 
-    private UniqueDatabase customDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
+    private final UniqueDatabase customerDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
@@ -85,7 +85,7 @@ public class MySqlParallelSourceITCase extends MySqlTestBase {
     }
 
     public void testReadMySQLTable(int parallelism, String[] captureTables) throws Exception {
-        customDatabase.createAndInitialize();
+        customerDatabase.createAndInitialize();
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -99,7 +99,7 @@ public class MySqlParallelSourceITCase extends MySqlTestBase {
         final Configuration configuration = getConfig();
         List<String> captureTableIds =
                 Arrays.stream(captureTables)
-                        .map(tableName -> customDatabase.getDatabaseName() + "." + tableName)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
@@ -283,10 +283,10 @@ public class MySqlParallelSourceITCase extends MySqlTestBase {
         Map<String, String> properties = new HashMap<>();
         properties.put("database.server.name", "embedded-test");
         properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.whitelist", customDatabase.getDatabaseName());
+        properties.put("database.whitelist", customerDatabase.getDatabaseName());
         properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        properties.put("database.user", customDatabase.getUsername());
-        properties.put("database.password", customDatabase.getPassword());
+        properties.put("database.user", customerDatabase.getUsername());
+        properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.history.skip.unparseable.ddl", "true");
         properties.put("server-id", "1001,1004");
         properties.put("scan.split.size", "1024");
