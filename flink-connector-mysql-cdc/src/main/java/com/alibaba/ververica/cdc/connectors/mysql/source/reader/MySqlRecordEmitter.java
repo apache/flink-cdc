@@ -23,7 +23,7 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Array;
@@ -43,26 +43,26 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
 
 /**
- * The {@link RecordEmitter} implementation for {@link MySQLSourceReader}.
+ * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
  *
  * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the binlog reader to
  * emit records rather than emit the records directly.
  */
-public final class MySQLRecordEmitter<T>
-        implements RecordEmitter<SourceRecord, T, MySQLSplitState> {
+public final class MySqlRecordEmitter<T>
+        implements RecordEmitter<SourceRecord, T, MySqlSplitState> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySQLRecordEmitter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
     private static final JsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
             new JsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
 
-    public MySQLRecordEmitter(DebeziumDeserializationSchema<T> debeziumDeserializationSchema) {
+    public MySqlRecordEmitter(DebeziumDeserializationSchema<T> debeziumDeserializationSchema) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
     }
 
     @Override
-    public void emitRecord(SourceRecord element, SourceOutput<T> output, MySQLSplitState splitState)
+    public void emitRecord(SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
             BinlogOffset watermark = getWatermark(element);

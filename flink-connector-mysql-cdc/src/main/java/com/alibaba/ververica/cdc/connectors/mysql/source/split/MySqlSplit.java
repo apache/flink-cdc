@@ -33,9 +33,9 @@ import java.util.List;
 import java.util.Map;
 
 /** The split of table comes from a Table that splits by primary key. */
-public class MySQLSplit implements SourceSplit {
+public class MySqlSplit implements SourceSplit {
 
-    private final MySQLSplitKind splitKind;
+    private final MySqlSplitKind splitKind;
     private final TableId tableId;
     private final String splitId;
     private final RowType splitBoundaryType;
@@ -59,12 +59,12 @@ public class MySQLSplit implements SourceSplit {
     private final Map<TableId, SchemaRecord> databaseHistory;
     /**
      * The splits are frequently serialized into checkpoints. Caching the byte representation makes
-     * repeated serialization cheap. This field is used by {@link MySQLSplitSerializer}.
+     * repeated serialization cheap. This field is used by {@link MySqlSplitSerializer}.
      */
     @Nullable transient byte[] serializedFormCache;
 
-    public MySQLSplit(
-            MySQLSplitKind splitKind,
+    public MySqlSplit(
+            MySqlSplitKind splitKind,
             TableId tableId,
             String splitId,
             RowType splitBoundaryType,
@@ -95,7 +95,7 @@ public class MySQLSplit implements SourceSplit {
         return splitId;
     }
 
-    public MySQLSplitKind getSplitKind() {
+    public MySqlSplitKind getSplitKind() {
         return splitKind;
     }
 
@@ -149,7 +149,7 @@ public class MySQLSplit implements SourceSplit {
 
     @Override
     public String toString() {
-        if (splitKind == MySQLSplitKind.SNAPSHOT) {
+        if (splitKind == MySqlSplitKind.SNAPSHOT) {
             return "MySQLSplit{"
                     + "splitKind="
                     + splitKind

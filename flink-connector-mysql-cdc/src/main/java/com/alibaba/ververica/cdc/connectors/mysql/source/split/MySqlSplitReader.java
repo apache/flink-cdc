@@ -28,7 +28,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.BinlogSplitRea
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLParallelSource;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -45,18 +45,18 @@ import java.util.Queue;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getBinaryClient;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getConnection;
 
-/** The {@link SplitReader} implementation for the {@link MySQLParallelSource}. */
-public class MySQLSplitReader implements SplitReader<SourceRecord, MySQLSplit> {
+/** The {@link SplitReader} implementation for the {@link MySqlParallelSource}. */
+public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySQLSplitReader.class);
-    private final Queue<MySQLSplit> splits;
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSplitReader.class);
+    private final Queue<MySqlSplit> splits;
     private final Configuration config;
     private final int subtaskId;
 
-    @Nullable private DebeziumReader<SourceRecord, MySQLSplit> currentReader;
+    @Nullable private DebeziumReader<SourceRecord, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
 
-    public MySQLSplitReader(Configuration config, int subtaskId) {
+    public MySqlSplitReader(Configuration config, int subtaskId) {
         this.config = config;
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
@@ -74,11 +74,11 @@ public class MySQLSplitReader implements SplitReader<SourceRecord, MySQLSplit> {
         }
         return dataIt == null
                 ? finishedSnapshotSplit()
-                : MySQLRecords.forRecords(currentSplitId, dataIt);
+                : MySqlRecords.forRecords(currentSplitId, dataIt);
     }
 
     @Override
-    public void handleSplitsChanges(SplitsChange<MySQLSplit> splitsChanges) {
+    public void handleSplitsChanges(SplitsChange<MySqlSplit> splitsChanges) {
         if (!(splitsChanges instanceof SplitsAddition)) {
             throw new UnsupportedOperationException(
                     String.format(
@@ -111,13 +111,13 @@ public class MySQLSplitReader implements SplitReader<SourceRecord, MySQLSplit> {
         }
 
         if (canAssignNextSplit()) {
-            final MySQLSplit nextSplit = splits.poll();
+            final MySqlSplit nextSplit = splits.poll();
             if (nextSplit == null) {
                 throw new IOException("Cannot fetch from another split - no split remaining");
             }
             currentSplitId = nextSplit.getSplitId();
 
-            if (nextSplit.getSplitKind() == MySQLSplitKind.SNAPSHOT) {
+            if (nextSplit.getSplitKind() == MySqlSplitKind.SNAPSHOT) {
                 if (currentReader == null) {
                     final MySqlConnection jdbcConnection = getConnection(config);
                     final BinaryLogClient binaryLogClient = getBinaryClient(config);
@@ -147,8 +147,8 @@ public class MySQLSplitReader implements SplitReader<SourceRecord, MySQLSplit> {
         return currentReader == null || currentReader.isIdle();
     }
 
-    private MySQLRecords finishedSnapshotSplit() {
-        final MySQLRecords finishedRecords = MySQLRecords.forFinishedSplit(currentSplitId);
+    private MySqlRecords finishedSnapshotSplit() {
+        final MySqlRecords finishedRecords = MySqlRecords.forFinishedSplit(currentSplitId);
         currentSplitId = null;
         return finishedRecords;
     }

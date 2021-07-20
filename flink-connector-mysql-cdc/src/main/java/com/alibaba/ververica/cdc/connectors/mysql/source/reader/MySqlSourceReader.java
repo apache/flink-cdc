@@ -32,10 +32,10 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorAckEve
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorRequestReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.SourceReaderReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitReader;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitKind;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,19 +49,19 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /** The source reader for MySQL source splits. */
-public class MySQLSourceReader<T>
+public class MySqlSourceReader<T>
         extends SingleThreadMultiplexSourceReaderBase<
-                SourceRecord, T, MySQLSplit, MySQLSplitState> {
+                SourceRecord, T, MySqlSplit, MySqlSplitState> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySQLSourceReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
 
-    private final Map<String, MySQLSplit> finishedNoAckSplits;
+    private final Map<String, MySqlSplit> finishedNoAckSplits;
     private final int subtaskId;
 
-    public MySQLSourceReader(
+    public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
-            Supplier<MySQLSplitReader> splitReaderSupplier,
-            RecordEmitter<SourceRecord, T, MySQLSplitState> recordEmitter,
+            Supplier<MySqlSplitReader> splitReaderSupplier,
+            RecordEmitter<SourceRecord, T, MySqlSplitState> recordEmitter,
             Configuration config,
             SourceReaderContext context) {
         super(
@@ -82,14 +82,14 @@ public class MySQLSourceReader<T>
     }
 
     @Override
-    protected MySQLSplitState initializedState(MySQLSplit split) {
-        return new MySQLSplitState(split);
+    protected MySqlSplitState initializedState(MySqlSplit split) {
+        return new MySqlSplitState(split);
     }
 
     @Override
-    public List<MySQLSplit> snapshotState(long checkpointId) {
+    public List<MySqlSplit> snapshotState(long checkpointId) {
         // unfinished splits
-        List<MySQLSplit> stateSplits = super.snapshotState(checkpointId);
+        List<MySqlSplit> stateSplits = super.snapshotState(checkpointId);
 
         // add finished splits that didn't receive ack yet
         stateSplits.addAll(finishedNoAckSplits.values());
@@ -97,24 +97,24 @@ public class MySQLSourceReader<T>
     }
 
     @Override
-    protected void onSplitFinished(Map<String, MySQLSplitState> finishedSplitIds) {
+    protected void onSplitFinished(Map<String, MySqlSplitState> finishedSplitIds) {
         LOG.info("The split(s) {} read finished.", finishedSplitIds);
-        final List<MySQLSplit> splits =
+        final List<MySqlSplit> splits =
                 finishedSplitIds.values().stream()
-                        .map(MySQLSplitState::toMySQLSplit)
+                        .map(MySqlSplitState::toMySQLSplit)
                         .collect(Collectors.toList());
         reportFinishedSnapshotSplits(splits);
         context.sendSplitRequest();
     }
 
     @Override
-    public void addSplits(List<MySQLSplit> splits) {
+    public void addSplits(List<MySqlSplit> splits) {
         // case for restore from state, notify split enumerator if there're finished snapshot splits
         // and has not report
         splits.stream()
                 .filter(
                         split ->
-                                split.getSplitKind() == MySQLSplitKind.SNAPSHOT
+                                split.getSplitKind() == MySqlSplitKind.SNAPSHOT
                                         && split.isSnapshotReadFinished())
                 .forEach(split -> this.finishedNoAckSplits.put(split.getSplitId(), split));
         reportFinishedSnapshotSplits(this.finishedNoAckSplits.values());
@@ -124,7 +124,7 @@ public class MySQLSourceReader<T>
                 splits.stream()
                         .filter(
                                 split ->
-                                        !(split.getSplitKind() == MySQLSplitKind.SNAPSHOT
+                                        !(split.getSplitKind() == MySqlSplitKind.SNAPSHOT
                                                 && split.isSnapshotReadFinished()))
                         .collect(Collectors.toList()));
     }
@@ -153,10 +153,10 @@ public class MySQLSourceReader<T>
         }
     }
 
-    private void reportFinishedSnapshotSplits(Collection<MySQLSplit> splits) {
+    private void reportFinishedSnapshotSplits(Collection<MySqlSplit> splits) {
         if (!splits.isEmpty()) {
             final ArrayList<Tuple2<String, BinlogOffset>> finishedNoAckSplits = new ArrayList<>();
-            for (MySQLSplit split : splits) {
+            for (MySqlSplit split : splits) {
                 finishedNoAckSplits.add(Tuple2.of(split.getSplitId(), split.getHighWatermark()));
             }
             SourceReaderReportEvent reportEvent = new SourceReaderReportEvent(finishedNoAckSplits);
@@ -169,7 +169,7 @@ public class MySQLSourceReader<T>
     }
 
     @Override
-    protected MySQLSplit toSplitType(String splitId, MySQLSplitState splitState) {
+    protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState;
     }
 }

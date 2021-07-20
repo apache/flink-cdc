@@ -42,17 +42,17 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_FETCH_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SNAPSHOT_PARALLEL_SCAN;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SNAPSHOT_PARALLEL_SCAN;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/** Test for {@link MySQLTableSource} created by {@link MySQLTableSourceFactory}. */
-public class MySQLTableSourceFactoryTest {
+/** Test for {@link MySqlTableSource} created by {@link MySqlTableSourceFactory}. */
+public class MySqlTableSourceFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -78,8 +78,8 @@ public class MySQLTableSourceFactoryTest {
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
@@ -110,8 +110,8 @@ public class MySQLTableSourceFactoryTest {
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
@@ -143,8 +143,8 @@ public class MySQLTableSourceFactoryTest {
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
@@ -175,8 +175,8 @@ public class MySQLTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "never");
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3307,
                         MY_LOCALHOST,
@@ -209,8 +209,8 @@ public class MySQLTableSourceFactoryTest {
         options.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
 
         DynamicTableSource actualSource = createTableSource(options);
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3307,
                         MY_LOCALHOST,
@@ -237,8 +237,8 @@ public class MySQLTableSourceFactoryTest {
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
@@ -265,8 +265,8 @@ public class MySQLTableSourceFactoryTest {
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
@@ -293,8 +293,8 @@ public class MySQLTableSourceFactoryTest {
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
-        MySQLTableSource expectedSource =
-                new MySQLTableSource(
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
                         3306,
                         MY_LOCALHOST,
@@ -393,7 +393,7 @@ public class MySQLTableSourceFactoryTest {
         }
 
         // validate missing required
-        Factory factory = new MySQLTableSourceFactory();
+        Factory factory = new MySqlTableSourceFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
             Map<String, String> properties = getAllOptions();
             properties.remove(requiredOption.key());
@@ -462,7 +462,7 @@ public class MySQLTableSourceFactoryTest {
                                 options),
                         SCHEMA),
                 new Configuration(),
-                MySQLTableSourceFactoryTest.class.getClassLoader(),
+                MySqlTableSourceFactoryTest.class.getClassLoader(),
                 false);
     }
 }

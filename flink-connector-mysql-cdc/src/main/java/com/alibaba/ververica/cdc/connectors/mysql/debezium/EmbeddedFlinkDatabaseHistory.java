@@ -19,7 +19,7 @@
 package com.alibaba.ververica.cdc.connectors.mysql.debezium;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
@@ -43,7 +43,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.S
 /**
  * A {@link DatabaseHistory} implementation which store the latest table schema in Flink state.
  *
- * <p>It stores/recovers history using data offered by {@link MySQLSplitState}.
+ * <p>It stores/recovers history using data offered by {@link MySqlSplitState}.
  */
 public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
 

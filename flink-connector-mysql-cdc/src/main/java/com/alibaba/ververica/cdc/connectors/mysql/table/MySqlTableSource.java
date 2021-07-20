@@ -31,10 +31,10 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlSource;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLParallelSource;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
@@ -50,17 +50,17 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.DATABASE_SERVER_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_COLUMN;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SERVER_ID;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_COLUMN;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * A {@link DynamicTableSource} that describes how to create a MySQL binlog source from a logical
  * description.
  */
-public class MySQLTableSource implements ScanTableSource {
+public class MySqlTableSource implements ScanTableSource {
 
     private final TableSchema physicalSchema;
     private final int port;
@@ -79,7 +79,7 @@ public class MySQLTableSource implements ScanTableSource {
     private final String splitColumn;
     private final StartupOptions startupOptions;
 
-    public MySQLTableSource(
+    public MySqlTableSource(
             TableSchema physicalSchema,
             int port,
             String hostname,
@@ -135,12 +135,12 @@ public class MySQLTableSource implements ScanTableSource {
         if (enableParallelRead) {
             RowType pkRowType = getPkType(physicalSchema);
             Configuration configuration = getParallelSourceConf(pkRowType);
-            MySQLParallelSource<RowData> parallelSource =
-                    new MySQLParallelSource<>(pkRowType, deserializer, configuration);
+            MySqlParallelSource<RowData> parallelSource =
+                    new MySqlParallelSource<>(pkRowType, deserializer, configuration);
             return SourceProvider.of(parallelSource);
         } else {
-            MySQLSource.Builder<RowData> builder =
-                    MySQLSource.<RowData>builder()
+            MySqlSource.Builder<RowData> builder =
+                    MySqlSource.<RowData>builder()
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)
@@ -153,7 +153,7 @@ public class MySQLTableSource implements ScanTableSource {
                             .deserializer(deserializer);
             Optional.ofNullable(serverId)
                     .ifPresent(
-                            serverId -> builder.serverId(MySQLSourceOptions.getServerId(serverId)));
+                            serverId -> builder.serverId(MySqlSourceOptions.getServerId(serverId)));
             DebeziumSourceFunction<RowData> sourceFunction = builder.build();
             return SourceFunctionProvider.of(sourceFunction, false);
         }
@@ -218,7 +218,7 @@ public class MySQLTableSource implements ScanTableSource {
 
     @Override
     public DynamicTableSource copy() {
-        return new MySQLTableSource(
+        return new MySqlTableSource(
                 physicalSchema,
                 port,
                 hostname,
@@ -242,10 +242,10 @@ public class MySQLTableSource implements ScanTableSource {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof MySQLTableSource)) {
+        if (!(o instanceof MySqlTableSource)) {
             return false;
         }
-        MySQLTableSource that = (MySQLTableSource) o;
+        MySqlTableSource that = (MySqlTableSource) o;
         return port == that.port
                 && enableIntegralOptimization == that.enableIntegralOptimization
                 && enableParallelRead == that.enableParallelRead

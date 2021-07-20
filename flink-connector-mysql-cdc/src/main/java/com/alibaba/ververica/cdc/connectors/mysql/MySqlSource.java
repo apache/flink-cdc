@@ -28,19 +28,19 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.DATABASE_SERVER_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
 import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.LEGACY_IMPLEMENTATION_KEY;
 import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.LEGACY_IMPLEMENTATION_VALUE;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A builder to build a SourceFunction which can read snapshot and continue to consume binlog. */
-public class MySQLSource {
+public class MySqlSource {
 
     public static <T> Builder<T> builder() {
         return new Builder<>();
     }
 
-    /** Builder class of {@link MySQLSource}. */
+    /** Builder class of {@link MySqlSource}. */
     public static class Builder<T> {
 
         private int port = 3306; // default 3306 port

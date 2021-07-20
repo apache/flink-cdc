@@ -23,10 +23,10 @@ import org.apache.flink.api.java.tuple.Tuple5;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySQLBinlogSplitReadTask;
+import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlOffsetContext;
@@ -58,7 +58,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
  * snapshot data that {@link SnapshotSplitReader} read.
  */
-public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSplit> {
+public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
@@ -66,8 +66,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
 
     private volatile boolean currentTaskRunning;
     private volatile ChangeEventQueue<DataChangeEvent> queue;
-    private MySQLBinlogSplitReadTask binlogSplitReadTask;
-    private MySQLSplit currentTableSplit;
+    private MySqlBinlogSplitReadTask binlogSplitReadTask;
+    private MySqlSplit currentTableSplit;
     // tableId -> List[splitKeyStart, splitKeyEnd, splitHighWatermark]
     private Map<TableId, List<Tuple3<Object[], Object[], BinlogOffset>>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
@@ -81,7 +81,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
         this.currentTaskRunning = false;
     }
 
-    public void submitSplit(MySQLSplit mySQLSplit) {
+    public void submitSplit(MySqlSplit mySQLSplit) {
         this.currentTableSplit = mySQLSplit;
         configureFilter();
         statefulTaskContext.configure(currentTableSplit);
@@ -91,7 +91,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
                 currentTableSplit.getOffset().getFilename(),
                 currentTableSplit.getOffset().getPosition());
         this.binlogSplitReadTask =
-                new MySQLBinlogSplitReadTask(
+                new MySqlBinlogSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
                         mySqlOffsetContext,
                         statefulTaskContext.getConnection(),

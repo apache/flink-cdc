@@ -30,7 +30,7 @@ import java.util.Set;
  * overriding mysql conf file, i.e. my.cnf.
  */
 @SuppressWarnings("rawtypes")
-public class MySQLContainer extends JdbcDatabaseContainer {
+public class MySqlContainer extends JdbcDatabaseContainer {
 
     public static final String IMAGE = "mysql";
     public static final String DEFAULT_TAG = "5.7";
@@ -44,7 +44,7 @@ public class MySQLContainer extends JdbcDatabaseContainer {
     private String username = "test";
     private String password = "test";
 
-    public MySQLContainer() {
+    public MySqlContainer() {
         super(IMAGE + ":" + DEFAULT_TAG);
         addExposedPort(MYSQL_PORT);
     }
@@ -145,31 +145,31 @@ public class MySQLContainer extends JdbcDatabaseContainer {
     }
 
     @SuppressWarnings("unchecked")
-    public MySQLContainer withConfigurationOverride(String s) {
+    public MySqlContainer withConfigurationOverride(String s) {
         parameters.put(MY_CNF_CONFIG_OVERRIDE_PARAM_NAME, s);
         return this;
     }
 
     @SuppressWarnings("unchecked")
-    public MySQLContainer withSetupSQL(String sqlPath) {
+    public MySqlContainer withSetupSQL(String sqlPath) {
         parameters.put(SETUP_SQL_PARAM_NAME, sqlPath);
         return this;
     }
 
     @Override
-    public MySQLContainer withDatabaseName(final String databaseName) {
+    public MySqlContainer withDatabaseName(final String databaseName) {
         this.databaseName = databaseName;
         return this;
     }
 
     @Override
-    public MySQLContainer withUsername(final String username) {
+    public MySqlContainer withUsername(final String username) {
         this.username = username;
         return this;
     }
 
     @Override
-    public MySQLContainer withPassword(final String password) {
+    public MySqlContainer withPassword(final String password) {
         this.password = password;
         return this;
     }

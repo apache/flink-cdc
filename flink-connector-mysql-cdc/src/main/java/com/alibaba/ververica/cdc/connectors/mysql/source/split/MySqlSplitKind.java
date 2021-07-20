@@ -19,7 +19,7 @@
 package com.alibaba.ververica.cdc.connectors.mysql.source.split;
 
 /** The kinds of MySQL table split. */
-public enum MySQLSplitKind {
+public enum MySqlSplitKind {
 
     /** The split that reads snapshot records of MySQL table. */
     SNAPSHOT,
@@ -27,7 +27,7 @@ public enum MySQLSplitKind {
     /** The split that reads binlog records of MySQL table. */
     BINLOG;
 
-    public static MySQLSplitKind fromString(String kind) {
+    public static MySqlSplitKind fromString(String kind) {
         if (SNAPSHOT.toString().equalsIgnoreCase(kind)) {
             return SNAPSHOT;
         }

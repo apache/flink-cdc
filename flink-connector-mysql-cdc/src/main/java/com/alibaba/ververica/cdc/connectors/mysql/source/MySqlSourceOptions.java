@@ -24,8 +24,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.util.Preconditions;
 
-/** Configurations for {@link MySQLParallelSource}. */
-public class MySQLSourceOptions {
+/** Configurations for {@link MySqlParallelSource}. */
+public class MySqlSourceOptions {
 
     public static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
 
@@ -156,9 +156,9 @@ public class MySQLSourceOptions {
 
     // utils
     public static String validateAndGetServerId(ReadableConfig configuration) {
-        final String serverIdValue = configuration.get(MySQLSourceOptions.SERVER_ID);
+        final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
         // validate server id range
-        if (configuration.get(MySQLSourceOptions.SNAPSHOT_PARALLEL_SCAN)) {
+        if (configuration.get(MySqlSourceOptions.SNAPSHOT_PARALLEL_SCAN)) {
             String errMsg =
                     "The server id should be a range syntax like '5400,5404' when enable 'snapshot.parallel-scan' to 'true', "
                             + "but actual is %s";
@@ -195,7 +195,7 @@ public class MySQLSourceOptions {
     }
 
     public static String getServerIdForSubTask(Configuration configuration, int subtaskId) {
-        String serverIdRange = configuration.getString(MySQLSourceOptions.SERVER_ID);
+        String serverIdRange = configuration.getString(MySqlSourceOptions.SERVER_ID);
         int serverIdStart = Integer.parseInt(serverIdRange.split(",")[0].trim());
         int serverIdEnd = Integer.parseInt(serverIdRange.split(",")[1].trim());
         int serverId = serverIdStart + subtaskId;

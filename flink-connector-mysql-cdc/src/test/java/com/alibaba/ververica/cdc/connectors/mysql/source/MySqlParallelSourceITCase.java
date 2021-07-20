@@ -34,7 +34,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -58,8 +58,8 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkD
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 
-/** IT tests for {@link MySQLParallelSource}. */
-public class MySQLParallelSourceITCase extends MySQLTestBase {
+/** IT tests for {@link MySqlParallelSource}. */
+public class MySqlParallelSourceITCase extends MySqlTestBase {
 
     private UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
@@ -103,8 +103,8 @@ public class MySQLParallelSourceITCase extends MySQLTestBase {
                         .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
-        MySQLParallelSource<Row> source =
-                new MySQLParallelSource<>(splitKeyType, deserializer, configuration);
+        MySqlParallelSource<Row> source =
+                new MySqlParallelSource<>(splitKeyType, deserializer, configuration);
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
         DataStream<Row> stream =

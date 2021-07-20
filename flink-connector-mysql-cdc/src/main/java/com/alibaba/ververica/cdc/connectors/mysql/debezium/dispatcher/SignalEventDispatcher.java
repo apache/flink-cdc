@@ -19,7 +19,7 @@
 package com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.pipeline.DataChangeEvent;
@@ -83,7 +83,7 @@ public class SignalEventDispatcher {
     }
 
     public void dispatchWatermarkEvent(
-            MySQLSplit mySQLSplit, BinlogOffset watermark, WatermarkKind watermarkKind)
+            MySqlSplit mySQLSplit, BinlogOffset watermark, WatermarkKind watermarkKind)
             throws InterruptedException {
         SourceRecord sourceRecord =
                 new SourceRecord(

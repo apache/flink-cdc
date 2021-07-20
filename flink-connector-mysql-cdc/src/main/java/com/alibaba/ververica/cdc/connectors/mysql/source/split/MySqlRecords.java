@@ -31,14 +31,14 @@ import java.util.Set;
 /**
  * An implementation of {@link RecordsWithSplitIds} which contains the records of one table split.
  */
-public final class MySQLRecords implements RecordsWithSplitIds<SourceRecord> {
+public final class MySqlRecords implements RecordsWithSplitIds<SourceRecord> {
 
     @Nullable private String splitId;
     @Nullable private Iterator<SourceRecord> recordsForCurrentSplit;
     @Nullable private final Iterator<SourceRecord> recordsForSplit;
     private final Set<String> finishedSnapshotSplits;
 
-    public MySQLRecords(
+    public MySqlRecords(
             @Nullable String splitId,
             @Nullable Iterator recordsForSplit,
             Set<String> finishedSnapshotSplits) {
@@ -79,13 +79,13 @@ public final class MySQLRecords implements RecordsWithSplitIds<SourceRecord> {
         return finishedSnapshotSplits;
     }
 
-    public static MySQLRecords forRecords(
+    public static MySqlRecords forRecords(
             final String splitId, final Iterator<SourceRecord> recordsForSplit) {
-        return new MySQLRecords(splitId, recordsForSplit, Collections.emptySet());
+        return new MySqlRecords(splitId, recordsForSplit, Collections.emptySet());
     }
 
-    public static MySQLRecords forFinishedSplit(final String splitId) {
-        return new MySQLRecords(
+    public static MySqlRecords forFinishedSplit(final String splitId) {
+        return new MySqlRecords(
                 splitId, Collections.emptySet().iterator(), Collections.singleton(splitId));
     }
 }

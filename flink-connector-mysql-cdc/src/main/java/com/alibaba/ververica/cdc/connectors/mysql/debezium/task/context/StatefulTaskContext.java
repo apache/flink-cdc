@@ -22,8 +22,8 @@ import org.apache.flink.configuration.Configuration;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.AbstractSourceInfo;
@@ -110,7 +110,7 @@ public class StatefulTaskContext {
         this.connection = connection;
     }
 
-    public void configure(MySQLSplit mySQLSplit) {
+    public void configure(MySqlSplit mySQLSplit) {
         // initial stateful objects
         final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
         this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
@@ -197,7 +197,7 @@ public class StatefulTaskContext {
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
-    private OffsetContext loadOffsetState(OffsetContext.Loader loader, MySQLSplit mySQLSplit) {
+    private OffsetContext loadOffsetState(OffsetContext.Loader loader, MySqlSplit mySQLSplit) {
         Map<String, Object> previousOffset = new HashMap<>();
         previousOffset.put("file", mySQLSplit.getOffset().getFilename());
         previousOffset.put("pos", mySQLSplit.getOffset().getPosition());
@@ -403,7 +403,7 @@ public class StatefulTaskContext {
                 .with("database.responseBuffering", "adaptive")
                 .with(
                         "database.fetchSize",
-                        configuration.getInteger(MySQLSourceOptions.SCAN_FETCH_SIZE))
+                        configuration.getInteger(MySqlSourceOptions.SCAN_FETCH_SIZE))
                 .build();
     }
 }

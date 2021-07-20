@@ -35,17 +35,17 @@ import java.util.List;
 import java.util.Map;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializerTest.assertSplitsEqual;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializerTest.getTestHistoryRecord;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.assertSplitsEqual;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.getTestHistoryRecord;
 
-/** Tests for {@link MySQLSplitState}. */
-public class MySQLSplitStateTest {
+/** Tests for {@link MySqlSplitState}. */
+public class MySqlSplitStateTest {
 
     @Test
     public void testFromToSplit() {
-        final MySQLSplit split =
-                new MySQLSplit(
-                        MySQLSplitKind.SNAPSHOT,
+        final MySqlSplit split =
+                new MySqlSplit(
+                        MySqlSplitKind.SNAPSHOT,
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
                         new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
@@ -57,15 +57,15 @@ public class MySQLSplitStateTest {
                         INITIAL_OFFSET,
                         new ArrayList<>(),
                         new HashMap<>());
-        final MySQLSplitState mySQLSplitState = new MySQLSplitState(split);
+        final MySqlSplitState mySQLSplitState = new MySqlSplitState(split);
         assertSplitsEqual(split, mySQLSplitState.toMySQLSplit());
     }
 
     @Test
     public void testRecordSnapshotSplitState() {
-        final MySQLSplit split =
-                new MySQLSplit(
-                        MySQLSplitKind.SNAPSHOT,
+        final MySqlSplit split =
+                new MySqlSplit(
+                        MySqlSplitKind.SNAPSHOT,
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
                         new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
@@ -77,14 +77,14 @@ public class MySQLSplitStateTest {
                         INITIAL_OFFSET,
                         new ArrayList<>(),
                         new HashMap<>());
-        final MySQLSplitState mySQLSplitState = new MySQLSplitState(split);
+        final MySqlSplitState mySQLSplitState = new MySqlSplitState(split);
         mySQLSplitState.setLowWatermarkState(new BinlogOffset("mysql-bin.000001", 3L));
         mySQLSplitState.setHighWatermarkState(new BinlogOffset("mysql-bin.000002", 78L));
         mySQLSplitState.setSnapshotReadFinishedState(true);
 
-        final MySQLSplit expected =
-                new MySQLSplit(
-                        MySQLSplitKind.SNAPSHOT,
+        final MySqlSplit expected =
+                new MySqlSplit(
+                        MySqlSplitKind.SNAPSHOT,
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
                         new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
@@ -102,10 +102,10 @@ public class MySQLSplitStateTest {
     @Test
     public void testRecordBinlogSplitState() throws Exception {
 
-        final MySQLSplit split =
+        final MySqlSplit split =
                 getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 4L));
 
-        final MySQLSplitState mySQLSplitState = new MySQLSplitState(split);
+        final MySqlSplitState mySQLSplitState = new MySqlSplitState(split);
         mySQLSplitState.setOffsetState(new BinlogOffset("mysql-bin.000001", 100L));
 
         assertSplitsEqual(
@@ -118,7 +118,7 @@ public class MySQLSplitStateTest {
                 mySQLSplitState.toMySQLSplit());
     }
 
-    private MySQLSplit getTestBinlogSplitWithOffset(BinlogOffset offset) throws Exception {
+    private MySqlSplit getTestBinlogSplitWithOffset(BinlogOffset offset) throws Exception {
         final TableId tableId = TableId.parse("test_db.test_table");
         final List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                 new ArrayList<>();
@@ -154,8 +154,8 @@ public class MySQLSplitStateTest {
         final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         databaseHistory.put(tableId, getTestHistoryRecord());
 
-        return new MySQLSplit(
-                MySQLSplitKind.BINLOG,
+        return new MySqlSplit(
+                MySqlSplitKind.BINLOG,
                 tableId,
                 "binlog-split-0",
                 new RowType(Arrays.asList(new RowType.RowField("card_no", new VarCharType()))),

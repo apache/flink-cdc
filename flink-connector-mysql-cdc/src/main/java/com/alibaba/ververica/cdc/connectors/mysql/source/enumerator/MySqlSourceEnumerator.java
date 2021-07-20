@@ -24,13 +24,13 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple5;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorAckEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorRequestReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.SourceReaderReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitKind;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
 import org.slf4j.Logger;
@@ -52,19 +52,19 @@ import java.util.stream.Collectors;
  * A MySQL CDC source enumerator that enumerates receive the split request and assign the split to
  * source readers.
  */
-public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLSourceEnumState> {
+public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlSourceEnumState> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySQLSourceEnumerator.class);
-    private final SplitEnumeratorContext<MySQLSplit> context;
-    private final MySQLSnapshotSplitAssigner snapshotSplitAssigner;
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceEnumerator.class);
+    private final SplitEnumeratorContext<MySqlSplit> context;
+    private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
-    private final Map<Integer, List<MySQLSplit>> assignedSplits;
+    private final Map<Integer, List<MySqlSplit>> assignedSplits;
     private final Map<Integer, List<Tuple2<String, BinlogOffset>>> receiveFinishedSnapshotSplits;
 
-    public MySQLSourceEnumerator(
-            SplitEnumeratorContext<MySQLSplit> context,
-            MySQLSnapshotSplitAssigner snapshotSplitAssigner,
-            Map<Integer, List<MySQLSplit>> assignedSplits,
+    public MySqlSourceEnumerator(
+            SplitEnumeratorContext<MySqlSplit> context,
+            MySqlSnapshotSplitAssigner snapshotSplitAssigner,
+            Map<Integer, List<MySqlSplit>> assignedSplits,
             Map<Integer, List<Tuple2<String, BinlogOffset>>> receiveFinishedSnapshotSplits) {
         this.context = context;
         this.snapshotSplitAssigner = snapshotSplitAssigner;
@@ -83,7 +83,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
 
     @Override
     public void handleSplitRequest(int subtaskId, @Nullable String requesterHostname) {
-        Optional<MySQLSplit> split = snapshotSplitAssigner.getNext(requesterHostname);
+        Optional<MySqlSplit> split = snapshotSplitAssigner.getNext(requesterHostname);
         // assign snapshot split firstly
         if (split.isPresent()) {
             context.assignSplit(split.get(), subtaskId);
@@ -113,13 +113,13 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
     private void notifyReaderReportFinishedSplitsIfNeed(Integer[] subtaskIds) {
         // call reader report finished snapshot
         for (int subtaskId : subtaskIds) {
-            final List<MySQLSplit> assignedSplit =
+            final List<MySqlSplit> assignedSplit =
                     assignedSplits.getOrDefault(subtaskId, new ArrayList<>());
             final List<Tuple2<String, BinlogOffset>> ackSpitsForReader =
                     receiveFinishedSnapshotSplits.getOrDefault(subtaskId, new ArrayList<>());
             int assignedSnapshotSplitSize =
                     assignedSplit.stream()
-                            .filter(sqlSplit -> sqlSplit.getSplitKind() == MySQLSplitKind.SNAPSHOT)
+                            .filter(sqlSplit -> sqlSplit.getSplitKind() == MySqlSplitKind.SNAPSHOT)
                             .collect(Collectors.toList())
                             .size();
             if (assignedSnapshotSplitSize > ackSpitsForReader.size()) {
@@ -131,7 +131,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
     }
 
     @Override
-    public void addSplitsBack(List<MySQLSplit> splits, int subtaskId) {
+    public void addSplitsBack(List<MySqlSplit> splits, int subtaskId) {
         snapshotSplitAssigner.addSplits(splits);
     }
 
@@ -171,8 +171,8 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
     }
 
     @Override
-    public MySQLSourceEnumState snapshotState(long checkpointId) throws Exception {
-        return new MySQLSourceEnumState(
+    public MySqlSourceEnumState snapshotState(long checkpointId) throws Exception {
+        return new MySqlSourceEnumState(
                 snapshotSplitAssigner.remainingSplits(),
                 snapshotSplitAssigner.getAlreadyProcessedTables(),
                 assignedSplits,
@@ -186,7 +186,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
 
     private boolean couldNotifyNoMoreSplits(int subtaskId) {
         // the task may never be assigned split
-        final List<MySQLSplit> assignedSplit = assignedSplits.get(subtaskId);
+        final List<MySqlSplit> assignedSplit = assignedSplits.get(subtaskId);
         if (assignedSplit == null || hasAssignedBinlogSplit()) {
             return true;
         } else {
@@ -195,10 +195,10 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
     }
 
     private boolean hasAssignedBinlogSplit() {
-        for (List<MySQLSplit> assignedSplit : assignedSplits.values()) {
+        for (List<MySqlSplit> assignedSplit : assignedSplits.values()) {
             if (assignedSplit != null) {
                 return assignedSplit.stream()
-                        .anyMatch(r -> r.getSplitKind().equals(MySQLSplitKind.BINLOG));
+                        .anyMatch(r -> r.getSplitKind().equals(MySqlSplitKind.BINLOG));
             }
         }
         return false;
@@ -220,10 +220,10 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
     }
 
     private void assignBinlogSplit(int requestTaskId) {
-        final List<MySQLSplit> assignedSnapshotSplit =
+        final List<MySqlSplit> assignedSnapshotSplit =
                 assignedSplits.values().stream()
                         .flatMap(Collection::stream)
-                        .sorted(Comparator.comparing(MySQLSplit::splitId))
+                        .sorted(Comparator.comparing(MySqlSplit::splitId))
                         .collect(Collectors.toList());
         final List<Tuple2<String, BinlogOffset>> receiveSnapshotSplits =
                 receiveFinishedSnapshotSplits.values().stream()
@@ -237,7 +237,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
 
         BinlogOffset minBinlogOffset = receiveSnapshotSplits.get(0).f1;
         for (int i = 0; i < assignedSnapshotSplit.size(); i++) {
-            MySQLSplit split = assignedSnapshotSplit.get(i);
+            MySqlSplit split = assignedSnapshotSplit.get(i);
             // find the min binlog offset
             if (receiveSnapshotSplits.get(i).f1.compareTo(minBinlogOffset) < 0) {
                 minBinlogOffset = receiveSnapshotSplits.get(i).f1;
@@ -253,11 +253,11 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
             databaseHistory.putAll(split.getDatabaseHistory());
         }
 
-        final MySQLSplit lastSnapshotSplit =
+        final MySqlSplit lastSnapshotSplit =
                 assignedSnapshotSplit.get(assignedSnapshotSplit.size() - 1);
-        MySQLSplit binlogSplit =
-                new MySQLSplit(
-                        MySQLSplitKind.BINLOG,
+        MySqlSplit binlogSplit =
+                new MySqlSplit(
+                        MySqlSplitKind.BINLOG,
                         lastSnapshotSplit.getTableId(),
                         "binlog-split-" + requestTaskId,
                         lastSnapshotSplit.getSplitBoundaryType(),
@@ -275,8 +275,8 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
         recordAssignedSplits(binlogSplit, requestTaskId);
     }
 
-    private void recordAssignedSplits(MySQLSplit split, int subtaskId) {
-        List<MySQLSplit> assignedSplits =
+    private void recordAssignedSplits(MySqlSplit split, int subtaskId) {
+        List<MySqlSplit> assignedSplits =
                 this.assignedSplits.getOrDefault(subtaskId, new ArrayList<>());
         assignedSplits.add(split);
         this.assignedSplits.put(subtaskId, assignedSplits);

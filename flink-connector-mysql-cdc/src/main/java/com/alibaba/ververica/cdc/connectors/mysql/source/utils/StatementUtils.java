@@ -22,7 +22,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
@@ -53,7 +53,7 @@ public class StatementUtils {
         if (pkType.getFieldCount() == 1) {
             return pkType;
         } else {
-            String splitColumnName = configuration.getString(MySQLSourceOptions.SCAN_SPLIT_COLUMN);
+            String splitColumnName = configuration.getString(MySqlSourceOptions.SCAN_SPLIT_COLUMN);
             return new RowType(
                     pkType.getFields().stream()
                             .filter(r -> splitColumnName.equalsIgnoreCase(r.getName()))

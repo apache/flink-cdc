@@ -28,10 +28,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * State of the reader, essentially a mutable version of the {@link MySQLSplit}. It has a modifiable
+ * State of the reader, essentially a mutable version of the {@link MySqlSplit}. It has a modifiable
  * split status and split offset (i.e. BinlogPosition).
  */
-public final class MySQLSplitState extends MySQLSplit {
+public final class MySqlSplitState extends MySqlSplit {
 
     private BinlogOffset lowWatermarkState;
     private BinlogOffset highWatermarkState;
@@ -40,7 +40,7 @@ public final class MySQLSplitState extends MySQLSplit {
 
     @Nullable private Map<TableId, SchemaRecord> databaseHistoryState;
 
-    public MySQLSplitState(MySQLSplit split) {
+    public MySqlSplitState(MySqlSplit split) {
         super(
                 split.getSplitKind(),
                 split.getTableId(),
@@ -105,8 +105,8 @@ public final class MySQLSplitState extends MySQLSplit {
     }
 
     /** Use the current split state to create a new MySQLSplit. */
-    public MySQLSplit toMySQLSplit() {
-        return new MySQLSplit(
+    public MySqlSplit toMySQLSplit() {
+        return new MySqlSplit(
                 getSplitKind(),
                 getTableId(),
                 getSplitId(),

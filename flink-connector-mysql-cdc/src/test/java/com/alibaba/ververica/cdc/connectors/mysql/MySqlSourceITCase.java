@@ -26,9 +26,9 @@ import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
-/** Integration tests for {@link MySQLSource}. */
+/** Integration tests for {@link MySqlSource}. */
 @Ignore
-public class MySQLSourceITCase extends MySQLTestBase {
+public class MySqlSourceITCase extends MySqlTestBase {
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
@@ -37,7 +37,7 @@ public class MySQLSourceITCase extends MySQLTestBase {
     public void testConsumingAllEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
         SourceFunction<String> sourceFunction =
-                MySQLSource.<String>builder()
+                MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(

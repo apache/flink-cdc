@@ -20,7 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.utils.MySQLContainer;
+import com.alibaba.ververica.cdc.connectors.mysql.source.utils.MySqlContainer;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,13 +36,13 @@ import java.util.stream.Stream;
  * Basic class for testing MySQL binlog source, this contains a MySQL container which enables
  * binlog.
  */
-public abstract class MySQLTestBase extends AbstractTestBase {
+public abstract class MySqlTestBase extends AbstractTestBase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySQLTestBase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlTestBase.class);
 
-    protected static final MySQLContainer MYSQL_CONTAINER =
-            (MySQLContainer)
-                    new MySQLContainer()
+    protected static final MySqlContainer MYSQL_CONTAINER =
+            (MySqlContainer)
+                    new MySqlContainer()
                             .withConfigurationOverride("docker/my.cnf")
                             .withSetupSQL("docker/setup.sql")
                             .withDatabaseName("flink-test")

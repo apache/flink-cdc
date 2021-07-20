@@ -33,23 +33,23 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.types.logical.RowType;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumState;
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumStateSerializer;
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumerator;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumStateSerializer;
+import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySQLRecordEmitter;
-import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySQLSourceReader;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitReader;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializer;
+import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
+import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.Supplier;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.getServerIdForSubTask;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.getServerIdForSubTask;
 
 /**
  * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithms which supports parallel
@@ -63,14 +63,16 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptio
  *
  * @param <T> The record type.
  */
-public class MySQLParallelSource<T>
-        implements Source<T, MySQLSplit, MySQLSourceEnumState>, ResultTypeQueryable<T> {
+public class MySqlParallelSource<T>
+        implements Source<T, MySqlSplit, MySqlSourceEnumState>, ResultTypeQueryable<T> {
+
+    private static final long serialVersionUID = 1L;
 
     private final RowType splitKeyRowType;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
     private final Configuration config;
 
-    public MySQLParallelSource(
+    public MySqlParallelSource(
             RowType splitKeyRowType,
             DebeziumDeserializationSchema<T> deserializationSchema,
             Configuration config) {
@@ -85,49 +87,49 @@ public class MySQLParallelSource<T>
     }
 
     @Override
-    public SourceReader<T, MySQLSplit> createReader(SourceReaderContext readerContext)
+    public SourceReader<T, MySqlSplit> createReader(SourceReaderContext readerContext)
             throws Exception {
         FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple2<T, BinlogOffset>>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
 
         // set the server id for reader
         Configuration readerConfiguration = config.clone();
-        readerConfiguration.removeConfig(MySQLSourceOptions.SERVER_ID);
+        readerConfiguration.removeConfig(MySqlSourceOptions.SERVER_ID);
         readerConfiguration.setString(
                 "database.server.id",
                 getServerIdForSubTask(config, readerContext.getIndexOfSubtask()));
 
-        Supplier<MySQLSplitReader> splitReaderSupplier =
-                () -> new MySQLSplitReader(readerConfiguration, readerContext.getIndexOfSubtask());
-        return new MySQLSourceReader(
+        Supplier<MySqlSplitReader> splitReaderSupplier =
+                () -> new MySqlSplitReader(readerConfiguration, readerContext.getIndexOfSubtask());
+        return new MySqlSourceReader(
                 elementsQueue,
                 splitReaderSupplier,
-                new MySQLRecordEmitter(deserializationSchema),
+                new MySqlRecordEmitter(deserializationSchema),
                 readerConfiguration,
                 readerContext);
     }
 
     @Override
-    public SplitEnumerator<MySQLSplit, MySQLSourceEnumState> createEnumerator(
-            SplitEnumeratorContext<MySQLSplit> enumContext) throws Exception {
-        final MySQLSnapshotSplitAssigner splitAssigner =
-                new MySQLSnapshotSplitAssigner(
+    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> createEnumerator(
+            SplitEnumeratorContext<MySqlSplit> enumContext) throws Exception {
+        final MySqlSnapshotSplitAssigner splitAssigner =
+                new MySqlSnapshotSplitAssigner(
                         config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>());
-        return new MySQLSourceEnumerator(
+        return new MySqlSourceEnumerator(
                 enumContext, splitAssigner, new HashMap<>(), new HashMap<>());
     }
 
     @Override
-    public SplitEnumerator<MySQLSplit, MySQLSourceEnumState> restoreEnumerator(
-            SplitEnumeratorContext<MySQLSplit> enumContext, MySQLSourceEnumState checkpoint)
+    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> restoreEnumerator(
+            SplitEnumeratorContext<MySqlSplit> enumContext, MySqlSourceEnumState checkpoint)
             throws Exception {
-        final MySQLSnapshotSplitAssigner splitAssigner =
-                new MySQLSnapshotSplitAssigner(
+        final MySqlSnapshotSplitAssigner splitAssigner =
+                new MySqlSnapshotSplitAssigner(
                         config,
                         this.splitKeyRowType,
                         checkpoint.getAlreadyProcessedTables(),
                         checkpoint.getRemainingSplits());
-        return new MySQLSourceEnumerator(
+        return new MySqlSourceEnumerator(
                 enumContext,
                 splitAssigner,
                 checkpoint.getAssignedSplits(),
@@ -135,13 +137,13 @@ public class MySQLParallelSource<T>
     }
 
     @Override
-    public SimpleVersionedSerializer<MySQLSplit> getSplitSerializer() {
-        return MySQLSplitSerializer.INSTANCE;
+    public SimpleVersionedSerializer<MySqlSplit> getSplitSerializer() {
+        return MySqlSplitSerializer.INSTANCE;
     }
 
     @Override
-    public SimpleVersionedSerializer<MySQLSourceEnumState> getEnumeratorCheckpointSerializer() {
-        return new MySQLSourceEnumStateSerializer(getSplitSerializer());
+    public SimpleVersionedSerializer<MySqlSourceEnumState> getEnumeratorCheckpointSerializer() {
+        return new MySqlSourceEnumStateSerializer(getSplitSerializer());
     }
 
     @Override
