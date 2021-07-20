@@ -67,7 +67,7 @@ Include following Maven dependency (available through Maven Central):
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {

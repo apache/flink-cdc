@@ -24,7 +24,7 @@ import org.apache.flink.table.types.logical.RowType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
@@ -80,7 +80,7 @@ public class RecordUtils {
      * [high watermark event]
      */
     public static List<SourceRecord> normalizedSplitRecords(
-            MySQLSplit mySQLSplit, List<SourceRecord> sourceRecords) {
+            MySqlSplit mySQLSplit, List<SourceRecord> sourceRecords) {
         List<SourceRecord> normalizedRecords = new ArrayList<>();
         Map<Struct, SourceRecord> snapshotRecords = new HashMap<>();
         List<SourceRecord> binlogRecords = new ArrayList<>();
@@ -125,7 +125,7 @@ public class RecordUtils {
     }
 
     private static List<SourceRecord> upsertBinlog(
-            MySQLSplit split,
+            MySqlSplit split,
             SourceRecord lowWatermarkEvent,
             SourceRecord highWatermarkEvent,
             Map<Struct, SourceRecord> snapshotRecords,
@@ -239,7 +239,7 @@ public class RecordUtils {
      *     filter binlog events when read binlog of table.
      */
     public static Tuple5<TableId, String, Object[], Object[], BinlogOffset> getSnapshotSplitInfo(
-            MySQLSplit split, SourceRecord highWatermark) {
+            MySqlSplit split, SourceRecord highWatermark) {
         Struct value = (Struct) highWatermark.value();
         String splitId = value.getString(SPLIT_ID_KEY);
         String file = value.getString(BINLOG_FILENAME_OFFSET_KEY);

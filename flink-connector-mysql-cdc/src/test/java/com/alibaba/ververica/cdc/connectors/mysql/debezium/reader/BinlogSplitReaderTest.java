@@ -30,15 +30,15 @@ import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitKind;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
@@ -66,7 +66,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartOffsetOfBinlogSplit;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
@@ -76,7 +76,7 @@ import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link BinlogSplitReader}. */
 @RunWith(Parameterized.class)
-public class BinlogSplitReaderTest extends MySQLTestBase {
+public class BinlogSplitReaderTest extends MySqlTestBase {
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
@@ -109,7 +109,7 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
+        List<MySqlSplit> splits = getMySQLSplits(configuration, pkType);
         String[] expected =
                 useIntegralTypeOptimization
                         ? new String[] {
@@ -154,7 +154,7 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
+        List<MySqlSplit> splits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
                 new String[] {
@@ -213,8 +213,8 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                                         DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
-        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
-        List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
+        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        List<MySqlSplit> splits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
                 new String[] {
@@ -247,8 +247,8 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                                         DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
-        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
-        List<MySQLSplit> splits = getMySQLSplits(configuration, pkType);
+        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        List<MySqlSplit> splits = getMySQLSplits(configuration, pkType);
         String[] expected =
                 new String[] {
                     "+I[20000, LEVEL_1, user_1, user with level 1]",
@@ -282,7 +282,7 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
     }
 
     private List<String> readBinlogSplits(
-            List<MySQLSplit> sqlSplits,
+            List<MySqlSplit> sqlSplits,
             DataType dataType,
             RowType pkType,
             Configuration configuration,
@@ -297,7 +297,7 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         // step-1: read snapshot splits firstly
         List<SourceRecord> fetchedRecords = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
-            MySQLSplit sqlSplit = sqlSplits.get(i);
+            MySqlSplit sqlSplit = sqlSplits.get(i);
             if (snapshotSplitReader.isIdle()) {
                 snapshotSplitReader.submitSplit(sqlSplit);
             }
@@ -316,13 +316,13 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         BinlogOffset startOffset = getStartOffsetOfBinlogSplit(finishedSplitsInfo);
         Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         TableId tableId = null;
-        for (MySQLSplit mySQLSplit : sqlSplits) {
+        for (MySqlSplit mySQLSplit : sqlSplits) {
             databaseHistory.putAll(mySQLSplit.getDatabaseHistory());
             tableId = mySQLSplit.getTableId();
         }
-        MySQLSplit binlogSplit =
-                new MySQLSplit(
-                        MySQLSplitKind.BINLOG,
+        MySqlSplit binlogSplit =
+                new MySqlSplit(
+                        MySqlSplitKind.BINLOG,
                         tableId,
                         "binlog-split-0",
                         pkType,
@@ -459,9 +459,9 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
     }
 
     private List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> getFinishedSplitsInfo(
-            List<MySQLSplit> mySQLSplits, List<SourceRecord> records) {
-        Map<String, MySQLSplit> splitMap = new HashMap<>();
-        mySQLSplits.forEach(r -> splitMap.put(r.getSplitId(), r));
+            List<MySqlSplit> mySqlSplits, List<SourceRecord> records) {
+        Map<String, MySqlSplit> splitMap = new HashMap<>();
+        mySqlSplits.forEach(r -> splitMap.put(r.getSplitId(), r));
 
         List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                 new ArrayList<>();
@@ -471,7 +471,7 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                         event -> {
                             Struct value = (Struct) event.value();
                             String splitId = value.getString(SignalEventDispatcher.SPLIT_ID_KEY);
-                            MySQLSplit mySQLSplit = splitMap.get(splitId);
+                            MySqlSplit mySQLSplit = splitMap.get(splitId);
                             finishedSplitsInfo.add(getSnapshotSplitInfo(mySQLSplit, event));
                         });
         return finishedSplitsInfo;
@@ -504,22 +504,22 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
                 .collect(Collectors.toList());
     }
 
-    private List<MySQLSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
-        final MySQLSnapshotSplitAssigner assigner =
-                new MySQLSnapshotSplitAssigner(
+    private List<MySqlSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(
                         configuration, pkType, new ArrayList<>(), new ArrayList<>());
         assigner.open();
-        List<MySQLSplit> mySQLSplits = new ArrayList<>();
+        List<MySqlSplit> mySqlSplits = new ArrayList<>();
         while (true) {
-            Optional<MySQLSplit> mySQLSplit = assigner.getNext(null);
+            Optional<MySqlSplit> mySQLSplit = assigner.getNext(null);
             if (mySQLSplit.isPresent()) {
-                mySQLSplits.add(mySQLSplit.get());
+                mySqlSplits.add(mySQLSplit.get());
             } else {
                 break;
             }
         }
         assigner.close();
-        return mySQLSplits;
+        return mySqlSplits;
     }
 
     private Configuration getConfig(String[] captureTables) {

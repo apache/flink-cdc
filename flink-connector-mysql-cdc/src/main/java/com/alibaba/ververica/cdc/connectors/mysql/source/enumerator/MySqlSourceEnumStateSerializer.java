@@ -24,7 +24,7 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.relational.TableId;
 
 import java.io.IOException;
@@ -42,8 +42,8 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.Serializer
  * The {@link org.apache.flink.core.io.SimpleVersionedSerializer Serializer} for the enumerator
  * state of MySQL CDC source.
  */
-public class MySQLSourceEnumStateSerializer
-        implements SimpleVersionedSerializer<MySQLSourceEnumState> {
+public class MySqlSourceEnumStateSerializer
+        implements SimpleVersionedSerializer<MySqlSourceEnumState> {
 
     private static final int VERSION = 1;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
@@ -51,9 +51,9 @@ public class MySQLSourceEnumStateSerializer
 
     private static final ThreadLocal<DataInputDeserializer> DESERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataInputDeserializer());
-    private final SimpleVersionedSerializer<MySQLSplit> splitSerializer;
+    private final SimpleVersionedSerializer<MySqlSplit> splitSerializer;
 
-    public MySQLSourceEnumStateSerializer(SimpleVersionedSerializer<MySQLSplit> splitSerializer) {
+    public MySqlSourceEnumStateSerializer(SimpleVersionedSerializer<MySqlSplit> splitSerializer) {
         this.splitSerializer = splitSerializer;
     }
 
@@ -63,7 +63,7 @@ public class MySQLSourceEnumStateSerializer
     }
 
     @Override
-    public byte[] serialize(MySQLSourceEnumState sourceEnumState) throws IOException {
+    public byte[] serialize(MySqlSourceEnumState sourceEnumState) throws IOException {
         // optimization: the splits lazily cache their own serialized form
         if (sourceEnumState.serializedFormCache != null) {
             return sourceEnumState.serializedFormCache;
@@ -83,24 +83,24 @@ public class MySQLSourceEnumStateSerializer
     }
 
     @Override
-    public MySQLSourceEnumState deserialize(int version, byte[] serialized) throws IOException {
+    public MySqlSourceEnumState deserialize(int version, byte[] serialized) throws IOException {
         if (version == 1) {
             return deserializeV1(serialized);
         }
         throw new IOException("Unknown version: " + version);
     }
 
-    private MySQLSourceEnumState deserializeV1(byte[] serialized) throws IOException {
+    private MySqlSourceEnumState deserializeV1(byte[] serialized) throws IOException {
         final DataInputDeserializer in = DESERIALIZER_CACHE.get();
         in.setBuffer(serialized);
 
-        final Collection<MySQLSplit> splits = readMySQLSplits(in);
+        final Collection<MySqlSplit> splits = readMySQLSplits(in);
         final Collection<TableId> tableIds = readTableIds(in);
-        final Map<Integer, List<MySQLSplit>> assignedSplits = readAssignedSplits(in);
+        final Map<Integer, List<MySqlSplit>> assignedSplits = readAssignedSplits(in);
         final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits =
                 readFinishedSnapshotSplits(in);
         in.releaseArrays();
-        return new MySQLSourceEnumState(splits, tableIds, assignedSplits, finishedSnapshotSplits);
+        return new MySqlSourceEnumState(splits, tableIds, assignedSplits, finishedSnapshotSplits);
     }
 
     private void writeFinishedSnapshotSplits(
@@ -155,54 +155,54 @@ public class MySQLSourceEnumStateSerializer
     }
 
     private void writeAssignedSplits(
-            Map<Integer, List<MySQLSplit>> assignedSplits, DataOutputSerializer out)
+            Map<Integer, List<MySqlSplit>> assignedSplits, DataOutputSerializer out)
             throws IOException {
         final int size = assignedSplits.size();
         out.writeInt(size);
-        for (Map.Entry<Integer, List<MySQLSplit>> entry : assignedSplits.entrySet()) {
+        for (Map.Entry<Integer, List<MySqlSplit>> entry : assignedSplits.entrySet()) {
             int subtaskId = entry.getKey();
-            List<MySQLSplit> splits = entry.getValue();
+            List<MySqlSplit> splits = entry.getValue();
             out.writeInt(subtaskId);
             writeMySQLSplits(splits, out);
         }
     }
 
-    private Map<Integer, List<MySQLSplit>> readAssignedSplits(DataInputDeserializer in)
+    private Map<Integer, List<MySqlSplit>> readAssignedSplits(DataInputDeserializer in)
             throws IOException {
-        Map<Integer, List<MySQLSplit>> assignedSplits = new HashMap<>();
+        Map<Integer, List<MySqlSplit>> assignedSplits = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             int subtaskId = in.readInt();
-            List<MySQLSplit> mySQLSplits = (List<MySQLSplit>) readMySQLSplits(in);
-            assignedSplits.put(subtaskId, mySQLSplits);
+            List<MySqlSplit> mySqlSplits = (List<MySqlSplit>) readMySQLSplits(in);
+            assignedSplits.put(subtaskId, mySqlSplits);
         }
         return assignedSplits;
     }
 
-    private void writeMySQLSplits(Collection<MySQLSplit> mySQLSplits, DataOutputSerializer out)
+    private void writeMySQLSplits(Collection<MySqlSplit> mySqlSplits, DataOutputSerializer out)
             throws IOException {
-        final int size = mySQLSplits.size();
+        final int size = mySqlSplits.size();
         out.writeInt(size);
-        final Iterator<MySQLSplit> iterator = mySQLSplits.iterator();
+        final Iterator<MySqlSplit> iterator = mySqlSplits.iterator();
         while (iterator.hasNext()) {
-            MySQLSplit split = iterator.next();
+            MySqlSplit split = iterator.next();
             byte[] splitBytes = splitSerializer.serialize(split);
             out.writeInt(splitBytes.length);
             out.write(splitBytes);
         }
     }
 
-    private Collection<MySQLSplit> readMySQLSplits(DataInputDeserializer in) throws IOException {
-        Collection<MySQLSplit> mySQLSplits = new ArrayList<>();
+    private Collection<MySqlSplit> readMySQLSplits(DataInputDeserializer in) throws IOException {
+        Collection<MySqlSplit> mySqlSplits = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             int splitBytesLen = in.readInt();
             byte[] splitBytes = new byte[splitBytesLen];
             in.read(splitBytes);
-            MySQLSplit mySQLSplit = splitSerializer.deserialize(getVersion(), splitBytes);
-            mySQLSplits.add(mySQLSplit);
+            MySqlSplit mySQLSplit = splitSerializer.deserialize(getVersion(), splitBytes);
+            mySqlSplits.add(mySQLSplit);
         }
-        return mySQLSplits;
+        return mySqlSplits;
     }
 
     private void writeTableIds(Collection<TableId> tableIds, DataOutputSerializer out)

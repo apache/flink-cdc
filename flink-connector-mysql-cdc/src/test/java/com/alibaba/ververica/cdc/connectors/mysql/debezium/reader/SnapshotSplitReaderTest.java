@@ -29,12 +29,12 @@ import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
@@ -58,13 +58,13 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link SnapshotSplitReader}. */
 @RunWith(Parameterized.class)
-public class SnapshotSplitReaderTest extends MySQLTestBase {
+public class SnapshotSplitReaderTest extends MySqlTestBase {
 
     private static final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
@@ -101,7 +101,7 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
                 useIntegralTypeOptimization
@@ -117,7 +117,7 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                             "+I[121, user_8, Shanghai, 123567891234]",
                             "+I[123, user_9, Shanghai, 123567891234]"
                         };
-        List<String> actual = readTableSnapshotSplits(mySQLSplits, configuration, 1, dataType);
+        List<String> actual = readTableSnapshotSplits(mySqlSplits, configuration, 1, dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
@@ -132,7 +132,7 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
                 new String[] {
@@ -159,14 +159,14 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
         List<String> actual =
-                readTableSnapshotSplits(mySQLSplits, configuration, mySQLSplits.size(), dataType);
+                readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
     @Test
     public void testReadAllSplitForTableWithSingleLine() throws Exception {
         Configuration configuration = getConfig(new String[] {"customer_card_single_line"});
-        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -179,10 +179,10 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                                         DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
-        List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySQLSplits(configuration, pkType);
         String[] expected = new String[] {"+I[20001, LEVEL_1, user_1, user with level 1]"};
         List<String> actual =
-                readTableSnapshotSplits(mySQLSplits, configuration, mySQLSplits.size(), dataType);
+                readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
@@ -190,7 +190,7 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
     public void testReadAllSnapshotSplitsForTables() throws Exception {
         Configuration configuration =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
-        configuration.set(MySQLSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
+        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -203,7 +203,7 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                                         DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
-        List<MySQLSplit> mySQLSplits = getMySQLSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
                 new String[] {
@@ -229,12 +229,12 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                     "+I[50003, LEVEL_1, user_14, user with level 1]",
                 };
         List<String> actual =
-                readTableSnapshotSplits(mySQLSplits, configuration, mySQLSplits.size(), dataType);
+                readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
     private List<String> readTableSnapshotSplits(
-            List<MySQLSplit> mySQLSplits,
+            List<MySqlSplit> mySqlSplits,
             Configuration configuration,
             int scanSplitsNum,
             DataType dataType)
@@ -246,7 +246,7 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
 
         List<SourceRecord> result = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
-            MySQLSplit sqlSplit = mySQLSplits.get(i);
+            MySqlSplit sqlSplit = mySqlSplits.get(i);
             if (snapshotSplitReader.isIdle()) {
                 snapshotSplitReader.submitSplit(sqlSplit);
             }
@@ -296,22 +296,22 @@ public class SnapshotSplitReaderTest extends MySQLTestBase {
                 .collect(Collectors.toList());
     }
 
-    private List<MySQLSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
-        MySQLSnapshotSplitAssigner assigner =
-                new MySQLSnapshotSplitAssigner(
+    private List<MySqlSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
+        MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(
                         configuration, pkType, new ArrayList<>(), new ArrayList<>());
         assigner.open();
-        List<MySQLSplit> mySQLSplitList = new ArrayList<>();
+        List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
-            Optional<MySQLSplit> mySQLSplit = assigner.getNext(null);
+            Optional<MySqlSplit> mySQLSplit = assigner.getNext(null);
             if (mySQLSplit.isPresent()) {
-                mySQLSplitList.add(mySQLSplit.get());
+                mySqlSplitList.add(mySQLSplit.get());
             } else {
                 break;
             }
         }
         assigner.close();
-        return mySQLSplitList;
+        return mySqlSplitList;
     }
 
     private Configuration getConfig(String[] captureTables) {

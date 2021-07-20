@@ -20,12 +20,12 @@ package com.alibaba.ververica.cdc.connectors.mysql.debezium.reader;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySQLBinlogSplitReadTask;
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySQLSnapshotSplitReadTask;
+import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
+import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySqlSnapshotSplitReadTask;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlOffsetContext;
@@ -53,7 +53,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
  * range.
  */
-public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSplit> {
+public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
@@ -63,8 +63,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
     private volatile boolean currentTaskRunning;
 
     // task to read snapshot for current split
-    private MySQLSnapshotSplitReadTask splitSnapshotReadTask;
-    private MySQLSplit currentTableSplit;
+    private MySqlSnapshotSplitReadTask splitSnapshotReadTask;
+    private MySqlSplit currentTableSplit;
     private AtomicBoolean hasNextElement;
     private AtomicBoolean reachEnd;
 
@@ -78,13 +78,13 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
         this.reachEnd = new AtomicBoolean(false);
     }
 
-    public void submitSplit(MySQLSplit mySQLSplit) {
+    public void submitSplit(MySqlSplit mySQLSplit) {
         this.currentTableSplit = mySQLSplit;
         statefulTaskContext.configure(currentTableSplit);
         this.queue = statefulTaskContext.getQueue();
         this.hasNextElement.set(true);
         this.splitSnapshotReadTask =
-                new MySQLSnapshotSplitReadTask(
+                new MySqlSnapshotSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
                         statefulTaskContext.getOffsetContext(),
                         statefulTaskContext.getSnapshotChangeEventSourceMetrics(),
@@ -104,12 +104,12 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
                         SnapshotResult snapshotResult =
                                 splitSnapshotReadTask.execute(sourceContext);
 
-                        final MySQLSplitState mySQLSplitState =
-                                new MySQLSplitState(currentTableSplit);
+                        final MySqlSplitState mySQLSplitState =
+                                new MySqlSplitState(currentTableSplit);
                         mySQLSplitState.setLowWatermarkState(sourceContext.getLowWatermark());
                         mySQLSplitState.setOffsetState(sourceContext.getLowWatermark());
                         mySQLSplitState.setHighWatermarkState(sourceContext.getHighWatermark());
-                        final MySQLSplit binlogReadSplit = mySQLSplitState.toMySQLSplit();
+                        final MySqlSplit binlogReadSplit = mySQLSplitState.toMySQLSplit();
                         final MySqlOffsetContext mySqlOffsetContext =
                                 statefulTaskContext.getOffsetContext();
                         mySqlOffsetContext.setBinlogStartPoint(
@@ -119,8 +119,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
                         // execute binlog read task
                         if (snapshotResult.isCompletedOrSkipped()) {
                             // task to read binlog for current split
-                            MySQLBinlogSplitReadTask splitBinlogReadTask =
-                                    new MySQLBinlogSplitReadTask(
+                            MySqlBinlogSplitReadTask splitBinlogReadTask =
+                                    new MySqlBinlogSplitReadTask(
                                             statefulTaskContext.getConnectorConfig(),
                                             mySqlOffsetContext,
                                             statefulTaskContext.getConnection(),
@@ -204,7 +204,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySQLSp
 
     /**
      * {@link ChangeEventSource.ChangeEventSourceContext} implementation that keeps low/high
-     * watermark for each {@link MySQLSplit}.
+     * watermark for each {@link MySqlSplit}.
      */
     public class SnapshotSplitChangeEventSourceContextImpl
             implements ChangeEventSource.ChangeEventSourceContext {

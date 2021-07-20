@@ -20,11 +20,11 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.events;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumerator;
-import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySQLSourceReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
+import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link MySQLSourceEnumerator} sends to {@link MySQLSourceReader} to
+ * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
  * notify reader should report its finished snapshot splits.
  */
 public class EnumeratorRequestReportEvent implements SourceEvent {

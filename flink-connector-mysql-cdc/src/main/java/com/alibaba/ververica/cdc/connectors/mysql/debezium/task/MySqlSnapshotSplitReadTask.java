@@ -22,7 +22,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispa
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils;
 import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -61,9 +61,9 @@ import java.util.Calendar;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** Task to read snapshot split of table. */
-public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSource {
+public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSource {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySQLSnapshotSplitReadTask.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitReadTask.class);
 
     /** Interval for showing a log statement with the progress while scanning a single table. */
     private static final Duration LOG_INTERVAL = Duration.ofMillis(10_000);
@@ -73,12 +73,12 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
     private final MySqlConnection jdbcConnection;
     private final EventDispatcherImpl<TableId> dispatcher;
     private final Clock clock;
-    private final MySQLSplit mySQLSplit;
+    private final MySqlSplit mySQLSplit;
     private final MySqlOffsetContext offsetContext;
     private final TopicSelector<TableId> topicSelector;
     private final SnapshotProgressListener snapshotProgressListener;
 
-    public MySQLSnapshotSplitReadTask(
+    public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
             MySqlOffsetContext previousOffset,
             SnapshotProgressListener snapshotProgressListener,
@@ -87,7 +87,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             EventDispatcherImpl<TableId> dispatcher,
             TopicSelector<TableId> topicSelector,
             Clock clock,
-            MySQLSplit mySQLSplit) {
+            MySqlSplit mySQLSplit) {
         super(connectorConfig, previousOffset, snapshotProgressListener);
         this.offsetContext = previousOffset;
         this.connectorConfig = connectorConfig;

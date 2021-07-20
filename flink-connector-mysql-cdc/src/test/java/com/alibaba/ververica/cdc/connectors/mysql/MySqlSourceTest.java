@@ -84,9 +84,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/** Tests for {@link MySQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
+/** Tests for {@link MySqlSource} which also heavily tests {@link DebeziumSourceFunction}. */
 @RunWith(Parameterized.class)
-public class MySQLSourceTest extends MySQLTestBase {
+public class MySqlSourceTest extends MySqlTestBase {
 
     private final UniqueDatabase database =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
@@ -98,7 +98,7 @@ public class MySQLSourceTest extends MySQLTestBase {
         return Arrays.asList(false, true);
     }
 
-    public MySQLSourceTest(boolean useLegacyImplementation) {
+    public MySqlSourceTest(boolean useLegacyImplementation) {
         this.useLegacyImplementation = useLegacyImplementation;
     }
 
@@ -860,14 +860,14 @@ public class MySQLSourceTest extends MySQLTestBase {
             boolean useLegacyImplementation)
             throws Exception {
         DebeziumSourceFunction<SourceRecord> source =
-                MySQLSource.<SourceRecord>builder()
+                MySqlSource.<SourceRecord>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(database.getDatabaseName())
                         .tableList(database.getDatabaseName() + "." + table)
                         .username(MYSQL_CONTAINER.getUsername())
                         .password(MYSQL_CONTAINER.getPassword())
-                        .deserializer(new MySQLSourceTest.ForwardDeserializeSchema())
+                        .deserializer(new MySqlSourceTest.ForwardDeserializeSchema())
                         .debeziumProperties(createDebeziumProperties(useLegacyImplementation))
                         .build();
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -986,9 +986,9 @@ public class MySQLSourceTest extends MySQLTestBase {
         return basicSourceBuilder().build();
     }
 
-    private MySQLSource.Builder<SourceRecord> basicSourceBuilder() {
+    private MySqlSource.Builder<SourceRecord> basicSourceBuilder() {
         Properties debeziumProps = createDebeziumProperties(useLegacyImplementation);
-        return MySQLSource.<SourceRecord>builder()
+        return MySqlSource.<SourceRecord>builder()
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .databaseList(database.getDatabaseName())

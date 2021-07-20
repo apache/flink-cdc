@@ -26,7 +26,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -42,14 +42,14 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.MySQLSourceTest.currentMySQLLatestOffset;
+import static com.alibaba.ververica.cdc.connectors.mysql.MySqlSourceTest.currentMySQLLatestOffset;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for MySQL binlog SQL source. */
 @RunWith(Parameterized.class)
-public class MySQLConnectorITCase extends MySQLTestBase {
+public class MySqlConnectorITCase extends MySqlTestBase {
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
@@ -71,7 +71,7 @@ public class MySQLConnectorITCase extends MySQLTestBase {
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    public MySQLConnectorITCase(boolean useLegacyDezMySQL, boolean parallelRead) {
+    public MySqlConnectorITCase(boolean useLegacyDezMySQL, boolean parallelRead) {
         this.useLegacyDezMySQL = useLegacyDezMySQL;
         this.parallelRead = parallelRead;
     }

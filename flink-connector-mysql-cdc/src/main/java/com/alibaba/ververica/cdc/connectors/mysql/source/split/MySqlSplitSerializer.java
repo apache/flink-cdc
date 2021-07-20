@@ -44,12 +44,12 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.Serializer
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
 
-/** A serializer for the {@link MySQLSplit}. */
-public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MySQLSplit> {
+/** A serializer for the {@link MySqlSplit}. */
+public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MySqlSplit> {
 
     private static final int VERSION = 1;
 
-    public static final MySQLSplitSerializer INSTANCE = new MySQLSplitSerializer();
+    public static final MySqlSplitSerializer INSTANCE = new MySqlSplitSerializer();
 
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
@@ -68,7 +68,7 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
     }
 
     @Override
-    public byte[] serialize(MySQLSplit split) throws IOException {
+    public byte[] serialize(MySqlSplit split) throws IOException {
 
         // optimization: the splits lazily cache their own serialized form
         if (split.serializedFormCache != null) {
@@ -81,7 +81,7 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
         out.writeUTF(split.getSplitId());
         out.writeUTF(split.getSplitBoundaryType().asSerializableString());
 
-        final boolean isSnapshotSplit = split.getSplitKind() == MySQLSplitKind.SNAPSHOT;
+        final boolean isSnapshotSplit = split.getSplitKind() == MySqlSplitKind.SNAPSHOT;
 
         out.writeBoolean(isSnapshotSplit);
         // snapshot split
@@ -115,18 +115,18 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
     }
 
     @Override
-    public MySQLSplit deserialize(int version, byte[] serialized) throws IOException {
+    public MySqlSplit deserialize(int version, byte[] serialized) throws IOException {
         if (version == 1) {
             return deserializeV1(serialized);
         }
         throw new IOException("Unknown version: " + version);
     }
 
-    public MySQLSplit deserializeV1(byte[] serialized) throws IOException {
+    public MySqlSplit deserializeV1(byte[] serialized) throws IOException {
         final DataInputDeserializer in = DESERIALIZER_CACHE.get();
         in.setBuffer(serialized);
 
-        MySQLSplitKind splitKind = MySQLSplitKind.fromString(in.readUTF());
+        MySqlSplitKind splitKind = MySqlSplitKind.fromString(in.readUTF());
         TableId tableId = TableId.parse(in.readUTF());
         String splitId = in.readUTF();
         RowType splitBoundaryType = (RowType) LogicalTypeParser.parse(in.readUTF());
@@ -141,7 +141,7 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
             Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
 
             in.releaseArrays();
-            return new MySQLSplit(
+            return new MySqlSplit(
                     splitKind,
                     tableId,
                     splitId,
@@ -160,7 +160,7 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
                     readFinishedSplitsInfo(in);
             Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
             in.releaseArrays();
-            return new MySQLSplit(
+            return new MySqlSplit(
                     splitKind,
                     tableId,
                     splitId,

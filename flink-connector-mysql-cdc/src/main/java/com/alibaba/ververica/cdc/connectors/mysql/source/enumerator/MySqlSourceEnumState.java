@@ -21,8 +21,8 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.enumerator;
 import org.apache.flink.api.java.tuple.Tuple2;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitReader;
 import io.debezium.relational.TableId;
 
 import javax.annotation.Nullable;
@@ -32,10 +32,10 @@ import java.util.List;
 import java.util.Map;
 
 /** The state of MySQL CDC source enumerator. */
-public class MySQLSourceEnumState {
+public class MySqlSourceEnumState {
 
     /** The splits in the checkpoint. */
-    private final Collection<MySQLSplit> remainingSplits;
+    private final Collection<MySqlSplit> remainingSplits;
 
     /**
      * The paths that are no longer in the enumerator checkpoint, but have been processed before and
@@ -44,26 +44,26 @@ public class MySQLSourceEnumState {
     private final Collection<TableId> alreadyProcessedTables;
 
     /**
-     * The splits that the {@link MySQLSourceEnumerator} has assigned to {@link MySQLSplitReader}s.
+     * The splits that the {@link MySqlSourceEnumerator} has assigned to {@link MySqlSplitReader}s.
      */
-    private final Map<Integer, List<MySQLSplit>> assignedSplits;
+    private final Map<Integer, List<MySqlSplit>> assignedSplits;
 
     /**
-     * The finished (snapshot) splits that the {@link MySQLSourceEnumerator} has received from
-     * {@link MySQLSplitReader}s.
+     * The finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received from
+     * {@link MySqlSplitReader}s.
      */
     private final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits;
 
     /**
      * The splits are frequently serialized into checkpoints. Caching the byte representation makes
-     * repeated serialization cheap. This field is used by {@link MySQLSourceEnumStateSerializer}.
+     * repeated serialization cheap. This field is used by {@link MySqlSourceEnumStateSerializer}.
      */
     @Nullable transient byte[] serializedFormCache;
 
-    public MySQLSourceEnumState(
-            Collection<MySQLSplit> remainingSplits,
+    public MySqlSourceEnumState(
+            Collection<MySqlSplit> remainingSplits,
             Collection<TableId> alreadyProcessedTables,
-            Map<Integer, List<MySQLSplit>> assignedSplits,
+            Map<Integer, List<MySqlSplit>> assignedSplits,
             Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits) {
         this.remainingSplits = remainingSplits;
         this.alreadyProcessedTables = alreadyProcessedTables;
@@ -75,11 +75,11 @@ public class MySQLSourceEnumState {
         return alreadyProcessedTables;
     }
 
-    public Collection<MySQLSplit> getRemainingSplits() {
+    public Collection<MySqlSplit> getRemainingSplits() {
         return remainingSplits;
     }
 
-    public Map<Integer, List<MySQLSplit>> getAssignedSplits() {
+    public Map<Integer, List<MySqlSplit>> getAssignedSplits() {
         return assignedSplits;
     }
 

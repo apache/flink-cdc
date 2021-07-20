@@ -34,28 +34,28 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.DATABASE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.HOSTNAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.PASSWORD;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.PORT;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_FETCH_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_COLUMN;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_SPLIT_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_MODE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SERVER_ID;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SERVER_TIME_ZONE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SNAPSHOT_PARALLEL_SCAN;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.TABLE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.USERNAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.validateAndGetServerId;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.HOSTNAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PASSWORD;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PORT;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_COLUMN;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_TIME_ZONE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SNAPSHOT_PARALLEL_SCAN;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.TABLE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.USERNAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.validateAndGetServerId;
 import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 
-/** Factory for creating configured instance of {@link MySQLTableSource}. */
-public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
+/** Factory for creating configured instance of {@link MySqlTableSource}. */
+public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "mysql-cdc";
 
@@ -89,7 +89,7 @@ public class MySQLTableSourceFactory implements DynamicTableSourceFactory {
             validateStartupOptionIfEnableParallel(startupOptions);
         }
 
-        return new MySQLTableSource(
+        return new MySqlTableSource(
                 physicalSchema,
                 port,
                 hostname,

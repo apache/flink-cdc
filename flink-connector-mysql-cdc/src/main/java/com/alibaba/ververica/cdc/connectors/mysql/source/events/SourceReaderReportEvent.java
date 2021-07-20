@@ -21,14 +21,14 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.events;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.java.tuple.Tuple2;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumerator;
+import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySQLSourceReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 import java.util.ArrayList;
 
 /**
- * The {@link SourceEvent} that {@link MySQLSourceReader} sends to {@link MySQLSourceEnumerator} to
+ * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
  * notify the snapshot split has read finished.
  */
 public class SourceReaderReportEvent implements SourceEvent {

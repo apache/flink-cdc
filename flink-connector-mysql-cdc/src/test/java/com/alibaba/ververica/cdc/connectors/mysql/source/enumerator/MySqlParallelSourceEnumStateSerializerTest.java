@@ -25,9 +25,9 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.VarCharType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializer;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitKind;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
 import org.junit.Test;
@@ -40,18 +40,18 @@ import java.util.List;
 import java.util.Map;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializerTest.assertSplitsEqual;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitSerializerTest.getTestHistoryRecord;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.assertSplitsEqual;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.getTestHistoryRecord;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
-/** Tests for {@link MySQLSourceEnumStateSerializer}. */
-public class MySQLParallelSourceEnumStateSerializerTest {
+/** Tests for {@link MySqlSourceEnumStateSerializer}. */
+public class MySqlParallelSourceEnumStateSerializerTest {
 
     @Test
     public void testsSerializeAndDeserialize() throws Exception {
-        final MySQLSourceEnumState sourceEnumState = getTestSourceEnumState();
+        final MySqlSourceEnumState sourceEnumState = getTestSourceEnumState();
 
         assertSourceEnumStateEqual(
                 sourceEnumState, serializeAndDeserializeSourceEnumState(sourceEnumState));
@@ -59,24 +59,24 @@ public class MySQLParallelSourceEnumStateSerializerTest {
 
     @Test
     public void testRepeatedSerializationCache() throws Exception {
-        final MySQLSourceEnumState sourceEnumState = getTestSourceEnumState();
-        final MySQLSourceEnumStateSerializer sourceEnumStateSerializer =
-                new MySQLSourceEnumStateSerializer(MySQLSplitSerializer.INSTANCE);
+        final MySqlSourceEnumState sourceEnumState = getTestSourceEnumState();
+        final MySqlSourceEnumStateSerializer sourceEnumStateSerializer =
+                new MySqlSourceEnumStateSerializer(MySqlSplitSerializer.INSTANCE);
 
         final byte[] ser1 = sourceEnumStateSerializer.serialize(sourceEnumState);
         final byte[] ser2 = sourceEnumStateSerializer.serialize(sourceEnumState);
         assertSame(ser1, ser2);
     }
 
-    static MySQLSourceEnumState serializeAndDeserializeSourceEnumState(
-            MySQLSourceEnumState sourceEnumState) throws Exception {
-        final MySQLSourceEnumStateSerializer mySQLSourceEnumStateSerializer =
-                new MySQLSourceEnumStateSerializer(MySQLSplitSerializer.INSTANCE);
+    static MySqlSourceEnumState serializeAndDeserializeSourceEnumState(
+            MySqlSourceEnumState sourceEnumState) throws Exception {
+        final MySqlSourceEnumStateSerializer mySQLSourceEnumStateSerializer =
+                new MySqlSourceEnumStateSerializer(MySqlSplitSerializer.INSTANCE);
         byte[] serialized = mySQLSourceEnumStateSerializer.serialize(sourceEnumState);
         return mySQLSourceEnumStateSerializer.deserialize(1, serialized);
     }
 
-    private MySQLSourceEnumState getTestSourceEnumState() throws Exception {
+    private MySqlSourceEnumState getTestSourceEnumState() throws Exception {
         // construct the source that captures two tables
         // the first one has 3 snapshot splits and has been assigned finished
         // the second one has 4 snapshot splits and has been assigned 2 splits
@@ -84,19 +84,19 @@ public class MySQLParallelSourceEnumStateSerializerTest {
         final Collection<TableId> alreadyProcessedTables = new ArrayList<>();
         alreadyProcessedTables.add(tableId0);
 
-        final Collection<MySQLSplit> remainingSplits = new ArrayList<>();
+        final Collection<MySqlSplit> remainingSplits = new ArrayList<>();
         final TableId tableId1 = TableId.parse("test_db.test_table1");
         remainingSplits.add(getTestSplit(tableId1, 2));
         remainingSplits.add(getTestSplit(tableId1, 3));
 
-        final Map<Integer, List<MySQLSplit>> assignedSplits = new HashMap<>();
-        List<MySQLSplit> assignedSplitsForTask0 = new ArrayList<>();
+        final Map<Integer, List<MySqlSplit>> assignedSplits = new HashMap<>();
+        List<MySqlSplit> assignedSplitsForTask0 = new ArrayList<>();
         assignedSplitsForTask0.add(getTestSplit(tableId0, 0));
         assignedSplitsForTask0.add(getTestSplit(tableId0, 1));
         assignedSplitsForTask0.add(getTestSplit(tableId0, 2));
         assignedSplitsForTask0.add(getTestBinlogSplit(tableId0));
 
-        List<MySQLSplit> assignedSplitsForTask1 = new ArrayList<>();
+        List<MySqlSplit> assignedSplitsForTask1 = new ArrayList<>();
         assignedSplitsForTask1.add(getTestSplit(tableId1, 0));
         assignedSplitsForTask1.add(getTestSplit(tableId1, 1));
 
@@ -115,13 +115,13 @@ public class MySQLParallelSourceEnumStateSerializerTest {
         finishedSnapshotSplits.put(0, finishedSplitsForTask0);
         finishedSnapshotSplits.put(1, finishedSplitsForTask1);
 
-        return new MySQLSourceEnumState(
+        return new MySqlSourceEnumState(
                 remainingSplits, alreadyProcessedTables, assignedSplits, finishedSnapshotSplits);
     }
 
-    private MySQLSplit getTestSplit(TableId tableId, int splitNo) {
-        return new MySQLSplit(
-                MySQLSplitKind.SNAPSHOT,
+    private MySqlSplit getTestSplit(TableId tableId, int splitNo) {
+        return new MySqlSplit(
+                MySqlSplitKind.SNAPSHOT,
                 tableId,
                 tableId.toString() + "-" + splitNo,
                 new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
@@ -135,7 +135,7 @@ public class MySQLParallelSourceEnumStateSerializerTest {
                 new HashMap<>());
     }
 
-    private MySQLSplit getTestBinlogSplit(TableId tableId) throws Exception {
+    private MySqlSplit getTestBinlogSplit(TableId tableId) throws Exception {
         final List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                 new ArrayList<>();
         finishedSplitsInfo.add(
@@ -162,8 +162,8 @@ public class MySQLParallelSourceEnumStateSerializerTest {
 
         final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         databaseHistory.put(tableId, getTestHistoryRecord());
-        return new MySQLSplit(
-                MySQLSplitKind.BINLOG,
+        return new MySqlSplit(
+                MySqlSplitKind.BINLOG,
                 tableId,
                 "binlog-split-0",
                 new RowType(Arrays.asList(new RowType.RowField("card_no", new VarCharType()))),
@@ -184,17 +184,17 @@ public class MySQLParallelSourceEnumStateSerializerTest {
     }
 
     static void assertSourceEnumStateEqual(
-            MySQLSourceEnumState expected, MySQLSourceEnumState actual) {
+            MySqlSourceEnumState expected, MySqlSourceEnumState actual) {
         assertArrayEquals(
                 expected.getAlreadyProcessedTables().toArray(),
                 actual.getAlreadyProcessedTables().toArray());
 
-        List<MySQLSplit> expectedSplits = new ArrayList<>(expected.getRemainingSplits());
-        List<MySQLSplit> actualSplits = new ArrayList<>(actual.getRemainingSplits());
+        List<MySqlSplit> expectedSplits = new ArrayList<>(expected.getRemainingSplits());
+        List<MySqlSplit> actualSplits = new ArrayList<>(actual.getRemainingSplits());
         assertSplitsEquals(expectedSplits, actualSplits);
 
         assertEquals(expected.getAssignedSplits().size(), actual.getAssignedSplits().size());
-        for (Map.Entry<Integer, List<MySQLSplit>> entry : expected.getAssignedSplits().entrySet()) {
+        for (Map.Entry<Integer, List<MySqlSplit>> entry : expected.getAssignedSplits().entrySet()) {
             assertSplitsEquals(entry.getValue(), actual.getAssignedSplits().get(entry.getKey()));
         }
 
@@ -210,7 +210,7 @@ public class MySQLParallelSourceEnumStateSerializerTest {
     }
 
     private static void assertSplitsEquals(
-            List<MySQLSplit> expectedSplits, List<MySQLSplit> actualSplits) {
+            List<MySqlSplit> expectedSplits, List<MySqlSplit> actualSplits) {
         assertEquals(expectedSplits.size(), actualSplits.size());
         for (int i = 0; i < expectedSplits.size(); i++) {
             assertSplitsEqual(expectedSplits.get(i), actualSplits.get(i));

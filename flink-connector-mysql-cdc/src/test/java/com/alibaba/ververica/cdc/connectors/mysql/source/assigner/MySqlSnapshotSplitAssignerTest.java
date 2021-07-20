@@ -22,9 +22,9 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -39,14 +39,14 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
-/** Tests for {@link MySQLSnapshotSplitAssigner}. */
-public class MySQLSnapshotSplitAssignerTest extends MySQLTestBase {
+/** Tests for {@link MySqlSnapshotSplitAssigner}. */
+public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
 
     private static final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "custom", "mysqluser", "mysqlpw");
@@ -197,14 +197,14 @@ public class MySQLSnapshotSplitAssignerTest extends MySQLTestBase {
                         .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
-        final MySQLSnapshotSplitAssigner assigner =
-                new MySQLSnapshotSplitAssigner(
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(
                         configuration, pkType, new ArrayList<>(), new ArrayList<>());
 
         assigner.open();
-        List<MySQLSplit> sqlSplits = new ArrayList<>();
+        List<MySqlSplit> sqlSplits = new ArrayList<>();
         while (true) {
-            Optional<MySQLSplit> split = assigner.getNext(null);
+            Optional<MySqlSplit> split = assigner.getNext(null);
             if (split.isPresent()) {
                 sqlSplits.add(split.get());
             } else {

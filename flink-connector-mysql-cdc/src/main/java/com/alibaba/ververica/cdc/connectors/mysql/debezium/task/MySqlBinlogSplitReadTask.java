@@ -22,8 +22,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispa
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader.SnapshotBinlogSplitChangeEventSourceContextImpl;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitKind;
 import com.github.shyiko.mysql.binlog.event.Event;
 import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -45,17 +45,17 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.Sig
  * Task to read all binlog for table and also supports read bounded (from lowWatermark to
  * highWatermark) binlog.
  */
-public class MySQLBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
+public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
-    private static final Logger logger = LoggerFactory.getLogger(MySQLBinlogSplitReadTask.class);
-    private final MySQLSplit mySQLSplit;
+    private static final Logger logger = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
+    private final MySqlSplit mySQLSplit;
     private final MySqlOffsetContext offsetContext;
     private final EventDispatcherImpl<TableId> eventDispatcher;
     private final SignalEventDispatcher signalEventDispatcher;
     private final ErrorHandler errorHandler;
     private ChangeEventSourceContext context;
 
-    public MySQLBinlogSplitReadTask(
+    public MySqlBinlogSplitReadTask(
             MySqlConnectorConfig connectorConfig,
             MySqlOffsetContext offsetContext,
             MySqlConnection connection,
@@ -65,7 +65,7 @@ public class MySQLBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
             MySqlTaskContext taskContext,
             MySqlStreamingChangeEventSourceMetrics metrics,
             String topic,
-            MySQLSplit mySQLSplit) {
+            MySqlSplit mySQLSplit) {
         super(
                 connectorConfig,
                 offsetContext,
@@ -122,7 +122,7 @@ public class MySQLBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     }
 
     private boolean isBoundedRead() {
-        return mySQLSplit.getSplitKind() == MySQLSplitKind.SNAPSHOT
+        return mySQLSplit.getSplitKind() == MySqlSplitKind.SNAPSHOT
                 && mySQLSplit.getHighWatermark() != null;
     }
 }

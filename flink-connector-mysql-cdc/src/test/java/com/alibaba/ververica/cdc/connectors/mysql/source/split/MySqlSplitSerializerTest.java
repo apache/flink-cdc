@@ -41,14 +41,14 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
-/** Tests for {@link MySQLSplitSerializer}. */
-public class MySQLSplitSerializerTest {
+/** Tests for {@link MySqlSplitSerializer}. */
+public class MySqlSplitSerializerTest {
 
     @Test
     public void testSnapshotSplit() throws Exception {
-        final MySQLSplit split =
-                new MySQLSplit(
-                        MySQLSplitKind.SNAPSHOT,
+        final MySqlSplit split =
+                new MySqlSplit(
+                        MySqlSplitKind.SNAPSHOT,
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
                         new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
@@ -100,9 +100,9 @@ public class MySQLSplitSerializerTest {
         final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         databaseHistory.put(tableId, getTestHistoryRecord());
 
-        final MySQLSplit split =
-                new MySQLSplit(
-                        MySQLSplitKind.BINLOG,
+        final MySqlSplit split =
+                new MySqlSplit(
+                        MySqlSplitKind.BINLOG,
                         tableId,
                         "binlog-split-0",
                         new RowType(
@@ -120,9 +120,9 @@ public class MySQLSplitSerializerTest {
 
     @Test
     public void testRepeatedSerializationCache() throws Exception {
-        final MySQLSplit split =
-                new MySQLSplit(
-                        MySQLSplitKind.SNAPSHOT,
+        final MySqlSplit split =
+                new MySqlSplit(
+                        MySqlSplitKind.SNAPSHOT,
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-0",
                         new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
@@ -134,13 +134,13 @@ public class MySQLSplitSerializerTest {
                         INITIAL_OFFSET,
                         new ArrayList<>(),
                         new HashMap<>());
-        final byte[] ser1 = MySQLSplitSerializer.INSTANCE.serialize(split);
-        final byte[] ser2 = MySQLSplitSerializer.INSTANCE.serialize(split);
+        final byte[] ser1 = MySqlSplitSerializer.INSTANCE.serialize(split);
+        final byte[] ser2 = MySqlSplitSerializer.INSTANCE.serialize(split);
         assertSame(ser1, ser2);
     }
 
-    private MySQLSplit serializeAndDeserializeSplit(MySQLSplit split) throws Exception {
-        final MySQLSplitSerializer sqlSplitSerializer = new MySQLSplitSerializer();
+    private MySqlSplit serializeAndDeserializeSplit(MySqlSplit split) throws Exception {
+        final MySqlSplitSerializer sqlSplitSerializer = new MySqlSplitSerializer();
         byte[] serialized = sqlSplitSerializer.serialize(split);
         return sqlSplitSerializer.deserializeV1(serialized);
     }
@@ -166,7 +166,7 @@ public class MySQLSplitSerializerTest {
         return new SchemaRecord(tableChange);
     }
 
-    public static void assertSplitsEqual(MySQLSplit expected, MySQLSplit actual) {
+    public static void assertSplitsEqual(MySqlSplit expected, MySqlSplit actual) {
         assertEquals(expected.getSplitKind(), actual.getSplitKind());
         assertEquals(expected.getTableId(), actual.getTableId());
         assertEquals(expected.getSplitId(), actual.getSplitId());

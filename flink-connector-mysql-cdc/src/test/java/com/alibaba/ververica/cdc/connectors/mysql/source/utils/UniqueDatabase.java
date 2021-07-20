@@ -50,14 +50,14 @@ public class UniqueDatabase {
             new String[] {"CREATE DATABASE $DBNAME$;", "USE $DBNAME$;"};
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    private final MySQLContainer container;
+    private final MySqlContainer container;
     private final String databaseName;
     private final String templateName;
     private final String username;
     private final String password;
 
     public UniqueDatabase(
-            MySQLContainer container, String databaseName, String username, String password) {
+            MySqlContainer container, String databaseName, String username, String password) {
         this(
                 container,
                 databaseName,
@@ -67,7 +67,7 @@ public class UniqueDatabase {
     }
 
     private UniqueDatabase(
-            MySQLContainer container,
+            MySqlContainer container,
             String databaseName,
             final String identifier,
             String username,

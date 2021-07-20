@@ -23,9 +23,9 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
+import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitKind;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -68,14 +68,14 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementU
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.readTableSplitStatement;
 
 /** A split assigner that assign table snapshot splits to readers. */
-public class MySQLSnapshotSplitAssigner {
+public class MySqlSnapshotSplitAssigner {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySQLSnapshotSplitAssigner.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitAssigner.class);
 
     private static final JsonTableChangeSerializer tableChangesSerializer =
             new JsonTableChangeSerializer();
     private final Collection<TableId> alreadyProcessedTables;
-    private final Collection<MySQLSplit> remainingSplits;
+    private final Collection<MySqlSplit> remainingSplits;
     private final Configuration configuration;
     private final int splitSize;
     private final RowType splitKeyType;
@@ -90,23 +90,23 @@ public class MySQLSnapshotSplitAssigner {
     private Map<TableId, SchemaRecord> cachedTableSchemas;
     private MySqlDatabaseSchema databaseSchema;
 
-    public MySQLSnapshotSplitAssigner(
+    public MySqlSnapshotSplitAssigner(
             Configuration configuration,
             RowType pkRowType,
             Collection<TableId> alreadyProcessedTables,
-            Collection<MySQLSplit> remainingSplits) {
+            Collection<MySqlSplit> remainingSplits) {
         this.configuration = configuration;
         this.splitKeyType = getSplitKey(configuration, pkRowType);
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
-        this.splitSize = configuration.getInteger(MySQLSourceOptions.SCAN_SPLIT_SIZE);
+        this.splitSize = configuration.getInteger(MySqlSourceOptions.SCAN_SPLIT_SIZE);
         Preconditions.checkState(
                 splitSize > 1,
                 String.format(
                         "The value of option 'scan.split.size' must bigger than 1, but is %d",
                         splitSize));
         this.enableIntegralOptimization =
-                configuration.getBoolean(MySQLSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY);
+                configuration.getBoolean(MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY);
         this.cachedTableSchemas = new HashMap<>();
     }
 
@@ -124,10 +124,10 @@ public class MySQLSnapshotSplitAssigner {
      * <p>When this method returns an empty {@code Optional}, then the set of splits is assumed to
      * be done and the source will finish once the readers finished their current splits.
      */
-    public Optional<MySQLSplit> getNext(@Nullable String hostname) {
+    public Optional<MySqlSplit> getNext(@Nullable String hostname) {
         if (!remainingSplits.isEmpty()) {
             // return remaining splits firstly
-            MySQLSplit split = remainingSplits.iterator().next();
+            MySqlSplit split = remainingSplits.iterator().next();
             remainingSplits.remove(split);
             if (remainingSplits.isEmpty()) {
                 this.alreadyProcessedTables.add(currentTableId);
@@ -157,8 +157,8 @@ public class MySQLSnapshotSplitAssigner {
     }
 
     private void analyzeSplitsForCurrentTable() {
-        MySQLSplit prevSplit = null;
-        MySQLSplit nextSplit;
+        MySqlSplit prevSplit = null;
+        MySqlSplit nextSplit;
         int splitCnt = 0;
         long start = System.currentTimeMillis();
         LOG.info("Begin to analyze splits for table {} ", currentTableId);
@@ -252,7 +252,7 @@ public class MySQLSnapshotSplitAssigner {
         }
     }
 
-    private MySQLSplit getNextSplit(MySQLSplit prevSplit) {
+    private MySqlSplit getNextSplit(MySqlSplit prevSplit) {
         boolean isFirstSplit = prevSplit == null;
         boolean isLastSplit = false;
         // first split
@@ -325,7 +325,7 @@ public class MySQLSnapshotSplitAssigner {
         return createSnapshotSplit(prevSplitEnd, splitEnd);
     }
 
-    private MySQLSplit createSnapshotSplit(Object[] splitStart, Object[] splitEnd) {
+    private MySqlSplit createSnapshotSplit(Object[] splitStart, Object[] splitEnd) {
         Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         // cache for optimization
         if (!cachedTableSchemas.containsKey(currentTableId)) {
@@ -333,8 +333,8 @@ public class MySQLSnapshotSplitAssigner {
         }
         databaseHistory.put(currentTableId, cachedTableSchemas.get(currentTableId));
 
-        return new MySQLSplit(
-                MySQLSplitKind.SNAPSHOT,
+        return new MySqlSplit(
+                MySqlSplitKind.SNAPSHOT,
                 currentTableId,
                 createSplitId(),
                 splitKeyType,
@@ -368,7 +368,7 @@ public class MySQLSnapshotSplitAssigner {
      * Adds a set of splits to this assigner. This happens for example when some split processing
      * failed and the splits need to be re-added, or when new splits got discovered.
      */
-    public void addSplits(Collection<MySQLSplit> splits) {
+    public void addSplits(Collection<MySqlSplit> splits) {
         remainingSplits.addAll(splits);
     }
 
@@ -377,7 +377,7 @@ public class MySQLSnapshotSplitAssigner {
     }
 
     /** Gets the remaining splits that this assigner has pending. */
-    public Collection<MySQLSplit> remainingSplits() {
+    public Collection<MySqlSplit> remainingSplits() {
         return remainingSplits;
     }
 
@@ -422,22 +422,22 @@ public class MySQLSnapshotSplitAssigner {
 
     private RelationalTableFilters getTableFilters() {
         io.debezium.config.Configuration debeziumConfig = toDebeziumConfig(configuration);
-        if (configuration.contains(MySQLSourceOptions.DATABASE_NAME)) {
+        if (configuration.contains(MySqlSourceOptions.DATABASE_NAME)) {
             debeziumConfig =
                     debeziumConfig
                             .edit()
                             .with(
                                     "database.whitelist",
-                                    configuration.getString(MySQLSourceOptions.DATABASE_NAME))
+                                    configuration.getString(MySqlSourceOptions.DATABASE_NAME))
                             .build();
         }
-        if (configuration.contains(MySQLSourceOptions.TABLE_NAME)) {
+        if (configuration.contains(MySqlSourceOptions.TABLE_NAME)) {
             debeziumConfig =
                     debeziumConfig
                             .edit()
                             .with(
                                     "table.whitelist",
-                                    configuration.getString(MySQLSourceOptions.TABLE_NAME))
+                                    configuration.getString(MySqlSourceOptions.TABLE_NAME))
                             .build();
         }
         final MySqlConnectorConfig mySqlConnectorConfig = new MySqlConnectorConfig(debeziumConfig);
