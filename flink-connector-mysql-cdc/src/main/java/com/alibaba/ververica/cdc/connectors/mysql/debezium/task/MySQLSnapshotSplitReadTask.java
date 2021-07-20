@@ -63,7 +63,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /** Task to read snapshot split of table. */
 public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSource {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MySQLSnapshotSplitReadTask.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLSnapshotSplitReadTask.class);
 
     /** Interval for showing a log statement with the progress while scanning a single table. */
     private static final Duration LOG_INTERVAL = Duration.ofMillis(10_000);
@@ -107,13 +107,13 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         try {
             ctx = prepare(context);
         } catch (Exception e) {
-            LOGGER.error("Failed to initialize snapshot context.", e);
+            LOG.error("Failed to initialize snapshot context.", e);
             throw new RuntimeException(e);
         }
         try {
             return doExecute(context, ctx, snapshottingTask);
         } catch (InterruptedException e) {
-            LOGGER.warn("Snapshot was interrupted before completion");
+            LOG.warn("Snapshot was interrupted before completion");
             throw e;
         } catch (Exception t) {
             throw new DebeziumException(t);
@@ -130,7 +130,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                 (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
 
         final BinlogOffset lowWatermark = getCurrentBinlogPosition();
-        LOGGER.info(
+        LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
                 mySQLSplit);
@@ -147,10 +147,10 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         signalEventDispatcher.dispatchWatermarkEvent(
                 mySQLSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
 
-        LOGGER.info("Snapshot step 2 - Snapshotting data");
+        LOG.info("Snapshot step 2 - Snapshotting data");
         createDataEvents(ctx, mySQLSplit.getTableId());
         final BinlogOffset highWatermark = getCurrentBinlogPosition();
-        LOGGER.info(
+        LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
                 mySQLSplit);
@@ -187,7 +187,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             throws Exception {
         EventDispatcher.SnapshotReceiver snapshotReceiver =
                 dispatcher.getSnapshotChangeEventReceiver();
-        LOGGER.debug("Snapshotting table {}", tableId);
+        LOG.debug("Snapshotting table {}", tableId);
         createDataEventsForTable(
                 snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
         snapshotReceiver.completeSnapshot();
@@ -201,8 +201,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             throws InterruptedException {
 
         long exportStart = clock.currentTimeInMillis();
-        LOGGER.info(
-                "Exporting data from split '{}' of table {}", mySQLSplit.getSplitId(), table.id());
+        LOG.info("Exporting data from split '{}' of table {}", mySQLSplit.getSplitId(), table.id());
 
         final String selectSql =
                 StatementUtils.buildSplitScanQuery(
@@ -210,7 +209,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                         mySQLSplit.getSplitBoundaryType(),
                         mySQLSplit.getSplitBoundaryStart() == null,
                         mySQLSplit.getSplitBoundaryEnd() == null);
-        LOGGER.info(
+        LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
                 mySQLSplit.getSplitId(),
                 table.id(),
@@ -242,7 +241,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                 }
                 if (logTimer.expired()) {
                     long stop = clock.currentTimeInMillis();
-                    LOGGER.info(
+                    LOG.info(
                             "Exported {} records for split '{}' after {}",
                             rows,
                             mySQLSplit.getSplitId(),
@@ -255,7 +254,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                         getChangeRecordEmitter(snapshotContext, table.id(), row),
                         snapshotReceiver);
             }
-            LOGGER.info(
+            LOG.info(
                     "Finished exporting {} records for split '{}' of table '{}'; total duration '{}'",
                     rows,
                     mySQLSplit.getSplitId(),
@@ -290,7 +289,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                             long binlogPosition = rs.getLong(2);
                             currentBinlogPosition.set(
                                     new BinlogOffset(binlogFilename, binlogPosition));
-                            LOGGER.info(
+                            LOG.info(
                                     "Read binlog '{}' at position '{}'",
                                     binlogFilename,
                                     binlogPosition);
@@ -303,7 +302,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                     });
             jdbcConnection.commit();
         } catch (Exception e) {
-            LOGGER.error("Read current binlog position error.", e);
+            LOG.error("Read current binlog position error.", e);
         }
         return currentBinlogPosition.get();
     }
@@ -364,7 +363,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             return MySqlValueConverters.stringToDuration(
                     new String(b.getBytes(1, (int) (b.length())), "UTF-8"));
         } catch (UnsupportedEncodingException e) {
-            LOGGER.error("Could not read MySQL TIME value as UTF-8");
+            LOG.error("Could not read MySQL TIME value as UTF-8");
             throw new RuntimeException(e);
         }
     }
@@ -384,7 +383,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             return MySqlValueConverters.stringToLocalDate(
                     new String(b.getBytes(1, (int) (b.length())), "UTF-8"), column, table);
         } catch (UnsupportedEncodingException e) {
-            LOGGER.error("Could not read MySQL TIME value as UTF-8");
+            LOG.error("Could not read MySQL TIME value as UTF-8");
             throw new RuntimeException(e);
         }
     }
@@ -406,7 +405,7 @@ public class MySQLSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                     ? null
                     : rs.getTimestamp(fieldNo, Calendar.getInstance());
         } catch (UnsupportedEncodingException e) {
-            LOGGER.error("Could not read MySQL TIME value as UTF-8");
+            LOG.error("Could not read MySQL TIME value as UTF-8");
             throw new RuntimeException(e);
         }
     }

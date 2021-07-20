@@ -53,7 +53,7 @@ public class MySQLSourceReader<T>
         extends SingleThreadMultiplexSourceReaderBase<
                 SourceRecord, T, MySQLSplit, MySQLSplitState> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MySQLSourceReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLSourceReader.class);
 
     private final Map<String, MySQLSplit> finishedNoAckSplits;
     private final int subtaskId;
@@ -98,7 +98,7 @@ public class MySQLSourceReader<T>
 
     @Override
     protected void onSplitFinished(Map<String, MySQLSplitState> finishedSplitIds) {
-        LOGGER.info("The split(s) {} read finished.", finishedSplitIds);
+        LOG.info("The split(s) {} read finished.", finishedSplitIds);
         final List<MySQLSplit> splits =
                 finishedSplitIds.values().stream()
                         .map(MySQLSplitState::toMySQLSplit)
@@ -133,7 +133,7 @@ public class MySQLSourceReader<T>
     public void handleSourceEvents(SourceEvent sourceEvent) {
         if (sourceEvent instanceof EnumeratorAckEvent) {
             EnumeratorAckEvent ackEvent = (EnumeratorAckEvent) sourceEvent;
-            LOGGER.info(
+            LOG.info(
                     "The subtask {} receive ack event for {} from Enumerator.",
                     subtaskId,
                     ackEvent.getFinishedSplits());
@@ -142,7 +142,7 @@ public class MySQLSourceReader<T>
             }
         } else if (sourceEvent instanceof EnumeratorRequestReportEvent) {
             // report finished snapshot splits
-            LOGGER.info(
+            LOG.info(
                     "The subtask {} receive request to report finished snapshot splits.",
                     subtaskId);
             reportFinishedSnapshotSplits(finishedNoAckSplits.values());
@@ -161,7 +161,7 @@ public class MySQLSourceReader<T>
             }
             SourceReaderReportEvent reportEvent = new SourceReaderReportEvent(finishedNoAckSplits);
             context.sendSourceEventToCoordinator(reportEvent);
-            LOGGER.info(
+            LOG.info(
                     "The subtask {} report finished snapshot splits {}.",
                     subtaskId,
                     finishedNoAckSplits);

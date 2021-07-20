@@ -60,7 +60,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
  */
 public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSplit> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(BinlogSplitReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executor;
 
@@ -113,7 +113,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
                         binlogSplitReadTask.execute(new BinlogSplitChangeEventSourceContextImpl());
                     } catch (Exception e) {
                         currentTaskRunning = false;
-                        LOGGER.error(
+                        LOG.error(
                                 String.format(
                                         "Execute binlog read task for mysql split %s fail",
                                         currentTableSplit),
@@ -161,7 +161,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySQLSpli
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
         } catch (Exception e) {
-            LOGGER.error("Close binlog reader error", e);
+            LOG.error("Close binlog reader error", e);
         }
     }
 

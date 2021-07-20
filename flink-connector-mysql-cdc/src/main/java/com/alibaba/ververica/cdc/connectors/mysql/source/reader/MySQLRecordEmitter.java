@@ -51,7 +51,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
 public final class MySQLRecordEmitter<T>
         implements RecordEmitter<SourceRecord, T, MySQLSplitState> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MySQLRecordEmitter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySQLRecordEmitter.class);
     private static final JsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
             new JsonTableChangeSerializer();
 
@@ -98,7 +98,7 @@ public final class MySQLRecordEmitter<T>
                     });
         } else {
             // unknown element
-            LOGGER.info("Meet unknown element {}, just skip.", element);
+            LOG.info("Meet unknown element {}, just skip.", element);
         }
     }
 }

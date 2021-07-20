@@ -61,7 +61,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.S
  */
 public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispatcher<T> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(EventDispatcherImpl.class);
+    private static final Logger LOG = LoggerFactory.getLogger(EventDispatcherImpl.class);
 
     public static final String HISTORY_RECORD_FIELD = "historyRecord";
     private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
@@ -133,7 +133,7 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
             throws InterruptedException {
         if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
             if (historizedSchema == null || historizedSchema.storeOnlyMonitoredTables()) {
-                LOGGER.trace("Filtering schema change event for {}", dataCollectionId);
+                LOG.trace("Filtering schema change event for {}", dataCollectionId);
                 return;
             }
         }
@@ -157,7 +157,7 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
         }
         if (!anyNonfilteredEvent) {
             if (historizedSchema == null || historizedSchema.storeOnlyMonitoredTables()) {
-                LOGGER.trace("Filtering schema change event for {}", dataCollectionIds);
+                LOG.trace("Filtering schema change event for {}", dataCollectionIds);
                 return;
             }
         }

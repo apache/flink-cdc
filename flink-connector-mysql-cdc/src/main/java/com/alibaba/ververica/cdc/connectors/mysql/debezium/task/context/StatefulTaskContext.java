@@ -76,7 +76,7 @@ import static io.debezium.config.CommonConnectorConfig.TOMBSTONES_ON_DELETE;
  */
 public class StatefulTaskContext {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(StatefulTaskContext.class);
+    private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
     private static final Clock clock = Clock.SYSTEM;
     private static final ConcurrentMap<String, Collection<SchemaRecord>> SCHEMA_HISTORY =
             new ConcurrentHashMap<>();
@@ -186,12 +186,12 @@ public class StatefulTaskContext {
         final List<String> logNames = connection.availableBinlogFiles();
         boolean found = logNames.stream().anyMatch(binlogFilename::equals);
         if (!found) {
-            LOGGER.info(
+            LOG.info(
                     "Connector requires binlog file '{}', but MySQL only has {}",
                     binlogFilename,
                     String.join(", ", logNames));
         } else {
-            LOGGER.info("MySQL has the binlog file '{}' required by the connector", binlogFilename);
+            LOG.info("MySQL has the binlog file '{}' required by the connector", binlogFilename);
         }
         return found;
     }
