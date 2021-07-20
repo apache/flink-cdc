@@ -21,7 +21,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.DebeziumException;
 import io.debezium.util.HexConverter;
 
@@ -31,14 +31,14 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition.INITIAL_OFFSET;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
 
 /** Utils for serialization/deserialization. */
 public class SerializerUtils {
 
     private SerializerUtils() {}
 
-    public static void writeBinlogPosition(BinlogPosition offset, DataOutputSerializer out)
+    public static void writeBinlogPosition(BinlogOffset offset, DataOutputSerializer out)
             throws IOException {
         out.writeBoolean(offset != null);
         if (offset != null) {
@@ -47,8 +47,8 @@ public class SerializerUtils {
         }
     }
 
-    public static BinlogPosition readBinlogPosition(DataInputDeserializer in) throws IOException {
-        return in.readBoolean() ? new BinlogPosition(in.readUTF(), in.readLong()) : INITIAL_OFFSET;
+    public static BinlogOffset readBinlogPosition(DataInputDeserializer in) throws IOException {
+        return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : INITIAL_OFFSET;
     }
 
     public static String rowToSerializedString(Object[] splitBoundary) {

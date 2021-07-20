@@ -18,7 +18,7 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlOffsetContext;
@@ -83,7 +83,7 @@ public class SignalEventDispatcher {
     }
 
     public void dispatchWatermarkEvent(
-            MySQLSplit mySQLSplit, BinlogPosition watermark, WatermarkKind watermarkKind)
+            MySQLSplit mySQLSplit, BinlogOffset watermark, WatermarkKind watermarkKind)
             throws InterruptedException {
         SourceRecord sourceRecord =
                 new SourceRecord(
@@ -113,15 +113,15 @@ public class SignalEventDispatcher {
             String databaseName,
             String tableName,
             String splitId,
-            BinlogPosition binlogPosition,
+            BinlogOffset binlogOffset,
             WatermarkKind watermarkKind) {
         Struct result = new Struct(signalEventValueSchema);
         result.put(DATABASE_NAME, databaseName);
         result.put(TABLE_NAME, tableName);
         result.put(SPLIT_ID_KEY, splitId);
         result.put(WATERMARK_KIND, watermarkKind.toString());
-        result.put(BINLOG_FILENAME_OFFSET_KEY, binlogPosition.getFilename());
-        result.put(BINLOG_POSITION_OFFSET_KEY, binlogPosition.getPosition());
+        result.put(BINLOG_FILENAME_OFFSET_KEY, binlogOffset.getFilename());
+        result.put(BINLOG_POSITION_OFFSET_KEY, binlogOffset.getPosition());
         return result;
     }
 

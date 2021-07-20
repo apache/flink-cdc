@@ -24,11 +24,11 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple5;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorAckEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorRequestReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.SourceReaderReportEvent;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
@@ -59,13 +59,13 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
     private final MySQLSnapshotSplitAssigner snapshotSplitAssigner;
 
     private final Map<Integer, List<MySQLSplit>> assignedSplits;
-    private final Map<Integer, List<Tuple2<String, BinlogPosition>>> receiveFinishedSnapshotSplits;
+    private final Map<Integer, List<Tuple2<String, BinlogOffset>>> receiveFinishedSnapshotSplits;
 
     public MySQLSourceEnumerator(
             SplitEnumeratorContext<MySQLSplit> context,
             MySQLSnapshotSplitAssigner snapshotSplitAssigner,
             Map<Integer, List<MySQLSplit>> assignedSplits,
-            Map<Integer, List<Tuple2<String, BinlogPosition>>> receiveFinishedSnapshotSplits) {
+            Map<Integer, List<Tuple2<String, BinlogOffset>>> receiveFinishedSnapshotSplits) {
         this.context = context;
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.assignedSplits = assignedSplits;
@@ -115,7 +115,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
         for (int subtaskId : subtaskIds) {
             final List<MySQLSplit> assignedSplit =
                     assignedSplits.getOrDefault(subtaskId, new ArrayList<>());
-            final List<Tuple2<String, BinlogPosition>> ackSpitsForReader =
+            final List<Tuple2<String, BinlogOffset>> ackSpitsForReader =
                     receiveFinishedSnapshotSplits.getOrDefault(subtaskId, new ArrayList<>());
             int assignedSnapshotSplitSize =
                     assignedSplit.stream()
@@ -146,7 +146,7 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
                     sourceEvent,
                     subtaskId);
             SourceReaderReportEvent reportEvent = (SourceReaderReportEvent) sourceEvent;
-            final List<Tuple2<String, BinlogPosition>> ackSpitsForReader =
+            final List<Tuple2<String, BinlogOffset>> ackSpitsForReader =
                     receiveFinishedSnapshotSplits.getOrDefault(subtaskId, new ArrayList<>());
 
             ackSpitsForReader.addAll(reportEvent.getFinishedSplits());
@@ -225,24 +225,24 @@ public class MySQLSourceEnumerator implements SplitEnumerator<MySQLSplit, MySQLS
                         .flatMap(Collection::stream)
                         .sorted(Comparator.comparing(MySQLSplit::splitId))
                         .collect(Collectors.toList());
-        final List<Tuple2<String, BinlogPosition>> receiveSnapshotSplits =
+        final List<Tuple2<String, BinlogOffset>> receiveSnapshotSplits =
                 receiveFinishedSnapshotSplits.values().stream()
                         .flatMap(Collection::stream)
                         .sorted(Comparator.comparing(o -> o.f0))
                         .collect(Collectors.toList());
 
-        final List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> snapshotSplits =
+        final List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> snapshotSplits =
                 new ArrayList<>();
         final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
 
-        BinlogPosition minBinlogOffset = receiveSnapshotSplits.get(0).f1;
+        BinlogOffset minBinlogOffset = receiveSnapshotSplits.get(0).f1;
         for (int i = 0; i < assignedSnapshotSplit.size(); i++) {
             MySQLSplit split = assignedSnapshotSplit.get(i);
             // find the min binlog offset
             if (receiveSnapshotSplits.get(i).f1.compareTo(minBinlogOffset) < 0) {
                 minBinlogOffset = receiveSnapshotSplits.get(i).f1;
             }
-            Tuple2<String, BinlogPosition> splitPosition = receiveSnapshotSplits.get(i);
+            Tuple2<String, BinlogOffset> splitPosition = receiveSnapshotSplits.get(i);
             snapshotSplits.add(
                     Tuple5.of(
                             split.getTableId(),

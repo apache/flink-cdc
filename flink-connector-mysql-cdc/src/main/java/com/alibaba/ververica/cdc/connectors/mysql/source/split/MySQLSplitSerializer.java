@@ -25,7 +25,7 @@ import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
@@ -38,7 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition.INITIAL_OFFSET;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
@@ -135,8 +135,8 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
         if (isSnapshotSplit) {
             Object[] splitBoundaryStart = serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = serializedStringToRow(in.readUTF());
-            BinlogPosition lowWatermark = readBinlogPosition(in);
-            BinlogPosition highWatermark = readBinlogPosition(in);
+            BinlogOffset lowWatermark = readBinlogPosition(in);
+            BinlogOffset highWatermark = readBinlogPosition(in);
             boolean isSnapshotReadFinished = in.readBoolean();
             Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
 
@@ -155,8 +155,8 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
                     new ArrayList<>(),
                     databaseHistory);
         } else {
-            BinlogPosition offset = readBinlogPosition(in);
-            List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
+            BinlogOffset offset = readBinlogPosition(in);
+            List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                     readFinishedSplitsInfo(in);
             Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
             in.releaseArrays();
@@ -201,13 +201,13 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
     }
 
     private static void writeFinishedSplitsInfo(
-            List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo,
+            List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo,
             DataOutputSerializer out)
             throws IOException {
         final int size = finishedSplitsInfo.size();
         out.writeInt(size);
         for (int i = 0; i < size; i++) {
-            Tuple5<TableId, String, Object[], Object[], BinlogPosition> splitInfo =
+            Tuple5<TableId, String, Object[], Object[], BinlogOffset> splitInfo =
                     finishedSplitsInfo.get(i);
             out.writeUTF(splitInfo.f0.toString());
             out.writeUTF(splitInfo.f1);
@@ -217,9 +217,9 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
         }
     }
 
-    private static List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>>
+    private static List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>>
             readFinishedSplitsInfo(DataInputDeserializer in) throws IOException {
-        List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
+        List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                 new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
@@ -227,7 +227,7 @@ public final class MySQLSplitSerializer implements SimpleVersionedSerializer<MyS
             String splitId = in.readUTF();
             Object[] splitStart = serializedStringToRow(in.readUTF());
             Object[] splitEnd = serializedStringToRow(in.readUTF());
-            BinlogPosition highWatermark = readBinlogPosition(in);
+            BinlogOffset highWatermark = readBinlogPosition(in);
             finishedSplitsInfo.add(
                     Tuple5.of(tableId, splitId, splitStart, splitEnd, highWatermark));
         }

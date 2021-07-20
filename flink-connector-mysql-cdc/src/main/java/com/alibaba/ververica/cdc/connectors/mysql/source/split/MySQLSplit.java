@@ -22,7 +22,7 @@ import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.table.types.logical.RowType;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.relational.TableId;
 
@@ -43,14 +43,14 @@ public class MySQLSplit implements SourceSplit {
     // the fields for snapshot split
     @Nullable private final Object[] splitBoundaryStart;
     @Nullable private final Object[] splitBoundaryEnd;
-    @Nullable private final BinlogPosition lowWatermark;
-    @Nullable private final BinlogPosition highWatermark;
+    @Nullable private final BinlogOffset lowWatermark;
+    @Nullable private final BinlogOffset highWatermark;
     private final boolean snapshotReadFinished;
 
     // the fields for binlog split
-    private final BinlogPosition offset;
+    private final BinlogOffset offset;
     // (tableId, splitId, splitStart, splitEnd, highWatermark)
-    private final List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>>
+    private final List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>>
             finishedSplitsInfo;
 
     // TODO: The databaseHistory can be shared in splitReader for all snapshot splits
@@ -70,11 +70,11 @@ public class MySQLSplit implements SourceSplit {
             RowType splitBoundaryType,
             @Nullable Object[] splitBoundaryStart,
             @Nullable Object[] splitBoundaryEnd,
-            @Nullable BinlogPosition lowWatermark,
-            @Nullable BinlogPosition highWatermark,
+            @Nullable BinlogOffset lowWatermark,
+            @Nullable BinlogOffset highWatermark,
             boolean snapshotReadFinished,
-            @Nullable BinlogPosition offset,
-            List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo,
+            @Nullable BinlogOffset offset,
+            List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo,
             Map<TableId, SchemaRecord> databaseHistory) {
         this.splitKind = splitKind;
         this.tableId = tableId;
@@ -122,12 +122,12 @@ public class MySQLSplit implements SourceSplit {
     }
 
     @Nullable
-    public BinlogPosition getLowWatermark() {
+    public BinlogOffset getLowWatermark() {
         return lowWatermark;
     }
 
     @Nullable
-    public BinlogPosition getHighWatermark() {
+    public BinlogOffset getHighWatermark() {
         return highWatermark;
     }
 
@@ -135,12 +135,11 @@ public class MySQLSplit implements SourceSplit {
         return snapshotReadFinished;
     }
 
-    public BinlogPosition getOffset() {
+    public BinlogOffset getOffset() {
         return offset;
     }
 
-    public List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>>
-            getFinishedSplitsInfo() {
+    public List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> getFinishedSplitsInfo() {
         return finishedSplitsInfo;
     }
 

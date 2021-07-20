@@ -33,10 +33,10 @@ import org.apache.flink.util.Collector;
 import com.alibaba.ververica.cdc.connectors.mysql.MySQLTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySQLSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySQLSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -311,9 +311,9 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         }
 
         // step-2: create binlog split according the finished snapshot splits
-        List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
+        List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                 getFinishedSplitsInfo(sqlSplits, fetchedRecords);
-        BinlogPosition startOffset = getStartOffsetOfBinlogSplit(finishedSplitsInfo);
+        BinlogOffset startOffset = getStartOffsetOfBinlogSplit(finishedSplitsInfo);
         Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
         TableId tableId = null;
         for (MySQLSplit mySQLSplit : sqlSplits) {
@@ -458,12 +458,12 @@ public class BinlogSplitReaderTest extends MySQLTestBase {
         }
     }
 
-    private List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> getFinishedSplitsInfo(
+    private List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> getFinishedSplitsInfo(
             List<MySQLSplit> mySQLSplits, List<SourceRecord> records) {
         Map<String, MySQLSplit> splitMap = new HashMap<>();
         mySQLSplits.forEach(r -> splitMap.put(r.getSplitId(), r));
 
-        List<Tuple5<TableId, String, Object[], Object[], BinlogPosition>> finishedSplitsInfo =
+        List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
                 new ArrayList<>();
         records.stream()
                 .filter(event -> isHighWatermarkEvent(event))

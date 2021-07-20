@@ -16,25 +16,21 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.mysql.debezium.offset;
+package com.alibaba.ververica.cdc.connectors.mysql.source.offset;
 
 import org.apache.flink.util.Preconditions;
 
-/** A {@link MySQLOffset} implementation that uses binlog position. */
-public class BinlogPosition implements MySQLOffset, Comparable<BinlogPosition> {
+import java.util.Objects;
 
-    public static final BinlogPosition INITIAL_OFFSET = new BinlogPosition("", 0);
+/** A structure describes an offset in a binlog of MySQL server. */
+public class BinlogOffset implements Comparable<BinlogOffset> {
+
+    public static final BinlogOffset INITIAL_OFFSET = new BinlogOffset("", 0);
     private final String filename;
     private final long position;
 
-    public BinlogPosition(String filename, long position) {
+    public BinlogOffset(String filename, long position) {
         Preconditions.checkNotNull(filename);
-        this.filename = filename;
-        this.position = position;
-    }
-
-    public BinlogPosition(
-            String filename, long position, boolean isLowWatermark, boolean isHighWatermark) {
         this.filename = filename;
         this.position = position;
     }
@@ -48,7 +44,7 @@ public class BinlogPosition implements MySQLOffset, Comparable<BinlogPosition> {
     }
 
     @Override
-    public int compareTo(BinlogPosition o) {
+    public int compareTo(BinlogOffset o) {
         if (this.filename.equals(o.filename)) {
             return Long.compare(this.position, o.position);
         } else {
@@ -57,7 +53,7 @@ public class BinlogPosition implements MySQLOffset, Comparable<BinlogPosition> {
         }
     }
 
-    public boolean isAtOrBefore(BinlogPosition that) {
+    public boolean isAtOrBefore(BinlogOffset that) {
         return this.compareTo(that) >= 0;
     }
 
@@ -67,32 +63,19 @@ public class BinlogPosition implements MySQLOffset, Comparable<BinlogPosition> {
     }
 
     @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + filename.hashCode();
-        result = prime * result + (int) (position ^ (position >>> 32));
-        return result;
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        BinlogOffset that = (BinlogOffset) o;
+        return position == that.position && Objects.equals(filename, that.filename);
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        BinlogPosition other = (BinlogPosition) obj;
-        if (!filename.equals(other.filename)) {
-            return false;
-        }
-        if (position != other.position) {
-            return false;
-        }
-        return true;
+    public int hashCode() {
+        return Objects.hash(filename, position);
     }
 }

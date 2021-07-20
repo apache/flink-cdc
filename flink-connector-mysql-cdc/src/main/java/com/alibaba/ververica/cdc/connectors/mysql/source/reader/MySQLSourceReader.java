@@ -28,10 +28,10 @@ import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSource
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorAckEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorRequestReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.SourceReaderReportEvent;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitKind;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitReader;
@@ -155,7 +155,7 @@ public class MySQLSourceReader<T>
 
     private void reportFinishedSnapshotSplits(Collection<MySQLSplit> splits) {
         if (!splits.isEmpty()) {
-            final ArrayList<Tuple2<String, BinlogPosition>> finishedNoAckSplits = new ArrayList<>();
+            final ArrayList<Tuple2<String, BinlogOffset>> finishedNoAckSplits = new ArrayList<>();
             for (MySQLSplit split : splits) {
                 finishedNoAckSplits.add(Tuple2.of(split.getSplitId(), split.getHighWatermark()));
             }

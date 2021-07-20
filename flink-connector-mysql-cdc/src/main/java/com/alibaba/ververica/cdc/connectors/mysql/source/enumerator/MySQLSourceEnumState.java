@@ -20,7 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.enumerator;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySQLSplitReader;
 import io.debezium.relational.TableId;
@@ -52,7 +52,7 @@ public class MySQLSourceEnumState {
      * The finished (snapshot) splits that the {@link MySQLSourceEnumerator} has received from
      * {@link MySQLSplitReader}s.
      */
-    private final Map<Integer, List<Tuple2<String, BinlogPosition>>> finishedSnapshotSplits;
+    private final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits;
 
     /**
      * The splits are frequently serialized into checkpoints. Caching the byte representation makes
@@ -64,7 +64,7 @@ public class MySQLSourceEnumState {
             Collection<MySQLSplit> remainingSplits,
             Collection<TableId> alreadyProcessedTables,
             Map<Integer, List<MySQLSplit>> assignedSplits,
-            Map<Integer, List<Tuple2<String, BinlogPosition>>> finishedSnapshotSplits) {
+            Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits) {
         this.remainingSplits = remainingSplits;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.assignedSplits = assignedSplits;
@@ -83,7 +83,7 @@ public class MySQLSourceEnumState {
         return assignedSplits;
     }
 
-    public Map<Integer, List<Tuple2<String, BinlogPosition>>> getFinishedSnapshotSplits() {
+    public Map<Integer, List<Tuple2<String, BinlogOffset>>> getFinishedSnapshotSplits() {
         return finishedSnapshotSplits;
     }
 }

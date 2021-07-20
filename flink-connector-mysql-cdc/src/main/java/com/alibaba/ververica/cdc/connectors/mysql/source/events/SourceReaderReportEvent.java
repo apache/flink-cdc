@@ -21,8 +21,8 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.events;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.java.tuple.Tuple2;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.offset.BinlogPosition;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySQLSourceEnumerator;
+import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySQLSourceReader;
 
 import java.util.ArrayList;
@@ -35,13 +35,13 @@ public class SourceReaderReportEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    private final ArrayList<Tuple2<String, BinlogPosition>> finishedSplits;
+    private final ArrayList<Tuple2<String, BinlogOffset>> finishedSplits;
 
-    public SourceReaderReportEvent(ArrayList<Tuple2<String, BinlogPosition>> finishedSplits) {
+    public SourceReaderReportEvent(ArrayList<Tuple2<String, BinlogOffset>> finishedSplits) {
         this.finishedSplits = finishedSplits;
     }
 
-    public ArrayList<Tuple2<String, BinlogPosition>> getFinishedSplits() {
+    public ArrayList<Tuple2<String, BinlogOffset>> getFinishedSplits() {
         return finishedSplits;
     }
 }
