@@ -106,7 +106,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
     private void checkSplitOrStartNext() throws IOException {
         // the binlog reader should keep alive
-        if (currentReader != null && currentReader instanceof BinlogSplitReader) {
+        if (currentReader instanceof BinlogSplitReader) {
             return;
         }
 
@@ -144,7 +144,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     }
 
     private boolean canAssignNextSplit() {
-        return currentReader == null || currentReader.isIdle();
+        return currentReader == null || currentReader.isFinished();
     }
 
     private MySqlRecords finishedSnapshotSplit() {

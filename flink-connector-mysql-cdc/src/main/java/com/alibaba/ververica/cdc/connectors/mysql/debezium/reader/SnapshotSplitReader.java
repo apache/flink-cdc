@@ -33,6 +33,7 @@ import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
+import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,8 +66,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     // task to read snapshot for current split
     private MySqlSnapshotSplitReadTask splitSnapshotReadTask;
     private MySqlSplit currentTableSplit;
-    private AtomicBoolean hasNextElement;
-    private AtomicBoolean reachEnd;
+    private SchemaNameAdjuster nameAdjuster;
+    public AtomicBoolean hasNextElement;
+    public AtomicBoolean reachEnd;
 
     public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
@@ -82,7 +84,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         this.currentTableSplit = mySQLSplit;
         statefulTaskContext.configure(currentTableSplit);
         this.queue = statefulTaskContext.getQueue();
+        this.nameAdjuster = statefulTaskContext.getSchemaNameAdjuster();
         this.hasNextElement.set(true);
+        this.reachEnd.set(false);
         this.splitSnapshotReadTask =
                 new MySqlSnapshotSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
@@ -155,7 +159,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     }
 
     @Override
-    public boolean isIdle() {
+    public boolean isFinished() {
         return currentTableSplit == null
                 || (!currentTaskRunning && !hasNextElement.get() && reachEnd.get());
     }
@@ -181,7 +185,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             }
             // snapshot split return its data once
             hasNextElement.set(false);
-            return normalizedSplitRecords(currentTableSplit, sourceRecords).iterator();
+            return normalizedSplitRecords(currentTableSplit, sourceRecords, nameAdjuster)
+                    .iterator();
         }
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);

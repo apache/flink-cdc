@@ -51,7 +51,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.Sig
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.MySqlEventMetadataProvider.SERVER_ID_KEY;
 
 /**
- * A subclass implementation of {@link EventDispatcher}。
+ * A subclass implementation of {@link EventDispatcher}.
  *
  * <pre>
  *  1. This class shares one {@link ChangeEventQueue} between multiple readers.
@@ -182,7 +182,7 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
             Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
             source.put(SERVER_ID_KEY, serverId);
             source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
-            source.put(BINLOG_FILENAME_OFFSET_KEY, pos);
+            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
             HistoryRecord historyRecord =
                     new HistoryRecord(
                             source,

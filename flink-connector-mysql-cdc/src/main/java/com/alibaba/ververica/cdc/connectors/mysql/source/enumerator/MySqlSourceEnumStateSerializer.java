@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -72,13 +71,15 @@ public class MySqlSourceEnumStateSerializer
 
         writeMySQLSplits(sourceEnumState.getRemainingSplits(), out);
         writeTableIds(sourceEnumState.getAlreadyProcessedTables(), out);
-        writeAssignedSplits(sourceEnumState.getAssignedSplits(), out);
+        writeAssignedSplits(sourceEnumState.getAssignedSnapshotSplits(), out);
+        writeAssignedSplits(sourceEnumState.getAssignedBinlogSplits(), out);
         writeFinishedSnapshotSplits(sourceEnumState.getFinishedSnapshotSplits(), out);
 
         final byte[] result = out.getCopyOfBuffer();
         // optimization: cache the serialized from, so we avoid the byte work during repeated
         // serialization
         sourceEnumState.serializedFormCache = result;
+        out.clear();
         return result;
     }
 
@@ -96,11 +97,17 @@ public class MySqlSourceEnumStateSerializer
 
         final Collection<MySqlSplit> splits = readMySQLSplits(in);
         final Collection<TableId> tableIds = readTableIds(in);
-        final Map<Integer, List<MySqlSplit>> assignedSplits = readAssignedSplits(in);
+        final Map<Integer, List<MySqlSplit>> assignedSnapshotSplits = readAssignedSplits(in);
+        final Map<Integer, List<MySqlSplit>> assignedBinlogSplits = readAssignedSplits(in);
         final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits =
                 readFinishedSnapshotSplits(in);
         in.releaseArrays();
-        return new MySqlSourceEnumState(splits, tableIds, assignedSplits, finishedSnapshotSplits);
+        return new MySqlSourceEnumState(
+                splits,
+                tableIds,
+                assignedSnapshotSplits,
+                assignedBinlogSplits,
+                finishedSnapshotSplits);
     }
 
     private void writeFinishedSnapshotSplits(
@@ -183,9 +190,7 @@ public class MySqlSourceEnumStateSerializer
             throws IOException {
         final int size = mySqlSplits.size();
         out.writeInt(size);
-        final Iterator<MySqlSplit> iterator = mySqlSplits.iterator();
-        while (iterator.hasNext()) {
-            MySqlSplit split = iterator.next();
+        for (MySqlSplit split : mySqlSplits) {
             byte[] splitBytes = splitSerializer.serialize(split);
             out.writeInt(splitBytes.length);
             out.write(splitBytes);
@@ -209,9 +214,7 @@ public class MySqlSourceEnumStateSerializer
             throws IOException {
         final int size = tableIds.size();
         out.writeInt(size);
-        final Iterator<TableId> idIterator = tableIds.iterator();
-        while (idIterator.hasNext()) {
-            TableId tableId = idIterator.next();
+        for (TableId tableId : tableIds) {
             out.writeUTF(tableId.toString());
         }
     }

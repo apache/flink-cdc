@@ -80,7 +80,9 @@ public class RecordUtils {
      * [high watermark event]
      */
     public static List<SourceRecord> normalizedSplitRecords(
-            MySqlSplit mySQLSplit, List<SourceRecord> sourceRecords) {
+            MySqlSplit mySQLSplit,
+            List<SourceRecord> sourceRecords,
+            SchemaNameAdjuster nameAdjuster) {
         List<SourceRecord> normalizedRecords = new ArrayList<>();
         Map<Struct, SourceRecord> snapshotRecords = new HashMap<>();
         List<SourceRecord> binlogRecords = new ArrayList<>();
@@ -106,7 +108,18 @@ public class RecordUtils {
             }
 
             if (i < sourceRecords.size() - 1) {
-                binlogRecords = sourceRecords.subList(i, sourceRecords.size() - 1);
+                List<SourceRecord> allBinlogRecords =
+                        sourceRecords.subList(i, sourceRecords.size() - 1);
+                for (SourceRecord binlog : allBinlogRecords) {
+                    Object[] key =
+                            getSplitKey(mySQLSplit.getSplitBoundaryType(), binlog, nameAdjuster);
+                    if (splitKeyRangeContains(
+                            key,
+                            mySQLSplit.getSplitBoundaryStart(),
+                            mySQLSplit.getSplitBoundaryEnd())) {
+                        binlogRecords.add(binlog);
+                    }
+                }
             }
             checkState(
                     isHighWatermarkEvent(highWatermark),

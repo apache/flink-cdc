@@ -132,7 +132,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     }
 
     @Override
-    public boolean isIdle() {
+    public boolean isFinished() {
         return currentTableSplit == null || !currentTaskRunning;
     }
 

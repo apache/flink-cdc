@@ -48,7 +48,7 @@ VALUES (101,"user_1","Shanghai","123567891234"),
        (1019,"user_20","Shanghai","123567891234"),
        (2000,"user_21","Shanghai","123567891234");
 
--- table has same name prefix with 'customers*'
+-- table has same name prefix with 'customers.*'
 CREATE TABLE customers_1 (
   id INTEGER NOT NULL PRIMARY KEY,
   name VARCHAR(255) NOT NULL DEFAULT 'flink',

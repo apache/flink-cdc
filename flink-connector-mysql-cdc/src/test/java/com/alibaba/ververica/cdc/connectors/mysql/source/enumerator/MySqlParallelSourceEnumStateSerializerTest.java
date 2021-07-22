@@ -86,22 +86,21 @@ public class MySqlParallelSourceEnumStateSerializerTest {
 
         final Collection<MySqlSplit> remainingSplits = new ArrayList<>();
         final TableId tableId1 = TableId.parse("test_db.test_table1");
+        alreadyProcessedTables.add(tableId1);
         remainingSplits.add(getTestSplit(tableId1, 2));
         remainingSplits.add(getTestSplit(tableId1, 3));
 
-        final Map<Integer, List<MySqlSplit>> assignedSplits = new HashMap<>();
-        List<MySqlSplit> assignedSplitsForTask0 = new ArrayList<>();
-        assignedSplitsForTask0.add(getTestSplit(tableId0, 0));
-        assignedSplitsForTask0.add(getTestSplit(tableId0, 1));
-        assignedSplitsForTask0.add(getTestSplit(tableId0, 2));
-        assignedSplitsForTask0.add(getTestBinlogSplit(tableId0));
+        final Map<Integer, List<MySqlSplit>> assignedSnapshotSplits = new HashMap<>();
+        List<MySqlSplit> assignedSnapshotSplitsForTask0 = new ArrayList<>();
+        assignedSnapshotSplitsForTask0.add(getTestSplit(tableId0, 0));
+        assignedSnapshotSplitsForTask0.add(getTestSplit(tableId0, 1));
+        assignedSnapshotSplitsForTask0.add(getTestSplit(tableId0, 2));
 
-        List<MySqlSplit> assignedSplitsForTask1 = new ArrayList<>();
-        assignedSplitsForTask1.add(getTestSplit(tableId1, 0));
-        assignedSplitsForTask1.add(getTestSplit(tableId1, 1));
-
-        assignedSplits.put(0, assignedSplitsForTask0);
-        assignedSplits.put(1, assignedSplitsForTask1);
+        List<MySqlSplit> assignedSnapshotSplitsForTask1 = new ArrayList<>();
+        assignedSnapshotSplitsForTask1.add(getTestSplit(tableId1, 0));
+        assignedSnapshotSplitsForTask1.add(getTestSplit(tableId1, 1));
+        assignedSnapshotSplits.put(0, assignedSnapshotSplitsForTask0);
+        assignedSnapshotSplits.put(1, assignedSnapshotSplitsForTask1);
 
         final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits =
                 new HashMap<>();
@@ -115,8 +114,17 @@ public class MySqlParallelSourceEnumStateSerializerTest {
         finishedSnapshotSplits.put(0, finishedSplitsForTask0);
         finishedSnapshotSplits.put(1, finishedSplitsForTask1);
 
+        final Map<Integer, List<MySqlSplit>> assignedBinlogSplits = new HashMap<>();
+        List<MySqlSplit> assignedBinlogSplitsForTask0 = new ArrayList<>();
+        assignedBinlogSplitsForTask0.add(getTestBinlogSplit(tableId0));
+        assignedBinlogSplits.put(0, assignedBinlogSplitsForTask0);
+
         return new MySqlSourceEnumState(
-                remainingSplits, alreadyProcessedTables, assignedSplits, finishedSnapshotSplits);
+                remainingSplits,
+                alreadyProcessedTables,
+                assignedSnapshotSplits,
+                assignedBinlogSplits,
+                finishedSnapshotSplits);
     }
 
     private MySqlSplit getTestSplit(TableId tableId, int splitNo) {
@@ -193,9 +201,13 @@ public class MySqlParallelSourceEnumStateSerializerTest {
         List<MySqlSplit> actualSplits = new ArrayList<>(actual.getRemainingSplits());
         assertSplitsEquals(expectedSplits, actualSplits);
 
-        assertEquals(expected.getAssignedSplits().size(), actual.getAssignedSplits().size());
-        for (Map.Entry<Integer, List<MySqlSplit>> entry : expected.getAssignedSplits().entrySet()) {
-            assertSplitsEquals(entry.getValue(), actual.getAssignedSplits().get(entry.getKey()));
+        assertEquals(
+                expected.getAssignedSnapshotSplits().size(),
+                actual.getAssignedSnapshotSplits().size());
+        for (Map.Entry<Integer, List<MySqlSplit>> entry :
+                expected.getAssignedSnapshotSplits().entrySet()) {
+            assertSplitsEquals(
+                    entry.getValue(), actual.getAssignedSnapshotSplits().get(entry.getKey()));
         }
 
         assertEquals(

@@ -41,7 +41,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +54,7 @@ public class MySqlSourceReader<T>
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
 
-    private final Map<String, MySqlSplit> finishedNoAckSplits;
+    private final Map<String, MySqlSplit> finishedUnAckedSplits;
     private final int subtaskId;
 
     public MySqlSourceReader(
@@ -70,7 +69,7 @@ public class MySqlSourceReader<T>
                 recordEmitter,
                 config,
                 context);
-        this.finishedNoAckSplits = new HashMap<>();
+        this.finishedUnAckedSplits = new HashMap<>();
         this.subtaskId = context.getIndexOfSubtask();
     }
 
@@ -92,19 +91,17 @@ public class MySqlSourceReader<T>
         List<MySqlSplit> stateSplits = super.snapshotState(checkpointId);
 
         // add finished splits that didn't receive ack yet
-        stateSplits.addAll(finishedNoAckSplits.values());
+        stateSplits.addAll(finishedUnAckedSplits.values());
         return stateSplits;
     }
 
     @Override
     protected void onSplitFinished(Map<String, MySqlSplitState> finishedSplitIds) {
-        LOG.info("The split(s) {} read finished.", finishedSplitIds);
-        final List<MySqlSplit> splits =
-                finishedSplitIds.values().stream()
-                        .map(MySqlSplitState::toMySQLSplit)
-                        .collect(Collectors.toList());
-        reportFinishedSnapshotSplits(splits);
-        context.sendSplitRequest();
+        for (MySqlSplitState mySQLSplitState : finishedSplitIds.values()) {
+            MySqlSplit split = mySQLSplitState.toMySQLSplit();
+            finishedUnAckedSplits.put(split.getSplitId(), split);
+        }
+        reportFinishedSnapshotSplits();
     }
 
     @Override
@@ -116,8 +113,8 @@ public class MySqlSourceReader<T>
                         split ->
                                 split.getSplitKind() == MySqlSplitKind.SNAPSHOT
                                         && split.isSnapshotReadFinished())
-                .forEach(split -> this.finishedNoAckSplits.put(split.getSplitId(), split));
-        reportFinishedSnapshotSplits(this.finishedNoAckSplits.values());
+                .forEach(split -> this.finishedUnAckedSplits.put(split.getSplitId(), split));
+        reportFinishedSnapshotSplits();
 
         // add all un-finished splits(including binlog split) to SourceReaderBase
         super.addSplits(
@@ -138,14 +135,14 @@ public class MySqlSourceReader<T>
                     subtaskId,
                     ackEvent.getFinishedSplits());
             for (String splitId : ackEvent.getFinishedSplits()) {
-                this.finishedNoAckSplits.remove(splitId);
+                this.finishedUnAckedSplits.remove(splitId);
             }
         } else if (sourceEvent instanceof EnumeratorRequestReportEvent) {
             // report finished snapshot splits
             LOG.info(
                     "The subtask {} receive request to report finished snapshot splits.",
                     subtaskId);
-            reportFinishedSnapshotSplits(finishedNoAckSplits.values());
+            reportFinishedSnapshotSplits();
             // also try to request new split
             context.sendSplitRequest();
         } else {
@@ -153,23 +150,22 @@ public class MySqlSourceReader<T>
         }
     }
 
-    private void reportFinishedSnapshotSplits(Collection<MySqlSplit> splits) {
-        if (!splits.isEmpty()) {
-            final ArrayList<Tuple2<String, BinlogOffset>> finishedNoAckSplits = new ArrayList<>();
-            for (MySqlSplit split : splits) {
-                finishedNoAckSplits.add(Tuple2.of(split.getSplitId(), split.getHighWatermark()));
+    private void reportFinishedSnapshotSplits() {
+        if (!finishedUnAckedSplits.isEmpty()) {
+            final ArrayList<Tuple2<String, BinlogOffset>> noAckSplits = new ArrayList<>();
+            for (MySqlSplit split : finishedUnAckedSplits.values()) {
+                noAckSplits.add(Tuple2.of(split.getSplitId(), split.getHighWatermark()));
             }
-            SourceReaderReportEvent reportEvent = new SourceReaderReportEvent(finishedNoAckSplits);
+            SourceReaderReportEvent reportEvent = new SourceReaderReportEvent(noAckSplits);
             context.sendSourceEventToCoordinator(reportEvent);
-            LOG.info(
-                    "The subtask {} report finished snapshot splits {}.",
-                    subtaskId,
-                    finishedNoAckSplits);
+            LOG.info("The subtask {} reports finished snapshot splits {}.", subtaskId, noAckSplits);
+            // try to request next split
+            context.sendSplitRequest();
         }
     }
 
     @Override
     protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
-        return splitState;
+        return splitState.toMySQLSplit();
     }
 }
