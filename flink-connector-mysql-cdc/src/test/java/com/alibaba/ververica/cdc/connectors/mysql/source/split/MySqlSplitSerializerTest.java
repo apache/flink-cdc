@@ -18,25 +18,27 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.split;
 
-import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.VarCharType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.JsonTableChangeSerializer;
+import io.debezium.relational.history.TableChanges.TableChange;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
@@ -47,18 +49,13 @@ public class MySqlSplitSerializerTest {
     @Test
     public void testSnapshotSplit() throws Exception {
         final MySqlSplit split =
-                new MySqlSplit(
-                        MySqlSplitKind.SNAPSHOT,
+                new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
                         new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
                         new Object[] {100L},
                         new Object[] {999L},
-                        new BinlogOffset("mysql-bin.000001", 3L),
-                        new BinlogOffset("mysql-bin.000002", 78L),
-                        true,
-                        INITIAL_OFFSET,
-                        new ArrayList<>(),
+                        null,
                         new HashMap<>());
         assertSplitsEqual(split, serializeAndDeserializeSplit(split));
     }
@@ -66,53 +63,47 @@ public class MySqlSplitSerializerTest {
     @Test
     public void testBinlogSplit() throws Exception {
         final TableId tableId = TableId.parse("test_db.test_table");
-        final List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
-                new ArrayList<>();
+        final List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
         finishedSplitsInfo.add(
-                Tuple5.of(
+                new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-0",
                         null,
                         new Object[] {100},
                         new BinlogOffset("mysql-bin.000001", 4L)));
         finishedSplitsInfo.add(
-                Tuple5.of(
+                new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-1",
                         new Object[] {100},
                         new Object[] {200},
                         new BinlogOffset("mysql-bin.000001", 200L)));
         finishedSplitsInfo.add(
-                Tuple5.of(
+                new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-2",
                         new Object[] {200},
                         new Object[] {300},
                         new BinlogOffset("mysql-bin.000001", 600L)));
         finishedSplitsInfo.add(
-                Tuple5.of(
+                new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-3",
                         new Object[] {300},
                         null,
                         new BinlogOffset("mysql-bin.000001", 800L)));
 
-        final Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
-        databaseHistory.put(tableId, getTestHistoryRecord());
+        final Map<TableId, TableChange> databaseHistory = new HashMap<>();
+        databaseHistory.put(tableId, getTestTableSchema());
 
         final MySqlSplit split =
-                new MySqlSplit(
-                        MySqlSplitKind.BINLOG,
-                        tableId,
-                        "binlog-split-0",
+                new MySqlBinlogSplit(
+                        BINLOG_SPLIT_ID,
                         new RowType(
-                                Arrays.asList(new RowType.RowField("card_no", new VarCharType()))),
-                        null,
-                        null,
-                        null,
-                        null,
-                        true,
+                                Collections.singletonList(
+                                        new RowType.RowField("card_no", new VarCharType()))),
                         new BinlogOffset("mysql-bin.000001", 4L),
+                        BinlogOffset.NO_STOPPING_OFFSET,
                         finishedSplitsInfo,
                         databaseHistory);
         assertSplitsEqual(split, serializeAndDeserializeSplit(split));
@@ -121,18 +112,15 @@ public class MySqlSplitSerializerTest {
     @Test
     public void testRepeatedSerializationCache() throws Exception {
         final MySqlSplit split =
-                new MySqlSplit(
-                        MySqlSplitKind.SNAPSHOT,
+                new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-0",
-                        new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
+                        new RowType(
+                                Collections.singletonList(
+                                        new RowType.RowField("id", new BigIntType()))),
                         null,
                         new Object[] {99L},
-                        new BinlogOffset("mysql-bin.000001", 3L),
-                        new BinlogOffset("mysql-bin.000002", 78L),
-                        true,
-                        INITIAL_OFFSET,
-                        new ArrayList<>(),
+                        null,
                         new HashMap<>());
         final byte[] ser1 = MySqlSplitSerializer.INSTANCE.serialize(split);
         final byte[] ser2 = MySqlSplitSerializer.INSTANCE.serialize(split);
@@ -145,7 +133,7 @@ public class MySqlSplitSerializerTest {
         return sqlSplitSerializer.deserializeV1(serialized);
     }
 
-    public static SchemaRecord getTestHistoryRecord() throws Exception {
+    public static TableChange getTestTableSchema() throws Exception {
         // the json string of a TableChange
         final String tableChangeJsonStr =
                 "{\"type\":\"CREATE\",\"id\":\"\\\"test_db\\\".\\\"test_table\\\"\","
@@ -162,22 +150,40 @@ public class MySqlSplitSerializerTest {
                         + "false},{\"name\":\"note\",\"jdbcType\":12,\"typeName\":\"VARCHAR\","
                         + "\"typeExpression\":\"VARCHAR\",\"charsetName\":\"latin1\",\"length\":1024,"
                         + "\"position\":4,\"optional\":true,\"autoIncremented\":false,\"generated\":false}]}}";
-        final Document tableChange = DocumentReader.defaultReader().read(tableChangeJsonStr);
-        return new SchemaRecord(tableChange);
+        final Document doc = DocumentReader.defaultReader().read(tableChangeJsonStr);
+        return JsonTableChangeSerializer.fromDocument(doc, true);
     }
 
     public static void assertSplitsEqual(MySqlSplit expected, MySqlSplit actual) {
-        assertEquals(expected.getSplitKind(), actual.getSplitKind());
-        assertEquals(expected.getTableId(), actual.getTableId());
-        assertEquals(expected.getSplitId(), actual.getSplitId());
-        assertEquals(expected.getSplitBoundaryType(), actual.getSplitBoundaryType());
-        assertArrayEquals(expected.getSplitBoundaryStart(), actual.getSplitBoundaryStart());
-        assertArrayEquals(expected.getSplitBoundaryEnd(), actual.getSplitBoundaryEnd());
-        assertEquals(expected.getOffset(), actual.getOffset());
-        assertEquals(
-                expected.getFinishedSplitsInfo().toString(),
-                actual.getFinishedSplitsInfo().toString());
-        assertEquals(
-                expected.getDatabaseHistory().toString(), actual.getDatabaseHistory().toString());
+        if (expected.isSnapshotSplit() && actual.isSnapshotSplit()) {
+            final MySqlSnapshotSplit expectedSplit = expected.asSnapshotSplit();
+            final MySqlSnapshotSplit actualSplit = actual.asSnapshotSplit();
+            assertEquals(expectedSplit.getTableId(), actualSplit.getTableId());
+            assertEquals(expectedSplit.splitId(), actualSplit.splitId());
+            assertEquals(expectedSplit.getSplitKeyType(), actualSplit.getSplitKeyType());
+            assertArrayEquals(expectedSplit.getSplitStart(), actualSplit.getSplitStart());
+            assertArrayEquals(expectedSplit.getSplitEnd(), actualSplit.getSplitEnd());
+            assertEquals(expectedSplit.getHighWatermark(), actualSplit.getHighWatermark());
+            assertEquals(
+                    expectedSplit.getTableSchemas().toString(),
+                    actualSplit.getTableSchemas().toString());
+        } else if (expected.isBinlogSplit() && actual.isBinlogSplit()) {
+            final MySqlBinlogSplit expectedSplit = expected.asBinlogSplit();
+            final MySqlBinlogSplit actualSplit = actual.asBinlogSplit();
+            assertEquals(expectedSplit.splitId(), actualSplit.splitId());
+            assertEquals(expectedSplit.getSplitKeyType(), actualSplit.getSplitKeyType());
+            assertEquals(
+                    expectedSplit.getTableSchemas().toString(),
+                    actualSplit.getTableSchemas().toString());
+            assertEquals(expectedSplit.getStartingOffset(), actualSplit.getStartingOffset());
+            assertEquals(
+                    expectedSplit.getFinishedSnapshotSplitInfos().toString(),
+                    actualSplit.getFinishedSnapshotSplitInfos().toString());
+            assertEquals(
+                    expectedSplit.getTableSchemas().toString(),
+                    actualSplit.getTableSchemas().toString());
+        } else {
+            Assert.fail("Fail, different split type");
+        }
     }
 }

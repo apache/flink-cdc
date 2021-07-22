@@ -31,9 +31,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
-
-/** Utils for serialization/deserialization. */
+/** Utils for serialization and deserialization. */
 public class SerializerUtils {
 
     private SerializerUtils() {}
@@ -48,7 +46,7 @@ public class SerializerUtils {
     }
 
     public static BinlogOffset readBinlogPosition(DataInputDeserializer in) throws IOException {
-        return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : INITIAL_OFFSET;
+        return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : null;
     }
 
     public static String rowToSerializedString(Object[] splitBoundary) {

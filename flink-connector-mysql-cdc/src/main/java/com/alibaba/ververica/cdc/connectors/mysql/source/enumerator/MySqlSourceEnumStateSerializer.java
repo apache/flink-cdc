@@ -42,7 +42,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.Serializer
  * state of MySQL CDC source.
  */
 public class MySqlSourceEnumStateSerializer
-        implements SimpleVersionedSerializer<MySqlSourceEnumState> {
+        implements SimpleVersionedSerializer<MySqlSourceEnumState<MySqlSplit>> {
 
     private static final int VERSION = 1;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
@@ -62,7 +62,7 @@ public class MySqlSourceEnumStateSerializer
     }
 
     @Override
-    public byte[] serialize(MySqlSourceEnumState sourceEnumState) throws IOException {
+    public byte[] serialize(MySqlSourceEnumState<MySqlSplit> sourceEnumState) throws IOException {
         // optimization: the splits lazily cache their own serialized form
         if (sourceEnumState.serializedFormCache != null) {
             return sourceEnumState.serializedFormCache;
@@ -84,14 +84,15 @@ public class MySqlSourceEnumStateSerializer
     }
 
     @Override
-    public MySqlSourceEnumState deserialize(int version, byte[] serialized) throws IOException {
+    public MySqlSourceEnumState<MySqlSplit> deserialize(int version, byte[] serialized)
+            throws IOException {
         if (version == 1) {
             return deserializeV1(serialized);
         }
         throw new IOException("Unknown version: " + version);
     }
 
-    private MySqlSourceEnumState deserializeV1(byte[] serialized) throws IOException {
+    private MySqlSourceEnumState<MySqlSplit> deserializeV1(byte[] serialized) throws IOException {
         final DataInputDeserializer in = DESERIALIZER_CACHE.get();
         in.setBuffer(serialized);
 
@@ -102,7 +103,7 @@ public class MySqlSourceEnumStateSerializer
         final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits =
                 readFinishedSnapshotSplits(in);
         in.releaseArrays();
-        return new MySqlSourceEnumState(
+        return new MySqlSourceEnumState<>(
                 splits,
                 tableIds,
                 assignedSnapshotSplits,
@@ -142,8 +143,7 @@ public class MySqlSourceEnumStateSerializer
             throws IOException {
         final int size = splitsInfo.size();
         out.writeInt(size);
-        for (int i = 0; i < size; i++) {
-            Tuple2<String, BinlogOffset> splitInfo = splitsInfo.get(i);
+        for (Tuple2<String, BinlogOffset> splitInfo : splitsInfo) {
             out.writeUTF(splitInfo.f0);
             writeBinlogPosition(splitInfo.f1, out);
         }

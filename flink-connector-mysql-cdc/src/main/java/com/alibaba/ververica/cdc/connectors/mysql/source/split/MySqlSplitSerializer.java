@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.split;
 
-import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
@@ -26,11 +25,12 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.JsonTableChangeSerializer;
+import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,7 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
@@ -62,6 +61,9 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
     private static final ThreadLocal<DocumentReader> DOCUMENT_READER =
             ThreadLocal.withInitial(DocumentReader::defaultReader);
 
+    private static final ThreadLocal<JsonTableChangeSerializer> JSON_TABLE_CHANGE_SERIALIZER =
+            ThreadLocal.withInitial(JsonTableChangeSerializer::new);
+
     @Override
     public int getVersion() {
         return VERSION;
@@ -69,49 +71,54 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
 
     @Override
     public byte[] serialize(MySqlSplit split) throws IOException {
+        if (split.isSnapshotSplit()) {
+            final MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
+            // optimization: the splits lazily cache their own serialized form
+            if (snapshotSplit.serializedFormCache != null) {
+                return snapshotSplit.serializedFormCache;
+            }
 
-        // optimization: the splits lazily cache their own serialized form
-        if (split.serializedFormCache != null) {
-            return split.serializedFormCache;
-        }
+            final DataOutputSerializer out = SERIALIZER_CACHE.get();
+            out.writeUTF(String.valueOf(MySqlSplitKind.SNAPSHOT));
+            out.writeUTF(snapshotSplit.getTableId().toString());
+            out.writeUTF(snapshotSplit.splitId());
+            out.writeUTF(snapshotSplit.getSplitKeyType().asSerializableString());
 
-        final DataOutputSerializer out = SERIALIZER_CACHE.get();
-        out.writeUTF(split.getSplitKind().toString());
-        out.writeUTF(split.getTableId().toString());
-        out.writeUTF(split.getSplitId());
-        out.writeUTF(split.getSplitBoundaryType().asSerializableString());
-
-        final boolean isSnapshotSplit = split.getSplitKind() == MySqlSplitKind.SNAPSHOT;
-
-        out.writeBoolean(isSnapshotSplit);
-        // snapshot split
-        if (isSnapshotSplit) {
-
-            final Object[] splitBoundaryStart = split.getSplitBoundaryStart();
-            final Object[] splitBoundaryEnd = split.getSplitBoundaryEnd();
+            final Object[] splitStart = snapshotSplit.getSplitStart();
+            final Object[] splitEnd = snapshotSplit.getSplitEnd();
             // rowToSerializedString deals null case
-            out.writeUTF(rowToSerializedString(splitBoundaryStart));
-            out.writeUTF(rowToSerializedString(splitBoundaryEnd));
+            out.writeUTF(rowToSerializedString(splitStart));
+            out.writeUTF(rowToSerializedString(splitEnd));
+            writeBinlogPosition(snapshotSplit.getHighWatermark(), out);
+            writeTableSchemas(snapshotSplit.getTableSchemas(), out);
+            final byte[] result = out.getCopyOfBuffer();
+            out.clear();
+            // optimization: cache the serialized from, so we avoid the byte work during repeated
+            // serialization
+            snapshotSplit.serializedFormCache = result;
+            return result;
+        } else {
+            final MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
+            // optimization: the splits lazily cache their own serialized form
+            if (binlogSplit.serializedFormCache != null) {
+                return binlogSplit.serializedFormCache;
+            }
+            final DataOutputSerializer out = SERIALIZER_CACHE.get();
+            out.writeUTF(String.valueOf(MySqlSplitKind.BINLOG));
+            out.writeUTF(binlogSplit.splitId());
+            out.writeUTF(binlogSplit.getSplitKeyType().asSerializableString());
 
-            writeBinlogPosition(split.getLowWatermark(), out);
-            writeBinlogPosition(split.getHighWatermark(), out);
-
-            out.writeBoolean(split.isSnapshotReadFinished());
+            writeBinlogPosition(binlogSplit.getStartingOffset(), out);
+            writeBinlogPosition(binlogSplit.getEndingOffset(), out);
+            writeFinishedSplitsInfo(binlogSplit.getFinishedSnapshotSplitInfos(), out);
+            writeTableSchemas(binlogSplit.getTableSchemas(), out);
+            final byte[] result = out.getCopyOfBuffer();
+            out.clear();
+            // optimization: cache the serialized from, so we avoid the byte work during repeated
+            // serialization
+            binlogSplit.serializedFormCache = result;
+            return result;
         }
-        // binlog split
-        else {
-            writeBinlogPosition(split.getOffset(), out);
-            writeFinishedSplitsInfo(split.getFinishedSplitsInfo(), out);
-        }
-        writeDatabaseHistory(split.getDatabaseHistory(), out);
-
-        final byte[] result = out.getCopyOfBuffer();
-        out.clear();
-        // optimization: cache the serialized from, so we avoid the byte work during repeated
-        // serialization
-        split.serializedFormCache = result;
-
-        return result;
     }
 
     @Override
@@ -127,100 +134,88 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         in.setBuffer(serialized);
 
         MySqlSplitKind splitKind = MySqlSplitKind.fromString(in.readUTF());
-        TableId tableId = TableId.parse(in.readUTF());
-        String splitId = in.readUTF();
-        RowType splitBoundaryType = (RowType) LogicalTypeParser.parse(in.readUTF());
-        boolean isSnapshotSplit = in.readBoolean();
-
-        if (isSnapshotSplit) {
+        if (splitKind == MySqlSplitKind.SNAPSHOT) {
+            TableId tableId = TableId.parse(in.readUTF());
+            String splitId = in.readUTF();
+            RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
             Object[] splitBoundaryStart = serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = serializedStringToRow(in.readUTF());
-            BinlogOffset lowWatermark = readBinlogPosition(in);
             BinlogOffset highWatermark = readBinlogPosition(in);
-            boolean isSnapshotReadFinished = in.readBoolean();
-            Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
+            Map<TableId, TableChange> databaseHistory = readTableSchemas(in);
 
             in.releaseArrays();
-            return new MySqlSplit(
-                    splitKind,
+            return new MySqlSnapshotSplit(
                     tableId,
                     splitId,
-                    splitBoundaryType,
+                    splitKeyType,
                     splitBoundaryStart,
                     splitBoundaryEnd,
-                    lowWatermark,
                     highWatermark,
-                    isSnapshotReadFinished,
-                    INITIAL_OFFSET,
-                    new ArrayList<>(),
                     databaseHistory);
         } else {
-            BinlogOffset offset = readBinlogPosition(in);
-            List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
-                    readFinishedSplitsInfo(in);
-            Map<TableId, SchemaRecord> databaseHistory = readDatabaseHistory(in);
+            String splitId = in.readUTF();
+            RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
+            BinlogOffset startingOffset = readBinlogPosition(in);
+            BinlogOffset endingOffset = readBinlogPosition(in);
+            List<FinishedSnapshotSplitInfo> finishedSplitsInfo = readFinishedSplitsInfo(in);
+            Map<TableId, TableChange> tableChangeMap = readTableSchemas(in);
             in.releaseArrays();
-            return new MySqlSplit(
-                    splitKind,
-                    tableId,
+            return new MySqlBinlogSplit(
                     splitId,
-                    splitBoundaryType,
-                    null,
-                    null,
-                    null,
-                    null,
-                    true,
-                    offset,
+                    splitKeyType,
+                    startingOffset,
+                    endingOffset,
                     finishedSplitsInfo,
-                    databaseHistory);
+                    tableChangeMap);
         }
     }
 
-    private static void writeDatabaseHistory(
-            Map<TableId, SchemaRecord> databaseHistory, DataOutputSerializer out)
-            throws IOException {
-        final int size = databaseHistory.size();
+    private static void writeTableSchemas(
+            Map<TableId, TableChange> tableSchemas, DataOutputSerializer out) throws IOException {
+        final int size = tableSchemas.size();
         out.writeInt(size);
-        for (Map.Entry<TableId, SchemaRecord> entry : databaseHistory.entrySet()) {
+        for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
             out.writeUTF(entry.getKey().toString());
-            out.writeUTF(DOCUMENT_WRITER.get().write(entry.getValue().toDocument()));
+            out.writeUTF(
+                    DOCUMENT_WRITER
+                            .get()
+                            .write(
+                                    JSON_TABLE_CHANGE_SERIALIZER
+                                            .get()
+                                            .toDocument(entry.getValue())));
         }
     }
 
-    private static Map<TableId, SchemaRecord> readDatabaseHistory(DataInputDeserializer in)
+    private static Map<TableId, TableChange> readTableSchemas(DataInputDeserializer in)
             throws IOException {
-        Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
+        Map<TableId, TableChange> databaseHistory = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             TableId tableId = TableId.parse(in.readUTF());
             Document document = DOCUMENT_READER.get().read(in.readUTF());
-            SchemaRecord historyRecord = new SchemaRecord(document);
-            databaseHistory.put(tableId, historyRecord);
+            TableChange tableChange = JsonTableChangeSerializer.fromDocument(document, true);
+            databaseHistory.put(tableId, tableChange);
         }
         return databaseHistory;
     }
 
     private static void writeFinishedSplitsInfo(
-            List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo,
-            DataOutputSerializer out)
+            List<FinishedSnapshotSplitInfo> finishedSplitsInfo, DataOutputSerializer out)
             throws IOException {
         final int size = finishedSplitsInfo.size();
         out.writeInt(size);
-        for (int i = 0; i < size; i++) {
-            Tuple5<TableId, String, Object[], Object[], BinlogOffset> splitInfo =
-                    finishedSplitsInfo.get(i);
-            out.writeUTF(splitInfo.f0.toString());
-            out.writeUTF(splitInfo.f1);
-            out.writeUTF(rowToSerializedString(splitInfo.f2));
-            out.writeUTF(rowToSerializedString(splitInfo.f3));
-            writeBinlogPosition(splitInfo.f4, out);
+        for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo) {
+            out.writeUTF(splitInfo.getTableId().toString());
+            out.writeUTF(splitInfo.getSplitId());
+            out.writeUTF(rowToSerializedString(splitInfo.getSplitStart()));
+            out.writeUTF(rowToSerializedString(splitInfo.getSplitEnd()));
+            writeBinlogPosition(splitInfo.getHighWatermark(), out);
         }
     }
 
-    private static List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>>
-            readFinishedSplitsInfo(DataInputDeserializer in) throws IOException {
-        List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
-                new ArrayList<>();
+    private static List<FinishedSnapshotSplitInfo> readFinishedSplitsInfo(DataInputDeserializer in)
+            throws IOException {
+        List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             TableId tableId = TableId.parse(in.readUTF());
@@ -229,8 +224,26 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             Object[] splitEnd = serializedStringToRow(in.readUTF());
             BinlogOffset highWatermark = readBinlogPosition(in);
             finishedSplitsInfo.add(
-                    Tuple5.of(tableId, splitId, splitStart, splitEnd, highWatermark));
+                    new FinishedSnapshotSplitInfo(
+                            tableId, splitId, splitStart, splitEnd, highWatermark));
         }
         return finishedSplitsInfo;
+    }
+
+    /** The split to describe a split of a MySql table. */
+    private enum MySqlSplitKind {
+
+        /** The split that reads snapshot records of MySQL table. */
+        SNAPSHOT,
+
+        /** The split that reads binlog records of MySQL table. */
+        BINLOG;
+
+        public static MySqlSplitKind fromString(String kind) {
+            if (SNAPSHOT.toString().equalsIgnoreCase(kind)) {
+                return SNAPSHOT;
+            }
+            return BINLOG;
+        }
     }
 }

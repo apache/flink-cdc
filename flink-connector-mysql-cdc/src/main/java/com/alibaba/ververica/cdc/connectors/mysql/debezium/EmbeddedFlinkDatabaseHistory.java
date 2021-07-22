@@ -20,7 +20,6 @@ package com.alibaba.ververica.cdc.connectors.mysql.debezium;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
-import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -32,6 +31,7 @@ import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
 import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges;
+import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,7 +52,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     private final JsonTableChangeSerializer tableChangesSerializer =
             new JsonTableChangeSerializer();
 
-    private ConcurrentMap<TableId, SchemaRecord> latestTables;
+    private ConcurrentMap<TableId, TableChange> tableSchemas;
     private String instanceName;
     private DatabaseHistoryListener listener;
     private boolean storeOnlyMonitoredTablesDdl;
@@ -72,15 +72,12 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
         this.useCatalogBeforeSchema = useCatalogBeforeSchema;
 
         // recover
-        this.latestTables = new ConcurrentHashMap<>();
-        for (SchemaRecord record : retrieveHistory(instanceName)) {
-            TableChanges.TableChange tableChange =
-                    JsonTableChangeSerializer.fromDocument(
-                            record.toDocument(), useCatalogBeforeSchema);
-            latestTables.put(tableChange.getId(), record);
+        this.tableSchemas = new ConcurrentHashMap<>();
+        for (TableChange tableChange : retrieveHistory(instanceName)) {
+            tableSchemas.put(tableChange.getId(), tableChange);
         }
         // register
-        registerHistory(instanceName, latestTables.values());
+        registerHistory(instanceName, tableSchemas.values());
     }
 
     @Override
@@ -107,16 +104,14 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
             throws DatabaseHistoryException {
         final HistoryRecord record =
                 new HistoryRecord(source, position, databaseName, schemaName, ddl, changes);
-        for (TableChanges.TableChange change : changes) {
+        for (TableChange change : changes) {
             switch (change.getType()) {
                 case CREATE:
                 case ALTER:
-                    latestTables.put(
-                            change.getId(),
-                            new SchemaRecord(tableChangesSerializer.toDocument(change)));
+                    tableSchemas.put(change.getId(), change);
                     break;
                 case DROP:
-                    latestTables.remove(change.getId());
+                    tableSchemas.remove(change.getId());
                     break;
                 default:
                     // impossible
@@ -131,10 +126,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     public void recover(
             Map<String, ?> source, Map<String, ?> position, Tables schema, DdlParser ddlParser) {
         listener.recoveryStarted();
-        for (SchemaRecord record : latestTables.values()) {
-            TableChanges.TableChange tableChange =
-                    JsonTableChangeSerializer.fromDocument(
-                            record.toDocument(), useCatalogBeforeSchema);
+        for (TableChange tableChange : tableSchemas.values()) {
             schema.overwriteTable(tableChange.getTable());
         }
         listener.recoveryStopped();
@@ -150,7 +142,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
 
     @Override
     public boolean exists() {
-        return latestTables != null && !latestTables.isEmpty();
+        return tableSchemas != null && !tableSchemas.isEmpty();
     }
 
     @Override

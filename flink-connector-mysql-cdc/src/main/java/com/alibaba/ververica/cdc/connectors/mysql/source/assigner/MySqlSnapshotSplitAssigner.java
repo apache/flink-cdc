@@ -24,9 +24,8 @@ import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitKind;
-import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
@@ -34,7 +33,7 @@ import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.JsonTableChangeSerializer;
-import io.debezium.relational.history.TableChanges;
+import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.SchemaChangeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +56,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.INITIAL_OFFSET;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isOptimizedKeyType;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.rowToArray;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMaxSplitKeyQuery;
@@ -87,7 +85,7 @@ public class MySqlSnapshotSplitAssigner {
     private Object[] currentTableMaxSplitKey;
     private RelationalTableFilters tableFilters;
     private MySqlConnection jdbc;
-    private Map<TableId, SchemaRecord> cachedTableSchemas;
+    private Map<TableId, TableChange> cachedTableSchemas;
     private MySqlDatabaseSchema databaseSchema;
 
     public MySqlSnapshotSplitAssigner(
@@ -277,7 +275,7 @@ public class MySqlSnapshotSplitAssigner {
             }
             prevSplitEnd = null;
         } else {
-            prevSplitEnd = prevSplit.getSplitBoundaryEnd();
+            prevSplitEnd = prevSplit.asSnapshotSplit().getSplitEnd();
             if (Arrays.equals(prevSplitEnd, currentTableMaxSplitKey)) {
                 isLastSplit = true;
             }
@@ -328,26 +326,21 @@ public class MySqlSnapshotSplitAssigner {
     }
 
     private MySqlSplit createSnapshotSplit(Object[] splitStart, Object[] splitEnd) {
-        Map<TableId, SchemaRecord> databaseHistory = new HashMap<>();
+        Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         // cache for optimization
         if (!cachedTableSchemas.containsKey(currentTableId)) {
             cachedTableSchemas.putAll(getTableSchema());
         }
-        databaseHistory.put(currentTableId, cachedTableSchemas.get(currentTableId));
+        tableChangeMap.put(currentTableId, cachedTableSchemas.get(currentTableId));
 
-        return new MySqlSplit(
-                MySqlSplitKind.SNAPSHOT,
+        return new MySqlSnapshotSplit(
                 currentTableId,
                 createSplitId(),
                 splitKeyType,
                 splitStart,
                 splitEnd,
                 null,
-                null,
-                false,
-                INITIAL_OFFSET,
-                new ArrayList<>(),
-                databaseHistory);
+                tableChangeMap);
     }
 
     private String createSplitId() {
@@ -461,8 +454,8 @@ public class MySqlSnapshotSplitAssigner {
         }
     }
 
-    private Map<TableId, SchemaRecord> getTableSchema() {
-        Map<TableId, SchemaRecord> historyRecords = new HashMap<>();
+    private Map<TableId, TableChange> getTableSchema() {
+        final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         try {
 
             jdbc.query(
@@ -481,12 +474,9 @@ public class MySqlSnapshotSplitAssigner {
                                             offsetContext,
                                             Instant.now());
                             for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
-                                for (TableChanges.TableChange tableChange :
+                                for (TableChange tableChange :
                                         schemaChangeEvent.getTableChanges()) {
-                                    SchemaRecord schemaRecord =
-                                            new SchemaRecord(
-                                                    tableChangesSerializer.toDocument(tableChange));
-                                    historyRecords.put(currentTableId, schemaRecord);
+                                    tableChangeMap.put(currentTableId, tableChange);
                                 }
                             }
                         }
@@ -494,6 +484,6 @@ public class MySqlSnapshotSplitAssigner {
         } catch (SQLException e) {
             LOG.error("Get table schema error.", e);
         }
-        return historyRecords;
+        return tableChangeMap;
     }
 }

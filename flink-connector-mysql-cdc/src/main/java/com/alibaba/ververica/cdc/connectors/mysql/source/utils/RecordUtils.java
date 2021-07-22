@@ -18,12 +18,13 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 
-import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
@@ -80,7 +81,7 @@ public class RecordUtils {
      * [high watermark event]
      */
     public static List<SourceRecord> normalizedSplitRecords(
-            MySqlSplit mySQLSplit,
+            MySqlSnapshotSplit snapshotSplit,
             List<SourceRecord> sourceRecords,
             SchemaNameAdjuster nameAdjuster) {
         List<SourceRecord> normalizedRecords = new ArrayList<>();
@@ -112,11 +113,9 @@ public class RecordUtils {
                         sourceRecords.subList(i, sourceRecords.size() - 1);
                 for (SourceRecord binlog : allBinlogRecords) {
                     Object[] key =
-                            getSplitKey(mySQLSplit.getSplitBoundaryType(), binlog, nameAdjuster);
+                            getSplitKey(snapshotSplit.getSplitKeyType(), binlog, nameAdjuster);
                     if (splitKeyRangeContains(
-                            key,
-                            mySQLSplit.getSplitBoundaryStart(),
-                            mySQLSplit.getSplitBoundaryEnd())) {
+                            key, snapshotSplit.getSplitStart(), snapshotSplit.getSplitEnd())) {
                         binlogRecords.add(binlog);
                     }
                 }
@@ -128,7 +127,7 @@ public class RecordUtils {
                             highWatermark));
             normalizedRecords =
                     upsertBinlog(
-                            mySQLSplit,
+                            snapshotSplit,
                             lowWatermark,
                             highWatermark,
                             snapshotRecords,
@@ -251,32 +250,30 @@ public class RecordUtils {
      * @return [splitId, splitStart, splitEnd, highWatermark], the information will be used to
      *     filter binlog events when read binlog of table.
      */
-    public static Tuple5<TableId, String, Object[], Object[], BinlogOffset> getSnapshotSplitInfo(
-            MySqlSplit split, SourceRecord highWatermark) {
+    public static FinishedSnapshotSplitInfo getSnapshotSplitInfo(
+            MySqlSnapshotSplit split, SourceRecord highWatermark) {
         Struct value = (Struct) highWatermark.value();
         String splitId = value.getString(SPLIT_ID_KEY);
         String file = value.getString(BINLOG_FILENAME_OFFSET_KEY);
         Long position = value.getInt64(BINLOG_POSITION_OFFSET_KEY);
-        return Tuple5.of(
+        return new FinishedSnapshotSplitInfo(
                 split.getTableId(),
                 splitId,
-                split.getSplitBoundaryStart(),
-                split.getSplitBoundaryEnd(),
+                split.getSplitStart(),
+                split.getSplitEnd(),
                 new BinlogOffset(file, position));
     }
 
     /** Returns the start offset of the binlog split. */
-    public static BinlogOffset getStartOffsetOfBinlogSplit(
-            List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>>
-                    finishedSnapshotSplits) {
+    public static BinlogOffset getStartingOffsetOfBinlogSplit(
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplits) {
         BinlogOffset startOffset =
                 finishedSnapshotSplits.isEmpty()
-                        ? new BinlogOffset("", 0)
-                        : finishedSnapshotSplits.get(0).f4;
-        for (Tuple5<TableId, String, Object[], Object[], BinlogOffset> finishedSnapshotSplit :
-                finishedSnapshotSplits) {
-            if (!finishedSnapshotSplit.f4.isAtOrBefore(startOffset)) {
-                startOffset = finishedSnapshotSplit.f4;
+                        ? BinlogOffset.INITIAL_OFFSET
+                        : finishedSnapshotSplits.get(0).getHighWatermark();
+        for (FinishedSnapshotSplitInfo finishedSnapshotSplit : finishedSnapshotSplits) {
+            if (!finishedSnapshotSplit.getHighWatermark().isAtOrBefore(startOffset)) {
+                startOffset = finishedSnapshotSplit.getHighWatermark();
             }
         }
         return startOffset;

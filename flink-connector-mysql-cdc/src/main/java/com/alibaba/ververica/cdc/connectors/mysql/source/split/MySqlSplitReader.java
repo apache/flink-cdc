@@ -46,7 +46,8 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.S
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getConnection;
 
 /** The {@link SplitReader} implementation for the {@link MySqlParallelSource}. */
-public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
+public class MySqlSplitReader<SplitT extends MySqlSplit>
+        implements SplitReader<SourceRecord, SplitT> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSplitReader.class);
     private final Queue<MySqlSplit> splits;
@@ -78,7 +79,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     }
 
     @Override
-    public void handleSplitsChanges(SplitsChange<MySqlSplit> splitsChanges) {
+    public void handleSplitsChanges(SplitsChange<SplitT> splitsChanges) {
         if (!(splitsChanges instanceof SplitsAddition)) {
             throw new UnsupportedOperationException(
                     String.format(
@@ -115,9 +116,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
             if (nextSplit == null) {
                 throw new IOException("Cannot fetch from another split - no split remaining");
             }
-            currentSplitId = nextSplit.getSplitId();
+            currentSplitId = nextSplit.splitId();
 
-            if (nextSplit.getSplitKind() == MySqlSplitKind.SNAPSHOT) {
+            if (nextSplit.isSnapshotSplit()) {
                 if (currentReader == null) {
                     final MySqlConnection jdbcConnection = getConnection(config);
                     final BinaryLogClient binaryLogClient = getBinaryClient(config);
@@ -125,7 +126,6 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                             new StatefulTaskContext(config, binaryLogClient, jdbcConnection);
                     currentReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
                 }
-                currentReader.submitSplit(nextSplit);
             } else {
                 // point from snapshot split to binlog split
                 if (currentReader != null) {
@@ -138,8 +138,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                         new StatefulTaskContext(config, binaryLogClient, jdbcConnection);
                 LOG.info("Create binlog reader");
                 currentReader = new BinlogSplitReader(statefulTaskContext, subtaskId);
-                currentReader.submitSplit(nextSplit);
             }
+            currentReader.submitSplit(nextSplit);
         }
     }
 

@@ -32,10 +32,10 @@ import java.util.List;
 import java.util.Map;
 
 /** The state of MySQL CDC source enumerator. */
-public class MySqlSourceEnumState {
+public class MySqlSourceEnumState<SplitT extends MySqlSplit> {
 
     /** The splits in the checkpoint. */
-    private final Collection<MySqlSplit> remainingSplits;
+    private final Collection<SplitT> remainingSplits;
 
     /**
      * The paths that are no longer in the enumerator checkpoint, but have been processed before and
@@ -68,7 +68,7 @@ public class MySqlSourceEnumState {
     @Nullable transient byte[] serializedFormCache;
 
     public MySqlSourceEnumState(
-            Collection<MySqlSplit> remainingSplits,
+            Collection<SplitT> remainingSplits,
             Collection<TableId> alreadyProcessedTables,
             Map<Integer, List<MySqlSplit>> assignedSnapshotSplits,
             Map<Integer, List<MySqlSplit>> assignedBinlogSplits,
@@ -84,7 +84,7 @@ public class MySqlSourceEnumState {
         return alreadyProcessedTables;
     }
 
-    public Collection<MySqlSplit> getRemainingSplits() {
+    public Collection<SplitT> getRemainingSplits() {
         return remainingSplits;
     }
 

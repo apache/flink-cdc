@@ -67,14 +67,12 @@ public class SignalEventDispatcher {
         this.signalEventKeySchema =
                 SchemaBuilder.struct()
                         .name(schemaNameAdjuster.adjust(SIGNAL_EVENT_KEY_SCHEMA_NAME))
-                        .field(DATABASE_NAME, Schema.STRING_SCHEMA)
+                        .field(SPLIT_ID_KEY, Schema.STRING_SCHEMA)
                         .field(WATERMARK_SIGNAL, Schema.BOOLEAN_SCHEMA)
                         .build();
         this.signalEventValueSchema =
                 SchemaBuilder.struct()
                         .name(schemaNameAdjuster.adjust(SIGNAL_EVENT_VALUE_SCHEMA_NAME))
-                        .field(DATABASE_NAME, Schema.OPTIONAL_STRING_SCHEMA)
-                        .field(TABLE_NAME, Schema.OPTIONAL_STRING_SCHEMA)
                         .field(SPLIT_ID_KEY, Schema.STRING_SCHEMA)
                         .field(WATERMARK_KIND, Schema.STRING_SCHEMA)
                         .field(BINLOG_FILENAME_OFFSET_KEY, Schema.STRING_SCHEMA)
@@ -85,39 +83,29 @@ public class SignalEventDispatcher {
     public void dispatchWatermarkEvent(
             MySqlSplit mySQLSplit, BinlogOffset watermark, WatermarkKind watermarkKind)
             throws InterruptedException {
+
         SourceRecord sourceRecord =
                 new SourceRecord(
                         offsetContext.getPartition(),
                         offsetContext.getPartition(),
                         topic,
                         signalEventKeySchema,
-                        signalRecordKey(mySQLSplit.getTableId().catalog()),
+                        signalRecordKey(mySQLSplit.splitId()),
                         signalEventValueSchema,
-                        signalRecordValue(
-                                mySQLSplit.getTableId().catalog(),
-                                mySQLSplit.getTableId().table(),
-                                mySQLSplit.getSplitId(),
-                                watermark,
-                                watermarkKind));
+                        signalRecordValue(mySQLSplit.splitId(), watermark, watermarkKind));
         queue.enqueue(new DataChangeEvent(sourceRecord));
     }
 
-    private Struct signalRecordKey(String databaseName) {
+    private Struct signalRecordKey(String splitId) {
         Struct result = new Struct(signalEventKeySchema);
-        result.put(DATABASE_NAME, databaseName);
+        result.put(SPLIT_ID_KEY, splitId);
         result.put(WATERMARK_SIGNAL, true);
         return result;
     }
 
     private Struct signalRecordValue(
-            String databaseName,
-            String tableName,
-            String splitId,
-            BinlogOffset binlogOffset,
-            WatermarkKind watermarkKind) {
+            String splitId, BinlogOffset binlogOffset, WatermarkKind watermarkKind) {
         Struct result = new Struct(signalEventValueSchema);
-        result.put(DATABASE_NAME, databaseName);
-        result.put(TABLE_NAME, tableName);
         result.put(SPLIT_ID_KEY, splitId);
         result.put(WATERMARK_KIND, watermarkKind.toString());
         result.put(BINLOG_FILENAME_OFFSET_KEY, binlogOffset.getFilename());

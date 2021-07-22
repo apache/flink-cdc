@@ -22,7 +22,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispa
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils;
 import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -73,7 +73,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
     private final MySqlConnection jdbcConnection;
     private final EventDispatcherImpl<TableId> dispatcher;
     private final Clock clock;
-    private final MySqlSplit mySQLSplit;
+    private final MySqlSnapshotSplit snapshotSplit;
     private final MySqlOffsetContext offsetContext;
     private final TopicSelector<TableId> topicSelector;
     private final SnapshotProgressListener snapshotProgressListener;
@@ -87,7 +87,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             EventDispatcherImpl<TableId> dispatcher,
             TopicSelector<TableId> topicSelector,
             Clock clock,
-            MySqlSplit mySQLSplit) {
+            MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, previousOffset, snapshotProgressListener);
         this.offsetContext = previousOffset;
         this.connectorConfig = connectorConfig;
@@ -95,7 +95,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         this.jdbcConnection = jdbcConnection;
         this.dispatcher = dispatcher;
         this.clock = clock;
-        this.mySQLSplit = mySQLSplit;
+        this.snapshotSplit = snapshotSplit;
         this.topicSelector = topicSelector;
         this.snapshotProgressListener = snapshotProgressListener;
     }
@@ -133,7 +133,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
-                mySQLSplit);
+                snapshotSplit);
         offsetContext.setBinlogStartPoint(lowWatermark.getFilename(), lowWatermark.getPosition());
         ctx.offset = offsetContext;
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
@@ -142,20 +142,20 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
                         offsetContext,
-                        topicSelector.topicNameFor(mySQLSplit.getTableId()),
+                        topicSelector.topicNameFor(snapshotSplit.getTableId()),
                         dispatcher.getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
-                mySQLSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
+                snapshotSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
 
         LOG.info("Snapshot step 2 - Snapshotting data");
-        createDataEvents(ctx, mySQLSplit.getTableId());
+        createDataEvents(ctx, snapshotSplit.getTableId());
         final BinlogOffset highWatermark = getCurrentBinlogPosition();
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
-                mySQLSplit);
+                snapshotSplit);
         signalEventDispatcher.dispatchWatermarkEvent(
-                mySQLSplit, highWatermark, SignalEventDispatcher.WatermarkKind.HIGH);
+                snapshotSplit, highWatermark, SignalEventDispatcher.WatermarkKind.HIGH);
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setHighWatermark(highWatermark);
 
@@ -201,17 +201,17 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             throws InterruptedException {
 
         long exportStart = clock.currentTimeInMillis();
-        LOG.info("Exporting data from split '{}' of table {}", mySQLSplit.getSplitId(), table.id());
+        LOG.info("Exporting data from split '{}' of table {}", snapshotSplit.splitId(), table.id());
 
         final String selectSql =
                 StatementUtils.buildSplitScanQuery(
-                        mySQLSplit.getTableId(),
-                        mySQLSplit.getSplitBoundaryType(),
-                        mySQLSplit.getSplitBoundaryStart() == null,
-                        mySQLSplit.getSplitBoundaryEnd() == null);
+                        snapshotSplit.getTableId(),
+                        snapshotSplit.getSplitKeyType(),
+                        snapshotSplit.getSplitStart() == null,
+                        snapshotSplit.getSplitEnd() == null);
         LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
-                mySQLSplit.getSplitId(),
+                snapshotSplit.splitId(),
                 table.id(),
                 selectSql);
 
@@ -219,11 +219,11 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                         StatementUtils.readTableSplitDataStatement(
                                 jdbcConnection,
                                 selectSql,
-                                mySQLSplit.getSplitBoundaryStart() == null,
-                                mySQLSplit.getSplitBoundaryEnd() == null,
-                                mySQLSplit.getSplitBoundaryStart(),
-                                mySQLSplit.getSplitBoundaryEnd(),
-                                mySQLSplit.getSplitBoundaryType().getFieldCount(),
+                                snapshotSplit.getSplitStart() == null,
+                                snapshotSplit.getSplitEnd() == null,
+                                snapshotSplit.getSplitStart(),
+                                snapshotSplit.getSplitEnd(),
+                                snapshotSplit.getSplitKeyType().getFieldCount(),
                                 connectorConfig.getQueryFetchSize());
                 ResultSet rs = selectStatement.executeQuery()) {
 
@@ -244,7 +244,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                     LOG.info(
                             "Exported {} records for split '{}' after {}",
                             rows,
-                            mySQLSplit.getSplitId(),
+                            snapshotSplit.splitId(),
                             Strings.duration(stop - exportStart));
                     snapshotProgressListener.rowsScanned(table.id(), rows);
                     logTimer = getTableScanLogTimer();
@@ -257,7 +257,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             LOG.info(
                     "Finished exporting {} records for split '{}' of table '{}'; total duration '{}'",
                     rows,
-                    mySQLSplit.getSplitId(),
+                    snapshotSplit.splitId(),
                     table.id(),
                     Strings.duration(clock.currentTimeInMillis() - exportStart));
         } catch (SQLException e) {

@@ -18,14 +18,13 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.debezium.reader;
 
-import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.api.java.tuple.Tuple5;
-
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -67,9 +66,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private volatile boolean currentTaskRunning;
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private MySqlBinlogSplitReadTask binlogSplitReadTask;
-    private MySqlSplit currentTableSplit;
-    // tableId -> List[splitKeyStart, splitKeyEnd, splitHighWatermark]
-    private Map<TableId, List<Tuple3<Object[], Object[], BinlogOffset>>> finishedSplitsInfo;
+    private MySqlBinlogSplit currentBinlogSplit;
+    private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
 
@@ -81,15 +79,15 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         this.currentTaskRunning = false;
     }
 
-    public void submitSplit(MySqlSplit mySQLSplit) {
-        this.currentTableSplit = mySQLSplit;
+    public void submitSplit(MySqlSplit mySqlSplit) {
+        this.currentBinlogSplit = mySqlSplit.asBinlogSplit();
         configureFilter();
-        statefulTaskContext.configure(currentTableSplit);
+        statefulTaskContext.configure(currentBinlogSplit);
         this.queue = statefulTaskContext.getQueue();
         final MySqlOffsetContext mySqlOffsetContext = statefulTaskContext.getOffsetContext();
         mySqlOffsetContext.setBinlogStartPoint(
-                currentTableSplit.getOffset().getFilename(),
-                currentTableSplit.getOffset().getPosition());
+                currentBinlogSplit.getStartingOffset().getFilename(),
+                currentBinlogSplit.getStartingOffset().getPosition());
         this.binlogSplitReadTask =
                 new MySqlBinlogSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
@@ -101,10 +99,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                         statefulTaskContext.getTaskContext(),
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                        statefulTaskContext
-                                .getTopicSelector()
-                                .topicNameFor(currentTableSplit.getTableId()),
-                        currentTableSplit);
+                        statefulTaskContext.getTopicSelector().getPrimaryTopic(),
+                        currentBinlogSplit);
 
         executor.submit(
                 () -> {
@@ -116,7 +112,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                         LOG.error(
                                 String.format(
                                         "Execute binlog read task for mysql split %s fail",
-                                        currentTableSplit),
+                                        currentBinlogSplit),
                                 e);
                         e.printStackTrace();
                     }
@@ -133,7 +129,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     @Override
     public boolean isFinished() {
-        return currentTableSplit == null || !currentTaskRunning;
+        return currentBinlogSplit == null || !currentTaskRunning;
     }
 
     @Nullable
@@ -190,13 +186,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             }
             Object[] key =
                     getSplitKey(
-                            currentTableSplit.getSplitBoundaryType(),
+                            currentBinlogSplit.getSplitKeyType(),
                             sourceRecord,
                             statefulTaskContext.getSchemaNameAdjuster());
-            for (Tuple3<Object[], Object[], BinlogOffset> splitInfo :
-                    finishedSplitsInfo.get(tableId)) {
-                if (RecordUtils.splitKeyRangeContains(key, splitInfo.f0, splitInfo.f1)
-                        && position.isAtOrBefore(splitInfo.f2)) {
+            for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
+                if (RecordUtils.splitKeyRangeContains(
+                                key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
+                        && position.isAtOrBefore(splitInfo.getHighWatermark())) {
                     return true;
                 }
             }
@@ -209,21 +205,19 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     }
 
     private void configureFilter() {
-        List<Tuple5<TableId, String, Object[], Object[], BinlogOffset>> finishedSplitsInfo =
-                currentTableSplit.getFinishedSplitsInfo();
-        Map<TableId, List<Tuple3<Object[], Object[], BinlogOffset>>> splitsInfoMap =
-                new HashMap<>();
+        List<FinishedSnapshotSplitInfo> finishedSplitInfos =
+                currentBinlogSplit.getFinishedSnapshotSplitInfos();
+        Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
 
-        for (Tuple5<TableId, String, Object[], Object[], BinlogOffset> finishedSplitInfo :
-                finishedSplitsInfo) {
-            TableId tableId = finishedSplitInfo.f0;
-            List<Tuple3<Object[], Object[], BinlogOffset>> list =
+        for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
+            TableId tableId = finishedSplitInfo.getTableId();
+            List<FinishedSnapshotSplitInfo> list =
                     splitsInfoMap.getOrDefault(tableId, new ArrayList<>());
-            list.add(Tuple3.of(finishedSplitInfo.f2, finishedSplitInfo.f3, finishedSplitInfo.f4));
+            list.add(finishedSplitInfo);
             splitsInfoMap.put(tableId, list);
 
-            BinlogOffset highWatermark = finishedSplitInfo.f4;
+            BinlogOffset highWatermark = finishedSplitInfo.getHighWatermark();
             BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
             if (maxHighWatermark == null || highWatermark.isAtOrBefore(maxHighWatermark)) {
                 tableIdBinlogPositionMap.put(tableId, highWatermark);

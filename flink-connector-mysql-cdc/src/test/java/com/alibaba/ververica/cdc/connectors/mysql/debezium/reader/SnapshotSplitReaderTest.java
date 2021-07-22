@@ -297,7 +297,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
     }
 
     private List<MySqlSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
-        MySqlSnapshotSplitAssigner assigner =
+        final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
                         configuration, pkType, new ArrayList<>(), new ArrayList<>());
         assigner.open();
