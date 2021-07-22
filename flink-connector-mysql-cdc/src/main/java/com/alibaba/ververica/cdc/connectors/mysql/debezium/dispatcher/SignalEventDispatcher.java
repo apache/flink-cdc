@@ -81,7 +81,7 @@ public class SignalEventDispatcher {
     }
 
     public void dispatchWatermarkEvent(
-            MySqlSplit mySQLSplit, BinlogOffset watermark, WatermarkKind watermarkKind)
+            MySqlSplit mySqlSplit, BinlogOffset watermark, WatermarkKind watermarkKind)
             throws InterruptedException {
 
         SourceRecord sourceRecord =
@@ -90,9 +90,9 @@ public class SignalEventDispatcher {
                         offsetContext.getPartition(),
                         topic,
                         signalEventKeySchema,
-                        signalRecordKey(mySQLSplit.splitId()),
+                        signalRecordKey(mySqlSplit.splitId()),
                         signalEventValueSchema,
-                        signalRecordValue(mySQLSplit.splitId(), watermark, watermarkKind));
+                        signalRecordValue(mySqlSplit.splitId(), watermark, watermarkKind));
         queue.enqueue(new DataChangeEvent(sourceRecord));
     }
 

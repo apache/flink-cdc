@@ -317,8 +317,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                 getFinishedSplitsInfo(sqlSplits, fetchedRecords);
         BinlogOffset startingOffset = getStartingOffsetOfBinlogSplit(finishedSplitsInfo);
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
-        for (MySqlSplit mySQLSplit : sqlSplits) {
-            tableSchemas.putAll(mySQLSplit.getTableSchemas());
+        for (MySqlSplit mySqlSplit : sqlSplits) {
+            tableSchemas.putAll(mySqlSplit.getTableSchemas());
         }
         TableId tableId = sqlSplits.get(sqlSplits.size() - 1).getTableId();
         MySqlSplit binlogSplit =
@@ -465,8 +465,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                         event -> {
                             Struct value = (Struct) event.value();
                             String splitId = value.getString(SignalEventDispatcher.SPLIT_ID_KEY);
-                            MySqlSnapshotSplit mySQLSplit = splitMap.get(splitId);
-                            finishedSplitsInfo.add(getSnapshotSplitInfo(mySQLSplit, event));
+                            MySqlSnapshotSplit mySqlSplit = splitMap.get(splitId);
+                            finishedSplitsInfo.add(getSnapshotSplitInfo(mySqlSplit, event));
                         });
         return finishedSplitsInfo;
     }
@@ -505,9 +505,9 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {
-            Optional<MySqlSplit> mySQLSplit = assigner.getNext(null);
-            if (mySQLSplit.isPresent()) {
-                mySqlSplits.add(mySQLSplit.get().asSnapshotSplit());
+            Optional<MySqlSplit> mySqlSplit = assigner.getNext(null);
+            if (mySqlSplit.isPresent()) {
+                mySqlSplits.add(mySqlSplit.get().asSnapshotSplit());
             } else {
                 break;
             }

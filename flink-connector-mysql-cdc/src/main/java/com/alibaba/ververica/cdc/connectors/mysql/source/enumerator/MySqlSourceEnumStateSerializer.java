@@ -204,8 +204,8 @@ public class MySqlSourceEnumStateSerializer
             int splitBytesLen = in.readInt();
             byte[] splitBytes = new byte[splitBytesLen];
             in.read(splitBytes);
-            MySqlSplit mySQLSplit = splitSerializer.deserialize(getVersion(), splitBytes);
-            mySqlSplits.add(mySQLSplit);
+            MySqlSplit mySqlSplit = splitSerializer.deserialize(getVersion(), splitBytes);
+            mySqlSplits.add(mySqlSplit);
         }
         return mySqlSplits;
     }

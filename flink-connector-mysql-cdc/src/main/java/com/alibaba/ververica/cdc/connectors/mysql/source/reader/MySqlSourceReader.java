@@ -108,8 +108,8 @@ public class MySqlSourceReader<T, SplitT extends MySqlSplit>
 
     @Override
     protected void onSplitFinished(Map<String, MySqlSplitState<SplitT>> finishedSplitIds) {
-        for (MySqlSplitState<SplitT> mySQLSplitState : finishedSplitIds.values()) {
-            SplitT mySqlSplit = mySQLSplitState.toMySqlSplit();
+        for (MySqlSplitState<SplitT> mySqlSplitState : finishedSplitIds.values()) {
+            SplitT mySqlSplit = mySqlSplitState.toMySqlSplit();
             checkState(
                     mySqlSplit.isSnapshotSplit(),
                     String.format(

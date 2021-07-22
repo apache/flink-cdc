@@ -48,6 +48,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.function.Supplier;
 
+import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_ID;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.getServerIdForSubTask;
 
 /**
@@ -90,14 +92,7 @@ public class MySqlParallelSource<T>
             throws Exception {
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
-
-        // set the server id for reader
-        Configuration readerConfiguration = config.clone();
-        readerConfiguration.removeConfig(MySqlSourceOptions.SERVER_ID);
-        readerConfiguration.setString(
-                "database.server.id",
-                getServerIdForSubTask(config, readerContext.getIndexOfSubtask()));
-
+        final Configuration readerConfiguration = getReaderConfig(readerContext);
         Supplier<MySqlSplitReader<MySqlSplit>> splitReaderSupplier =
                 () ->
                         new MySqlSplitReader<>(
@@ -108,6 +103,22 @@ public class MySqlParallelSource<T>
                 new MySqlRecordEmitter<>(deserializationSchema),
                 readerConfiguration,
                 readerContext);
+    }
+
+    private Configuration getReaderConfig(SourceReaderContext readerContext) {
+        // set the server id for each reader, will used by debezium reader
+        Configuration readerConfiguration = config.clone();
+        readerConfiguration.removeConfig(MySqlSourceOptions.SERVER_ID);
+        readerConfiguration.setString(
+                DATABASE_SERVER_ID,
+                getServerIdForSubTask(config, readerContext.getIndexOfSubtask()));
+        // set the DatabaseHistory name for each reader, will used by debezium reader
+        readerConfiguration.setString(
+                DATABASE_HISTORY_INSTANCE_NAME,
+                config.toMap().get(DATABASE_HISTORY_INSTANCE_NAME)
+                        + "_"
+                        + readerContext.getIndexOfSubtask());
+        return readerConfiguration;
     }
 
     @Override
