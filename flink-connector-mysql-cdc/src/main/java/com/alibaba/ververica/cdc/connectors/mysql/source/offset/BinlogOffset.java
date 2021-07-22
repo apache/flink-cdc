@@ -20,10 +20,11 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.offset;
 
 import org.apache.flink.util.Preconditions;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /** A structure describes an offset in a binlog of MySQL server. */
-public class BinlogOffset implements Comparable<BinlogOffset> {
+public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
 
     public static final BinlogOffset INITIAL_OFFSET = new BinlogOffset("", 0);
     private final String filename;

@@ -25,7 +25,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceE
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
-import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
@@ -35,13 +35,18 @@ public class SourceReaderReportEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    private final ArrayList<Tuple2<String, BinlogOffset>> finishedSplits;
+    private final List<Tuple2<String, BinlogOffset>> finishedSplits;
 
-    public SourceReaderReportEvent(ArrayList<Tuple2<String, BinlogOffset>> finishedSplits) {
+    public SourceReaderReportEvent(List<Tuple2<String, BinlogOffset>> finishedSplits) {
         this.finishedSplits = finishedSplits;
     }
 
-    public ArrayList<Tuple2<String, BinlogOffset>> getFinishedSplits() {
+    public List<Tuple2<String, BinlogOffset>> getFinishedSplits() {
         return finishedSplits;
+    }
+
+    @Override
+    public String toString() {
+        return "SourceReaderReportEvent{" + "finishedSplits=" + finishedSplits + '}';
     }
 }

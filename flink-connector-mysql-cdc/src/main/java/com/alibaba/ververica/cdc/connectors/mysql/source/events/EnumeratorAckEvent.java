@@ -42,4 +42,9 @@ public class EnumeratorAckEvent implements SourceEvent {
     public List<String> getFinishedSplits() {
         return finishedSplits;
     }
+
+    @Override
+    public String toString() {
+        return "EnumeratorAckEvent{" + "finishedSplits=" + finishedSplits + '}';
+    }
 }

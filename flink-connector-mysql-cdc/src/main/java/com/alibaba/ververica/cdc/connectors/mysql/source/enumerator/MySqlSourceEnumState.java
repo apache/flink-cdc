@@ -44,9 +44,16 @@ public class MySqlSourceEnumState {
     private final Collection<TableId> alreadyProcessedTables;
 
     /**
-     * The splits that the {@link MySqlSourceEnumerator} has assigned to {@link MySqlSplitReader}s.
+     * The snapshot splits that the {@link MySqlSourceEnumerator} has assigned to {@link
+     * MySqlSplitReader}s.
      */
-    private final Map<Integer, List<MySqlSplit>> assignedSplits;
+    private final Map<Integer, List<MySqlSplit>> assignedSnapshotSplits;
+
+    /**
+     * The binlog splits that the {@link MySqlSourceEnumerator} has assigned to {@link
+     * MySqlSplitReader}s.
+     */
+    private final Map<Integer, List<MySqlSplit>> assignedBinlogSplits;
 
     /**
      * The finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received from
@@ -63,11 +70,13 @@ public class MySqlSourceEnumState {
     public MySqlSourceEnumState(
             Collection<MySqlSplit> remainingSplits,
             Collection<TableId> alreadyProcessedTables,
-            Map<Integer, List<MySqlSplit>> assignedSplits,
+            Map<Integer, List<MySqlSplit>> assignedSnapshotSplits,
+            Map<Integer, List<MySqlSplit>> assignedBinlogSplits,
             Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits) {
         this.remainingSplits = remainingSplits;
         this.alreadyProcessedTables = alreadyProcessedTables;
-        this.assignedSplits = assignedSplits;
+        this.assignedSnapshotSplits = assignedSnapshotSplits;
+        this.assignedBinlogSplits = assignedBinlogSplits;
         this.finishedSnapshotSplits = finishedSnapshotSplits;
     }
 
@@ -79,8 +88,12 @@ public class MySqlSourceEnumState {
         return remainingSplits;
     }
 
-    public Map<Integer, List<MySqlSplit>> getAssignedSplits() {
-        return assignedSplits;
+    public Map<Integer, List<MySqlSplit>> getAssignedSnapshotSplits() {
+        return assignedSnapshotSplits;
+    }
+
+    public Map<Integer, List<MySqlSplit>> getAssignedBinlogSplits() {
+        return assignedBinlogSplits;
     }
 
     public Map<Integer, List<Tuple2<String, BinlogOffset>>> getFinishedSnapshotSplits() {

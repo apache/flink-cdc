@@ -25,8 +25,8 @@ import java.util.Iterator;
 /** Reader to read split of table, the split is either snapshot split or binlog split. */
 public interface DebeziumReader<T, Split> {
 
-    /** Return the reader is idle or not. */
-    boolean isIdle();
+    /** Return the current split of the reader is finished or not. */
+    boolean isFinished();
 
     /**
      * Add to split to read, this should call only the when reader is idle.

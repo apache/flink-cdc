@@ -339,7 +339,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<String> splits = getTestAssignSnapshotSplits(2000, pkType, new String[] {"customers"});
-        System.out.println(splits);
         assertArrayEquals(expected, splits.toArray());
     }
 

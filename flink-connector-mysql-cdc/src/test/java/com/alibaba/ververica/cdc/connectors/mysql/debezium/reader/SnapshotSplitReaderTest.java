@@ -247,7 +247,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
         List<SourceRecord> result = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
             MySqlSplit sqlSplit = mySqlSplits.get(i);
-            if (snapshotSplitReader.isIdle()) {
+            if (snapshotSplitReader.isFinished()) {
                 snapshotSplitReader.submitSplit(sqlSplit);
             }
             Iterator<SourceRecord> res;

@@ -25,7 +25,6 @@ import org.apache.flink.api.connector.source.SourceReader;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
@@ -37,13 +36,13 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotS
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumStateSerializer;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
-import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -89,7 +88,7 @@ public class MySqlParallelSource<T>
     @Override
     public SourceReader<T, MySqlSplit> createReader(SourceReaderContext readerContext)
             throws Exception {
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<Tuple2<T, BinlogOffset>>> elementsQueue =
+        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
 
         // set the server id for reader
@@ -116,7 +115,7 @@ public class MySqlParallelSource<T>
                 new MySqlSnapshotSplitAssigner(
                         config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>());
         return new MySqlSourceEnumerator(
-                enumContext, splitAssigner, new HashMap<>(), new HashMap<>());
+                enumContext, splitAssigner, new HashMap<>(), new HashMap<>(), new HashMap<>());
     }
 
     @Override
@@ -132,7 +131,8 @@ public class MySqlParallelSource<T>
         return new MySqlSourceEnumerator(
                 enumContext,
                 splitAssigner,
-                checkpoint.getAssignedSplits(),
+                checkpoint.getAssignedSnapshotSplits(),
+                checkpoint.getAssignedBinlogSplits(),
                 checkpoint.getFinishedSnapshotSplits());
     }
 

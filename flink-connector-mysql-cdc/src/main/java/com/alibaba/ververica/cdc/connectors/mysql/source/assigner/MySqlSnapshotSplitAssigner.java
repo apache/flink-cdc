@@ -129,9 +129,6 @@ public class MySqlSnapshotSplitAssigner {
             // return remaining splits firstly
             MySqlSplit split = remainingSplits.iterator().next();
             remainingSplits.remove(split);
-            if (remainingSplits.isEmpty()) {
-                this.alreadyProcessedTables.add(currentTableId);
-            }
             return Optional.of(split);
         } else {
             // it's turn for new table
@@ -161,6 +158,7 @@ public class MySqlSnapshotSplitAssigner {
         MySqlSplit nextSplit;
         int splitCnt = 0;
         long start = System.currentTimeMillis();
+        List<MySqlSplit> splitsForCurrentTable = new ArrayList<>();
         LOG.info("Begin to analyze splits for table {} ", currentTableId);
         // optimization for integral, bigDecimal type
         if (enableIntegralOptimization
@@ -187,7 +185,7 @@ public class MySqlSnapshotSplitAssigner {
             Object prevSplitEnd = null;
             do {
                 Object splitEnd = getOptimizedSplitEnd(prevSplitEnd, minMaxSplitKey);
-                remainingSplits.add(
+                splitsForCurrentTable.add(
                         createSnapshotSplit(
                                 prevSplitEnd == null ? null : new Object[] {prevSplitEnd},
                                 splitEnd == null ? null : new Object[] {splitEnd}));
@@ -197,7 +195,7 @@ public class MySqlSnapshotSplitAssigner {
         // general case
         else {
             while ((nextSplit = getNextSplit(prevSplit)) != null) {
-                remainingSplits.add(nextSplit);
+                splitsForCurrentTable.add(nextSplit);
                 prevSplit = nextSplit;
                 splitCnt++;
                 if (splitCnt % 100 == 0) {
@@ -213,6 +211,10 @@ public class MySqlSnapshotSplitAssigner {
                 }
             }
         }
+
+        alreadyProcessedTables.add(currentTableId);
+        remainingSplits.addAll(splitsForCurrentTable);
+
         long end = System.currentTimeMillis();
         LOG.info(
                 "Finish to analyze splits for table {}, time cost:{} ",
@@ -417,6 +419,11 @@ public class MySqlSnapshotSplitAssigner {
             LOG.error("Obtain available tables fail.", e);
             this.close();
         }
+        Preconditions.checkState(
+                capturedTableIds.size() > 0,
+                String.format(
+                        "The captured table(s) is empty!, please check your configured table-name %s",
+                        configuration.get(MySqlSourceOptions.TABLE_NAME)));
         return capturedTableIds;
     }
 

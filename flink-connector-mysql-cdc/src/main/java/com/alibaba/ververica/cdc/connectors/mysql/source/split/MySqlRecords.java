@@ -85,7 +85,6 @@ public final class MySqlRecords implements RecordsWithSplitIds<SourceRecord> {
     }
 
     public static MySqlRecords forFinishedSplit(final String splitId) {
-        return new MySqlRecords(
-                splitId, Collections.emptySet().iterator(), Collections.singleton(splitId));
+        return new MySqlRecords(null, null, Collections.singleton(splitId));
     }
 }

@@ -298,7 +298,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         List<SourceRecord> fetchedRecords = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
             MySqlSplit sqlSplit = sqlSplits.get(i);
-            if (snapshotSplitReader.isIdle()) {
+            if (snapshotSplitReader.isFinished()) {
                 snapshotSplitReader.submitSplit(sqlSplit);
             }
             Iterator<SourceRecord> res;
