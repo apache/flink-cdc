@@ -18,106 +18,38 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.split;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
-import io.debezium.relational.TableId;
+/** State of the reader, essentially a mutable version of the {@link MySqlSplit}. */
+public abstract class MySqlSplitState<SplitT extends MySqlSplit> {
 
-import javax.annotation.Nullable;
+    protected final SplitT split;
 
-import java.util.HashMap;
-import java.util.Map;
-
-/**
- * State of the reader, essentially a mutable version of the {@link MySqlSplit}. It has a modifiable
- * split status and split offset (i.e. BinlogPosition).
- */
-public final class MySqlSplitState extends MySqlSplit {
-
-    private BinlogOffset lowWatermarkState;
-    private BinlogOffset highWatermarkState;
-    private BinlogOffset offsetState;
-    private boolean snapshotReadFinishedState;
-
-    @Nullable private Map<TableId, SchemaRecord> databaseHistoryState;
-
-    public MySqlSplitState(MySqlSplit split) {
-        super(
-                split.getSplitKind(),
-                split.getTableId(),
-                split.getSplitId(),
-                split.getSplitBoundaryType(),
-                split.getSplitBoundaryStart(),
-                split.getSplitBoundaryEnd(),
-                split.getLowWatermark(),
-                split.getHighWatermark(),
-                split.isSnapshotReadFinished(),
-                split.getOffset(),
-                split.getFinishedSplitsInfo(),
-                split.getDatabaseHistory());
-        this.lowWatermarkState = split.getLowWatermark();
-        this.highWatermarkState = split.getHighWatermark();
-        this.offsetState = split.getOffset();
-        this.snapshotReadFinishedState = split.isSnapshotReadFinished();
-        this.databaseHistoryState =
-                split.getDatabaseHistory() == null ? new HashMap<>() : split.getDatabaseHistory();
+    public MySqlSplitState(SplitT split) {
+        this.split = split;
     }
 
-    public void setLowWatermarkState(BinlogOffset lowWatermarkState) {
-        this.lowWatermarkState = lowWatermarkState;
+    /** Checks whether this split state is a snapshot split state. */
+    public final boolean isSnapshotSplitState() {
+        return getClass() == MySqlSnapshotSplitState.class;
     }
 
-    public void setHighWatermarkState(BinlogOffset highWatermarkState) {
-        this.highWatermarkState = highWatermarkState;
+    /** Checks whether this split state is a binlog split state. */
+    public final boolean isBinlogSplitState() {
+        return getClass() == MySqlBinlogSplitState.class;
     }
 
-    public void setOffsetState(BinlogOffset offsetState) {
-        this.offsetState = offsetState;
+    /** Casts this split state into a {@link MySqlSnapshotSplitState}. */
+    @SuppressWarnings("unchecked")
+    public final MySqlSnapshotSplitState asSnapshotSplitState() {
+        return (MySqlSnapshotSplitState) this;
     }
 
-    public void setSnapshotReadFinishedState(boolean snapshotReadFinishedState) {
-        this.snapshotReadFinishedState = snapshotReadFinishedState;
-    }
-
-    @Nullable
-    public Map<TableId, SchemaRecord> getDatabaseHistoryState() {
-        return databaseHistoryState;
-    }
-
-    public void recordSchemaHistory(TableId tableId, SchemaRecord latestSchemaChange) {
-        this.databaseHistoryState.put(tableId, latestSchemaChange);
-    }
-
-    public BinlogOffset getLowWatermarkState() {
-        return lowWatermarkState;
-    }
-
-    public BinlogOffset getHighWatermarkState() {
-        return highWatermarkState;
-    }
-
-    @Nullable
-    public BinlogOffset getOffsetState() {
-        return offsetState;
-    }
-
-    public boolean isSnapshotReadFinishedState() {
-        return snapshotReadFinishedState;
+    /** Casts this split state into a {@link MySqlBinlogSplitState}. */
+    @SuppressWarnings("unchecked")
+    public final MySqlBinlogSplitState asBinlogSplitState() {
+        return (MySqlBinlogSplitState) this;
     }
 
     /** Use the current split state to create a new MySQLSplit. */
-    public MySqlSplit toMySQLSplit() {
-        return new MySqlSplit(
-                getSplitKind(),
-                getTableId(),
-                getSplitId(),
-                getSplitBoundaryType(),
-                getSplitBoundaryStart(),
-                getSplitBoundaryEnd(),
-                getLowWatermarkState(),
-                getHighWatermarkState(),
-                isSnapshotReadFinishedState(),
-                getOffsetState(),
-                getFinishedSplitsInfo(),
-                getDatabaseHistory());
-    }
+    @SuppressWarnings("unchecked")
+    public abstract SplitT toMySqlSplit();
 }

@@ -26,7 +26,11 @@ import java.util.Objects;
 /** A structure describes an offset in a binlog of MySQL server. */
 public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     public static final BinlogOffset INITIAL_OFFSET = new BinlogOffset("", 0);
+    public static final BinlogOffset NO_STOPPING_OFFSET = new BinlogOffset("", Long.MIN_VALUE);
+
     private final String filename;
     private final long position;
 

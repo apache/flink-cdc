@@ -60,14 +60,14 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testAssignSingleTableSplits() {
         String[] expected =
                 new String[] {
-                    "customers SNAPSHOT null [109]",
-                    "customers SNAPSHOT [109] [118]",
-                    "customers SNAPSHOT [118] [1009]",
-                    "customers SNAPSHOT [1009] [1012]",
-                    "customers SNAPSHOT [1012] [1015]",
-                    "customers SNAPSHOT [1015] [1018]",
-                    "customers SNAPSHOT [1018] [2000]",
-                    "customers SNAPSHOT [2000] null"
+                    "customers null [109]",
+                    "customers [109] [118]",
+                    "customers [118] [1009]",
+                    "customers [1009] [1012]",
+                    "customers [1012] [1015]",
+                    "customers [1015] [1018]",
+                    "customers [1018] [2000]",
+                    "customers [2000] null"
                 };
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
@@ -79,22 +79,22 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testAssignMultipleTableSplits() {
         String[] expected =
                 new String[] {
-                    "customers SNAPSHOT null [109]",
-                    "customers SNAPSHOT [109] [118]",
-                    "customers SNAPSHOT [118] [1009]",
-                    "customers SNAPSHOT [1009] [1012]",
-                    "customers SNAPSHOT [1012] [1015]",
-                    "customers SNAPSHOT [1015] [1018]",
-                    "customers SNAPSHOT [1018] [2000]",
-                    "customers SNAPSHOT [2000] null",
-                    "customers_1 SNAPSHOT null [109]",
-                    "customers_1 SNAPSHOT [109] [118]",
-                    "customers_1 SNAPSHOT [118] [1009]",
-                    "customers_1 SNAPSHOT [1009] [1012]",
-                    "customers_1 SNAPSHOT [1012] [1015]",
-                    "customers_1 SNAPSHOT [1015] [1018]",
-                    "customers_1 SNAPSHOT [1018] [2000]",
-                    "customers_1 SNAPSHOT [2000] null"
+                    "customers null [109]",
+                    "customers [109] [118]",
+                    "customers [118] [1009]",
+                    "customers [1009] [1012]",
+                    "customers [1012] [1015]",
+                    "customers [1015] [1018]",
+                    "customers [1018] [2000]",
+                    "customers [2000] null",
+                    "customers_1 null [109]",
+                    "customers_1 [109] [118]",
+                    "customers_1 [118] [1009]",
+                    "customers_1 [1009] [1012]",
+                    "customers_1 [1012] [1015]",
+                    "customers_1 [1015] [1018]",
+                    "customers_1 [1018] [2000]",
+                    "customers_1 [2000] null"
                 };
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
@@ -107,10 +107,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testEnableIntegralKeyOptimization() {
         String[] expected =
                 new String[] {
-                    "customers SNAPSHOT null [101]",
-                    "customers SNAPSHOT [101] [1101]",
-                    "customers SNAPSHOT [1101] [2000]",
-                    "customers SNAPSHOT [2000] null"
+                    "customers null [101]",
+                    "customers [101] [1101]",
+                    "customers [1101] [2000]",
+                    "customers [2000] null"
                 };
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.INT())).getLogicalType();
@@ -123,14 +123,14 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testEnableIntegralKeyOptimizationWithMultipleTable() {
         String[] expected =
                 new String[] {
-                    "customers SNAPSHOT null [101]",
-                    "customers SNAPSHOT [101] [1101]",
-                    "customers SNAPSHOT [1101] [2000]",
-                    "customers SNAPSHOT [2000] null",
-                    "customers_1 SNAPSHOT null [101]",
-                    "customers_1 SNAPSHOT [101] [1101]",
-                    "customers_1 SNAPSHOT [1101] [2000]",
-                    "customers_1 SNAPSHOT [2000] null"
+                    "customers null [101]",
+                    "customers [101] [1101]",
+                    "customers [1101] [2000]",
+                    "customers [2000] null",
+                    "customers_1 null [101]",
+                    "customers_1 [101] [1101]",
+                    "customers_1 [1101] [2000]",
+                    "customers_1 [2000] null"
                 };
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.INT())).getLogicalType();
@@ -144,10 +144,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testEnableBigIntKeyOptimization() {
         String[] expected =
                 new String[] {
-                    "shopping_cart_big SNAPSHOT null [9223372036854773807]",
-                    "shopping_cart_big SNAPSHOT [9223372036854773807] [9223372036854774807]",
-                    "shopping_cart_big SNAPSHOT [9223372036854774807] [9223372036854775807]",
-                    "shopping_cart_big SNAPSHOT [9223372036854775807] null"
+                    "shopping_cart_big null [9223372036854773807]",
+                    "shopping_cart_big [9223372036854773807] [9223372036854774807]",
+                    "shopping_cart_big [9223372036854774807] [9223372036854775807]",
+                    "shopping_cart_big [9223372036854775807] null"
                 };
         // MySQL BIGINT UNSIGNED <=> Flink DECIMAL(20, 0)
         final RowType pkType =
@@ -163,11 +163,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testEnableDecimalKeyOptimization() {
         String[] expected =
                 new String[] {
-                    "shopping_cart_dec SNAPSHOT null [123456.1230]",
-                    "shopping_cart_dec SNAPSHOT [123456.1230] [124456.1230]",
-                    "shopping_cart_dec SNAPSHOT [124456.1230] [125456.1230]",
-                    "shopping_cart_dec SNAPSHOT [125456.1230] [125489.6789]",
-                    "shopping_cart_dec SNAPSHOT [125489.6789] null"
+                    "shopping_cart_dec null [123456.1230]",
+                    "shopping_cart_dec [123456.1230] [124456.1230]",
+                    "shopping_cart_dec [124456.1230] [125456.1230]",
+                    "shopping_cart_dec [125456.1230] [125489.6789]",
+                    "shopping_cart_dec [125489.6789] null"
                 };
         final RowType pkType =
                 (RowType)
@@ -214,14 +214,17 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
 
         return sqlSplits.stream()
                 .map(
-                        split ->
-                                split.getTableId().table()
+                        split -> {
+                            if (split.isSnapshotSplit()) {
+                                return split.asSnapshotSplit().getTableId().table()
                                         + " "
-                                        + split.getSplitKind()
+                                        + Arrays.toString(split.asSnapshotSplit().getSplitStart())
                                         + " "
-                                        + Arrays.toString(split.getSplitBoundaryStart())
-                                        + " "
-                                        + Arrays.toString(split.getSplitBoundaryEnd()))
+                                        + Arrays.toString(split.asSnapshotSplit().getSplitEnd());
+                            } else {
+                                return split.toString();
+                            }
+                        })
                 .collect(Collectors.toList());
     }
 
@@ -229,12 +232,12 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testAssignTableWithMultipleKey() {
         String[] expected =
                 new String[] {
-                    "customer_card SNAPSHOT null [20004]",
-                    "customer_card SNAPSHOT [20004] [30009]",
-                    "customer_card SNAPSHOT [30009] [40001]",
-                    "customer_card SNAPSHOT [40001] [50001]",
-                    "customer_card SNAPSHOT [50001] [50003]",
-                    "customer_card SNAPSHOT [50003] null"
+                    "customer_card null [20004]",
+                    "customer_card [20004] [30009]",
+                    "customer_card [30009] [40001]",
+                    "customer_card [40001] [50001]",
+                    "customer_card [50001] [50003]",
+                    "customer_card [50003] null"
                 };
         final RowType pkType =
                 (RowType)
@@ -249,8 +252,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testAssignTableWithSingleLine() {
         String[] expected =
                 new String[] {
-                    "customer_card_single_line SNAPSHOT null [20001]",
-                    "customer_card_single_line SNAPSHOT [20001] null"
+                    "customer_card_single_line null [20001]",
+                    "customer_card_single_line [20001] null"
                 };
         final RowType pkType =
                 (RowType)
@@ -265,12 +268,12 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testAssignTableWithConfiguredIntSplitKey() {
         String[] expected =
                 new String[] {
-                    "shopping_cart SNAPSHOT null [102]",
-                    "shopping_cart SNAPSHOT [102] [401]",
-                    "shopping_cart SNAPSHOT [401] [501]",
-                    "shopping_cart SNAPSHOT [501] [701]",
-                    "shopping_cart SNAPSHOT [701] [801]",
-                    "shopping_cart SNAPSHOT [801] null"
+                    "shopping_cart null [102]",
+                    "shopping_cart [102] [401]",
+                    "shopping_cart [401] [501]",
+                    "shopping_cart [501] [701]",
+                    "shopping_cart [701] [801]",
+                    "shopping_cart [801] null"
                 };
         final RowType pkType =
                 (RowType)
@@ -285,11 +288,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testAssignTableWithConfiguredStringSplitKey() {
         String[] expected =
                 new String[] {
-                    "shopping_cart SNAPSHOT null [user_1]",
-                    "shopping_cart SNAPSHOT [user_1] [user_4]",
-                    "shopping_cart SNAPSHOT [user_4] [user_5]",
-                    "shopping_cart SNAPSHOT [user_5] [user_6]",
-                    "shopping_cart SNAPSHOT [user_6] null"
+                    "shopping_cart null [user_1]",
+                    "shopping_cart [user_1] [user_4]",
+                    "shopping_cart [user_4] [user_5]",
+                    "shopping_cart [user_5] [user_6]",
+                    "shopping_cart [user_6] null"
                 };
         final RowType pkType =
                 (RowType)
@@ -304,27 +307,27 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testAssignMinSplitSize() {
         String[] expected =
                 new String[] {
-                    "customers SNAPSHOT null [102]",
-                    "customers SNAPSHOT [102] [103]",
-                    "customers SNAPSHOT [103] [109]",
-                    "customers SNAPSHOT [109] [110]",
-                    "customers SNAPSHOT [110] [111]",
-                    "customers SNAPSHOT [111] [118]",
-                    "customers SNAPSHOT [118] [121]",
-                    "customers SNAPSHOT [121] [123]",
-                    "customers SNAPSHOT [123] [1009]",
-                    "customers SNAPSHOT [1009] [1010]",
-                    "customers SNAPSHOT [1010] [1011]",
-                    "customers SNAPSHOT [1011] [1012]",
-                    "customers SNAPSHOT [1012] [1013]",
-                    "customers SNAPSHOT [1013] [1014]",
-                    "customers SNAPSHOT [1014] [1015]",
-                    "customers SNAPSHOT [1015] [1016]",
-                    "customers SNAPSHOT [1016] [1017]",
-                    "customers SNAPSHOT [1017] [1018]",
-                    "customers SNAPSHOT [1018] [1019]",
-                    "customers SNAPSHOT [1019] [2000]",
-                    "customers SNAPSHOT [2000] null"
+                    "customers null [102]",
+                    "customers [102] [103]",
+                    "customers [103] [109]",
+                    "customers [109] [110]",
+                    "customers [110] [111]",
+                    "customers [111] [118]",
+                    "customers [118] [121]",
+                    "customers [121] [123]",
+                    "customers [123] [1009]",
+                    "customers [1009] [1010]",
+                    "customers [1010] [1011]",
+                    "customers [1011] [1012]",
+                    "customers [1012] [1013]",
+                    "customers [1013] [1014]",
+                    "customers [1014] [1015]",
+                    "customers [1015] [1016]",
+                    "customers [1016] [1017]",
+                    "customers [1017] [1018]",
+                    "customers [1018] [1019]",
+                    "customers [1019] [2000]",
+                    "customers [2000] null"
                 };
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
@@ -334,8 +337,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
 
     @Test
     public void testAssignMaxSplitSize() {
-        String[] expected =
-                new String[] {"customers SNAPSHOT null [2000]", "customers SNAPSHOT [2000] null"};
+        String[] expected = new String[] {"customers null [2000]", "customers [2000] null"};
         final RowType pkType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<String> splits = getTestAssignSnapshotSplits(2000, pkType, new String[] {"customers"});

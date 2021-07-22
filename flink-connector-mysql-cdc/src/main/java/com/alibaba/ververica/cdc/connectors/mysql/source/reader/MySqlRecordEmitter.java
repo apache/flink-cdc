@@ -23,9 +23,9 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.debezium.internal.SchemaRecord;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.JsonTableChangeSerializer;
@@ -48,8 +48,8 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
  * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the binlog reader to
  * emit records rather than emit the records directly.
  */
-public final class MySqlRecordEmitter<T>
-        implements RecordEmitter<SourceRecord, T, MySqlSplitState> {
+public final class MySqlRecordEmitter<T, SplitT extends MySqlSplit>
+        implements RecordEmitter<SourceRecord, T, MySqlSplitState<SplitT>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
     private static final JsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
@@ -62,39 +62,39 @@ public final class MySqlRecordEmitter<T>
     }
 
     @Override
-    public void emitRecord(SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
+    public void emitRecord(
+            SourceRecord element, SourceOutput<T> output, MySqlSplitState<SplitT> splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
             BinlogOffset watermark = getWatermark(element);
-            if (isHighWatermarkEvent(element)) {
-                splitState.setHighWatermarkState(watermark);
-                splitState.setSnapshotReadFinishedState(true);
-            } else {
-                splitState.setLowWatermarkState(watermark);
+            if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+                splitState.asSnapshotSplitState().setHighWatermark(watermark);
             }
-        } else if (isSchemaChangeEvent(element)) {
+        } else if (isSchemaChangeEvent(element) && splitState.isBinlogSplitState()) {
             HistoryRecord historyRecord = getHistoryRecord(element);
             Array tableChanges =
                     historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
             TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
             for (TableChanges.TableChange tableChange : changes) {
-                splitState.recordSchemaHistory(
-                        tableChange.getId(),
-                        new SchemaRecord(TABLE_CHANGE_SERIALIZER.toDocument(tableChange)));
+                splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
             }
         } else if (isDataChangeRecord(element)) {
-            BinlogOffset position = getBinlogPosition(element);
-            splitState.setOffsetState(position);
+            if (splitState.isBinlogSplitState()) {
+                BinlogOffset position = getBinlogPosition(element);
+                splitState.asBinlogSplitState().setStartingOffset(position);
+            }
             debeziumDeserializationSchema.deserialize(
                     element,
                     new Collector<T>() {
                         @Override
-                        public void collect(T record) {
-                            output.collect(record);
+                        public void collect(T t) {
+                            output.collect(t);
                         }
 
                         @Override
-                        public void close() {}
+                        public void close() {
+                            // do nothing
+                        }
                     });
         } else {
             // unknown element
