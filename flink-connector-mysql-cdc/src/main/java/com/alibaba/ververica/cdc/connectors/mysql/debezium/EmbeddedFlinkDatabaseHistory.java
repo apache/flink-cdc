@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.debezium;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
@@ -29,16 +28,18 @@ import io.debezium.relational.history.DatabaseHistoryException;
 import io.debezium.relational.history.DatabaseHistoryListener;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
-import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.SchemaStateUtils.registerHistory;
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.SchemaStateUtils.retrieveHistory;
+import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils.registerHistory;
+import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils.removeHistory;
+import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils.retrieveHistory;
 
 /**
  * A {@link DatabaseHistory} implementation which store the latest table schema in Flink state.
@@ -49,8 +50,8 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
 
     public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
 
-    private final JsonTableChangeSerializer tableChangesSerializer =
-            new JsonTableChangeSerializer();
+    public static final ConcurrentMap<String, Collection<TableChange>> TABLE_SCHEMAS =
+            new ConcurrentHashMap<>();
 
     private ConcurrentMap<TableId, TableChange> tableSchemas;
     private String instanceName;
@@ -89,8 +90,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     public void record(
             Map<String, ?> source, Map<String, ?> position, String databaseName, String ddl)
             throws DatabaseHistoryException {
-        throw new UnsupportedOperationException(
-                "The FlinkDatabaseSchemaHistory needs debezium provides the schema.");
+        throw new UnsupportedOperationException("should not call here, error");
     }
 
     @Override
@@ -135,7 +135,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     @Override
     public void stop() {
         if (instanceName != null) {
-            StatefulTaskContext.SchemaStateUtils.removeHistory(instanceName);
+            removeHistory(instanceName);
         }
         listener.stopped();
     }
@@ -163,5 +163,22 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     @Override
     public boolean skipUnparseableDdlStatements() {
         return skipUnparseableDDL;
+    }
+
+    /** Utils to get/put/remove the table schema. */
+    public static final class SchemaStateUtils {
+
+        public static void registerHistory(
+                String engineName, Collection<TableChange> engineHistory) {
+            TABLE_SCHEMAS.put(engineName, engineHistory);
+        }
+
+        public static Collection<TableChange> retrieveHistory(String engineName) {
+            return TABLE_SCHEMAS.getOrDefault(engineName, Collections.emptyList());
+        }
+
+        public static void removeHistory(String engineName) {
+            TABLE_SCHEMAS.remove(engineName);
+        }
     }
 }

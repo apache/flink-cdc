@@ -51,8 +51,8 @@ public class MySqlSplitStateTest {
                         new Object[] {999L},
                         new BinlogOffset("mysql-bin.000002", 78L),
                         new HashMap<>());
-        final MySqlSnapshotSplitState mySQLSplitState = new MySqlSnapshotSplitState(split);
-        assertSplitsEqual(split, mySQLSplitState.toMySqlSplit());
+        final MySqlSnapshotSplitState mySqlSplitState = new MySqlSnapshotSplitState(split);
+        assertSplitsEqual(split, mySqlSplitState.toMySqlSplit());
     }
 
     @Test
@@ -66,8 +66,8 @@ public class MySqlSplitStateTest {
                         new Object[] {999L},
                         null,
                         new HashMap<>());
-        final MySqlSnapshotSplitState mySQLSplitState = new MySqlSnapshotSplitState(split);
-        mySQLSplitState.setHighWatermark(new BinlogOffset("mysql-bin.000002", 78L));
+        final MySqlSnapshotSplitState mySqlSplitState = new MySqlSnapshotSplitState(split);
+        mySqlSplitState.setHighWatermark(new BinlogOffset("mysql-bin.000002", 78L));
 
         final MySqlSnapshotSplit expected =
                 new MySqlSnapshotSplit(
@@ -78,7 +78,7 @@ public class MySqlSplitStateTest {
                         new Object[] {999L},
                         new BinlogOffset("mysql-bin.000002", 78L),
                         new HashMap<>());
-        assertSplitsEqual(expected, mySQLSplitState.toMySqlSplit());
+        assertSplitsEqual(expected, mySqlSplitState.toMySqlSplit());
     }
 
     @Test
@@ -87,17 +87,17 @@ public class MySqlSplitStateTest {
         final MySqlBinlogSplit split =
                 getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 4L));
 
-        final MySqlBinlogSplitState mySQLSplitState = new MySqlBinlogSplitState(split);
-        mySQLSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 100L));
+        final MySqlBinlogSplitState mySqlSplitState = new MySqlBinlogSplitState(split);
+        mySqlSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 100L));
 
         assertSplitsEqual(
                 getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 100L)),
-                mySQLSplitState.toMySqlSplit());
+                mySqlSplitState.toMySqlSplit());
 
-        mySQLSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 400L));
+        mySqlSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 400L));
         assertSplitsEqual(
                 getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 400L)),
-                mySQLSplitState.toMySqlSplit());
+                mySqlSplitState.toMySqlSplit());
     }
 
     private MySqlBinlogSplit getTestBinlogSplitWithOffset(BinlogOffset startingOffset)

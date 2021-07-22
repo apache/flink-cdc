@@ -21,6 +21,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context;
 import org.apache.flink.configuration.Configuration;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
+import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -48,7 +49,6 @@ import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.AbstractDatabaseHistory;
-import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
@@ -59,12 +59,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import static io.debezium.config.CommonConnectorConfig.TOMBSTONES_ON_DELETE;
 
@@ -78,8 +74,6 @@ public class StatefulTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
     private static final Clock clock = Clock.SYSTEM;
-    private static final ConcurrentMap<String, Collection<TableChange>> TABLE_SCHEMAS =
-            new ConcurrentHashMap<>();
 
     private final io.debezium.config.Configuration dezConf;
     private final MySqlConnectorConfig connectorConfig;
@@ -110,14 +104,14 @@ public class StatefulTaskContext {
         this.connection = connection;
     }
 
-    public void configure(MySqlSplit mySQLSplit) {
+    public void configure(MySqlSplit mySqlSplit) {
         // initial stateful objects
         final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
         this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
         final MySqlValueConverters valueConverters = getValueConverters(connectorConfig);
         SchemaStateUtils.registerHistory(
                 dezConf.getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
-                mySQLSplit.getTableSchemas().values());
+                mySqlSplit.getTableSchemas().values());
         this.databaseSchema =
                 new MySqlDatabaseSchema(
                         connectorConfig,
@@ -128,7 +122,7 @@ public class StatefulTaskContext {
         this.offsetContext =
                 (MySqlOffsetContext)
                         loadStartingOffsetState(
-                                new MySqlOffsetContext.Loader(connectorConfig), mySQLSplit);
+                                new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
         this.taskContext =
@@ -178,12 +172,12 @@ public class StatefulTaskContext {
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
     private OffsetContext loadStartingOffsetState(
-            OffsetContext.Loader loader, MySqlSplit mySQLSplit) {
+            OffsetContext.Loader loader, MySqlSplit mySqlSplit) {
         Map<String, Object> previousOffset = new HashMap<>();
         BinlogOffset offset =
-                mySQLSplit.isSnapshotSplit()
+                mySqlSplit.isSnapshotSplit()
                         ? BinlogOffset.INITIAL_OFFSET
-                        : mySQLSplit.asBinlogSplit().getStartingOffset();
+                        : mySqlSplit.asBinlogSplit().getStartingOffset();
         previousOffset.put("file", offset.getFilename());
         previousOffset.put("pos", offset.getPosition());
 
@@ -330,23 +324,6 @@ public class StatefulTaskContext {
 
     public SchemaNameAdjuster getSchemaNameAdjuster() {
         return schemaNameAdjuster;
-    }
-
-    /** Utils to get/put/remove the table schema. */
-    public static final class SchemaStateUtils {
-
-        public static void registerHistory(
-                String engineName, Collection<TableChange> engineHistory) {
-            TABLE_SCHEMAS.put(engineName, engineHistory);
-        }
-
-        public static Collection<TableChange> retrieveHistory(String engineName) {
-            return TABLE_SCHEMAS.getOrDefault(engineName, Collections.emptyList());
-        }
-
-        public static void removeHistory(String engineName) {
-            TABLE_SCHEMAS.remove(engineName);
-        }
     }
 
     // ------------ utils ---------

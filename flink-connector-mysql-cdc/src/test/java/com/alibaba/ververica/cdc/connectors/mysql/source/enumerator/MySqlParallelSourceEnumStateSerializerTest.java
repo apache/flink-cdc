@@ -53,7 +53,7 @@ public class MySqlParallelSourceEnumStateSerializerTest {
 
     @Test
     public void testsSerializeAndDeserialize() throws Exception {
-        final MySqlSourceEnumState<MySqlSplit> sourceEnumState = getTestSourceEnumState();
+        final MySqlSourceEnumState sourceEnumState = getTestSourceEnumState();
 
         assertSourceEnumStateEqual(
                 sourceEnumState, serializeAndDeserializeSourceEnumState(sourceEnumState));
@@ -61,7 +61,7 @@ public class MySqlParallelSourceEnumStateSerializerTest {
 
     @Test
     public void testRepeatedSerializationCache() throws Exception {
-        final MySqlSourceEnumState<MySqlSplit> sourceEnumState = getTestSourceEnumState();
+        final MySqlSourceEnumState sourceEnumState = getTestSourceEnumState();
         final MySqlSourceEnumStateSerializer sourceEnumStateSerializer =
                 new MySqlSourceEnumStateSerializer(MySqlSplitSerializer.INSTANCE);
 
@@ -70,15 +70,15 @@ public class MySqlParallelSourceEnumStateSerializerTest {
         assertSame(ser1, ser2);
     }
 
-    static MySqlSourceEnumState<MySqlSplit> serializeAndDeserializeSourceEnumState(
-            MySqlSourceEnumState<MySqlSplit> sourceEnumState) throws Exception {
+    static MySqlSourceEnumState serializeAndDeserializeSourceEnumState(
+            MySqlSourceEnumState sourceEnumState) throws Exception {
         final MySqlSourceEnumStateSerializer mySQLSourceEnumStateSerializer =
                 new MySqlSourceEnumStateSerializer(MySqlSplitSerializer.INSTANCE);
         byte[] serialized = mySQLSourceEnumStateSerializer.serialize(sourceEnumState);
         return mySQLSourceEnumStateSerializer.deserialize(1, serialized);
     }
 
-    private MySqlSourceEnumState<MySqlSplit> getTestSourceEnumState() throws Exception {
+    private MySqlSourceEnumState getTestSourceEnumState() throws Exception {
         // construct the source that captures two tables
         // the first one has 3 snapshot splits and has been assigned finished
         // the second one has 4 snapshot splits and has been assigned 2 splits
@@ -187,7 +187,7 @@ public class MySqlParallelSourceEnumStateSerializerTest {
     }
 
     static void assertSourceEnumStateEqual(
-            MySqlSourceEnumState<MySqlSplit> expected, MySqlSourceEnumState<MySqlSplit> actual) {
+            MySqlSourceEnumState expected, MySqlSourceEnumState actual) {
         assertArrayEquals(
                 expected.getAlreadyProcessedTables().toArray(),
                 actual.getAlreadyProcessedTables().toArray());

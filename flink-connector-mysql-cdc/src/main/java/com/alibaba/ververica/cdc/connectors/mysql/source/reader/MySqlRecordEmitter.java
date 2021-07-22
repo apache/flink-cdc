@@ -23,7 +23,6 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.document.Array;
@@ -48,8 +47,8 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
  * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the binlog reader to
  * emit records rather than emit the records directly.
  */
-public final class MySqlRecordEmitter<T, SplitT extends MySqlSplit>
-        implements RecordEmitter<SourceRecord, T, MySqlSplitState<SplitT>> {
+public final class MySqlRecordEmitter<T>
+        implements RecordEmitter<SourceRecord, T, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
     private static final JsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
@@ -62,8 +61,7 @@ public final class MySqlRecordEmitter<T, SplitT extends MySqlSplit>
     }
 
     @Override
-    public void emitRecord(
-            SourceRecord element, SourceOutput<T> output, MySqlSplitState<SplitT> splitState)
+    public void emitRecord(SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
             BinlogOffset watermark = getWatermark(element);

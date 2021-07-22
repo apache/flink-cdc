@@ -28,6 +28,7 @@ import org.apache.flink.util.Preconditions;
 public class MySqlSourceOptions {
 
     public static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
+    public static final String DATABASE_SERVER_ID = "database.server.id";
 
     public static final ConfigOption<String> HOSTNAME =
             ConfigOptions.key("hostname")

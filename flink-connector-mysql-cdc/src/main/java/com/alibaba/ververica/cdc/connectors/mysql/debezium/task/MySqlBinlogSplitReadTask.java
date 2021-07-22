@@ -122,6 +122,6 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     }
 
     private boolean isBoundedRead() {
-        return binlogSplit.getEndingOffset() != NO_STOPPING_OFFSET;
+        return !NO_STOPPING_OFFSET.equals(binlogSplit.getEndingOffset());
     }
 }
