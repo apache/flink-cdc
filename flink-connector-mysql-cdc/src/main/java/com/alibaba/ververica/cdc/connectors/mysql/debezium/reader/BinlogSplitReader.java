@@ -18,6 +18,8 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.util.FlinkRuntimeException;
+
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
@@ -63,8 +65,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executor;
 
-    private volatile boolean currentTaskRunning;
     private volatile ChangeEventQueue<DataChangeEvent> queue;
+    private volatile boolean currentTaskRunning;
+    private volatile Throwable readException;
+
     private MySqlBinlogSplitReadTask binlogSplitReadTask;
     private MySqlBinlogSplit currentBinlogSplit;
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
@@ -114,7 +118,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                                         "Execute binlog read task for mysql split %s fail",
                                         currentBinlogSplit),
                                 e);
-                        e.printStackTrace();
+                        readException = e;
                     }
                 });
     }
@@ -135,6 +139,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     @Nullable
     @Override
     public Iterator<SourceRecord> pollSplitRecords() throws InterruptedException {
+        checkReadException();
         final List<SourceRecord> sourceRecords = new ArrayList<>();
         if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
@@ -145,6 +150,16 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             }
         }
         return sourceRecords.iterator();
+    }
+
+    private void checkReadException() {
+        if (readException != null) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "Read split %s error due to %s.",
+                            currentBinlogSplit, readException.getMessage()),
+                    readException);
+        }
     }
 
     @Override

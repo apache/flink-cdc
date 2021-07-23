@@ -18,6 +18,8 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.util.FlinkRuntimeException;
+
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
@@ -63,6 +65,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
+    private volatile Throwable readException;
 
     // task to read snapshot for current split
     private MySqlSnapshotSplitReadTask splitSnapshotReadTask;
@@ -137,10 +140,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                             splitBinlogReadTask.execute(
                                     new SnapshotBinlogSplitChangeEventSourceContextImpl());
                         } else {
-                            throw new IllegalStateException(
-                                    String.format(
-                                            "Read snapshot for mysql split %s fail",
-                                            currentSnapshotSplit));
+                            readException =
+                                    new IllegalStateException(
+                                            String.format(
+                                                    "Read snapshot for mysql split %s fail",
+                                                    currentSnapshotSplit));
                         }
                     } catch (Exception e) {
                         currentTaskRunning = false;
@@ -149,6 +153,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                                         "Execute snapshot read task for mysql split %s fail",
                                         currentSnapshotSplit),
                                 e);
+                        readException = e;
                     }
                 });
     }
@@ -173,6 +178,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     @Nullable
     @Override
     public Iterator<SourceRecord> pollSplitRecords() throws InterruptedException {
+        checkReadException();
+
         if (hasNextElement.get()) {
             // data input: [low watermark event][snapshot events][high watermark event][binlog
             // events][binlog-end event]
@@ -197,6 +204,16 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
         return null;
+    }
+
+    private void checkReadException() {
+        if (readException != null) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "Read split %s error due to %s.",
+                            currentSnapshotSplit, readException.getMessage()),
+                    readException);
+        }
     }
 
     @Override
