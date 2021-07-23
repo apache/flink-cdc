@@ -30,25 +30,25 @@ import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_NAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.HOSTNAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PASSWORD;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PORT;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_FETCH_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_COLUMN;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_PARALLEL_READ;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_TIME_ZONE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SNAPSHOT_PARALLEL_SCAN;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.TABLE_NAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.USERNAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.validateAndGetServerId;
@@ -72,22 +72,20 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         int port = config.get(PORT);
-        int splitSize = config.get(SCAN_SPLIT_SIZE);
-        int fetchSize = config.get(SCAN_FETCH_SIZE);
+        int splitSize = config.get(SCAN_SNAPSHOT_CHUNK_SIZE);
+        int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
         String serverId = validateAndGetServerId(config);
-        boolean enableIntegralOptimization = config.get(SCAN_OPTIMIZE_INTEGRAL_KEY);
-        boolean enableParallelRead = config.get(SNAPSHOT_PARALLEL_SCAN);
-        String splitColumn = null;
+        boolean enableParallelRead = config.get(SCAN_SNAPSHOT_PARALLEL_READ);
         StartupOptions startupOptions = getStartupOptions(config);
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
-            splitColumn = validateAndGetSplitColumn(config.get(SCAN_SPLIT_COLUMN), physicalSchema);
             validateStartupOptionIfEnableParallel(startupOptions);
         }
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
         return new MySqlTableSource(
                 physicalSchema,
@@ -100,11 +98,10 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 serverTimeZone,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 serverId,
-                enableIntegralOptimization,
                 enableParallelRead,
                 splitSize,
                 fetchSize,
-                splitColumn,
+                connectTimeout,
                 startupOptions);
     }
 
@@ -134,11 +131,10 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
-        options.add(SNAPSHOT_PARALLEL_SCAN);
-        options.add(SCAN_SPLIT_SIZE);
-        options.add(SCAN_FETCH_SIZE);
-        options.add(SCAN_SPLIT_COLUMN);
-        options.add(SCAN_OPTIMIZE_INTEGRAL_KEY);
+        options.add(SCAN_SNAPSHOT_PARALLEL_READ);
+        options.add(SCAN_SNAPSHOT_CHUNK_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
+        options.add(CONNECT_TIMEOUT);
         return options;
     }
 
@@ -187,45 +183,10 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
     private void validatePrimaryKeyIfEnableParallel(TableSchema physicalSchema) {
         if (!physicalSchema.getPrimaryKey().isPresent()) {
             throw new ValidationException(
-                    "The primary key is necessary when enable 'snapshot.parallel-scan' to 'true'");
+                    String.format(
+                            "The primary key is necessary when enable '%s' to 'true'",
+                            SCAN_SNAPSHOT_PARALLEL_READ));
         }
-    }
-
-    private String validateAndGetSplitColumn(String splitColumn, TableSchema physicalSchema) {
-        String validatedSplitColumn = splitColumn;
-        if (physicalSchema.getPrimaryKey().isPresent()) {
-            int pkSize = physicalSchema.getPrimaryKey().get().getColumns().size();
-            if (pkSize > 1) {
-                Preconditions.checkState(
-                        splitColumn != null,
-                        "The 'scan.split.column' option is required if the primary key contains multiple fields");
-                Preconditions.checkState(
-                        physicalSchema.getPrimaryKey().get().getColumns().contains(splitColumn),
-                        String.format(
-                                "The 'scan.split.column' value %s should be one field of the primary key %s, but it does not.",
-                                splitColumn, physicalSchema.getPrimaryKey().get().getColumns()));
-                return splitColumn;
-            }
-            // single primary key field
-            else {
-                // use primary key by default
-                if (splitColumn == null) {
-                    validatedSplitColumn = physicalSchema.getPrimaryKey().get().getColumns().get(0);
-                } else {
-                    // validate configured split column
-                    Preconditions.checkState(
-                            physicalSchema.getPrimaryKey().get().getColumns().contains(splitColumn),
-                            String.format(
-                                    "The 'scan.split.column' value %s should be one field of the primary key %s, but it does not.",
-                                    splitColumn,
-                                    physicalSchema.getPrimaryKey().get().getColumns()));
-                }
-            }
-        } else {
-            throw new ValidationException(
-                    "The primary key is necessary when enable 'snapshot.parallel-scan' to 'true'");
-        }
-        return validatedSplitColumn;
     }
 
     private void validateStartupOptionIfEnableParallel(StartupOptions startupOptions) {

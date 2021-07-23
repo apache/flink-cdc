@@ -18,11 +18,8 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.Preconditions;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
@@ -37,29 +34,6 @@ import java.util.stream.Collectors;
 public class StatementUtils {
 
     private StatementUtils() {}
-
-    /**
-     * Returns the split key, the split key should always single field。
-     *
-     * <p>The split key is primary key when primary key contains single field, the split key will be
-     * inferred when the primary key contains multiple field.
-     *
-     * @param pkType the primary key type
-     * @return
-     */
-    public static RowType getSplitKey(Configuration configuration, RowType pkType) {
-        Preconditions.checkState(
-                pkType.getFieldCount() >= 1, "The primary key is required in table definition.");
-        if (pkType.getFieldCount() == 1) {
-            return pkType;
-        } else {
-            String splitColumnName = configuration.getString(MySqlSourceOptions.SCAN_SPLIT_COLUMN);
-            return new RowType(
-                    pkType.getFields().stream()
-                            .filter(r -> splitColumnName.equalsIgnoreCase(r.getName()))
-                            .collect(Collectors.toList()));
-        }
-    }
 
     public static String buildSplitBoundaryQuery(
             TableId tableId,

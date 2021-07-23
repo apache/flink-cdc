@@ -24,6 +24,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.util.Preconditions;
 
+import java.time.Duration;
+
 /** Configurations for {@link MySqlParallelSource}. */
 public class MySqlSourceOptions {
 
@@ -81,41 +83,41 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "A numeric ID or a numeric ID range of this database client, "
                                     + "The numeric ID syntax is like '5400', the numeric ID range syntax "
-                                    + "is like '5400,5408', The numeric ID range syntax is required when "
-                                    + "'snapshot.parallel-read' enabled. Every ID must be unique across all "
+                                    + "is like '5400-5408', The numeric ID range syntax is required when "
+                                    + "'scan.snapshot.parallel-read' enabled. Every ID must be unique across all "
                                     + "currently-running database processes in the MySQL cluster. This connector"
                                     + " joins the MySQL database cluster as another server (with this unique ID) "
                                     + "so it can read the binlog. By default, a random number is generated between"
                                     + " 5400 and 6400, though we recommend setting an explicit value.");
 
-    public static final ConfigOption<Boolean> SNAPSHOT_PARALLEL_SCAN =
-            ConfigOptions.key("snapshot.parallel-scan")
+    public static final ConfigOption<Boolean> SCAN_SNAPSHOT_PARALLEL_READ =
+            ConfigOptions.key("scan.snapshot.parallel-read")
                     .booleanType()
-                    .defaultValue(false)
+                    .defaultValue(true)
                     .withDescription(
-                            "Enable parallel scan snapshot of table or not, false by default."
+                            "Enable parallel read snapshot of table or not, false by default."
                                     + "The 'server-id' is required to be a range syntax like '5400,5408'.");
 
-    public static final ConfigOption<Integer> SCAN_SPLIT_SIZE =
-            ConfigOptions.key("scan.split.size")
+    public static final ConfigOption<Integer> SCAN_SNAPSHOT_CHUNK_SIZE =
+            ConfigOptions.key("scan.snapshot.chunk.size")
                     .intType()
                     .defaultValue(8096)
-                    .withDescription("The split size used to cut splits for table.");
-    public static final ConfigOption<Integer> SCAN_FETCH_SIZE =
-            ConfigOptions.key("scan.fetch.size")
+                    .withDescription(
+                            "The chunk size of table snapshot, the table is cut to multiple chunks when read the snapshot of table.");
+
+    public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
+            ConfigOptions.key("scan.snapshot.fetch.size")
                     .intType()
                     .defaultValue(1024)
-                    .withDescription("The fetch size for per poll.");
-
-    public static final ConfigOption<String> SCAN_SPLIT_COLUMN =
-            ConfigOptions.key("scan.split.column")
-                    .stringType()
-                    .noDefaultValue()
                     .withDescription(
-                            "The single column used to cut splits for table,"
-                                    + " the default value is primary key. If the primary key contains"
-                                    + " multiple columns, this option is required to configure,"
-                                    + " the configured column should make the splits as small as possible.");
+                            "The maximum fetch size for per poll when read table snapshot.");
+
+    public static final ConfigOption<Duration> CONNECT_TIMEOUT =
+            ConfigOptions.key("connect.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription(
+                            "The maximum time in milliseconds that the connector should wait after trying to connect to the MySQL database server before timing out.");
 
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")
@@ -147,30 +149,26 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "Optional timestamp used in case of \"timestamp\" startup mode");
 
-    public static final ConfigOption<Boolean> SCAN_OPTIMIZE_INTEGRAL_KEY =
-            ConfigOptions.key("scan.optimize.integral-key")
-                    .booleanType()
-                    .defaultValue(true)
-                    .withDescription(
-                            "Optimization to calculate the boundary of table snapshot split base on numeric value rather than querying the DB,"
-                                    + " by default this option is enabled.");
-
     // utils
     public static String validateAndGetServerId(ReadableConfig configuration) {
         final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
         // validate server id range
-        if (configuration.get(MySqlSourceOptions.SNAPSHOT_PARALLEL_SCAN)) {
+        if (configuration.get(SCAN_SNAPSHOT_PARALLEL_READ)) {
             String errMsg =
-                    "The server id should be a range syntax like '5400,5404' when enable 'snapshot.parallel-scan' to 'true', "
+                    "The '%s' should be a range syntax like '5400-5404' when enable '%s', "
                             + "but actual is %s";
             Preconditions.checkState(
                     serverIdValue != null
-                            && serverIdValue.contains(",")
-                            && serverIdValue.split(",").length == 2,
-                    String.format(errMsg, serverIdValue));
+                            && serverIdValue.contains("-")
+                            && serverIdValue.split("-").length == 2,
+                    String.format(
+                            errMsg,
+                            SERVER_ID.key(),
+                            SCAN_SNAPSHOT_PARALLEL_READ.key(),
+                            serverIdValue));
             try {
-                Integer.parseInt(serverIdValue.split(",")[0].trim());
-                Integer.parseInt(serverIdValue.split(",")[1].trim());
+                Integer.parseInt(serverIdValue.split("-")[0].trim());
+                Integer.parseInt(serverIdValue.split("-")[1].trim());
             } catch (NumberFormatException e) {
                 throw new IllegalStateException(String.format(errMsg, serverIdValue), e);
             }
@@ -197,8 +195,8 @@ public class MySqlSourceOptions {
 
     public static String getServerIdForSubTask(Configuration configuration, int subtaskId) {
         String serverIdRange = configuration.getString(MySqlSourceOptions.SERVER_ID);
-        int serverIdStart = Integer.parseInt(serverIdRange.split(",")[0].trim());
-        int serverIdEnd = Integer.parseInt(serverIdRange.split(",")[1].trim());
+        int serverIdStart = Integer.parseInt(serverIdRange.split("-")[0].trim());
+        int serverIdEnd = Integer.parseInt(serverIdRange.split("-")[1].trim());
         int serverId = serverIdStart + subtaskId;
         Preconditions.checkState(
                 serverIdStart <= serverId && serverId <= serverIdEnd,

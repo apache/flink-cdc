@@ -123,14 +123,14 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
                                 + " primary key (id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
-                                + " 'snapshot.parallel-scan' = 'true',"
+                                + " 'scan.snapshot.parallel-read' = 'true',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.split.size' = '1024',"
+                                + " 'scan.snapshot.chunk.size' = '1024',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -243,7 +243,7 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
     private String getServerId() {
         final Random random = new Random();
         int serverIdStart = random.nextInt(100) + 5400;
-        return serverIdStart + "," + (serverIdStart + PARALLELISM);
+        return serverIdStart + "-" + (serverIdStart + PARALLELISM);
     }
 
     private void sleepMs(long millis) {
