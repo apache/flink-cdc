@@ -38,18 +38,15 @@ public abstract class MySqlSplitState {
     }
 
     /** Casts this split state into a {@link MySqlSnapshotSplitState}. */
-    @SuppressWarnings("unchecked")
     public final MySqlSnapshotSplitState asSnapshotSplitState() {
         return (MySqlSnapshotSplitState) this;
     }
 
     /** Casts this split state into a {@link MySqlBinlogSplitState}. */
-    @SuppressWarnings("unchecked")
     public final MySqlBinlogSplitState asBinlogSplitState() {
         return (MySqlBinlogSplitState) this;
     }
 
     /** Use the current split state to create a new MySQLSplit. */
-    @SuppressWarnings("unchecked")
     public abstract MySqlSplit toMySqlSplit();
 }

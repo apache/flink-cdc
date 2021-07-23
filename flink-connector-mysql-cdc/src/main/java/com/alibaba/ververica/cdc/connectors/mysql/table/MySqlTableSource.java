@@ -49,7 +49,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_COLUMN;
@@ -176,7 +175,6 @@ public class MySqlTableSource implements ScanTableSource {
     private Configuration getParallelSourceConf(RowType pkRowType) {
         Map<String, String> properties = new HashMap<>();
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
         properties.put("database.hostname", checkNotNull(hostname));
         properties.put("database.user", checkNotNull(username));
         properties.put("database.password", checkNotNull(password));

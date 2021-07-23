@@ -21,7 +21,6 @@ package com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context;
 import org.apache.flink.configuration.Configuration;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -109,7 +108,7 @@ public class StatefulTaskContext {
         final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
         this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
         final MySqlValueConverters valueConverters = getValueConverters(connectorConfig);
-        SchemaStateUtils.registerHistory(
+        EmbeddedFlinkDatabaseHistory.registerHistory(
                 dezConf.getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 mySqlSplit.getTableSchemas().values());
         this.databaseSchema =

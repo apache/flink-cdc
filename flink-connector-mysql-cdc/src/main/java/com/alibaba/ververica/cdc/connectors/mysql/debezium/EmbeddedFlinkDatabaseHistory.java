@@ -33,13 +33,10 @@ import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils.registerHistory;
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils.removeHistory;
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.SchemaStateUtils.retrieveHistory;
 
 /**
  * A {@link DatabaseHistory} implementation which store the latest table schema in Flink state.
@@ -53,12 +50,10 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     public static final ConcurrentMap<String, Collection<TableChange>> TABLE_SCHEMAS =
             new ConcurrentHashMap<>();
 
-    private ConcurrentMap<TableId, TableChange> tableSchemas;
-    private String instanceName;
+    private Map<TableId, TableChange> tableSchemas;
     private DatabaseHistoryListener listener;
     private boolean storeOnlyMonitoredTablesDdl;
     private boolean skipUnparseableDDL;
-    private boolean useCatalogBeforeSchema;
 
     @Override
     public void configure(
@@ -66,19 +61,16 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
             HistoryRecordComparator comparator,
             DatabaseHistoryListener listener,
             boolean useCatalogBeforeSchema) {
-        this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
         this.listener = listener;
         this.storeOnlyMonitoredTablesDdl = config.getBoolean(STORE_ONLY_MONITORED_TABLES_DDL);
         this.skipUnparseableDDL = config.getBoolean(SKIP_UNPARSEABLE_DDL_STATEMENTS);
-        this.useCatalogBeforeSchema = useCatalogBeforeSchema;
 
         // recover
-        this.tableSchemas = new ConcurrentHashMap<>();
-        for (TableChange tableChange : retrieveHistory(instanceName)) {
+        String instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
+        this.tableSchemas = new HashMap<>();
+        for (TableChange tableChange : removeHistory(instanceName)) {
             tableSchemas.put(tableChange.getId(), tableChange);
         }
-        // register
-        registerHistory(instanceName, tableSchemas.values());
     }
 
     @Override
@@ -104,21 +96,6 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
             throws DatabaseHistoryException {
         final HistoryRecord record =
                 new HistoryRecord(source, position, databaseName, schemaName, ddl, changes);
-        for (TableChange change : changes) {
-            switch (change.getType()) {
-                case CREATE:
-                case ALTER:
-                    tableSchemas.put(change.getId(), change);
-                    break;
-                case DROP:
-                    tableSchemas.remove(change.getId());
-                    break;
-                default:
-                    // impossible
-                    throw new RuntimeException(
-                            String.format("Unknown change type: %s.", change.getType()));
-            }
-        }
         listener.onChangeApplied(record);
     }
 
@@ -134,9 +111,6 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
 
     @Override
     public void stop() {
-        if (instanceName != null) {
-            removeHistory(instanceName);
-        }
         listener.stopped();
     }
 
@@ -165,20 +139,12 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
         return skipUnparseableDDL;
     }
 
-    /** Utils to get/put/remove the table schema. */
-    public static final class SchemaStateUtils {
+    public static void registerHistory(String engineName, Collection<TableChange> engineHistory) {
+        TABLE_SCHEMAS.put(engineName, engineHistory);
+    }
 
-        public static void registerHistory(
-                String engineName, Collection<TableChange> engineHistory) {
-            TABLE_SCHEMAS.put(engineName, engineHistory);
-        }
-
-        public static Collection<TableChange> retrieveHistory(String engineName) {
-            return TABLE_SCHEMAS.getOrDefault(engineName, Collections.emptyList());
-        }
-
-        public static void removeHistory(String engineName) {
-            TABLE_SCHEMAS.remove(engineName);
-        }
+    public static Collection<TableChange> removeHistory(String engineName) {
+        Collection<TableChange> tableChanges = TABLE_SCHEMAS.remove(engineName);
+        return tableChanges != null ? tableChanges : Collections.emptyList();
     }
 }
