@@ -38,8 +38,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceE
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.kafka.connect.source.SourceRecord;

@@ -21,8 +21,8 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.enumerator;
 import org.apache.flink.api.java.tuple.Tuple2;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitReader;
 import io.debezium.relational.TableId;
 
 import javax.annotation.Nullable;

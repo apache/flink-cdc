@@ -36,7 +36,6 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplitS
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplitState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;

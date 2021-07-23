@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.mysql.source.split;
+package com.alibaba.ververica.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
@@ -29,6 +29,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlRecords;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
