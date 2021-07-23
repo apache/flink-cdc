@@ -51,6 +51,9 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -184,9 +187,9 @@ public class MySqlTableSource implements ScanTableSource {
          * The server id is required, it will be replaced to 'database.server.id' when build {@Link
          * MySQLSplitReader}
          */
-        properties.put("server-id", serverId);
-        properties.put("scan.split.size", String.valueOf(splitSize));
-        properties.put("scan.fetch.size", String.valueOf(fetchSize));
+        properties.put(SERVER_ID.key(), serverId);
+        properties.put(SCAN_SNAPSHOT_CHUNK_SIZE.key(), String.valueOf(splitSize));
+        properties.put(SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
         properties.put("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
 
         if (database != null) {

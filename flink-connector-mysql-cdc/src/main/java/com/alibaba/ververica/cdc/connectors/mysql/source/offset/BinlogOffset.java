@@ -66,6 +66,10 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         return this.compareTo(that) >= 0;
     }
 
+    public boolean isBefore(BinlogOffset that) {
+        return this.compareTo(that) > 0;
+    }
+
     @Override
     public String toString() {
         return filename + ":" + position;

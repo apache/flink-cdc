@@ -117,7 +117,7 @@ public class MySqlSourceOptions {
                     .durationType()
                     .defaultValue(Duration.ofSeconds(30))
                     .withDescription(
-                            "The maximum time in milliseconds that the connector should wait after trying to connect to the MySQL database server before timing out.");
+                            "The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.");
 
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")

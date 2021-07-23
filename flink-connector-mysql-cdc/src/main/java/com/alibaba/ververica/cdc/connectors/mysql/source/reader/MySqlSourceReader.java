@@ -31,6 +31,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorAckEve
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorRequestReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.SourceReaderReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplitState;
@@ -40,11 +42,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -55,7 +57,12 @@ public class MySqlSourceReader<T>
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
 
-    private final Map<String, MySqlSnapshotSplit> finishedUnAckedSplits;
+    private final HashMap<String, MySqlSnapshotSplit> finishedUnAckedSplits;
+    // before the binlog split start, wait at least one complete checkpoint to
+    // ensure the order of snapshot records and binlog records in parallel tasks
+    private final HashMap<MySqlBinlogSplit, Integer> binlogSplitWithCheckpointCnt;
+    private final HashMap<String, BinlogOffset> binlogSplitWithMinHighWatermark;
+
     private final int subtaskId;
 
     public MySqlSourceReader(
@@ -71,6 +78,8 @@ public class MySqlSourceReader<T>
                 config,
                 context);
         this.finishedUnAckedSplits = new HashMap<>();
+        this.binlogSplitWithCheckpointCnt = new HashMap<>();
+        this.binlogSplitWithMinHighWatermark = new HashMap<>();
         this.subtaskId = context.getIndexOfSubtask();
     }
 
@@ -97,6 +106,11 @@ public class MySqlSourceReader<T>
 
         // add finished snapshot splits that didn't receive ack yet
         stateSplits.addAll(finishedUnAckedSplits.values());
+
+        // add the initial binlog to state
+        if (binlogSplitWithCheckpointCnt.size() > 0) {
+            stateSplits.addAll(binlogSplitWithCheckpointCnt.keySet());
+        }
         return stateSplits;
     }
 
@@ -116,28 +130,35 @@ public class MySqlSourceReader<T>
 
     @Override
     public void addSplits(List<MySqlSplit> splits) {
+        for (MySqlSplit split : splits) {
+            if (split.isSnapshotSplit()) {
+                if (split.asSnapshotSplit().isSnapshotReadFinished()) {
+                    this.finishedUnAckedSplits.put(split.splitId(), split.asSnapshotSplit());
+                } else {
+                    // add all un-finished snapshot splits to SourceReaderBase
+                    super.addSplits(Collections.singletonList(split));
+                }
+            } else {
+                if (hasBeenReadBinlogSplit(split.asBinlogSplit())) {
+                    // add binlog split has been read, the case restores from state
+                    super.addSplits(Collections.singletonList(split));
+                } else {
+                    // receive new binlog split, check need wait or not
+                    if (!binlogSplitWithCheckpointCnt.containsKey(split)) {
+                        // wait
+                        binlogSplitWithCheckpointCnt.put(split.asBinlogSplit(), 0);
+                    } else if (binlogSplitWithCheckpointCnt.get(split) > 0) {
+                        // the binlog split has wait more thant one checkpoint
+                        // submit it
+                        super.addSplits(Collections.singletonList(split));
+                    }
+                }
+            }
+        }
+
         // case for restore from state, notify split enumerator if there're finished snapshot splits
         // and has not report
-        splits.stream()
-                .filter(
-                        split ->
-                                split.isSnapshotSplit()
-                                        && split.asSnapshotSplit().isSnapshotReadFinished())
-                .forEach(
-                        split ->
-                                this.finishedUnAckedSplits.put(
-                                        split.splitId(), split.asSnapshotSplit()));
         reportFinishedSnapshotSplitsIfNeed();
-
-        // add all un-finished splits(including binlog split) to SourceReaderBase
-        super.addSplits(
-                splits.stream()
-                        .filter(
-                                split ->
-                                        !(split.isSnapshotSplit()
-                                                && split.asSnapshotSplit()
-                                                        .isSnapshotReadFinished()))
-                        .collect(Collectors.toList()));
     }
 
     @Override
@@ -180,7 +201,51 @@ public class MySqlSourceReader<T>
     }
 
     @Override
+    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+        if (binlogSplitWithCheckpointCnt.size() > 0) {
+            MySqlBinlogSplit mySqlBinlogSplit =
+                    binlogSplitWithCheckpointCnt.keySet().iterator().next();
+
+            binlogSplitWithCheckpointCnt.put(
+                    mySqlBinlogSplit, binlogSplitWithCheckpointCnt.get(mySqlBinlogSplit) + 1);
+
+            if (binlogSplitWithCheckpointCnt.get(mySqlBinlogSplit) > 0) {
+                this.addSplits(Collections.singletonList(mySqlBinlogSplit));
+                binlogSplitWithCheckpointCnt.clear();
+            }
+        }
+    }
+
+    @Override
     protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState.toMySqlSplit();
+    }
+
+    private boolean hasBeenReadBinlogSplit(MySqlBinlogSplit binlogSplit) {
+        if (binlogSplit.getFinishedSnapshotSplitInfos().isEmpty()) {
+            // the latest-offset mode, do not need to wait checkpoint
+            return true;
+        } else {
+            BinlogOffset minHighWatermark = getMinHighWatermark(binlogSplit);
+            return binlogSplit.getStartingOffset().isBefore(minHighWatermark);
+        }
+    }
+
+    private BinlogOffset getMinHighWatermark(MySqlBinlogSplit binlogSplit) {
+        final String binlogSplitId = binlogSplit.splitId();
+        if (binlogSplitWithMinHighWatermark.containsKey(binlogSplitId)) {
+            return binlogSplitWithMinHighWatermark.get(binlogSplitId);
+        } else {
+            BinlogOffset minBinlogOffset = BinlogOffset.INITIAL_OFFSET;
+            for (FinishedSnapshotSplitInfo snapshotSplitInfo :
+                    binlogSplit.getFinishedSnapshotSplitInfos()) {
+                // find the min HighWatermark of all finished snapshot splits
+                if (snapshotSplitInfo.getHighWatermark().compareTo(minBinlogOffset) < 0) {
+                    minBinlogOffset = snapshotSplitInfo.getHighWatermark();
+                }
+            }
+            binlogSplitWithMinHighWatermark.put(binlogSplitId, minBinlogOffset);
+            return minBinlogOffset;
+        }
     }
 }
