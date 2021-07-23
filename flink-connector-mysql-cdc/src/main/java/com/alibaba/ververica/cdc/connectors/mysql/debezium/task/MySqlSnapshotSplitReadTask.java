@@ -58,7 +58,8 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Duration;
 import java.util.Calendar;
-import java.util.concurrent.atomic.AtomicReference;
+
+import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.getCurrentBinlogPosition;
 
 /** Task to read snapshot split of table. */
 public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSource {
@@ -129,7 +130,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         final RelationalSnapshotChangeEventSource.RelationalSnapshotContext ctx =
                 (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
 
-        final BinlogOffset lowWatermark = getCurrentBinlogPosition();
+        final BinlogOffset lowWatermark = getCurrentBinlogPosition(jdbcConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
@@ -149,7 +150,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
 
         LOG.info("Snapshot step 2 - Snapshotting data");
         createDataEvents(ctx, snapshotSplit.getTableId());
-        final BinlogOffset highWatermark = getCurrentBinlogPosition();
+        final BinlogOffset highWatermark = getCurrentBinlogPosition(jdbcConnection);
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
@@ -273,38 +274,6 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
 
     private Threads.Timer getTableScanLogTimer() {
         return Threads.timer(clock, LOG_INTERVAL);
-    }
-
-    private BinlogOffset getCurrentBinlogPosition() {
-        AtomicReference<BinlogOffset> currentBinlogPosition =
-                new AtomicReference<>(BinlogOffset.INITIAL_OFFSET);
-        try {
-            jdbcConnection.setAutoCommit(false);
-            String showMasterStmt = "SHOW MASTER STATUS";
-            jdbcConnection.query(
-                    showMasterStmt,
-                    rs -> {
-                        if (rs.next()) {
-                            String binlogFilename = rs.getString(1);
-                            long binlogPosition = rs.getLong(2);
-                            currentBinlogPosition.set(
-                                    new BinlogOffset(binlogFilename, binlogPosition));
-                            LOG.info(
-                                    "Read binlog '{}' at position '{}'",
-                                    binlogFilename,
-                                    binlogPosition);
-                        } else {
-                            throw new IllegalStateException(
-                                    "Cannot read the binlog filename and position via '"
-                                            + showMasterStmt
-                                            + "'. Make sure your server is correctly configured");
-                        }
-                    });
-            jdbcConnection.commit();
-        } catch (Exception e) {
-            LOG.error("Read current binlog position error.", e);
-        }
-        return currentBinlogPosition.get();
     }
 
     /**

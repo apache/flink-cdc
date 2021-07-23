@@ -24,7 +24,7 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorAckEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.EnumeratorRequestReportEvent;
 import com.alibaba.ververica.cdc.connectors.mysql.source.events.SourceReaderReportEvent;
@@ -62,7 +62,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
 
     private static final long CHECK_EVENT_INTERVAL = 30_000L;
     private final SplitEnumeratorContext<MySqlSplit> context;
-    private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
+    private final MySqlSplitAssigner splitAssigner;
 
     private final Map<Integer, List<MySqlSplit>> assignedSnapshotSplits;
     private final Map<Integer, List<MySqlSplit>> assignedBinlogSplits;
@@ -70,12 +70,12 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
 
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
-            MySqlSnapshotSplitAssigner snapshotSplitAssigner,
+            MySqlSplitAssigner splitAssigner,
             Map<Integer, List<MySqlSplit>> assignedSnapshotSplits,
             Map<Integer, List<MySqlSplit>> assignedBinlogSplits,
             Map<Integer, List<Tuple2<String, BinlogOffset>>> receiveFinishedSnapshotSplits) {
         this.context = context;
-        this.snapshotSplitAssigner = snapshotSplitAssigner;
+        this.splitAssigner = splitAssigner;
         this.assignedSnapshotSplits = assignedSnapshotSplits;
         this.assignedBinlogSplits = assignedBinlogSplits;
         this.receiveFinishedSnapshotSplits = receiveFinishedSnapshotSplits;
@@ -83,7 +83,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
 
     @Override
     public void start() {
-        this.snapshotSplitAssigner.open();
+        this.splitAssigner.open();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
@@ -97,7 +97,21 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
             // reader failed between sending the request and now. skip this request.
             return;
         }
-        Optional<MySqlSplit> snapshotSplit = snapshotSplitAssigner.getNext(requesterHostname);
+
+        if (splitAssigner.isBinlogSplitAssigner()) {
+            LOG.info("The startup mode is 'latest-offset', will assign binlog if possible");
+            Optional<MySqlSplit> binlogSplit = splitAssigner.getNext(requesterHostname);
+            if (binlogSplit.isPresent()) {
+                // assign
+                context.assignSplit(binlogSplit.get(), subtaskId);
+                // record assigned binlog splits
+                recordAssignedBinlogSplit(binlogSplit.get(), subtaskId);
+                LOG.info("Assign binlog split for subtask {}", subtaskId);
+            }
+            return;
+        }
+
+        Optional<MySqlSplit> snapshotSplit = splitAssigner.getNext(requesterHostname);
         // assign snapshot split firstly
         if (snapshotSplit.isPresent()) {
             final MySqlSplit split = snapshotSplit.get();
@@ -106,7 +120,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
             LOG.info("Assign snapshot split {} for subtask {}", split, subtaskId);
         } else {
             // no more snapshot split, try assign binlog split
-            if (couldAssignBinlogSplit()) {
+            if (couldAssignBinlogSplitAfterSnapshot()) {
                 LOG.info("The snapshot phase read finished, will read binlog continue");
                 assignBinlogSplit(subtaskId);
                 LOG.info("Assign binlog split for subtask {}", subtaskId);
@@ -140,7 +154,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
             }
         }
         if (!snapshotSplits.isEmpty()) {
-            snapshotSplitAssigner.addSplits(snapshotSplits);
+            splitAssigner.addSplits(snapshotSplits);
         }
         if (!binlogSplits.isEmpty()) {
             if (context.registeredReaders().size() > 0) {
@@ -178,8 +192,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
     @Override
     public MySqlSourceEnumState snapshotState(long checkpointId) throws Exception {
         return new MySqlSourceEnumState(
-                snapshotSplitAssigner.remainingSplits(),
-                snapshotSplitAssigner.getAlreadyProcessedTables(),
+                splitAssigner.remainingSplits(),
+                splitAssigner.getAlreadyProcessedTables(),
                 assignedSnapshotSplits,
                 assignedBinlogSplits,
                 receiveFinishedSnapshotSplits);
@@ -187,7 +201,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
 
     @Override
     public void close() throws IOException {
-        this.snapshotSplitAssigner.close();
+        this.splitAssigner.close();
     }
 
     private void syncWithReaders(Integer[] subtaskIds, Throwable t) {
@@ -253,7 +267,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
         return assignedBinlogSplits.size() > 0;
     }
 
-    private boolean couldAssignBinlogSplit() {
+    private boolean couldAssignBinlogSplitAfterSnapshot() {
         final long assignedSnapshotSplit =
                 assignedSnapshotSplits.values().stream().mapToLong(Collection::size).sum();
         final long receiveSnapshotSplits =
@@ -277,7 +291,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlS
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         final Map<TableId, TableChange> databaseHistory = new HashMap<>();
 
-        BinlogOffset minBinlogOffset = receiveSnapshotSplits.get(0).f1;
+        BinlogOffset minBinlogOffset = BinlogOffset.INITIAL_OFFSET;
         for (int i = 0; i < assignedSnapshotSplit.size(); i++) {
             MySqlSnapshotSplit split = assignedSnapshotSplit.get(i).asSnapshotSplit();
             // find the min binlog offset

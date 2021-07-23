@@ -192,9 +192,10 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
     private void validateStartupOptionIfEnableParallel(StartupOptions startupOptions) {
         // validate mode
         Preconditions.checkState(
-                startupOptions.startupMode == StartupMode.INITIAL,
+                startupOptions.startupMode == StartupMode.INITIAL
+                        || startupOptions.startupMode == StartupMode.LATEST_OFFSET,
                 String.format(
-                        "MySQL Parallel Source only supports startup mode 'initial' now,"
+                        "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
                                 + " but actual is %s",
                         startupOptions.startupMode));
     }

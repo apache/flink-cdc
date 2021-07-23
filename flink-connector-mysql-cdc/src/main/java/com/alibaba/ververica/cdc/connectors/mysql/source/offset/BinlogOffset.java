@@ -18,10 +18,14 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.offset;
 
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
+
+import io.debezium.jdbc.JdbcConnection;
 
 import java.io.Serializable;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** A structure describes an offset in a binlog of MySQL server. */
 public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
@@ -82,5 +86,33 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
     @Override
     public int hashCode() {
         return Objects.hash(filename, position);
+    }
+
+    public static BinlogOffset getCurrentBinlogPosition(JdbcConnection jdbcConnection) {
+        AtomicReference<BinlogOffset> currentBinlogPosition =
+                new AtomicReference<>(BinlogOffset.INITIAL_OFFSET);
+        try {
+            jdbcConnection.setAutoCommit(false);
+            String showMasterStmt = "SHOW MASTER STATUS";
+            jdbcConnection.query(
+                    showMasterStmt,
+                    rs -> {
+                        if (rs.next()) {
+                            String binlogFilename = rs.getString(1);
+                            long binlogPosition = rs.getLong(2);
+                            currentBinlogPosition.set(
+                                    new BinlogOffset(binlogFilename, binlogPosition));
+                        } else {
+                            throw new IllegalStateException(
+                                    "Cannot read the binlog filename and position via '"
+                                            + showMasterStmt
+                                            + "'. Make sure your server is correctly configured");
+                        }
+                    });
+            jdbcConnection.commit();
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Read current binlog position error.", e);
+        }
+        return currentBinlogPosition.get();
     }
 }

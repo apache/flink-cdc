@@ -224,18 +224,23 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 currentBinlogSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
+        if (finishedSplitInfos.isEmpty()) {
+            for (TableId tableId : currentBinlogSplit.getTableSchemas().keySet()) {
+                tableIdBinlogPositionMap.put(tableId, currentBinlogSplit.getStartingOffset());
+            }
+        } else {
+            for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
+                TableId tableId = finishedSplitInfo.getTableId();
+                List<FinishedSnapshotSplitInfo> list =
+                        splitsInfoMap.getOrDefault(tableId, new ArrayList<>());
+                list.add(finishedSplitInfo);
+                splitsInfoMap.put(tableId, list);
 
-        for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
-            TableId tableId = finishedSplitInfo.getTableId();
-            List<FinishedSnapshotSplitInfo> list =
-                    splitsInfoMap.getOrDefault(tableId, new ArrayList<>());
-            list.add(finishedSplitInfo);
-            splitsInfoMap.put(tableId, list);
-
-            BinlogOffset highWatermark = finishedSplitInfo.getHighWatermark();
-            BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
-            if (maxHighWatermark == null || highWatermark.isAtOrBefore(maxHighWatermark)) {
-                tableIdBinlogPositionMap.put(tableId, highWatermark);
+                BinlogOffset highWatermark = finishedSplitInfo.getHighWatermark();
+                BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
+                if (maxHighWatermark == null || highWatermark.isAtOrBefore(maxHighWatermark)) {
+                    tableIdBinlogPositionMap.put(tableId, highWatermark);
+                }
             }
         }
         this.finishedSplitsInfo = splitsInfoMap;
