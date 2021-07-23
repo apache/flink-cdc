@@ -86,22 +86,9 @@ public abstract class MySqlSplitAssigner {
         return getClass() == MySqlBinlogSplitAssigner.class;
     }
 
-    /** Casts this assigner into a {@link MySqlSnapshotSplitAssigner}. */
-    @SuppressWarnings("unchecked")
-    public final MySqlSnapshotSplitAssigner asSnapshotSplitAssigner() {
-        return (MySqlSnapshotSplitAssigner) this;
-    }
-
-    /** Casts this assigner into a {@link MySqlBinlogSplitAssigner}. */
-    @SuppressWarnings("unchecked")
-    public final MySqlBinlogSplitAssigner asBinlogSplitAssigner() {
-        return (MySqlBinlogSplitAssigner) this;
-    }
-
     public void open() {
         initJdbcConnection();
         this.tableFilters = getTableFilters();
-        // TODO: skip to scan table lists if we are already in binlog phase
         this.capturedTables = getCapturedTables();
         this.databaseSchema = StatefulTaskContext.getMySqlDatabaseSchema(configuration, jdbc);
     }

@@ -36,7 +36,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOff
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SplitKeyUtils.validateAndGetSplitKeyType;
 
 /**
- * A split assigner that assign the binlog split for all capture tables.
+ * A split assigner that assign the binlog split for all captured tables.
  *
  * <p>This assigner is used for latest-offset startup mode.
  */

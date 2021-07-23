@@ -20,6 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.assigner;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
@@ -85,6 +86,10 @@ public class MySqlSnapshotSplitAssigner extends MySqlSplitAssigner {
 
     public void open() {
         super.open();
+        // TODO: skip to scan table lists if we are already in binlog phase
+        alreadyProcessedTables.forEach(capturedTables::remove);
+        this.remainingTables.addAll(capturedTables);
+
         this.currentTableSplitSeq = 0;
     }
 
@@ -174,6 +179,10 @@ public class MySqlSnapshotSplitAssigner extends MySqlSplitAssigner {
                         LOG.error(
                                 "Interrupted when analyze splits for table {}, exception {}",
                                 tableId,
+                                e);
+                        throw new FlinkRuntimeException(
+                                String.format(
+                                        "Interrupted when analyze splits for table %s", tableId),
                                 e);
                     }
                     LOG.info("Has analyze {} splits for table {} ", splitCnt, tableId);
