@@ -20,22 +20,14 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.assigner;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
-import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.MySqlConnectorConfig;
-import io.debezium.connector.mysql.MySqlDatabaseSchema;
-import io.debezium.connector.mysql.MySqlOffsetContext;
-import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
-import io.debezium.schema.SchemaChangeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,48 +37,35 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isOptimizedKeyType;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.rowToArray;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SplitKeyUtils.getSplitKeyType;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SplitKeyUtils.splitKeyIsAutoIncremented;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SplitKeyUtils.validateAndGetSplitKeyType;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMaxSplitKeyQuery;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMinMaxSplitKeyQuery;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildSplitBoundaryQuery;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.readTableSplitStatement;
 
 /** A split assigner that assign table snapshot splits to readers. */
-public class MySqlSnapshotSplitAssigner {
+public class MySqlSnapshotSplitAssigner extends MySqlSplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitAssigner.class);
 
-    private final Collection<TableId> alreadyProcessedTables;
-    private final Collection<MySqlSplit> remainingSplits;
     private final LinkedList<TableId> remainingTables;
-    private final Configuration configuration;
     private final int splitSize;
-    private final RowType definedPkType;
 
     private TableId currentTableId;
     private int currentTableSplitSeq;
     private Object[] currentTableMaxSplitKey;
-    private RelationalTableFilters tableFilters;
-    private MySqlConnection jdbc;
-    private Map<TableId, TableChange> tableSchemas;
-    private MySqlDatabaseSchema databaseSchema;
     private RowType splitKeyType;
 
     public MySqlSnapshotSplitAssigner(
@@ -94,10 +73,7 @@ public class MySqlSnapshotSplitAssigner {
             RowType definedPkType,
             Collection<TableId> alreadyProcessedTables,
             Collection<MySqlSplit> remainingSplits) {
-        this.configuration = configuration;
-        this.definedPkType = definedPkType;
-        this.alreadyProcessedTables = alreadyProcessedTables;
-        this.remainingSplits = remainingSplits;
+        super(configuration, definedPkType, alreadyProcessedTables, remainingSplits);
         this.remainingTables = new LinkedList<>();
         this.splitSize = configuration.getInteger(MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE);
         Preconditions.checkState(
@@ -105,17 +81,10 @@ public class MySqlSnapshotSplitAssigner {
                 String.format(
                         "The value of option 'scan.snapshot.chunk.size' must bigger than 1, but is %d",
                         splitSize));
-        this.tableSchemas = new HashMap<>();
     }
 
     public void open() {
-        initJdbcConnection();
-        this.tableFilters = getTableFilters();
-        // TODO: skip to scan table lists if we are already in binlog phase
-        Set<TableId> capturedTables = getCapturedTables();
-        alreadyProcessedTables.forEach(capturedTables::remove);
-        this.remainingTables.addAll(capturedTables);
-        this.databaseSchema = StatefulTaskContext.getMySqlDatabaseSchema(configuration, jdbc);
+        super.open();
         this.currentTableSplitSeq = 0;
     }
 
@@ -156,9 +125,10 @@ public class MySqlSnapshotSplitAssigner {
 
         LOG.info("Begin to analyze splits for table {} ", tableId);
         tableSchemas.put(tableId, getTableSchema(tableId));
-        splitKeyType = getSplitKeyType(definedPkType, tableSchemas.get(tableId).getTable());
+        splitKeyType =
+                validateAndGetSplitKeyType(definedPkType, tableSchemas.get(tableId).getTable());
 
-        // optimization for integral, bigDecimal type
+        // optimization for int/bigint auto_increment type
         final Table currentTable = tableSchemas.get(currentTableId).getTable();
         if (splitKeyIsAutoIncremented(splitKeyType, currentTable)
                 && isOptimizedKeyType(splitKeyType.getTypeAt(0).getTypeRoot())) {
@@ -372,125 +342,5 @@ public class MySqlSnapshotSplitAssigner {
      */
     public Collection<MySqlSplit> remainingSplits() {
         return remainingSplits;
-    }
-
-    /** Gets the remaining tables that this assigner has pending. */
-    public Collection<TableId> remainingTables() {
-        return remainingTables;
-    }
-
-    private Set<TableId> getCapturedTables() {
-        final Set<TableId> capturedTableIds = new HashSet<>();
-        try {
-            LOG.info("Read list of available databases。");
-            final List<String> databaseNames = new ArrayList<>();
-
-            jdbc.query(
-                    "SHOW DATABASES",
-                    rs -> {
-                        while (rs.next()) {
-                            databaseNames.add(rs.getString(1));
-                        }
-                    });
-            LOG.info("The list of available databases is: {}", databaseNames);
-
-            LOG.info("Read list of available tables in each database");
-
-            for (String dbName : databaseNames) {
-                jdbc.query(
-                        "SHOW FULL TABLES IN " + quote(dbName) + " where Table_Type = 'BASE TABLE'",
-                        rs -> {
-                            while (rs.next()) {
-                                TableId tableId = new TableId(dbName, null, rs.getString(1));
-                                if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
-                                    capturedTableIds.add(tableId);
-                                    LOG.info("Add table '{}' to capture", tableId);
-                                } else {
-                                    LOG.info("Table '{}' is filtered out of capturing", tableId);
-                                }
-                            }
-                        });
-            }
-        } catch (Exception e) {
-            LOG.error("Obtain available tables fail.", e);
-            this.close();
-        }
-        Preconditions.checkState(
-                capturedTableIds.size() > 0,
-                String.format(
-                        "The captured table(s) is empty!, please check your configured table-name %s",
-                        configuration.get(MySqlSourceOptions.TABLE_NAME)));
-        return capturedTableIds;
-    }
-
-    private RelationalTableFilters getTableFilters() {
-        io.debezium.config.Configuration debeziumConfig = toDebeziumConfig(configuration);
-        if (configuration.contains(MySqlSourceOptions.DATABASE_NAME)) {
-            debeziumConfig =
-                    debeziumConfig
-                            .edit()
-                            .with(
-                                    "database.whitelist",
-                                    configuration.getString(MySqlSourceOptions.DATABASE_NAME))
-                            .build();
-        }
-        if (configuration.contains(MySqlSourceOptions.TABLE_NAME)) {
-            debeziumConfig =
-                    debeziumConfig
-                            .edit()
-                            .with(
-                                    "table.whitelist",
-                                    configuration.getString(MySqlSourceOptions.TABLE_NAME))
-                            .build();
-        }
-        final MySqlConnectorConfig mySqlConnectorConfig = new MySqlConnectorConfig(debeziumConfig);
-        return mySqlConnectorConfig.getTableFilters();
-    }
-
-    private void initJdbcConnection() {
-
-        this.jdbc = StatefulTaskContext.getConnection(configuration);
-        try {
-            jdbc.connect();
-        } catch (SQLException e) {
-            LOG.error("connect to mysql error", e);
-        }
-    }
-
-    private TableChange getTableSchema(final TableId tableId) {
-        final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
-        try {
-            jdbc.query(
-                    "SHOW CREATE TABLE " + quote(tableId),
-                    rs -> {
-                        if (rs.next()) {
-                            final String ddl = rs.getString(2);
-                            final MySqlOffsetContext offsetContext =
-                                    MySqlOffsetContext.initial(
-                                            new MySqlConnectorConfig(
-                                                    toDebeziumConfig(configuration)));
-                            List<SchemaChangeEvent> schemaChangeEvents =
-                                    databaseSchema.parseSnapshotDdl(
-                                            ddl, tableId.catalog(), offsetContext, Instant.now());
-                            for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
-                                for (TableChange tableChange :
-                                        schemaChangeEvent.getTableChanges()) {
-                                    tableChangeMap.put(tableId, tableChange);
-                                }
-                            }
-                        }
-                    });
-        } catch (SQLException e) {
-            throw new FlinkRuntimeException(
-                    String.format("Get schema of table %s error.", tableId), e);
-        }
-        if (tableChangeMap.isEmpty()) {
-            throw new FlinkRuntimeException(
-                    String.format(
-                            "Can not get schema of table %s, please check the configured table name.",
-                            tableId));
-        }
-
-        return tableChangeMap.get(tableId);
     }
 }

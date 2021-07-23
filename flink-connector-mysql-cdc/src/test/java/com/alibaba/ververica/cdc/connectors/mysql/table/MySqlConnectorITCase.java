@@ -25,6 +25,7 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
+import org.apache.flink.types.Row;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -37,12 +38,15 @@ import org.junit.runners.Parameterized;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.MySqlSourceTest.currentMySQLLatestOffset;
+import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -79,8 +83,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     @Parameterized.Parameters(name = "useLegacyDezImpl: {0}, parallelRead: {1}")
     public static Object[] parameters() {
         return new Object[][] {
-            //            new Object[] {true, false},
-            //            new Object[] {false, false},
+            new Object[] {true, false},
+            new Object[] {false, false},
             // the parallel read is base on new Debezium implementation
             new Object[] {false, true}
         };
@@ -91,6 +95,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
         TestValuesTableFactory.clearAllData();
         if (parallelRead) {
             env.setParallelism(4);
+            env.enableCheckpointing(200);
         } else {
             env.setParallelism(1);
         }
@@ -380,6 +385,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'scan.startup.mode' = 'specific-offset',"
                                 + " 'scan.startup.specific-offset.file' = '%s',"
                                 + " 'scan.startup.specific-offset.pos' = '%s',"
+                                + " 'scan.snapshot.parallel-read' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -390,6 +396,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         "products",
                         offset.f0,
                         offset.f1,
+                        parallelRead,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -455,6 +462,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'earliest-offset',"
+                                + " 'scan.snapshot.parallel-read' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -463,6 +471,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
+                        parallelRead,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -516,10 +525,6 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     @Test
     public void testStartupFromLatestOffset() throws Exception {
-        if (parallelRead) {
-            // not support yet
-            return;
-        }
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -527,7 +532,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key(id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -537,6 +543,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'latest-offset',"
+                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'server-id' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -545,20 +553,17 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
+                        parallelRead,
+                        getServerId(),
                         getDezImplementation());
-        String sinkDDL =
-                "CREATE TABLE sink "
-                        + " WITH ("
-                        + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false'"
-                        + ") LIKE debezium_source (EXCLUDING OPTIONS)";
         tEnv.executeSql(sourceDDL);
-        tEnv.executeSql(sinkDDL);
 
         // async submit job
-        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+        TableResult result = tEnv.executeSql("SELECT * FROM debezium_source");
         // wait for the source startup, we don't have a better way to wait it, use sleep for now
-        Thread.sleep(5000L);
+        while (result.getJobClient().get().getJobStatus().get() != RUNNING) {
+            Thread.sleep(5000L);
+        }
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -573,15 +578,28 @@ public class MySqlConnectorITCase extends MySqlTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 7);
-
         String[] expected =
-                new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
-
-        List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertThat(actual, containsInAnyOrder(expected));
-
+                new String[] {
+                    "110,jacket,water resistent white wind breaker,0.200",
+                    "111,scooter,Big 2-wheel scooter ,5.180",
+                    "110,jacket,water resistent white wind breaker,0.200",
+                    "110,jacket,new water resistent white wind breaker,0.500",
+                    "111,scooter,Big 2-wheel scooter ,5.180",
+                    "111,scooter,Big 2-wheel scooter ,5.170",
+                    "111,scooter,Big 2-wheel scooter ,5.170"
+                };
+        assertThat(fetchRows(result.collect(), 7), containsInAnyOrder(expected));
         result.getJobClient().get().cancel().get();
+    }
+
+    private static List<String> fetchRows(Iterator<Row> iter, int size) {
+        List<String> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Row row = iter.next();
+            rows.add(row.toString());
+            size--;
+        }
+        return rows;
     }
 
     @Test
@@ -608,6 +626,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'timestamp',"
                                 + " 'scan.startup.timestamp-millis' = '%s',"
+                                + " 'scan.snapshot.parallel-read' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -617,6 +636,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),
+                        parallelRead,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "

@@ -200,7 +200,18 @@ public class MySqlTableSource implements ScanTableSource {
         }
 
         // set mode
-        properties.put("snapshot.mode", "initial");
+        switch (startupOptions.startupMode) {
+            case INITIAL:
+                properties.put("scan.startup.mode", "initial");
+                break;
+
+            case LATEST_OFFSET:
+                properties.put("scan.startup.mode", "latest-offset");
+                break;
+
+            default:
+                throw new UnsupportedOperationException();
+        }
 
         return Configuration.fromMap(properties);
     }

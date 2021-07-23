@@ -33,6 +33,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlBinlogSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
@@ -63,6 +64,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
@@ -259,6 +261,84 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                 readBinlogSplits(
                         splits, dataType, pkType, configuration, splits.size(), expected.length);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+    }
+
+    @Test
+    public void testReadBinlogFromLatestOffset() throws Exception {
+        customerDatabase.createAndInitialize();
+        Configuration configuration = getConfig(new String[] {"customers"});
+        configuration.set(SCAN_STARTUP_MODE, "latest-offset");
+        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
+        mySqlConnection = StatefulTaskContext.getConnection(configuration);
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        final RowType pkType =
+                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
+
+        String[] expected =
+                new String[] {
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-D[102, user_2, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]",
+                    "+U[1010, Hangzhou, Shanghai, 123567891234]",
+                    "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+I[2001, user_22, Shanghai, 123567891234]",
+                    "+I[2002, user_23, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]"
+                };
+        List<String> actual =
+                readBinlogSplitsFromLatestOffset(dataType, pkType, configuration, expected.length);
+        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+    }
+
+    private List<String> readBinlogSplitsFromLatestOffset(
+            DataType dataType, RowType pkType, Configuration configuration, int expectedSize)
+            throws Exception {
+        final StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
+
+        // step-1: create binlog split
+        MySqlBinlogSplitAssigner binlogSplitAssigner =
+                new MySqlBinlogSplitAssigner(
+                        configuration, pkType, new ArrayList<>(), new ArrayList<>());
+        binlogSplitAssigner.open();
+        MySqlSplit binlogSplit = binlogSplitAssigner.getNext().get();
+
+        // step-2: test read binlog split
+        BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
+        binlogReader.submitSplit(binlogSplit);
+
+        // step-3: make some binlog events
+        TableId tableId = binlogSplit.getTableSchemas().keySet().iterator().next();
+
+        if (tableId.table().contains("customers")) {
+            makeCustomersBinlogEvents(
+                    statefulTaskContext.getConnection(), tableId.toString(), false);
+        } else {
+            makeCustomerCardsBinlogEvents(statefulTaskContext.getConnection(), tableId.toString());
+        }
+
+        // step-4: fetched all produced binlog data and format them
+        List<String> actual = new ArrayList<>();
+        Iterator<SourceRecord> recordIterator;
+        List<SourceRecord> fetchedRecords = new ArrayList<>();
+        while ((recordIterator = binlogReader.pollSplitRecords()) != null) {
+            while (recordIterator.hasNext()) {
+                fetchedRecords.add(recordIterator.next());
+            }
+            actual = formatResult(fetchedRecords, dataType);
+            if (actual.size() >= expectedSize) {
+                break;
+            }
+        }
+        return actual;
     }
 
     private List<String> readBinlogSplits(

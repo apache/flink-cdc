@@ -85,7 +85,7 @@ public final class MySqlRecordEmitter<T>
                     element,
                     new Collector<T>() {
                         @Override
-                        public void collect(T t) {
+                        public void collect(final T t) {
                             output.collect(t);
                         }
 

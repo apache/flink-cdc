@@ -41,7 +41,7 @@ public class SplitKeyUtils {
      * @param definedPkType the defined primary key type in Flink.
      * @param actualTable the table schema in MySQL database.
      */
-    public static RowType getSplitKeyType(RowType definedPkType, Table actualTable) {
+    public static RowType validateAndGetSplitKeyType(RowType definedPkType, Table actualTable) {
         Preconditions.checkState(
                 definedPkType.getFieldCount() >= 1,
                 "The primary key is required in Flink SQL Table definition.");

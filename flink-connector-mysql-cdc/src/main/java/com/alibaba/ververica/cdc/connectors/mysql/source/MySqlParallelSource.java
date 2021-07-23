@@ -32,7 +32,9 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlBinlogSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumState;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumStateSerializer;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
@@ -50,6 +52,7 @@ import java.util.function.Supplier;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_ID;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.getServerIdForSubTask;
 
 /**
@@ -72,6 +75,7 @@ public class MySqlParallelSource<T>
     private final RowType splitKeyRowType;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
     private final Configuration config;
+    private final String startupMode;
 
     public MySqlParallelSource(
             RowType splitKeyRowType,
@@ -80,6 +84,7 @@ public class MySqlParallelSource<T>
         this.splitKeyRowType = splitKeyRowType;
         this.deserializationSchema = deserializationSchema;
         this.config = config;
+        this.startupMode = config.get(SCAN_STARTUP_MODE);
     }
 
     @Override
@@ -122,9 +127,14 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) throws Exception {
-        final MySqlSnapshotSplitAssigner splitAssigner =
-                new MySqlSnapshotSplitAssigner(
-                        config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>());
+
+        final MySqlSplitAssigner splitAssigner =
+                startupMode.equals("initial")
+                        ? new MySqlSnapshotSplitAssigner(
+                                config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>())
+                        : new MySqlBinlogSplitAssigner(
+                                config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>());
+
         return new MySqlSourceEnumerator(
                 enumContext, splitAssigner, new HashMap<>(), new HashMap<>(), false);
     }
@@ -133,12 +143,20 @@ public class MySqlParallelSource<T>
     public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, MySqlSourceEnumState checkpoint)
             throws Exception {
-        final MySqlSnapshotSplitAssigner splitAssigner =
-                new MySqlSnapshotSplitAssigner(
-                        config,
-                        this.splitKeyRowType,
-                        checkpoint.getAlreadyProcessedTables(),
-                        checkpoint.getRemainingSplits());
+
+        final MySqlSplitAssigner splitAssigner =
+                startupMode.equals("initial")
+                        ? new MySqlSnapshotSplitAssigner(
+                                config,
+                                this.splitKeyRowType,
+                                checkpoint.getAlreadyProcessedTables(),
+                                checkpoint.getRemainingSplits())
+                        : new MySqlBinlogSplitAssigner(
+                                config,
+                                this.splitKeyRowType,
+                                checkpoint.getAlreadyProcessedTables(),
+                                checkpoint.getRemainingSplits());
+
         return new MySqlSourceEnumerator(
                 enumContext,
                 splitAssigner,

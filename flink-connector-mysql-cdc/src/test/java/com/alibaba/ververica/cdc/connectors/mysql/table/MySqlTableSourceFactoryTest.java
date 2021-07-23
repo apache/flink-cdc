@@ -46,6 +46,7 @@ import java.util.Properties;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_PARALLEL_READ;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -105,7 +106,6 @@ public class MySqlTableSourceFactoryTest {
         properties.put("server-id", "123-126");
         properties.put("scan.snapshot.chunk.size", "8000");
         properties.put("scan.snapshot.fetch.size", "100");
-        properties.put("scan.snapshot.parallel-read", String.valueOf(true));
         properties.put("connect.timeout", "45s");
 
         // validation for source
@@ -127,6 +127,35 @@ public class MySqlTableSourceFactoryTest {
                         100,
                         Duration.ofSeconds(45),
                         StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testEnableParallelReadSourceLatestOffset() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("server-id", "123-126");
+        properties.put("scan.startup.mode", "latest-offset");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        "123-126",
+                        SCAN_SNAPSHOT_PARALLEL_READ.defaultValue(),
+                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        StartupOptions.latest());
         assertEquals(expectedSource, actualSource);
     }
 
