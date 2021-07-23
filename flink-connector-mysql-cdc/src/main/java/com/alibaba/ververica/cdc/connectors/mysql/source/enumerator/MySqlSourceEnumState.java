@@ -18,10 +18,9 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.enumerator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
-
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
+import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.relational.TableId;
 
@@ -47,19 +46,16 @@ public class MySqlSourceEnumState {
      * The snapshot splits that the {@link MySqlSourceEnumerator} has assigned to {@link
      * MySqlSplitReader}s.
      */
-    private final Map<Integer, List<MySqlSplit>> assignedSnapshotSplits;
+    private final Map<Integer, List<MySqlSnapshotSplit>> assignedSnapshotSplits;
 
-    /**
-     * The binlog splits that the {@link MySqlSourceEnumerator} has assigned to {@link
-     * MySqlSplitReader}s.
-     */
-    private final Map<Integer, List<MySqlSplit>> assignedBinlogSplits;
+    /** The flag indicates whether the binlog split has been assigned. */
+    private final boolean binlogSplitAssigned;
 
     /**
      * The finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received from
      * {@link MySqlSplitReader}s.
      */
-    private final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits;
+    private final Map<Integer, Map<String, BinlogOffset>> finishedSnapshotSplits;
 
     /**
      * The splits are frequently serialized into checkpoints. Caching the byte representation makes
@@ -70,14 +66,14 @@ public class MySqlSourceEnumState {
     public MySqlSourceEnumState(
             Collection<MySqlSplit> remainingSplits,
             Collection<TableId> alreadyProcessedTables,
-            Map<Integer, List<MySqlSplit>> assignedSnapshotSplits,
-            Map<Integer, List<MySqlSplit>> assignedBinlogSplits,
-            Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits) {
+            Map<Integer, List<MySqlSnapshotSplit>> assignedSnapshotSplits,
+            Map<Integer, Map<String, BinlogOffset>> finishedSnapshotSplits,
+            boolean binlogSplitAssigned) {
         this.remainingSplits = remainingSplits;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.assignedSnapshotSplits = assignedSnapshotSplits;
-        this.assignedBinlogSplits = assignedBinlogSplits;
         this.finishedSnapshotSplits = finishedSnapshotSplits;
+        this.binlogSplitAssigned = binlogSplitAssigned;
     }
 
     public Collection<TableId> getAlreadyProcessedTables() {
@@ -88,15 +84,15 @@ public class MySqlSourceEnumState {
         return remainingSplits;
     }
 
-    public Map<Integer, List<MySqlSplit>> getAssignedSnapshotSplits() {
+    public Map<Integer, List<MySqlSnapshotSplit>> getAssignedSnapshotSplits() {
         return assignedSnapshotSplits;
     }
 
-    public Map<Integer, List<MySqlSplit>> getAssignedBinlogSplits() {
-        return assignedBinlogSplits;
+    public boolean isBinlogSplitAssigned() {
+        return binlogSplitAssigned;
     }
 
-    public Map<Integer, List<Tuple2<String, BinlogOffset>>> getFinishedSnapshotSplits() {
+    public Map<Integer, Map<String, BinlogOffset>> getFinishedSnapshotSplits() {
         return finishedSnapshotSplits;
     }
 }

@@ -22,6 +22,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.relational.TableId;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 /** The information used to describe a finished snapshot split. */
 public class FinishedSnapshotSplitInfo {
@@ -63,6 +64,30 @@ public class FinishedSnapshotSplitInfo {
 
     public BinlogOffset getHighWatermark() {
         return highWatermark;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        FinishedSnapshotSplitInfo that = (FinishedSnapshotSplitInfo) o;
+        return Objects.equals(tableId, that.tableId)
+                && Objects.equals(splitId, that.splitId)
+                && Arrays.equals(splitStart, that.splitStart)
+                && Arrays.equals(splitEnd, that.splitEnd)
+                && Objects.equals(highWatermark, that.highWatermark);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(tableId, splitId, highWatermark);
+        result = 31 * result + Arrays.hashCode(splitStart);
+        result = 31 * result + Arrays.hashCode(splitEnd);
+        return result;
     }
 
     @Override

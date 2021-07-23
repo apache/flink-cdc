@@ -425,10 +425,10 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         } else {
             // make binlog events for the first split
             connection.execute(
-                    "UPDATE " + tableId + " SET level = 'LEVEL_3' where user_id = 'user_1')",
+                    "UPDATE " + tableId + " SET level = 'LEVEL_3' where user_id = 'user_1'",
                     "INSERT INTO "
                             + tableId
-                            + " VALUES(20002, 'LEVEL_5', 'user_15', 'user with level 15')");
+                            + " VALUES(20002, 'LEVEL_5', 'user_15', 'user with level 15'");
             connection.commit();
 
             // make binlog events for middle split
@@ -505,7 +505,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {
-            Optional<MySqlSplit> mySqlSplit = assigner.getNext(null);
+            Optional<MySqlSplit> mySqlSplit = assigner.getNext();
             if (mySqlSplit.isPresent()) {
                 mySqlSplits.add(mySqlSplit.get().asSnapshotSplit());
             } else {

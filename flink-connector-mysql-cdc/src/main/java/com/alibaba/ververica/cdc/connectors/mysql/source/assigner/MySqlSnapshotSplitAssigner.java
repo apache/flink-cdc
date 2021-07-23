@@ -32,13 +32,10 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.SchemaChangeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nullable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -51,9 +48,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isOptimizedKeyType;
@@ -70,16 +70,14 @@ public class MySqlSnapshotSplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitAssigner.class);
 
-    private static final JsonTableChangeSerializer tableChangesSerializer =
-            new JsonTableChangeSerializer();
     private final Collection<TableId> alreadyProcessedTables;
     private final Collection<MySqlSplit> remainingSplits;
+    private final LinkedList<TableId> remainingTables;
     private final Configuration configuration;
     private final int splitSize;
     private final RowType splitKeyType;
     private final boolean enableIntegralOptimization;
 
-    private Collection<TableId> capturedTables;
     private TableId currentTableId;
     private int currentTableSplitSeq;
     private Object[] currentTableMaxSplitKey;
@@ -97,6 +95,7 @@ public class MySqlSnapshotSplitAssigner {
         this.splitKeyType = getSplitKey(configuration, pkRowType);
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
+        this.remainingTables = new LinkedList<>();
         this.splitSize = configuration.getInteger(MySqlSourceOptions.SCAN_SPLIT_SIZE);
         Preconditions.checkState(
                 splitSize > 1,
@@ -111,7 +110,10 @@ public class MySqlSnapshotSplitAssigner {
     public void open() {
         initJdbcConnection();
         this.tableFilters = getTableFilters();
-        this.capturedTables = getCapturedTables();
+        // TODO: skip to scan table lists if we are already in binlog phase
+        Set<TableId> capturedTables = getCapturedTables();
+        alreadyProcessedTables.forEach(capturedTables::remove);
+        this.remainingTables.addAll(capturedTables);
         this.databaseSchema = StatefulTaskContext.getMySqlDatabaseSchema(configuration, jdbc);
         this.currentTableSplitSeq = 0;
     }
@@ -122,7 +124,7 @@ public class MySqlSnapshotSplitAssigner {
      * <p>When this method returns an empty {@code Optional}, then the set of splits is assumed to
      * be done and the source will finish once the readers finished their current splits.
      */
-    public Optional<MySqlSplit> getNext(@Nullable String hostname) {
+    public Optional<MySqlSplit> getNext() {
         if (!remainingSplits.isEmpty()) {
             // return remaining splits firstly
             MySqlSplit split = remainingSplits.iterator().next();
@@ -130,34 +132,27 @@ public class MySqlSnapshotSplitAssigner {
             return Optional.of(split);
         } else {
             // it's turn for new table
-            TableId nextTable = getNextTable();
+            TableId nextTable = remainingTables.pollFirst();
             if (nextTable != null) {
+                // TODO: move currentTableId and currentTableSplitSeq into another helper class
                 currentTableId = nextTable;
                 currentTableSplitSeq = 0;
-                analyzeSplitsForCurrentTable();
-                return getNext(hostname);
+                remainingSplits.addAll(enumerateSplits(nextTable));
+                alreadyProcessedTables.add(nextTable);
+                return getNext();
             } else {
                 return Optional.empty();
             }
         }
     }
 
-    private TableId getNextTable() {
-        for (TableId tableId : capturedTables) {
-            if (!alreadyProcessedTables.contains(tableId)) {
-                return tableId;
-            }
-        }
-        return null;
-    }
-
-    private void analyzeSplitsForCurrentTable() {
+    private List<MySqlSplit> enumerateSplits(TableId tableId) {
         MySqlSplit prevSplit = null;
         MySqlSplit nextSplit;
         int splitCnt = 0;
         long start = System.currentTimeMillis();
         List<MySqlSplit> splitsForCurrentTable = new ArrayList<>();
-        LOG.info("Begin to analyze splits for table {} ", currentTableId);
+        LOG.info("Begin to analyze splits for table {} ", tableId);
         // optimization for integral, bigDecimal type
         if (enableIntegralOptimization
                 && isOptimizedKeyType(splitKeyType.getTypeAt(0).getTypeRoot())) {
@@ -166,7 +161,7 @@ public class MySqlSnapshotSplitAssigner {
             try {
                 minMaxSplitKey =
                         jdbc.queryAndMap(
-                                buildMinMaxSplitKeyQuery(currentTableId, splitKeyFieldName),
+                                buildMinMaxSplitKeyQuery(tableId, splitKeyFieldName),
                                 rs -> {
                                     if (!rs.next()) {
                                         return null;
@@ -177,7 +172,7 @@ public class MySqlSnapshotSplitAssigner {
                 LOG.error(
                         String.format(
                                 "Read max value and min value of split key from table %s failed.",
-                                currentTableId),
+                                tableId),
                         e);
             }
             Object prevSplitEnd = null;
@@ -202,22 +197,21 @@ public class MySqlSnapshotSplitAssigner {
                     } catch (InterruptedException e) {
                         LOG.error(
                                 "Interrupted when analyze splits for table {}, exception {}",
-                                currentTableId,
+                                tableId,
                                 e);
                     }
-                    LOG.info("Has analyze {} splits for table {} ", splitCnt, currentTableId);
+                    LOG.info("Has analyze {} splits for table {} ", splitCnt, tableId);
                 }
             }
         }
 
-        alreadyProcessedTables.add(currentTableId);
-        remainingSplits.addAll(splitsForCurrentTable);
-
         long end = System.currentTimeMillis();
         LOG.info(
-                "Finish to analyze splits for table {}, time cost:{} ",
-                currentTableId,
+                "Finish to analyze splits for table {}, split size: {}, time cost: {}ms",
+                tableId,
+                splitsForCurrentTable.size(),
                 Duration.ofMillis(end - start));
+        return splitsForCurrentTable;
     }
 
     public Object getOptimizedSplitEnd(Object prevSplitEnd, Object[] minMaxSplitKey) {
@@ -344,7 +338,7 @@ public class MySqlSnapshotSplitAssigner {
     }
 
     private String createSplitId() {
-        final String splitId = currentTableId + "-" + currentTableSplitSeq;
+        final String splitId = currentTableId + ":" + currentTableSplitSeq;
         currentTableSplitSeq++;
         return splitId;
     }
@@ -371,13 +365,20 @@ public class MySqlSnapshotSplitAssigner {
         return alreadyProcessedTables;
     }
 
-    /** Gets the remaining splits that this assigner has pending. */
+    /**
+     * Gets the remaining splits for {@link #alreadyProcessedTables} that this assigner has pending.
+     */
     public Collection<MySqlSplit> remainingSplits() {
         return remainingSplits;
     }
 
-    private Collection<TableId> getCapturedTables() {
-        final List<TableId> capturedTableIds = new ArrayList<>();
+    /** Gets the remaining tables that this assigner has pending. */
+    public Collection<TableId> remainingTables() {
+        return remainingTables;
+    }
+
+    private Set<TableId> getCapturedTables() {
+        final Set<TableId> capturedTableIds = new HashSet<>();
         try {
             LOG.info("Read list of available databases。");
             final List<String> databaseNames = new ArrayList<>();

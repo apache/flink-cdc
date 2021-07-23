@@ -34,8 +34,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.assertSplitsEqual;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.getTestTableSchema;
+import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link MySqlSplitState}. */
 public class MySqlSplitStateTest {
@@ -52,7 +52,7 @@ public class MySqlSplitStateTest {
                         new BinlogOffset("mysql-bin.000002", 78L),
                         new HashMap<>());
         final MySqlSnapshotSplitState mySqlSplitState = new MySqlSnapshotSplitState(split);
-        assertSplitsEqual(split, mySqlSplitState.toMySqlSplit());
+        assertEquals(split, mySqlSplitState.toMySqlSplit());
     }
 
     @Test
@@ -78,7 +78,7 @@ public class MySqlSplitStateTest {
                         new Object[] {999L},
                         new BinlogOffset("mysql-bin.000002", 78L),
                         new HashMap<>());
-        assertSplitsEqual(expected, mySqlSplitState.toMySqlSplit());
+        assertEquals(expected, mySqlSplitState.toMySqlSplit());
     }
 
     @Test
@@ -90,12 +90,12 @@ public class MySqlSplitStateTest {
         final MySqlBinlogSplitState mySqlSplitState = new MySqlBinlogSplitState(split);
         mySqlSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 100L));
 
-        assertSplitsEqual(
+        assertEquals(
                 getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 100L)),
                 mySqlSplitState.toMySqlSplit());
 
         mySqlSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 400L));
-        assertSplitsEqual(
+        assertEquals(
                 getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 400L)),
                 mySqlSplitState.toMySqlSplit());
     }

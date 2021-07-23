@@ -20,7 +20,6 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SourceReaderContext;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
@@ -41,7 +40,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,7 +82,6 @@ public class MySqlSourceReader<T>
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     protected MySqlSplitState initializedState(MySqlSplit split) {
         if (split.isSnapshotSplit()) {
             return new MySqlSnapshotSplitState(split.asSnapshotSplit());
@@ -94,7 +91,6 @@ public class MySqlSourceReader<T>
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public List<MySqlSplit> snapshotState(long checkpointId) {
         // unfinished splits
         List<MySqlSplit> stateSplits = super.snapshotState(checkpointId);
@@ -168,13 +164,16 @@ public class MySqlSourceReader<T>
 
     private void reportFinishedSnapshotSplitsIfNeed() {
         if (!finishedUnAckedSplits.isEmpty()) {
-            final ArrayList<Tuple2<String, BinlogOffset>> noAckSplits = new ArrayList<>();
+            final Map<String, BinlogOffset> finishedSplits = new HashMap<>();
             for (MySqlSnapshotSplit split : finishedUnAckedSplits.values()) {
-                noAckSplits.add(Tuple2.of(split.splitId(), split.getHighWatermark()));
+                finishedSplits.put(split.splitId(), split.getHighWatermark());
             }
-            SourceReaderReportEvent reportEvent = new SourceReaderReportEvent(noAckSplits);
+            SourceReaderReportEvent reportEvent = new SourceReaderReportEvent(finishedSplits);
             context.sendSourceEventToCoordinator(reportEvent);
-            LOG.info("The subtask {} reports finished snapshot splits {}.", subtaskId, noAckSplits);
+            LOG.info(
+                    "The subtask {} reports finished snapshot splits {}.",
+                    subtaskId,
+                    finishedSplits);
             // try to request next split
             context.sendSplitRequest();
         }

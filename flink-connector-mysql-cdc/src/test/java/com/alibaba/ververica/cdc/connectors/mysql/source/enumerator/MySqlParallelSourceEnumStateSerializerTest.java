@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source.enumerator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.VarCharType;
@@ -42,7 +41,6 @@ import java.util.Map;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.NO_STOPPING_OFFSET;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.assertSplitsEqual;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.getTestTableSchema;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -92,45 +90,39 @@ public class MySqlParallelSourceEnumStateSerializerTest {
         remainingSplits.add(getTestSnapshotSplit(tableId1, 2));
         remainingSplits.add(getTestSnapshotSplit(tableId1, 3));
 
-        final Map<Integer, List<MySqlSplit>> assignedSnapshotSplits = new HashMap<>();
-        List<MySqlSplit> assignedSnapshotSplitsForTask0 = new ArrayList<>();
+        final Map<Integer, List<MySqlSnapshotSplit>> assignedSnapshotSplits = new HashMap<>();
+        List<MySqlSnapshotSplit> assignedSnapshotSplitsForTask0 = new ArrayList<>();
         assignedSnapshotSplitsForTask0.add(getTestSnapshotSplit(tableId0, 0));
         assignedSnapshotSplitsForTask0.add(getTestSnapshotSplit(tableId0, 1));
         assignedSnapshotSplitsForTask0.add(getTestSnapshotSplit(tableId0, 2));
 
-        List<MySqlSplit> assignedSnapshotSplitsForTask1 = new ArrayList<>();
+        List<MySqlSnapshotSplit> assignedSnapshotSplitsForTask1 = new ArrayList<>();
         assignedSnapshotSplitsForTask1.add(getTestSnapshotSplit(tableId1, 0));
         assignedSnapshotSplitsForTask1.add(getTestSnapshotSplit(tableId1, 1));
 
         assignedSnapshotSplits.put(0, assignedSnapshotSplitsForTask0);
         assignedSnapshotSplits.put(1, assignedSnapshotSplitsForTask1);
 
-        final Map<Integer, List<Tuple2<String, BinlogOffset>>> finishedSnapshotSplits =
-                new HashMap<>();
-        List<Tuple2<String, BinlogOffset>> finishedSplitsForTask0 = new ArrayList<>();
-        finishedSplitsForTask0.add(getTestSplitInfo(tableId0, 0));
-        finishedSplitsForTask0.add(getTestSplitInfo(tableId0, 1));
-        finishedSplitsForTask0.add(getTestSplitInfo(tableId1, 0));
-        List<Tuple2<String, BinlogOffset>> finishedSplitsForTask1 = new ArrayList<>();
-        finishedSplitsForTask0.add(getTestSplitInfo(tableId1, 1));
-        finishedSplitsForTask0.add(getTestSplitInfo(tableId0, 2));
+        final Map<Integer, Map<String, BinlogOffset>> finishedSnapshotSplits = new HashMap<>();
+        Map<String, BinlogOffset> finishedSplitsForTask0 = new HashMap<>();
+        finishedSplitsForTask0.putAll(getTestSplitInfo(tableId0, 0));
+        finishedSplitsForTask0.putAll(getTestSplitInfo(tableId0, 1));
+        finishedSplitsForTask0.putAll(getTestSplitInfo(tableId1, 0));
+        Map<String, BinlogOffset> finishedSplitsForTask1 = new HashMap<>();
+        finishedSplitsForTask1.putAll(getTestSplitInfo(tableId1, 1));
+        finishedSplitsForTask1.putAll(getTestSplitInfo(tableId0, 2));
         finishedSnapshotSplits.put(0, finishedSplitsForTask0);
         finishedSnapshotSplits.put(1, finishedSplitsForTask1);
-
-        final Map<Integer, List<MySqlSplit>> assignedBinlogSplits = new HashMap<>();
-        List<MySqlSplit> assignedBinlogSplitsForTask0 = new ArrayList<>();
-        assignedBinlogSplitsForTask0.add(getTestBinlogSplit(tableId0));
-        assignedBinlogSplits.put(0, assignedBinlogSplitsForTask0);
 
         return new MySqlSourceEnumState(
                 remainingSplits,
                 alreadyProcessedTables,
                 assignedSnapshotSplits,
-                assignedBinlogSplits,
-                finishedSnapshotSplits);
+                finishedSnapshotSplits,
+                false);
     }
 
-    private MySqlSplit getTestSnapshotSplit(TableId tableId, int splitNo) {
+    private MySqlSnapshotSplit getTestSnapshotSplit(TableId tableId, int splitNo) {
         return new MySqlSnapshotSplit(
                 tableId,
                 tableId.toString() + "-" + splitNo,
@@ -179,11 +171,11 @@ public class MySqlParallelSourceEnumStateSerializerTest {
                 databaseHistory);
     }
 
-    private Tuple2<String, BinlogOffset> getTestSplitInfo(TableId tableId, int splitNo) {
+    private Map<String, BinlogOffset> getTestSplitInfo(TableId tableId, int splitNo) {
         final String splitId = tableId.toString() + "-" + splitNo;
         final BinlogOffset highWatermark =
                 new BinlogOffset("mysql-bin.000001", (long) splitNo * 200);
-        return Tuple2.of(splitId, highWatermark);
+        return Collections.singletonMap(splitId, highWatermark);
     }
 
     static void assertSourceEnumStateEqual(
@@ -194,33 +186,8 @@ public class MySqlParallelSourceEnumStateSerializerTest {
 
         List<MySqlSplit> expectedSplits = new ArrayList<>(expected.getRemainingSplits());
         List<MySqlSplit> actualSplits = new ArrayList<>(actual.getRemainingSplits());
-        assertSplitsEquals(expectedSplits, actualSplits);
-
-        assertEquals(
-                expected.getAssignedSnapshotSplits().size(),
-                actual.getAssignedSnapshotSplits().size());
-        for (Map.Entry<Integer, List<MySqlSplit>> entry :
-                expected.getAssignedSnapshotSplits().entrySet()) {
-            assertSplitsEquals(
-                    entry.getValue(), actual.getAssignedSnapshotSplits().get(entry.getKey()));
-        }
-
-        assertEquals(
-                expected.getFinishedSnapshotSplits().size(),
-                actual.getFinishedSnapshotSplits().size());
-        for (Map.Entry<Integer, List<Tuple2<String, BinlogOffset>>> entry :
-                expected.getFinishedSnapshotSplits().entrySet()) {
-            assertEquals(
-                    entry.getValue().toString(),
-                    actual.getFinishedSnapshotSplits().get(entry.getKey()).toString());
-        }
-    }
-
-    private static void assertSplitsEquals(
-            List<MySqlSplit> expectedSplits, List<MySqlSplit> actualSplits) {
-        assertEquals(expectedSplits.size(), actualSplits.size());
-        for (int i = 0; i < expectedSplits.size(); i++) {
-            assertSplitsEqual(expectedSplits.get(i), actualSplits.get(i));
-        }
+        assertEquals(expectedSplits, actualSplits);
+        assertEquals(expected.getAssignedSnapshotSplits(), actual.getAssignedSnapshotSplits());
+        assertEquals(expected.getFinishedSnapshotSplits(), actual.getFinishedSnapshotSplits());
     }
 }

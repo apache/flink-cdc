@@ -31,7 +31,7 @@ public class MySqlBinlogSplitState extends MySqlSplitState {
 
     @Nullable private BinlogOffset startingOffset;
     @Nullable private BinlogOffset endingOffset;
-    private Map<TableId, TableChange> tableSchemas;
+    private final Map<TableId, TableChange> tableSchemas;
 
     public MySqlBinlogSplitState(MySqlBinlogSplit split) {
         super(split);

@@ -46,23 +46,14 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.Serializer
 /** A serializer for the {@link MySqlSplit}. */
 public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MySqlSplit> {
 
-    private static final int VERSION = 1;
-
     public static final MySqlSplitSerializer INSTANCE = new MySqlSplitSerializer();
 
+    private static final int VERSION = 1;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
-    private static final ThreadLocal<DataInputDeserializer> DESERIALIZER_CACHE =
-            ThreadLocal.withInitial(() -> new DataInputDeserializer());
 
-    private static final ThreadLocal<DocumentWriter> DOCUMENT_WRITER =
-            ThreadLocal.withInitial(DocumentWriter::defaultWriter);
-
-    private static final ThreadLocal<DocumentReader> DOCUMENT_READER =
-            ThreadLocal.withInitial(DocumentReader::defaultReader);
-
-    private static final ThreadLocal<JsonTableChangeSerializer> JSON_TABLE_CHANGE_SERIALIZER =
-            ThreadLocal.withInitial(JsonTableChangeSerializer::new);
+    private static final int SNAPSHOT_SPLIT_FLAG = 1;
+    private static final int BINLOG_SPLIT_FLAG = 2;
 
     @Override
     public int getVersion() {
@@ -79,7 +70,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             }
 
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
-            out.writeUTF(String.valueOf(MySqlSplitKind.SNAPSHOT));
+            out.writeInt(SNAPSHOT_SPLIT_FLAG);
             out.writeUTF(snapshotSplit.getTableId().toString());
             out.writeUTF(snapshotSplit.splitId());
             out.writeUTF(snapshotSplit.getSplitKeyType().asSerializableString());
@@ -104,7 +95,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                 return binlogSplit.serializedFormCache;
             }
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
-            out.writeUTF(String.valueOf(MySqlSplitKind.BINLOG));
+            out.writeInt(BINLOG_SPLIT_FLAG);
             out.writeUTF(binlogSplit.splitId());
             out.writeUTF(binlogSplit.getSplitKeyType().asSerializableString());
 
@@ -123,27 +114,25 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
 
     @Override
     public MySqlSplit deserialize(int version, byte[] serialized) throws IOException {
-        if (version == 1) {
+        if (version == VERSION) {
             return deserializeV1(serialized);
         }
         throw new IOException("Unknown version: " + version);
     }
 
     public MySqlSplit deserializeV1(byte[] serialized) throws IOException {
-        final DataInputDeserializer in = DESERIALIZER_CACHE.get();
-        in.setBuffer(serialized);
+        final DataInputDeserializer in = new DataInputDeserializer(serialized);
 
-        MySqlSplitKind splitKind = MySqlSplitKind.fromString(in.readUTF());
-        if (splitKind == MySqlSplitKind.SNAPSHOT) {
+        int splitKind = in.readInt();
+        if (splitKind == SNAPSHOT_SPLIT_FLAG) {
             TableId tableId = TableId.parse(in.readUTF());
             String splitId = in.readUTF();
             RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
             Object[] splitBoundaryStart = serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = serializedStringToRow(in.readUTF());
             BinlogOffset highWatermark = readBinlogPosition(in);
-            Map<TableId, TableChange> databaseHistory = readTableSchemas(in);
+            Map<TableId, TableChange> tableSchemas = readTableSchemas(in);
 
-            in.releaseArrays();
             return new MySqlSnapshotSplit(
                     tableId,
                     splitId,
@@ -151,8 +140,8 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     splitBoundaryStart,
                     splitBoundaryEnd,
                     highWatermark,
-                    databaseHistory);
-        } else {
+                    tableSchemas);
+        } else if (splitKind == BINLOG_SPLIT_FLAG) {
             String splitId = in.readUTF();
             RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
             BinlogOffset startingOffset = readBinlogPosition(in);
@@ -167,36 +156,35 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     endingOffset,
                     finishedSplitsInfo,
                     tableChangeMap);
+        } else {
+            throw new IOException("Unknown split kind: " + splitKind);
         }
     }
 
     private static void writeTableSchemas(
             Map<TableId, TableChange> tableSchemas, DataOutputSerializer out) throws IOException {
+        JsonTableChangeSerializer jsonSerializer = new JsonTableChangeSerializer();
+        DocumentWriter documentWriter = DocumentWriter.defaultWriter();
         final int size = tableSchemas.size();
         out.writeInt(size);
         for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
             out.writeUTF(entry.getKey().toString());
-            out.writeUTF(
-                    DOCUMENT_WRITER
-                            .get()
-                            .write(
-                                    JSON_TABLE_CHANGE_SERIALIZER
-                                            .get()
-                                            .toDocument(entry.getValue())));
+            out.writeUTF(documentWriter.write(jsonSerializer.toDocument(entry.getValue())));
         }
     }
 
     private static Map<TableId, TableChange> readTableSchemas(DataInputDeserializer in)
             throws IOException {
-        Map<TableId, TableChange> databaseHistory = new HashMap<>();
+        DocumentReader documentReader = DocumentReader.defaultReader();
+        Map<TableId, TableChange> tableSchemas = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             TableId tableId = TableId.parse(in.readUTF());
-            Document document = DOCUMENT_READER.get().read(in.readUTF());
+            Document document = documentReader.read(in.readUTF());
             TableChange tableChange = JsonTableChangeSerializer.fromDocument(document, true);
-            databaseHistory.put(tableId, tableChange);
+            tableSchemas.put(tableId, tableChange);
         }
-        return databaseHistory;
+        return tableSchemas;
     }
 
     private static void writeFinishedSplitsInfo(
@@ -228,22 +216,5 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                             tableId, splitId, splitStart, splitEnd, highWatermark));
         }
         return finishedSplitsInfo;
-    }
-
-    /** The split to describe a split of a MySql table. */
-    private enum MySqlSplitKind {
-
-        /** The split that reads snapshot records of MySQL table. */
-        SNAPSHOT,
-
-        /** The split that reads binlog records of MySQL table. */
-        BINLOG;
-
-        public static MySqlSplitKind fromString(String kind) {
-            if (SNAPSHOT.toString().equalsIgnoreCase(kind)) {
-                return SNAPSHOT;
-            }
-            return BINLOG;
-        }
     }
 }

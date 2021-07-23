@@ -19,13 +19,12 @@
 package com.alibaba.ververica.cdc.connectors.mysql.source.events;
 
 import org.apache.flink.api.connector.source.SourceEvent;
-import org.apache.flink.api.java.tuple.Tuple2;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
-import java.util.List;
+import java.util.Map;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
@@ -35,18 +34,18 @@ public class SourceReaderReportEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    private final List<Tuple2<String, BinlogOffset>> finishedSplits;
+    private final Map<String, BinlogOffset> finishedSnapshotSplits;
 
-    public SourceReaderReportEvent(List<Tuple2<String, BinlogOffset>> finishedSplits) {
-        this.finishedSplits = finishedSplits;
+    public SourceReaderReportEvent(Map<String, BinlogOffset> finishedSnapshotSplits) {
+        this.finishedSnapshotSplits = finishedSnapshotSplits;
     }
 
-    public List<Tuple2<String, BinlogOffset>> getFinishedSplits() {
-        return finishedSplits;
+    public Map<String, BinlogOffset> getFinishedSnapshotSplits() {
+        return finishedSnapshotSplits;
     }
 
     @Override
     public String toString() {
-        return "SourceReaderReportEvent{" + "finishedSplits=" + finishedSplits + '}';
+        return "SourceReaderReportEvent{" + "finishedSplits=" + finishedSnapshotSplits + '}';
     }
 }

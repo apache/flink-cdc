@@ -126,7 +126,7 @@ public class MySqlParallelSource<T>
                 new MySqlSnapshotSplitAssigner(
                         config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>());
         return new MySqlSourceEnumerator(
-                enumContext, splitAssigner, new HashMap<>(), new HashMap<>(), new HashMap<>());
+                enumContext, splitAssigner, new HashMap<>(), new HashMap<>(), false);
     }
 
     @Override
@@ -143,8 +143,8 @@ public class MySqlParallelSource<T>
                 enumContext,
                 splitAssigner,
                 checkpoint.getAssignedSnapshotSplits(),
-                checkpoint.getAssignedBinlogSplits(),
-                checkpoint.getFinishedSnapshotSplits());
+                checkpoint.getFinishedSnapshotSplits(),
+                checkpoint.isBinlogSplitAssigned());
     }
 
     @Override

@@ -204,7 +204,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();
         while (true) {
-            Optional<MySqlSplit> split = assigner.getNext(null);
+            Optional<MySqlSplit> split = assigner.getNext();
             if (split.isPresent()) {
                 sqlSplits.add(split.get());
             } else {

@@ -255,10 +255,9 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
                         snapshotReceiver);
             }
             LOG.info(
-                    "Finished exporting {} records for split '{}' of table '{}'; total duration '{}'",
+                    "Finished exporting {} records for split '{}', total duration '{}'",
                     rows,
                     snapshotSplit.splitId(),
-                    table.id(),
                     Strings.duration(clock.currentTimeInMillis() - exportStart));
         } catch (SQLException e) {
             throw new ConnectException("Snapshotting of table " + table.id() + " failed", e);

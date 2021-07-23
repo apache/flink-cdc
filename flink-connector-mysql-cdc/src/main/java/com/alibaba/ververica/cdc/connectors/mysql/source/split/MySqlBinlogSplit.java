@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** The split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplit extends MySqlSplit {
@@ -64,13 +66,40 @@ public class MySqlBinlogSplit extends MySqlSplit {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+        MySqlBinlogSplit that = (MySqlBinlogSplit) o;
+        return Objects.equals(startingOffset, that.startingOffset)
+                && Objects.equals(endingOffset, that.endingOffset)
+                && Objects.equals(finishedSnapshotSplitInfos, that.finishedSnapshotSplitInfos);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                super.hashCode(), startingOffset, endingOffset, finishedSnapshotSplitInfos);
+    }
+
+    @Override
     public String toString() {
+        String splitKeyTypeSummary =
+                splitKeyType.getFields().stream()
+                        .map(RowType.RowField::asSummaryString)
+                        .collect(Collectors.joining(",", "[", "]"));
         return "MySqlBinlogSplit{"
                 + ", splitId='"
                 + splitId
                 + '\''
                 + ", splitKeyType="
-                + splitKeyType
+                + splitKeyTypeSummary
                 + ", offset="
                 + startingOffset
                 + ", endOffset="

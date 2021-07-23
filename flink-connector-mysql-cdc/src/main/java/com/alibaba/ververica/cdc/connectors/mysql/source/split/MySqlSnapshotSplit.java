@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** The split to describe a split of a MySql table snapshot. */
 public class MySqlSnapshotSplit extends MySqlSplit {
@@ -79,7 +81,37 @@ public class MySqlSnapshotSplit extends MySqlSplit {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+        MySqlSnapshotSplit that = (MySqlSnapshotSplit) o;
+        return Objects.equals(tableId, that.tableId)
+                && Arrays.equals(splitStart, that.splitStart)
+                && Arrays.equals(splitEnd, that.splitEnd)
+                && Objects.equals(highWatermark, that.highWatermark);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(super.hashCode(), tableId, highWatermark);
+        result = 31 * result + Arrays.hashCode(splitStart);
+        result = 31 * result + Arrays.hashCode(splitEnd);
+        return result;
+    }
+
+    @Override
     public String toString() {
+        String splitKeyTypeSummary =
+                splitKeyType.getFields().stream()
+                        .map(RowType.RowField::asSummaryString)
+                        .collect(Collectors.joining(",", "[", "]"));
         return "MySqlSnapshotSplit{"
                 + "tableId="
                 + tableId
@@ -87,7 +119,7 @@ public class MySqlSnapshotSplit extends MySqlSplit {
                 + splitId
                 + '\''
                 + ", splitKeyType="
-                + splitKeyType
+                + splitKeyTypeSummary
                 + ", splitStart="
                 + Arrays.toString(splitStart)
                 + ", splitEnd="

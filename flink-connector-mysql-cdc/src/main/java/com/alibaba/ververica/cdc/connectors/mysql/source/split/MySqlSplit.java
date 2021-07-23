@@ -25,6 +25,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.util.Map;
+import java.util.Objects;
 
 /** The split of table comes from a Table that splits by primary key. */
 public abstract class MySqlSplit implements SourceSplit {
@@ -51,13 +52,11 @@ public abstract class MySqlSplit implements SourceSplit {
     }
 
     /** Casts this split into a {@link MySqlSnapshotSplit}. */
-    @SuppressWarnings("unchecked")
     public final MySqlSnapshotSplit asSnapshotSplit() {
         return (MySqlSnapshotSplit) this;
     }
 
     /** Casts this split into a {@link MySqlBinlogSplit}. */
-    @SuppressWarnings("unchecked")
     public final MySqlBinlogSplit asBinlogSplit() {
         return (MySqlBinlogSplit) this;
     }
@@ -73,5 +72,24 @@ public abstract class MySqlSplit implements SourceSplit {
 
     public Map<TableId, TableChange> getTableSchemas() {
         return tableSchemas;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        MySqlSplit that = (MySqlSplit) o;
+        return Objects.equals(splitId, that.splitId)
+                && Objects.equals(splitKeyType, that.splitKeyType)
+                && Objects.equals(tableSchemas, that.tableSchemas);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(splitId, splitKeyType, tableSchemas);
     }
 }

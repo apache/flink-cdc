@@ -28,7 +28,6 @@ import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges.TableChange;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -39,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
@@ -57,7 +55,7 @@ public class MySqlSplitSerializerTest {
                         new Object[] {999L},
                         null,
                         new HashMap<>());
-        assertSplitsEqual(split, serializeAndDeserializeSplit(split));
+        assertEquals(split, serializeAndDeserializeSplit(split));
     }
 
     @Test
@@ -106,7 +104,7 @@ public class MySqlSplitSerializerTest {
                         BinlogOffset.NO_STOPPING_OFFSET,
                         finishedSplitsInfo,
                         databaseHistory);
-        assertSplitsEqual(split, serializeAndDeserializeSplit(split));
+        assertEquals(split, serializeAndDeserializeSplit(split));
     }
 
     @Test
@@ -152,38 +150,5 @@ public class MySqlSplitSerializerTest {
                         + "\"position\":4,\"optional\":true,\"autoIncremented\":false,\"generated\":false}]}}";
         final Document doc = DocumentReader.defaultReader().read(tableChangeJsonStr);
         return JsonTableChangeSerializer.fromDocument(doc, true);
-    }
-
-    public static void assertSplitsEqual(MySqlSplit expected, MySqlSplit actual) {
-        if (expected.isSnapshotSplit() && actual.isSnapshotSplit()) {
-            final MySqlSnapshotSplit expectedSplit = expected.asSnapshotSplit();
-            final MySqlSnapshotSplit actualSplit = actual.asSnapshotSplit();
-            assertEquals(expectedSplit.getTableId(), actualSplit.getTableId());
-            assertEquals(expectedSplit.splitId(), actualSplit.splitId());
-            assertEquals(expectedSplit.getSplitKeyType(), actualSplit.getSplitKeyType());
-            assertArrayEquals(expectedSplit.getSplitStart(), actualSplit.getSplitStart());
-            assertArrayEquals(expectedSplit.getSplitEnd(), actualSplit.getSplitEnd());
-            assertEquals(expectedSplit.getHighWatermark(), actualSplit.getHighWatermark());
-            assertEquals(
-                    expectedSplit.getTableSchemas().toString(),
-                    actualSplit.getTableSchemas().toString());
-        } else if (expected.isBinlogSplit() && actual.isBinlogSplit()) {
-            final MySqlBinlogSplit expectedSplit = expected.asBinlogSplit();
-            final MySqlBinlogSplit actualSplit = actual.asBinlogSplit();
-            assertEquals(expectedSplit.splitId(), actualSplit.splitId());
-            assertEquals(expectedSplit.getSplitKeyType(), actualSplit.getSplitKeyType());
-            assertEquals(
-                    expectedSplit.getTableSchemas().toString(),
-                    actualSplit.getTableSchemas().toString());
-            assertEquals(expectedSplit.getStartingOffset(), actualSplit.getStartingOffset());
-            assertEquals(
-                    expectedSplit.getFinishedSnapshotSplitInfos().toString(),
-                    actualSplit.getFinishedSnapshotSplitInfos().toString());
-            assertEquals(
-                    expectedSplit.getTableSchemas().toString(),
-                    actualSplit.getTableSchemas().toString());
-        } else {
-            Assert.fail("Fail, different split type");
-        }
     }
 }

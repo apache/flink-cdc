@@ -303,7 +303,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
-            Optional<MySqlSplit> mySqlSplit = assigner.getNext(null);
+            Optional<MySqlSplit> mySqlSplit = assigner.getNext();
             if (mySqlSplit.isPresent()) {
                 mySqlSplitList.add(mySqlSplit.get());
             } else {

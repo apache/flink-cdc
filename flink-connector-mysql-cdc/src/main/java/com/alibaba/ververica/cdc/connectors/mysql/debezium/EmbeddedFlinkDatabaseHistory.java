@@ -144,6 +144,9 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     }
 
     public static Collection<TableChange> removeHistory(String engineName) {
+        if (engineName == null) {
+            return Collections.emptyList();
+        }
         Collection<TableChange> tableChanges = TABLE_SCHEMAS.remove(engineName);
         return tableChanges != null ? tableChanges : Collections.emptyList();
     }
