@@ -126,11 +126,15 @@ public class StatefulTaskContext {
 
         this.taskContext =
                 new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
+        final int queueSize =
+                mySqlSplit.isSnapshotSplit()
+                        ? Integer.MAX_VALUE
+                        : connectorConfig.getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
                         .pollInterval(connectorConfig.getPollInterval())
                         .maxBatchSize(connectorConfig.getMaxBatchSize())
-                        .maxQueueSize(connectorConfig.getMaxQueueSize())
+                        .maxQueueSize(queueSize)
                         .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
                         .loggingContextSupplier(
                                 () ->
@@ -365,7 +369,7 @@ public class StatefulTaskContext {
                 .with("database.responseBuffering", "adaptive")
                 .with(
                         "database.fetchSize",
-                        configuration.getInteger(MySqlSourceOptions.SCAN_FETCH_SIZE))
+                        configuration.getInteger(MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE))
                 .build();
     }
 }

@@ -41,6 +41,7 @@ import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema
 
 import javax.annotation.Nullable;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
@@ -50,9 +51,6 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SPLIT_COLUMN;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -71,11 +69,10 @@ public class MySqlTableSource implements ScanTableSource {
     private final String tableName;
     private final ZoneId serverTimeZone;
     private final Properties dbzProperties;
-    private final boolean enableIntegralOptimization;
     private final boolean enableParallelRead;
     private final int splitSize;
     private final int fetchSize;
-    private final String splitColumn;
+    private final Duration connectTimeout;
     private final StartupOptions startupOptions;
 
     public MySqlTableSource(
@@ -89,11 +86,10 @@ public class MySqlTableSource implements ScanTableSource {
             ZoneId serverTimeZone,
             Properties dbzProperties,
             @Nullable String serverId,
-            boolean enableIntegralOptimization,
             boolean enableParallelRead,
             int splitSize,
             int fetchSize,
-            @Nullable String splitColumn,
+            Duration connectTimeout,
             StartupOptions startupOptions) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -105,11 +101,10 @@ public class MySqlTableSource implements ScanTableSource {
         this.serverId = serverId;
         this.serverTimeZone = serverTimeZone;
         this.dbzProperties = dbzProperties;
-        this.enableIntegralOptimization = enableIntegralOptimization;
         this.enableParallelRead = enableParallelRead;
         this.splitSize = splitSize;
         this.fetchSize = fetchSize;
-        this.splitColumn = splitColumn;
+        this.connectTimeout = connectTimeout;
         this.startupOptions = startupOptions;
     }
 
@@ -133,7 +128,7 @@ public class MySqlTableSource implements ScanTableSource {
                         rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
         if (enableParallelRead) {
             RowType pkRowType = getPkType(physicalSchema);
-            Configuration configuration = getParallelSourceConf(pkRowType);
+            Configuration configuration = getParallelSourceConf();
             MySqlParallelSource<RowData> parallelSource =
                     new MySqlParallelSource<>(pkRowType, deserializer, configuration);
             return SourceProvider.of(parallelSource);
@@ -172,8 +167,11 @@ public class MySqlTableSource implements ScanTableSource {
         return RowType.of(pkFieldTypes, pkFieldNames.toArray(new String[0]));
     }
 
-    private Configuration getParallelSourceConf(RowType pkRowType) {
+    private Configuration getParallelSourceConf() {
         Map<String, String> properties = new HashMap<>();
+        if (dbzProperties != null) {
+            dbzProperties.forEach((k, v) -> properties.put(k.toString(), v.toString()));
+        }
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
         properties.put("database.hostname", checkNotNull(hostname));
         properties.put("database.user", checkNotNull(username));
@@ -186,9 +184,10 @@ public class MySqlTableSource implements ScanTableSource {
          * The server id is required, it will be replaced to 'database.server.id' when build {@Link
          * MySQLSplitReader}
          */
-        properties.put(SERVER_ID.key(), serverId);
+        properties.put("server-id", serverId);
         properties.put("scan.split.size", String.valueOf(splitSize));
         properties.put("scan.fetch.size", String.valueOf(fetchSize));
+        properties.put("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
 
         if (database != null) {
             properties.put("database.whitelist", database);
@@ -202,14 +201,6 @@ public class MySqlTableSource implements ScanTableSource {
 
         // set mode
         properties.put("snapshot.mode", "initial");
-
-        properties.put(
-                SCAN_OPTIMIZE_INTEGRAL_KEY.key(), String.valueOf(enableIntegralOptimization));
-
-        // set split key
-        if (pkRowType.getFieldCount() > 1) {
-            properties.put(SCAN_SPLIT_COLUMN.key(), splitColumn);
-        }
 
         return Configuration.fromMap(properties);
     }
@@ -227,11 +218,10 @@ public class MySqlTableSource implements ScanTableSource {
                 serverTimeZone,
                 dbzProperties,
                 serverId,
-                enableIntegralOptimization,
                 enableParallelRead,
                 splitSize,
                 fetchSize,
-                splitColumn,
+                connectTimeout,
                 startupOptions);
     }
 
@@ -245,7 +235,6 @@ public class MySqlTableSource implements ScanTableSource {
         }
         MySqlTableSource that = (MySqlTableSource) o;
         return port == that.port
-                && enableIntegralOptimization == that.enableIntegralOptimization
                 && enableParallelRead == that.enableParallelRead
                 && splitSize == that.splitSize
                 && fetchSize == that.fetchSize
@@ -258,7 +247,7 @@ public class MySqlTableSource implements ScanTableSource {
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(serverTimeZone, that.serverTimeZone)
                 && Objects.equals(dbzProperties, that.dbzProperties)
-                && Objects.equals(splitColumn, that.splitColumn)
+                && Objects.equals(connectTimeout, that.connectTimeout)
                 && Objects.equals(startupOptions, that.startupOptions);
     }
 
@@ -275,11 +264,10 @@ public class MySqlTableSource implements ScanTableSource {
                 tableName,
                 serverTimeZone,
                 dbzProperties,
-                enableIntegralOptimization,
                 enableParallelRead,
                 splitSize,
                 fetchSize,
-                splitColumn,
+                connectTimeout,
                 startupOptions);
     }
 

@@ -20,6 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.assigner;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
@@ -31,6 +32,7 @@ import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.relational.RelationalTableFilters;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.SchemaChangeEvent;
@@ -58,10 +60,11 @@ import java.util.Set;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isOptimizedKeyType;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.rowToArray;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SplitKeyUtils.getSplitKeyType;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.SplitKeyUtils.splitKeyIsAutoIncremented;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMaxSplitKeyQuery;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildMinMaxSplitKeyQuery;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.buildSplitBoundaryQuery;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.getSplitKey;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.StatementUtils.readTableSplitStatement;
 
@@ -75,36 +78,34 @@ public class MySqlSnapshotSplitAssigner {
     private final LinkedList<TableId> remainingTables;
     private final Configuration configuration;
     private final int splitSize;
-    private final RowType splitKeyType;
-    private final boolean enableIntegralOptimization;
+    private final RowType definedPkType;
 
     private TableId currentTableId;
     private int currentTableSplitSeq;
     private Object[] currentTableMaxSplitKey;
     private RelationalTableFilters tableFilters;
     private MySqlConnection jdbc;
-    private Map<TableId, TableChange> cachedTableSchemas;
+    private Map<TableId, TableChange> tableSchemas;
     private MySqlDatabaseSchema databaseSchema;
+    private RowType splitKeyType;
 
     public MySqlSnapshotSplitAssigner(
             Configuration configuration,
-            RowType pkRowType,
+            RowType definedPkType,
             Collection<TableId> alreadyProcessedTables,
             Collection<MySqlSplit> remainingSplits) {
         this.configuration = configuration;
-        this.splitKeyType = getSplitKey(configuration, pkRowType);
+        this.definedPkType = definedPkType;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.remainingTables = new LinkedList<>();
-        this.splitSize = configuration.getInteger(MySqlSourceOptions.SCAN_SPLIT_SIZE);
+        this.splitSize = configuration.getInteger(MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE);
         Preconditions.checkState(
                 splitSize > 1,
                 String.format(
-                        "The value of option 'scan.split.size' must bigger than 1, but is %d",
+                        "The value of option 'scan.snapshot.chunk.size' must bigger than 1, but is %d",
                         splitSize));
-        this.enableIntegralOptimization =
-                configuration.getBoolean(MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY);
-        this.cachedTableSchemas = new HashMap<>();
+        this.tableSchemas = new HashMap<>();
     }
 
     public void open() {
@@ -152,9 +153,14 @@ public class MySqlSnapshotSplitAssigner {
         int splitCnt = 0;
         long start = System.currentTimeMillis();
         List<MySqlSplit> splitsForCurrentTable = new ArrayList<>();
+
         LOG.info("Begin to analyze splits for table {} ", tableId);
+        tableSchemas.put(tableId, getTableSchema(tableId));
+        splitKeyType = getSplitKeyType(definedPkType, tableSchemas.get(tableId).getTable());
+
         // optimization for integral, bigDecimal type
-        if (enableIntegralOptimization
+        final Table currentTable = tableSchemas.get(currentTableId).getTable();
+        if (splitKeyIsAutoIncremented(splitKeyType, currentTable)
                 && isOptimizedKeyType(splitKeyType.getTypeAt(0).getTypeRoot())) {
             String splitKeyFieldName = splitKeyType.getFieldNames().get(0);
             Object[] minMaxSplitKey = new Object[2];
@@ -321,11 +327,7 @@ public class MySqlSnapshotSplitAssigner {
 
     private MySqlSplit createSnapshotSplit(Object[] splitStart, Object[] splitEnd) {
         Map<TableId, TableChange> tableChangeMap = new HashMap<>();
-        // cache for optimization
-        if (!cachedTableSchemas.containsKey(currentTableId)) {
-            cachedTableSchemas.putAll(getTableSchema());
-        }
-        tableChangeMap.put(currentTableId, cachedTableSchemas.get(currentTableId));
+        tableChangeMap.put(currentTableId, tableSchemas.get(currentTableId));
 
         return new MySqlSnapshotSplit(
                 currentTableId,
@@ -455,12 +457,11 @@ public class MySqlSnapshotSplitAssigner {
         }
     }
 
-    private Map<TableId, TableChange> getTableSchema() {
+    private TableChange getTableSchema(final TableId tableId) {
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         try {
-
             jdbc.query(
-                    "SHOW CREATE TABLE " + quote(currentTableId),
+                    "SHOW CREATE TABLE " + quote(tableId),
                     rs -> {
                         if (rs.next()) {
                             final String ddl = rs.getString(2);
@@ -470,21 +471,26 @@ public class MySqlSnapshotSplitAssigner {
                                                     toDebeziumConfig(configuration)));
                             List<SchemaChangeEvent> schemaChangeEvents =
                                     databaseSchema.parseSnapshotDdl(
-                                            ddl,
-                                            currentTableId.catalog(),
-                                            offsetContext,
-                                            Instant.now());
+                                            ddl, tableId.catalog(), offsetContext, Instant.now());
                             for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
                                 for (TableChange tableChange :
                                         schemaChangeEvent.getTableChanges()) {
-                                    tableChangeMap.put(currentTableId, tableChange);
+                                    tableChangeMap.put(tableId, tableChange);
                                 }
                             }
                         }
                     });
         } catch (SQLException e) {
-            LOG.error("Get table schema error.", e);
+            throw new FlinkRuntimeException(
+                    String.format("Get schema of table %s error.", tableId), e);
         }
-        return tableChangeMap;
+        if (tableChangeMap.isEmpty()) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "Can not get schema of table %s, please check the configured table name.",
+                            tableId));
+        }
+
+        return tableChangeMap.get(tableId);
     }
 }

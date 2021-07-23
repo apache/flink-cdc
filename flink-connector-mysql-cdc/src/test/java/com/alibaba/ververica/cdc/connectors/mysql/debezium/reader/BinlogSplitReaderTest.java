@@ -33,7 +33,6 @@ import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
@@ -51,14 +50,11 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -67,7 +63,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
@@ -77,32 +72,20 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtil
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link BinlogSplitReader}. */
-@RunWith(Parameterized.class)
 public class BinlogSplitReaderTest extends MySqlTestBase {
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
-    private final BinaryLogClient binaryLogClient;
-    private final MySqlConnection mySqlConnection;
-    private final boolean useIntegralTypeOptimization;
-
-    @Parameterized.Parameters(name = "useIntegralTypeOptimization: {0}")
-    public static Collection<Boolean> parameters() {
-        return Arrays.asList(false, true);
-    }
-
-    public BinlogSplitReaderTest(boolean useIntegralTypeOptimization) {
-        this.useIntegralTypeOptimization = useIntegralTypeOptimization;
-        Configuration configuration = getConfig(new String[] {"customers"});
-        this.binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        this.mySqlConnection = StatefulTaskContext.getConnection(configuration);
-    }
+    private BinaryLogClient binaryLogClient;
+    private MySqlConnection mySqlConnection;
 
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
         customerDatabase.createAndInitialize();
         Configuration configuration = getConfig(new String[] {"customers"});
+        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
+        mySqlConnection = StatefulTaskContext.getConnection(configuration);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -113,32 +96,23 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<MySqlSnapshotSplit> splits = getMySQLSplits(configuration, pkType);
         String[] expected =
-                useIntegralTypeOptimization
-                        ? new String[] {
-                            "+U[103, user_3, Hangzhou, 123567891234]",
-                            "+U[103, user_3, Shanghai, 123567891234]",
-                            "-D[102, user_2, Shanghai, 123567891234]",
-                            "+I[102, user_2, Shanghai, 123567891234]",
-                            "-U[103, user_3, Hangzhou, 123567891234]",
-                            "-U[103, user_3, Shanghai, 123567891234]"
-                        }
-                        : new String[] {
-                            "+I[101, user_1, Shanghai, 123567891234]",
-                            "+I[102, user_2, Shanghai, 123567891234]",
-                            "-D[102, user_2, Shanghai, 123567891234]",
-                            "+I[102, user_2, Shanghai, 123567891234]",
-                            "-U[103, user_3, Shanghai, 123567891234]",
-                            "+U[103, user_3, Hangzhou, 123567891234]",
-                            "-U[103, user_3, Hangzhou, 123567891234]",
-                            "+U[103, user_3, Shanghai, 123567891234]",
-                            "+I[103, user_3, Shanghai, 123567891234]",
-                            "+I[109, user_4, Shanghai, 123567891234]",
-                            "+I[110, user_5, Shanghai, 123567891234]",
-                            "+I[111, user_6, Shanghai, 123567891234]",
-                            "+I[118, user_7, Shanghai, 123567891234]",
-                            "+I[121, user_8, Shanghai, 123567891234]",
-                            "+I[123, user_9, Shanghai, 123567891234]"
-                        };
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-D[102, user_2, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]"
+                };
         List<String> actual =
                 readBinlogSplits(splits, dataType, pkType, configuration, 1, expected.length);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
@@ -148,6 +122,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
     public void testReadAllBinlogSplitsForOneTable() throws Exception {
         customerDatabase.createAndInitialize();
         Configuration configuration = getConfig(new String[] {"customers"});
+        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
+        mySqlConnection = StatefulTaskContext.getConnection(configuration);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -203,6 +179,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
     public void testReadAllBinlogForTableWithSingleLine() throws Exception {
         customerDatabase.createAndInitialize();
         Configuration configuration = getConfig(new String[] {"customer_card_single_line"});
+        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
+        mySqlConnection = StatefulTaskContext.getConnection(configuration);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -215,7 +193,6 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                                         DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
-        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
         List<MySqlSnapshotSplit> splits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
@@ -237,6 +214,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         customerDatabase.createAndInitialize();
         Configuration configuration =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
+        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
+        mySqlConnection = StatefulTaskContext.getConnection(configuration);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -249,7 +228,6 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                                         DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
-        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
         List<MySqlSnapshotSplit> splits = getMySQLSplits(configuration, pkType);
         String[] expected =
                 new String[] {
@@ -525,7 +503,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.whitelist", customerDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id-range", "1001, 1002");
+        properties.put("server-id-range", "1001-1002");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
@@ -535,15 +513,9 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         properties.put("table.whitelist", String.join(",", captureTableIds));
-        properties.put(
-                SCAN_OPTIMIZE_INTEGRAL_KEY.key(), String.valueOf(useIntegralTypeOptimization));
-        if (useIntegralTypeOptimization) {
-            properties.put("scan.split.size", "1024");
-            properties.put("scan.fetch.size", "1024");
-        } else {
-            properties.put("scan.split.size", "10");
-            properties.put("scan.fetch.size", "2");
-        }
+        properties.put("scan.snapshot.chunk.size", "10");
+        properties.put("scan.snapshot.fetch.size", "2");
+
         return Configuration.fromMap(properties);
     }
 

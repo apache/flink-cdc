@@ -117,9 +117,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
-                                + " 'snapshot.parallel-scan' = '%s',"
+                                + " 'scan.snapshot.parallel-read' = '%s',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.split.size' = '%s'"
+                                + " 'scan.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -246,9 +246,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
-                                + " 'snapshot.parallel-scan' = '%s',"
+                                + " 'scan.snapshot.parallel-read' = '%s',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.split.size' = '%s'"
+                                + " 'scan.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -666,7 +666,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
         final Random random = new Random();
         int serverIdStart = random.nextInt(100) + 5400;
         if (parallelRead) {
-            return serverIdStart + "," + (serverIdStart + env.getParallelism());
+            return serverIdStart + "-" + (serverIdStart + env.getParallelism());
         }
         return String.valueOf(serverIdStart);
     }

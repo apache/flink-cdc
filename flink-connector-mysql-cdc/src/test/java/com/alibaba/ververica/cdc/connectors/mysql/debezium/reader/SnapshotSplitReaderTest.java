@@ -32,7 +32,6 @@ import org.apache.flink.util.Collector;
 import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -43,13 +42,10 @@ import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -58,36 +54,24 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link SnapshotSplitReader}. */
-@RunWith(Parameterized.class)
 public class SnapshotSplitReaderTest extends MySqlTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
-    private final boolean useIntegralTypeOptimization;
-    private final BinaryLogClient binaryLogClient;
-    private final MySqlConnection mySqlConnection;
-
-    @Parameterized.Parameters(name = "useIntegralTypeOptimization: {0}")
-    public static Collection<Boolean> parameters() {
-        return Arrays.asList(false, true);
-    }
-
-    public SnapshotSplitReaderTest(boolean useIntegralTypeOptimization) {
-        this.useIntegralTypeOptimization = useIntegralTypeOptimization;
-        Configuration configuration = getConfig(new String[] {"customers"});
-        this.binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        this.mySqlConnection = StatefulTaskContext.getConnection(configuration);
-    }
+    private static BinaryLogClient binaryLogClient;
+    private static MySqlConnection mySqlConnection;
 
     @BeforeClass
     public static void init() {
         customerDatabase.createAndInitialize();
+        Configuration configuration = getConfig(new String[] {"customers"});
+        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
+        mySqlConnection = StatefulTaskContext.getConnection(configuration);
     }
 
     @Test
@@ -104,19 +88,17 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
         List<MySqlSplit> mySqlSplits = getMySQLSplits(configuration, pkType);
 
         String[] expected =
-                useIntegralTypeOptimization
-                        ? new String[] {}
-                        : new String[] {
-                            "+I[101, user_1, Shanghai, 123567891234]",
-                            "+I[102, user_2, Shanghai, 123567891234]",
-                            "+I[103, user_3, Shanghai, 123567891234]",
-                            "+I[109, user_4, Shanghai, 123567891234]",
-                            "+I[110, user_5, Shanghai, 123567891234]",
-                            "+I[111, user_6, Shanghai, 123567891234]",
-                            "+I[118, user_7, Shanghai, 123567891234]",
-                            "+I[121, user_8, Shanghai, 123567891234]",
-                            "+I[123, user_9, Shanghai, 123567891234]"
-                        };
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]"
+                };
         List<String> actual = readTableSnapshotSplits(mySqlSplits, configuration, 1, dataType);
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
@@ -166,7 +148,6 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
     @Test
     public void testReadAllSplitForTableWithSingleLine() throws Exception {
         Configuration configuration = getConfig(new String[] {"customer_card_single_line"});
-        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -190,7 +171,6 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
     public void testReadAllSnapshotSplitsForTables() throws Exception {
         Configuration configuration =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
-        configuration.set(MySqlSourceOptions.SCAN_SPLIT_COLUMN, "card_no");
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -314,7 +294,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
         return mySqlSplitList;
     }
 
-    private Configuration getConfig(String[] captureTables) {
+    private static Configuration getConfig(String[] captureTables) {
         Map<String, String> properties = new HashMap<>();
         properties.put("database.server.name", "embedded-test");
         properties.put("database.hostname", MYSQL_CONTAINER.getHost());
@@ -323,7 +303,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
         properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.whitelist", customerDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id-range", "1001, 1002");
+        properties.put("server-id-range", "1001-1002");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
@@ -333,15 +313,9 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         properties.put("table.whitelist", String.join(",", captureTableIds));
-        properties.put(
-                SCAN_OPTIMIZE_INTEGRAL_KEY.key(), String.valueOf(useIntegralTypeOptimization));
-        if (useIntegralTypeOptimization) {
-            properties.put("scan.split.size", "1000");
-            properties.put("scan.fetch.size", "1024");
-        } else {
-            properties.put("scan.split.size", "10");
-            properties.put("scan.fetch.size", "2");
-        }
+
+        properties.put("scan.snapshot.chunk.size", "10");
+        properties.put("scan.snapshot.fetch.size", "2");
         return Configuration.fromMap(properties);
     }
 

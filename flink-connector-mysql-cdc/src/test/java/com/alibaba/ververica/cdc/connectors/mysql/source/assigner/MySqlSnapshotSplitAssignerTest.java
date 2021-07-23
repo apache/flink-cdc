@@ -21,6 +21,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.assigner;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.ExceptionUtils;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
@@ -39,10 +40,10 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_OPTIMIZE_INTEGRAL_KEY;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
@@ -104,69 +105,28 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     }
 
     @Test
-    public void testEnableIntegralKeyOptimization() {
+    public void testEnableAutoIncrementedKeyOptimization() {
         String[] expected =
                 new String[] {
-                    "customers null [101]",
-                    "customers [101] [1101]",
-                    "customers [1101] [2000]",
-                    "customers [2000] null"
+                    "shopping_cart_big null [1]",
+                    "shopping_cart_big [1] [3]",
+                    "shopping_cart_big [3] null"
                 };
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.INT())).getLogicalType();
-        List<String> splits =
-                getTestAssignSnapshotSplits(1000, pkType, new String[] {"customers"}, true);
-        assertArrayEquals(expected, splits.toArray());
-    }
-
-    @Test
-    public void testEnableIntegralKeyOptimizationWithMultipleTable() {
-        String[] expected =
-                new String[] {
-                    "customers null [101]",
-                    "customers [101] [1101]",
-                    "customers [1101] [2000]",
-                    "customers [2000] null",
-                    "customers_1 null [101]",
-                    "customers_1 [101] [1101]",
-                    "customers_1 [1101] [2000]",
-                    "customers_1 [2000] null"
-                };
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.INT())).getLogicalType();
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        1000, pkType, new String[] {"customers", "customers_1"}, true);
-        assertArrayEquals(expected, splits.toArray());
-    }
-
-    @Test
-    public void testEnableBigIntKeyOptimization() {
-        String[] expected =
-                new String[] {
-                    "shopping_cart_big null [9223372036854773807]",
-                    "shopping_cart_big [9223372036854773807] [9223372036854774807]",
-                    "shopping_cart_big [9223372036854774807] [9223372036854775807]",
-                    "shopping_cart_big [9223372036854775807] null"
-                };
-        // MySQL BIGINT UNSIGNED <=> Flink DECIMAL(20, 0)
         final RowType pkType =
                 (RowType)
                         DataTypes.ROW(DataTypes.FIELD("product_no", DataTypes.DECIMAL(20, 0)))
                                 .getLogicalType();
         List<String> splits =
-                getTestAssignSnapshotSplits(1000, pkType, new String[] {"shopping_cart_big"}, true);
+                getTestAssignSnapshotSplits(2, pkType, new String[] {"shopping_cart_big"});
         assertArrayEquals(expected, splits.toArray());
     }
 
     @Test
-    public void testEnableDecimalKeyOptimization() {
+    public void testAssignSnapshotSplitsWithDecimalKey() {
         String[] expected =
                 new String[] {
-                    "shopping_cart_dec null [123456.1230]",
-                    "shopping_cart_dec [123456.1230] [124456.1230]",
-                    "shopping_cart_dec [124456.1230] [125456.1230]",
-                    "shopping_cart_dec [125456.1230] [125489.6789]",
+                    "shopping_cart_dec null [124456.4560]",
+                    "shopping_cart_dec [124456.4560] [125489.6789]",
                     "shopping_cart_dec [125489.6789] null"
                 };
         final RowType pkType =
@@ -174,23 +134,14 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         DataTypes.ROW(DataTypes.FIELD("product_no", DataTypes.DECIMAL(10, 4)))
                                 .getLogicalType();
         List<String> splits =
-                getTestAssignSnapshotSplits(1000, pkType, new String[] {"shopping_cart_dec"}, true);
+                getTestAssignSnapshotSplits(2, pkType, new String[] {"shopping_cart_dec"});
         assertArrayEquals(expected, splits.toArray());
     }
 
     private List<String> getTestAssignSnapshotSplits(
             int splitSize, RowType pkType, String[] captureTables) {
-        return getTestAssignSnapshotSplits(splitSize, pkType, captureTables, false);
-    }
-
-    private List<String> getTestAssignSnapshotSplits(
-            int splitSize,
-            RowType pkType,
-            String[] captureTables,
-            boolean enableIntegralOptimization) {
         Configuration configuration = getConfig();
-        configuration.setString("scan.split.size", String.valueOf(splitSize));
-        configuration.setBoolean(SCAN_OPTIMIZE_INTEGRAL_KEY.key(), enableIntegralOptimization);
+        configuration.setString("scan.snapshot.chunk.size", String.valueOf(splitSize));
         List<String> captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
@@ -241,7 +192,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                 };
         final RowType pkType =
                 (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("card_no", DataTypes.BIGINT()))
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                                        DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
         List<String> splits =
                 getTestAssignSnapshotSplits(4, pkType, new String[] {"customer_card"});
@@ -257,7 +210,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                 };
         final RowType pkType =
                 (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("card_no", DataTypes.BIGINT()))
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
+                                        DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
         List<String> splits =
                 getTestAssignSnapshotSplits(4, pkType, new String[] {"customer_card_single_line"});
@@ -265,7 +220,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     }
 
     @Test
-    public void testAssignTableWithConfiguredIntSplitKey() {
+    public void testAssignTableWithCombinedIntSplitKey() {
         String[] expected =
                 new String[] {
                     "shopping_cart null [102]",
@@ -277,7 +232,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                 };
         final RowType pkType =
                 (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("product_no", DataTypes.BIGINT()))
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("product_no", DataTypes.INT()),
+                                        DataTypes.FIELD("user_id", DataTypes.STRING()),
+                                        DataTypes.FIELD("product_kind", DataTypes.STRING()))
                                 .getLogicalType();
         List<String> splits =
                 getTestAssignSnapshotSplits(4, pkType, new String[] {"shopping_cart"});
@@ -296,7 +254,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                 };
         final RowType pkType =
                 (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("user_id", DataTypes.STRING()))
+                        DataTypes.ROW(
+                                        DataTypes.FIELD("user_id", DataTypes.STRING()),
+                                        DataTypes.FIELD("product_no", DataTypes.INT()),
+                                        DataTypes.FIELD("product_kind", DataTypes.STRING()))
                                 .getLogicalType();
         List<String> splits =
                 getTestAssignSnapshotSplits(4, pkType, new String[] {"shopping_cart"});
@@ -357,7 +318,24 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
             assertThat(
                     e,
                     containsMessage(
-                            "The value of option 'scan.split.size' must bigger than 1, but is 1"));
+                            "The value of option 'scan.snapshot.chunk.size' must bigger than 1, but is 1"));
+        }
+    }
+
+    @Test
+    public void testUnMatchedPrimaryKey() {
+        final RowType pkType =
+                (RowType)
+                        DataTypes.ROW(DataTypes.FIELD("card_no", DataTypes.BIGINT()))
+                                .getLogicalType();
+        try {
+            getTestAssignSnapshotSplits(4, pkType, new String[] {"customer_card"});
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The defined primary key [card_no] in Flink is not matched with actual primary key [card_no, level] in MySQL")
+                            .isPresent());
         }
     }
 
@@ -371,7 +349,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.history.skip.unparseable.ddl", "true");
         properties.put("server-id.range", "1001,1004");
-        properties.put("scan.fetch.size", "2");
+        properties.put("scan.snapshot.fetch.size", "2");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
