@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import java.util.Map;
 
 /** The state of split to describe the binlog of MySql table(s). */
-public class MySqlBinlogSplitState extends MySqlSplitState<MySqlBinlogSplit> {
+public class MySqlBinlogSplitState extends MySqlSplitState {
 
     @Nullable private BinlogOffset startingOffset;
     @Nullable private BinlogOffset endingOffset;
@@ -67,12 +67,13 @@ public class MySqlBinlogSplitState extends MySqlSplitState<MySqlBinlogSplit> {
     }
 
     public MySqlBinlogSplit toMySqlSplit() {
+        final MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
         return new MySqlBinlogSplit(
-                split.splitId(),
-                split.getSplitKeyType(),
+                binlogSplit.splitId(),
+                binlogSplit.getSplitKeyType(),
                 getStartingOffset(),
                 getEndingOffset(),
-                split.getFinishedSnapshotSplitInfos(),
+                binlogSplit.asBinlogSplit().getFinishedSnapshotSplitInfos(),
                 getTableSchemas());
     }
 

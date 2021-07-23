@@ -65,7 +65,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptio
  * @param <T> The record type.
  */
 public class MySqlParallelSource<T>
-        implements Source<T, MySqlSplit, MySqlSourceEnumState<MySqlSplit>>, ResultTypeQueryable<T> {
+        implements Source<T, MySqlSplit, MySqlSourceEnumState>, ResultTypeQueryable<T> {
 
     private static final long serialVersionUID = 1L;
 
@@ -93,10 +93,8 @@ public class MySqlParallelSource<T>
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
         final Configuration readerConfiguration = getReaderConfig(readerContext);
-        Supplier<MySqlSplitReader<MySqlSplit>> splitReaderSupplier =
-                () ->
-                        new MySqlSplitReader<>(
-                                readerConfiguration, readerContext.getIndexOfSubtask());
+        Supplier<MySqlSplitReader> splitReaderSupplier =
+                () -> new MySqlSplitReader(readerConfiguration, readerContext.getIndexOfSubtask());
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
@@ -122,7 +120,7 @@ public class MySqlParallelSource<T>
     }
 
     @Override
-    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState<MySqlSplit>> createEnumerator(
+    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) throws Exception {
         final MySqlSnapshotSplitAssigner splitAssigner =
                 new MySqlSnapshotSplitAssigner(
@@ -132,9 +130,8 @@ public class MySqlParallelSource<T>
     }
 
     @Override
-    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState<MySqlSplit>> restoreEnumerator(
-            SplitEnumeratorContext<MySqlSplit> enumContext,
-            MySqlSourceEnumState<MySqlSplit> checkpoint)
+    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> restoreEnumerator(
+            SplitEnumeratorContext<MySqlSplit> enumContext, MySqlSourceEnumState checkpoint)
             throws Exception {
         final MySqlSnapshotSplitAssigner splitAssigner =
                 new MySqlSnapshotSplitAssigner(
@@ -156,8 +153,7 @@ public class MySqlParallelSource<T>
     }
 
     @Override
-    public SimpleVersionedSerializer<MySqlSourceEnumState<MySqlSplit>>
-            getEnumeratorCheckpointSerializer() {
+    public SimpleVersionedSerializer<MySqlSourceEnumState> getEnumeratorCheckpointSerializer() {
         return new MySqlSourceEnumStateSerializer(getSplitSerializer());
     }
 

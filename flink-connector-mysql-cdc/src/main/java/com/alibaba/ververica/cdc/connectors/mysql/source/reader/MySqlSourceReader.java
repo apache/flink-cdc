@@ -43,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,9 +52,9 @@ import java.util.stream.Collectors;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** The source reader for MySQL source splits. */
-public class MySqlSourceReader<T, SplitT extends MySqlSplit>
+public class MySqlSourceReader<T>
         extends SingleThreadMultiplexSourceReaderBase<
-                SourceRecord, T, SplitT, MySqlSplitState<SplitT>> {
+                SourceRecord, T, MySqlSplit, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
 
@@ -64,8 +63,8 @@ public class MySqlSourceReader<T, SplitT extends MySqlSplit>
 
     public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
-            Supplier<MySqlSplitReader<SplitT>> splitReaderSupplier,
-            RecordEmitter<SourceRecord, T, MySqlSplitState<SplitT>> recordEmitter,
+            Supplier<MySqlSplitReader> splitReaderSupplier,
+            RecordEmitter<SourceRecord, T, MySqlSplitState> recordEmitter,
             Configuration config,
             SourceReaderContext context) {
         super(
@@ -87,29 +86,29 @@ public class MySqlSourceReader<T, SplitT extends MySqlSplit>
 
     @Override
     @SuppressWarnings("unchecked")
-    protected MySqlSplitState<SplitT> initializedState(SplitT split) {
+    protected MySqlSplitState initializedState(MySqlSplit split) {
         if (split.isSnapshotSplit()) {
-            return (MySqlSplitState<SplitT>) new MySqlSnapshotSplitState(split.asSnapshotSplit());
+            return new MySqlSnapshotSplitState(split.asSnapshotSplit());
         } else {
-            return (MySqlSplitState<SplitT>) new MySqlBinlogSplitState(split.asBinlogSplit());
+            return new MySqlBinlogSplitState(split.asBinlogSplit());
         }
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public List<SplitT> snapshotState(long checkpointId) {
+    public List<MySqlSplit> snapshotState(long checkpointId) {
         // unfinished splits
-        List<SplitT> stateSplits = super.snapshotState(checkpointId);
+        List<MySqlSplit> stateSplits = super.snapshotState(checkpointId);
 
         // add finished snapshot splits that didn't receive ack yet
-        stateSplits.addAll((Collection<? extends SplitT>) finishedUnAckedSplits.values());
+        stateSplits.addAll(finishedUnAckedSplits.values());
         return stateSplits;
     }
 
     @Override
-    protected void onSplitFinished(Map<String, MySqlSplitState<SplitT>> finishedSplitIds) {
-        for (MySqlSplitState<SplitT> mySqlSplitState : finishedSplitIds.values()) {
-            SplitT mySqlSplit = mySqlSplitState.toMySqlSplit();
+    protected void onSplitFinished(Map<String, MySqlSplitState> finishedSplitIds) {
+        for (MySqlSplitState mySqlSplitState : finishedSplitIds.values()) {
+            MySqlSplit mySqlSplit = mySqlSplitState.toMySqlSplit();
             checkState(
                     mySqlSplit.isSnapshotSplit(),
                     String.format(
@@ -121,7 +120,7 @@ public class MySqlSourceReader<T, SplitT extends MySqlSplit>
     }
 
     @Override
-    public void addSplits(List<SplitT> splits) {
+    public void addSplits(List<MySqlSplit> splits) {
         // case for restore from state, notify split enumerator if there're finished snapshot splits
         // and has not report
         splits.stream()
@@ -183,7 +182,7 @@ public class MySqlSourceReader<T, SplitT extends MySqlSplit>
     }
 
     @Override
-    protected SplitT toSplitType(String splitId, MySqlSplitState<SplitT> splitState) {
+    protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState.toMySqlSplit();
     }
 }

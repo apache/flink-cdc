@@ -23,7 +23,7 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import javax.annotation.Nullable;
 
 /** The state of split to describe the binlog of MySql table(s). */
-public class MySqlSnapshotSplitState extends MySqlSplitState<MySqlSnapshotSplit> {
+public class MySqlSnapshotSplitState extends MySqlSplitState {
 
     @Nullable private BinlogOffset highWatermark;
 
@@ -42,14 +42,15 @@ public class MySqlSnapshotSplitState extends MySqlSplitState<MySqlSnapshotSplit>
     }
 
     public MySqlSnapshotSplit toMySqlSplit() {
+        final MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
         return new MySqlSnapshotSplit(
-                split.getTableId(),
-                split.splitId(),
-                split.getSplitKeyType(),
-                split.getSplitStart(),
-                split.getSplitEnd(),
+                snapshotSplit.asSnapshotSplit().getTableId(),
+                snapshotSplit.splitId(),
+                snapshotSplit.getSplitKeyType(),
+                snapshotSplit.getSplitStart(),
+                snapshotSplit.getSplitEnd(),
                 getHighWatermark(),
-                split.getTableSchemas());
+                snapshotSplit.getTableSchemas());
     }
 
     @Override

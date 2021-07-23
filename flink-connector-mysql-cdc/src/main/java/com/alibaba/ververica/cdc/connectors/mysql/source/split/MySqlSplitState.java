@@ -19,11 +19,11 @@
 package com.alibaba.ververica.cdc.connectors.mysql.source.split;
 
 /** State of the reader, essentially a mutable version of the {@link MySqlSplit}. */
-public abstract class MySqlSplitState<SplitT extends MySqlSplit> {
+public abstract class MySqlSplitState {
 
-    protected final SplitT split;
+    protected final MySqlSplit split;
 
-    public MySqlSplitState(SplitT split) {
+    public MySqlSplitState(MySqlSplit split) {
         this.split = split;
     }
 
@@ -51,5 +51,5 @@ public abstract class MySqlSplitState<SplitT extends MySqlSplit> {
 
     /** Use the current split state to create a new MySQLSplit. */
     @SuppressWarnings("unchecked")
-    public abstract SplitT toMySqlSplit();
+    public abstract MySqlSplit toMySqlSplit();
 }

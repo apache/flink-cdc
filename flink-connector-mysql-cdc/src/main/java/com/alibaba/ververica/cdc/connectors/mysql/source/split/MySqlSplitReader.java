@@ -46,8 +46,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.S
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getConnection;
 
 /** The {@link SplitReader} implementation for the {@link MySqlParallelSource}. */
-public class MySqlSplitReader<SplitT extends MySqlSplit>
-        implements SplitReader<SourceRecord, SplitT> {
+public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSplitReader.class);
     private final Queue<MySqlSplit> splits;
@@ -79,7 +78,7 @@ public class MySqlSplitReader<SplitT extends MySqlSplit>
     }
 
     @Override
-    public void handleSplitsChanges(SplitsChange<SplitT> splitsChanges) {
+    public void handleSplitsChanges(SplitsChange<MySqlSplit> splitsChanges) {
         if (!(splitsChanges instanceof SplitsAddition)) {
             throw new UnsupportedOperationException(
                     String.format(

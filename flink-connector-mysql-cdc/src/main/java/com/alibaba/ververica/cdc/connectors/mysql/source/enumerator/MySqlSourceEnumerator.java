@@ -54,8 +54,7 @@ import java.util.stream.Collectors;
  * A MySQL CDC source enumerator that enumerates receive the split request and assign the split to
  * source readers.
  */
-public class MySqlSourceEnumerator
-        implements SplitEnumerator<MySqlSplit, MySqlSourceEnumState<MySqlSplit>> {
+public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, MySqlSourceEnumState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceEnumerator.class);
 
@@ -177,8 +176,8 @@ public class MySqlSourceEnumerator
     }
 
     @Override
-    public MySqlSourceEnumState<MySqlSplit> snapshotState(long checkpointId) throws Exception {
-        return new MySqlSourceEnumState<>(
+    public MySqlSourceEnumState snapshotState(long checkpointId) throws Exception {
+        return new MySqlSourceEnumState(
                 snapshotSplitAssigner.remainingSplits(),
                 snapshotSplitAssigner.getAlreadyProcessedTables(),
                 assignedSnapshotSplits,
