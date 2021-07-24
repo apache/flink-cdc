@@ -46,7 +46,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import static org.apache.flink.util.Preconditions.checkState;
@@ -58,13 +57,11 @@ public class MySqlSourceReader<T>
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
 
-    // These maps need to be concurrent because it will be accessed by both the main thread
-    // and the split fetcher thread in the callback.
-    private final ConcurrentHashMap<String, MySqlSnapshotSplit> finishedUnAckedSplits;
+    private final HashMap<String, MySqlSnapshotSplit> finishedUnAckedSplits;
     // before the binlog split start, wait at least one complete checkpoint to
     // ensure the order of snapshot records and binlog records in parallel tasks
-    private final ConcurrentHashMap<MySqlBinlogSplit, Integer> binlogSplitWithCheckpointCnt;
-    private final ConcurrentHashMap<String, BinlogOffset> binlogSplitWithMinHighWatermark;
+    private final HashMap<MySqlBinlogSplit, Integer> binlogSplitWithCheckpointCnt;
+    private final HashMap<String, BinlogOffset> binlogSplitWithMinHighWatermark;
 
     private final int subtaskId;
 
@@ -80,9 +77,9 @@ public class MySqlSourceReader<T>
                 recordEmitter,
                 config,
                 context);
-        this.finishedUnAckedSplits = new ConcurrentHashMap<>();
-        this.binlogSplitWithCheckpointCnt = new ConcurrentHashMap<>();
-        this.binlogSplitWithMinHighWatermark = new ConcurrentHashMap<>();
+        this.finishedUnAckedSplits = new HashMap<>();
+        this.binlogSplitWithCheckpointCnt = new HashMap<>();
+        this.binlogSplitWithMinHighWatermark = new HashMap<>();
         this.subtaskId = context.getIndexOfSubtask();
     }
 
@@ -112,8 +109,7 @@ public class MySqlSourceReader<T>
 
         // add the initial binlog to state
         if (binlogSplitWithCheckpointCnt.size() > 0) {
-            stateSplits.addAll(
-                    Collections.singletonList(binlogSplitWithCheckpointCnt.keys().nextElement()));
+            stateSplits.addAll(binlogSplitWithCheckpointCnt.keySet());
         }
         return stateSplits;
     }
@@ -207,7 +203,8 @@ public class MySqlSourceReader<T>
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
         if (binlogSplitWithCheckpointCnt.size() > 0) {
-            MySqlBinlogSplit mySqlBinlogSplit = binlogSplitWithCheckpointCnt.keys().nextElement();
+            MySqlBinlogSplit mySqlBinlogSplit =
+                    binlogSplitWithCheckpointCnt.keySet().iterator().next();
 
             binlogSplitWithCheckpointCnt.put(
                     mySqlBinlogSplit, binlogSplitWithCheckpointCnt.get(mySqlBinlogSplit) + 1);

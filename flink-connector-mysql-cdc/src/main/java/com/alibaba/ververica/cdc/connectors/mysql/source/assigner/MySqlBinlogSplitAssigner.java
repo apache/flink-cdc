@@ -52,10 +52,6 @@ public class MySqlBinlogSplitAssigner extends MySqlSplitAssigner {
         super(configuration, definedPkType, alreadyProcessedTables, remainingSplits);
     }
 
-    public void open() {
-        super.open();
-    }
-
     /**
      * Gets the binlog split for latest-offset.
      *
@@ -90,9 +86,5 @@ public class MySqlBinlogSplitAssigner extends MySqlSplitAssigner {
                 return Optional.empty();
             }
         }
-    }
-
-    public void close() {
-        super.close();
     }
 }

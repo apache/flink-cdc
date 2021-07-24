@@ -21,6 +21,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
 
+import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 
 import java.util.Arrays;
@@ -63,8 +64,8 @@ public class SplitKeyUtils {
 
     public static boolean splitKeyIsAutoIncremented(RowType splitKeyType, Table actualTable) {
         final String splitKeyName = unquoteColumnName(splitKeyType.getFieldNames().get(0));
-        return !actualTable.primaryKeyColumnNames().isEmpty()
-                && actualTable.isAutoIncremented(splitKeyName);
+        final Column column = actualTable.columnWithName(splitKeyName);
+        return column != null && column.isAutoIncremented();
     }
 
     private static void validatePrimaryKey(

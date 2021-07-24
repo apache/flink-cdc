@@ -323,33 +323,4 @@ public class MySqlSnapshotSplitAssigner extends MySqlSplitAssigner {
         currentTableSplitSeq++;
         return splitId;
     }
-
-    public void close() {
-        if (jdbc != null) {
-            try {
-                jdbc.close();
-            } catch (SQLException e) {
-                LOG.error("Close jdbc connection error", e);
-            }
-        }
-    }
-
-    /**
-     * Adds a set of splits to this assigner. This happens for example when some split processing
-     * failed and the splits need to be re-added, or when new splits got discovered.
-     */
-    public void addSplits(Collection<MySqlSplit> splits) {
-        remainingSplits.addAll(splits);
-    }
-
-    public Collection<TableId> getAlreadyProcessedTables() {
-        return alreadyProcessedTables;
-    }
-
-    /**
-     * Gets the remaining splits for {@link #alreadyProcessedTables} that this assigner has pending.
-     */
-    public Collection<MySqlSplit> remainingSplits() {
-        return remainingSplits;
-    }
 }
