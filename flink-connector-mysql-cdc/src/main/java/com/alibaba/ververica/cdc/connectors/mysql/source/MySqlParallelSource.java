@@ -48,6 +48,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
@@ -112,9 +113,9 @@ public class MySqlParallelSource<T>
         // set the server id for each reader, will used by debezium reader
         Configuration readerConfiguration = config.clone();
         readerConfiguration.removeConfig(MySqlSourceOptions.SERVER_ID);
-        readerConfiguration.setString(
-                DATABASE_SERVER_ID,
-                getServerIdForSubTask(config, readerContext.getIndexOfSubtask()));
+        final Optional<String> serverId =
+                getServerIdForSubTask(config, readerContext.getIndexOfSubtask());
+        serverId.ifPresent(s -> readerConfiguration.setString(DATABASE_SERVER_ID, s));
         // set the DatabaseHistory name for each reader, will used by debezium reader
         readerConfiguration.setString(
                 DATABASE_HISTORY_INSTANCE_NAME,

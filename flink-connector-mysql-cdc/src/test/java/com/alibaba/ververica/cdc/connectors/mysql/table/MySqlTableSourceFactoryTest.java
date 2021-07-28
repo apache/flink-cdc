@@ -131,6 +131,37 @@ public class MySqlTableSourceFactoryTest {
     }
 
     @Test
+    public void testEnableParallelReadSourceWithSingleServerId() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("server-id", "123");
+        properties.put("scan.snapshot.chunk.size", "8000");
+        properties.put("scan.snapshot.fetch.size", "100");
+        properties.put("connect.timeout", "45s");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        "123",
+                        true,
+                        8000,
+                        100,
+                        Duration.ofSeconds(45),
+                        StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
     public void testEnableParallelReadSourceLatestOffset() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.snapshot.parallel-read", "true");
@@ -331,23 +362,7 @@ public class MySqlTableSourceFactoryTest {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    "The 'server.id' should contains single numeric ID, but is 123b")
-                            .isPresent());
-        }
-
-        // validate illegal server id range
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.snapshot.parallel-read", "true");
-            properties.put("server-id", "123");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The 'server-id' should be a range syntax like '5400-5404' when enable 'scan.snapshot.parallel-read', but actual is 123")
+                                    "The 'server-id' should contains single numeric ID like '5400' or numeric ID range '5400-5404', but actual is 123b")
                             .isPresent());
         }
 

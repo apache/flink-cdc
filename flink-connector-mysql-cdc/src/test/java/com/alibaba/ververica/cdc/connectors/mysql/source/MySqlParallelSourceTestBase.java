@@ -242,8 +242,8 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
 
     private String getServerId() {
         final Random random = new Random();
-        int serverIdStart = random.nextInt(100) + 5400;
-        return serverIdStart + "-" + (serverIdStart + PARALLELISM);
+        int serverId = random.nextInt(100) + 5400;
+        return serverId + "-" + (serverId + PARALLELISM);
     }
 
     private void sleepMs(long millis) {
