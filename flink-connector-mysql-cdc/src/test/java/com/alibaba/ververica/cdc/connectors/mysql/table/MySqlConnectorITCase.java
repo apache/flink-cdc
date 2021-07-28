@@ -632,11 +632,11 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     private String getServerId() {
         final Random random = new Random();
-        int serverIdStart = random.nextInt(100) + 5400;
+        int serverId = random.nextInt(100) + 5400;
         if (parallelRead) {
-            return serverIdStart + "-" + (serverIdStart + env.getParallelism());
+            return serverId + "-" + (serverId + env.getParallelism());
         }
-        return String.valueOf(serverIdStart);
+        return String.valueOf(serverId);
     }
 
     private int getSplitSize() {

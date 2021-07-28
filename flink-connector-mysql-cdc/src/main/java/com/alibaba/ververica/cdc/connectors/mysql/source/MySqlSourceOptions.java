@@ -25,6 +25,7 @@ import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.util.Preconditions;
 
 import java.time.Duration;
+import java.util.Optional;
 
 /** Configurations for {@link MySqlParallelSource}. */
 public class MySqlSourceOptions {
@@ -83,10 +84,10 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "A numeric ID or a numeric ID range of this database client, "
                                     + "The numeric ID syntax is like '5400', the numeric ID range syntax "
-                                    + "is like '5400-5408', The numeric ID range syntax is required when "
+                                    + "is like '5400-5408', The numeric ID range syntax is recommended when "
                                     + "'scan.snapshot.parallel-read' enabled. Every ID must be unique across all "
                                     + "currently-running database processes in the MySQL cluster. This connector"
-                                    + " joins the MySQL database cluster as another server (with this unique ID) "
+                                    + " joins the MySQL  cluster as another server (with this unique ID) "
                                     + "so it can read the binlog. By default, a random number is generated between"
                                     + " 5400 and 6400, though we recommend setting an explicit value.");
 
@@ -96,7 +97,7 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Enable parallel read snapshot of table or not, false by default."
-                                    + "The 'server-id' is required to be a range syntax like '5400,5408'.");
+                                    + "The 'server-id' is required to be a range syntax like '5400-5408'.");
 
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_CHUNK_SIZE =
             ConfigOptions.key("scan.snapshot.chunk.size")
@@ -152,57 +153,69 @@ public class MySqlSourceOptions {
     // utils
     public static String validateAndGetServerId(ReadableConfig configuration) {
         final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
-        // validate server id range
-        if (configuration.get(SCAN_SNAPSHOT_PARALLEL_READ)) {
-            String errMsg =
-                    "The '%s' should be a range syntax like '5400-5404' when enable '%s', "
-                            + "but actual is %s";
-            Preconditions.checkState(
-                    serverIdValue != null
-                            && serverIdValue.contains("-")
-                            && serverIdValue.split("-").length == 2,
-                    String.format(
-                            errMsg,
-                            SERVER_ID.key(),
-                            SCAN_SNAPSHOT_PARALLEL_READ.key(),
-                            serverIdValue));
-            try {
-                Integer.parseInt(serverIdValue.split("-")[0].trim());
-                Integer.parseInt(serverIdValue.split("-")[1].trim());
-            } catch (NumberFormatException e) {
-                throw new IllegalStateException(String.format(errMsg, serverIdValue), e);
-            }
-        } else {
-            // validate single server id
-            try {
-                if (serverIdValue != null) {
-                    Integer.parseInt(serverIdValue);
-                }
-            } catch (NumberFormatException e) {
-                throw new IllegalStateException(
+        if (serverIdValue != null) {
+            if (serverIdValue.contains("-")) {
+                String errMsg =
+                        "The '%s' should be a range syntax like '5400-5404' when enable '%s', "
+                                + "but actual is %s";
+                Preconditions.checkState(
+                        serverIdValue.split("-").length == 2,
                         String.format(
-                                "The 'server.id' should contains single numeric ID, but is %s",
-                                serverIdValue),
-                        e);
+                                errMsg,
+                                SERVER_ID.key(),
+                                SCAN_SNAPSHOT_PARALLEL_READ.key(),
+                                serverIdValue));
+                checkServerId(serverIdValue.split("-")[0].trim());
+                checkServerId(serverIdValue.split("-")[1].trim());
+            } else {
+                checkServerId(serverIdValue);
             }
         }
         return serverIdValue;
+    }
+
+    private static void checkServerId(String serverIdValue) {
+        try {
+            Integer.parseInt(serverIdValue);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    String.format(
+                            "The 'server-id' should contains single numeric ID like '5400' or numeric ID range '5400-5404', but actual is %s",
+                            serverIdValue),
+                    e);
+        }
     }
 
     public static int getServerId(String serverIdValue) {
         return Integer.parseInt(serverIdValue);
     }
 
-    public static String getServerIdForSubTask(Configuration configuration, int subtaskId) {
+    public static Optional<String> getServerIdForSubTask(
+            Configuration configuration, int subtaskId) {
         String serverIdRange = configuration.getString(MySqlSourceOptions.SERVER_ID);
-        int serverIdStart = Integer.parseInt(serverIdRange.split("-")[0].trim());
-        int serverIdEnd = Integer.parseInt(serverIdRange.split("-")[1].trim());
-        int serverId = serverIdStart + subtaskId;
-        Preconditions.checkState(
-                serverIdStart <= serverId && serverId <= serverIdEnd,
-                String.format(
-                        "The server id %s in task %d is out of server id range %s, please keep the job parallelism same with server id num of server id range.",
-                        serverId, subtaskId, serverIdRange));
-        return String.valueOf(serverId);
+        if (serverIdRange == null) {
+            return Optional.empty();
+        }
+        if (serverIdRange.contains("-")) {
+            int serverIdStart = Integer.parseInt(serverIdRange.split("-")[0].trim());
+            int serverIdEnd = Integer.parseInt(serverIdRange.split("-")[1].trim());
+            int serverId = serverIdStart + subtaskId;
+            Preconditions.checkState(
+                    serverIdStart <= serverId && serverId <= serverIdEnd,
+                    String.format(
+                            "The server id %s in task %d is out of server id range %s, please keep the job parallelism same with server id num of server id range.",
+                            serverId, subtaskId, serverIdRange));
+            return Optional.of(String.valueOf(serverId));
+        } else {
+            int serverIdStart = Integer.parseInt(serverIdRange);
+            if (subtaskId > 0) {
+                throw new IllegalStateException(
+                        String.format(
+                                "The server id should a range like '5400-5404' when %s enabled , but actual is %s",
+                                SCAN_SNAPSHOT_PARALLEL_READ.key(), serverIdRange));
+            } else {
+                return Optional.of(String.valueOf(serverIdStart));
+            }
+        }
     }
 }
