@@ -212,8 +212,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        super.open(parameters);
         validator.validate();
+        super.open(parameters);
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-engine").build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);

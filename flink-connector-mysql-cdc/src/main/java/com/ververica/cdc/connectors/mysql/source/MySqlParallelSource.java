@@ -32,6 +32,7 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
@@ -125,19 +126,22 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) {
+        MySqlValidator validator =
+                new MySqlValidator(io.debezium.config.Configuration.from(config.toMap()));
 
         final MySqlSplitAssigner splitAssigner =
                 startupMode.equals("initial")
                         ? new MySqlHybridSplitAssigner(config)
                         : new MySqlBinlogSplitAssigner(config);
 
-        return new MySqlSourceEnumerator(enumContext, splitAssigner);
+        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
     }
 
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
-
+        MySqlValidator validator =
+                new MySqlValidator(io.debezium.config.Configuration.from(config.toMap()));
         final MySqlSplitAssigner splitAssigner;
         if (checkpoint instanceof HybridPendingSplitsState) {
             splitAssigner =
@@ -150,7 +154,7 @@ public class MySqlParallelSource<T>
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
 
-        return new MySqlSourceEnumerator(enumContext, splitAssigner);
+        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
     }
 
     @Override

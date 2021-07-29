@@ -43,16 +43,18 @@ public class MySqlValidator implements Validator, Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final Properties properties;
+    private final Configuration configuration;
 
     public MySqlValidator(Properties properties) {
-        this.properties = properties;
+        this(Configuration.from(properties));
+    }
+
+    public MySqlValidator(Configuration configuration) {
+        this.configuration = configuration;
     }
 
     @Override
     public void validate() {
-        Configuration configuration = Configuration.from(properties);
-
         try (MySqlConnection connection =
                 new MySqlConnection(new MySqlConnectionConfiguration(configuration))) {
             if (!isVersionSatisfied(connection)) {

@@ -23,6 +23,7 @@ import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.alibaba.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
@@ -52,19 +53,24 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     private final SplitEnumeratorContext<MySqlSplit> context;
     private final MySqlSplitAssigner splitAssigner;
+    private final MySqlValidator validator;
 
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
 
     public MySqlSourceEnumerator(
-            SplitEnumeratorContext<MySqlSplit> context, MySqlSplitAssigner splitAssigner) {
+            SplitEnumeratorContext<MySqlSplit> context,
+            MySqlSplitAssigner splitAssigner,
+            MySqlValidator validator) {
         this.context = context;
         this.splitAssigner = splitAssigner;
+        this.validator = validator;
         this.readersAwaitingSplit = new TreeSet<>();
     }
 
     @Override
     public void start() {
+        validator.validate();
         splitAssigner.open();
         this.context.callAsync(
                 this::getRegisteredReader,

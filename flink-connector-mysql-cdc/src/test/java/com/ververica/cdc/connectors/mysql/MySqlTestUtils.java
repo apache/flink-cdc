@@ -25,25 +25,19 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
-import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
-import com.jayway.jsonpath.JsonPath;
-import com.ververica.cdc.connectors.mysql.source.utils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -51,84 +45,25 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertEquals;
-
 /** Utils to help test. */
 public class MySqlTestUtils {
 
-    /** Gets the latest offset of current MySQL server. */
-    public static Tuple2<String, Integer> currentMySQLLatestOffset(
-            UniqueDatabase database,
-            String table,
-            int expectedRecordCount,
-            boolean useLegacyImplementation)
-            throws Exception {
-        DebeziumSourceFunction<SourceRecord> source =
-                MySqlSource.<SourceRecord>builder()
-                        .hostname(database.getHost())
-                        .port(database.getDatabasePort())
-                        .databaseList(database.getDatabaseName())
-                        .tableList(database.getDatabaseName() + "." + table)
-                        .username(database.getUsername())
-                        .password(database.getPassword())
-                        .deserializer(new ForwardDeserializeSchema())
-                        .debeziumProperties(createDebeziumProperties(useLegacyImplementation))
-                        .build();
-        final TestingListState<byte[]> offsetState = new TestingListState<>();
-        final TestingListState<String> historyState = new TestingListState<>();
-
-        // ---------------------------------------------------------------------------
-        // Step-1: start source
-        // ---------------------------------------------------------------------------
-        TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
-        setupSource(source, false, offsetState, historyState, true, 0, 1);
-        final CheckedThread runThread =
-                new CheckedThread() {
-                    @Override
-                    public void go() throws Exception {
-                        source.run(sourceContext);
-                    }
-                };
-        runThread.start();
-
-        drain(sourceContext, expectedRecordCount);
-
-        // ---------------------------------------------------------------------------
-        // Step-2: trigger checkpoint-1 after snapshot finished
-        // ---------------------------------------------------------------------------
-        synchronized (sourceContext.getCheckpointLock()) {
-            // trigger checkpoint-1
-            source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
-        }
-
-        assertEquals(1, offsetState.list.size());
-        String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-        String offsetFile = JsonPath.read(state, "$.sourceOffset.file");
-        int offsetPos = JsonPath.read(state, "$.sourceOffset.pos");
-
-        source.cancel();
-        source.close();
-        runThread.sync();
-
-        return Tuple2.of(offsetFile, offsetPos);
-    }
-
-    public static MySqlSource.Builder<SourceRecord> basicSourceBuilder(
-            MySqlContainer container, UniqueDatabase database, boolean useLegacyImplementation) {
+    static MySqlSource.Builder<SourceRecord> basicSourceBuilder(
+            UniqueDatabase database, boolean useLegacyImplementation) {
         Properties debeziumProps = createDebeziumProperties(useLegacyImplementation);
         return MySqlSource.<SourceRecord>builder()
-                .hostname(container.getHost())
-                .port(container.getDatabasePort())
+                .hostname(database.getHost())
+                .port(database.getDatabasePort())
                 .databaseList(database.getDatabaseName())
                 .tableList(
                         database.getDatabaseName() + "." + "products") // monitor table "products"
-                .username(container.getUsername())
-                .password(container.getPassword())
+                .username(database.getUsername())
+                .password(database.getPassword())
                 .deserializer(new ForwardDeserializeSchema())
                 .debeziumProperties(debeziumProps);
     }
 
-    public static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
+    static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
         setupSource(
                 source, false, null, null,
                 true, // enable checkpointing; auto commit should be ignored
