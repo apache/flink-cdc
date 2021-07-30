@@ -30,7 +30,9 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
+import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
@@ -120,10 +122,20 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                                 appendBinlogSplit.getStartingOffset().getPosition());
                         // execute binlog read task
                         if (snapshotResult.isCompletedOrSkipped()) {
+                            // we should only capture events for the current table,
+                            // otherwise, we may can't find corresponding schema
+                            Configuration dezConf =
+                                    statefulTaskContext
+                                            .getDezConf()
+                                            .edit()
+                                            .with(
+                                                    "table.whitelist",
+                                                    currentSnapshotSplit.getTableId())
+                                            .build();
                             // task to read binlog for current split
                             MySqlBinlogSplitReadTask splitBinlogReadTask =
                                     new MySqlBinlogSplitReadTask(
-                                            statefulTaskContext.getConnectorConfig(),
+                                            new MySqlConnectorConfig(dezConf),
                                             mySqlOffsetContext,
                                             statefulTaskContext.getConnection(),
                                             statefulTaskContext.getDispatcher(),

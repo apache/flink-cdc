@@ -102,9 +102,9 @@ public class MySqlTableSourceFactoryTest {
     @Test
     public void testEnableParallelReadSource() {
         Map<String, String> properties = getAllOptions();
-        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123-126");
-        properties.put("scan.snapshot.chunk.size", "8000");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
 
@@ -164,7 +164,7 @@ public class MySqlTableSourceFactoryTest {
     @Test
     public void testEnableParallelReadSourceLatestOffset() {
         Map<String, String> properties = getAllOptions();
-        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123-126");
         properties.put("scan.startup.mode", "latest-offset");
 
@@ -366,6 +366,22 @@ public class MySqlTableSourceFactoryTest {
                             .isPresent());
         }
 
+        // validate illegal server id range
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("server-id", "123");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The 'server-id' should be a range syntax like '5400-5404' when enable 'scan.incremental.snapshot.enabled', but actual is 123")
+                            .isPresent());
+        }
+
         // validate missing required
         Factory factory = new MySqlTableSourceFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
@@ -421,7 +437,7 @@ public class MySqlTableSourceFactoryTest {
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);
-        options.put("scan.snapshot.parallel-read", String.valueOf(false));
+        options.put("scan.incremental.snapshot.enabled", String.valueOf(false));
         return options;
     }
 

@@ -33,8 +33,8 @@ import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlBinlogSplitAssigner;
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -65,7 +65,6 @@ import java.util.stream.Collectors;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
@@ -116,7 +115,14 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                     "+I[123, user_9, Shanghai, 123567891234]"
                 };
         List<String> actual =
-                readBinlogSplits(splits, dataType, pkType, configuration, 1, expected.length);
+                readBinlogSplits(
+                        splits,
+                        dataType,
+                        pkType,
+                        configuration,
+                        1,
+                        expected.length,
+                        splits.get(splits.size() - 1).getTableId());
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
@@ -173,7 +179,13 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                 };
         List<String> actual =
                 readBinlogSplits(
-                        splits, dataType, pkType, configuration, splits.size(), expected.length);
+                        splits,
+                        dataType,
+                        pkType,
+                        configuration,
+                        splits.size(),
+                        expected.length,
+                        splits.get(splits.size() - 1).getTableId());
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
@@ -207,7 +219,13 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
 
         List<String> actual =
                 readBinlogSplits(
-                        splits, dataType, pkType, configuration, splits.size(), expected.length);
+                        splits,
+                        dataType,
+                        pkType,
+                        configuration,
+                        splits.size(),
+                        expected.length,
+                        splits.get(splits.size() - 1).getTableId());
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
@@ -259,7 +277,17 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                 };
         List<String> actual =
                 readBinlogSplits(
-                        splits, dataType, pkType, configuration, splits.size(), expected.length);
+                        splits,
+                        dataType,
+                        pkType,
+                        configuration,
+                        splits.size(),
+                        expected.length,
+                        // make the result deterministic
+                        TableId.parse(
+                                customerDatabase.getDatabaseName()
+                                        + "."
+                                        + "customer_card_single_line"));
         assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
     }
 
@@ -305,9 +333,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                 new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
 
         // step-1: create binlog split
-        MySqlBinlogSplitAssigner binlogSplitAssigner =
-                new MySqlBinlogSplitAssigner(
-                        configuration, pkType, new ArrayList<>(), new ArrayList<>());
+        MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(configuration);
         binlogSplitAssigner.open();
         MySqlSplit binlogSplit = binlogSplitAssigner.getNext().get();
 
@@ -347,7 +373,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
             RowType pkType,
             Configuration configuration,
             int scanSplitsNum,
-            int expectedSize)
+            int expectedSize,
+            TableId binlogChangeTableId)
             throws Exception {
         final StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
@@ -378,10 +405,9 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         for (MySqlSplit mySqlSplit : sqlSplits) {
             tableSchemas.putAll(mySqlSplit.getTableSchemas());
         }
-        TableId tableId = sqlSplits.get(sqlSplits.size() - 1).getTableId();
         MySqlSplit binlogSplit =
                 new MySqlBinlogSplit(
-                        BINLOG_SPLIT_ID,
+                        "binlog-split",
                         pkType,
                         startingOffset,
                         BinlogOffset.NO_STOPPING_OFFSET,
@@ -393,11 +419,14 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         binlogReader.submitSplit(binlogSplit);
 
         // step-4: make some binlog events
-        if (tableId.table().contains("customers")) {
+        if (binlogChangeTableId.table().contains("customers")) {
             makeCustomersBinlogEvents(
-                    statefulTaskContext.getConnection(), tableId.toString(), scanSplitsNum == 1);
+                    statefulTaskContext.getConnection(),
+                    binlogChangeTableId.toString(),
+                    scanSplitsNum == 1);
         } else {
-            makeCustomerCardsBinlogEvents(statefulTaskContext.getConnection(), tableId.toString());
+            makeCustomerCardsBinlogEvents(
+                    statefulTaskContext.getConnection(), binlogChangeTableId.toString());
         }
 
         // step-5: fetched all produced binlog data and format them
@@ -557,9 +586,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
     }
 
     private List<MySqlSnapshotSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
-        final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(
-                        configuration, pkType, new ArrayList<>(), new ArrayList<>());
+        final MySqlSnapshotSplitAssigner assigner = new MySqlSnapshotSplitAssigner(configuration);
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {
@@ -583,7 +610,6 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.whitelist", customerDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id-range", "1001-1002");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
@@ -593,7 +619,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         properties.put("table.whitelist", String.join(",", captureTableIds));
-        properties.put("scan.snapshot.chunk.size", "10");
+        properties.put("scan.incremental.snapshot.chunk.size", "10");
         properties.put("scan.snapshot.fetch.size", "2");
 
         return Configuration.fromMap(properties);

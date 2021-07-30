@@ -20,6 +20,7 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.utils;
 
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
@@ -30,18 +31,85 @@ import java.util.Iterator;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.RecordUtils.rowToArray;
+
 /** Utils to prepare SQL statement. */
 public class StatementUtils {
 
     private StatementUtils() {}
 
-    public static String buildSplitBoundaryQuery(
+    public static Object[] queryMinMax(MySqlConnection jdbc, TableId tableId, String columnName)
+            throws SQLException {
+        final String minMaxQuery =
+                String.format(
+                        "SELECT MIN(%s), MAX(%s) FROM %s",
+                        quote(columnName), quote(columnName), quote(tableId));
+        return jdbc.queryAndMap(
+                minMaxQuery,
+                rs -> {
+                    if (!rs.next()) {
+                        // this should never happen
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]",
+                                        minMaxQuery));
+                    }
+                    return rowToArray(rs, 2);
+                });
+    }
+
+    public static Object queryMin(
+            MySqlConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+            throws SQLException {
+        final String minQuery =
+                String.format(
+                        "SELECT MIN(%s) FROM %s WHERE %s > ?",
+                        quote(columnName), quote(tableId), quote(columnName));
+        return jdbc.prepareQueryAndMap(
+                minQuery,
+                ps -> ps.setObject(1, excludedLowerBound),
+                rs -> {
+                    if (!rs.next()) {
+                        // this should never happen
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]", minQuery));
+                    }
+                    return rs.getObject(1);
+                });
+    }
+
+    public static Object queryNextChunkMax(
+            MySqlConnection jdbc,
             TableId tableId,
-            RowType pkRowType,
-            boolean isFirstSplit,
-            boolean isLastSplit,
-            int maxSplitSize) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, maxSplitSize, false);
+            String splitColumnName,
+            int chunkSize,
+            Object includedLowerBound)
+            throws SQLException {
+        String quotedColumn = quote(splitColumnName);
+        String query =
+                String.format(
+                        "SELECT MAX(%s) FROM ("
+                                + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC LIMIT %s"
+                                + ") AS T",
+                        quotedColumn,
+                        quotedColumn,
+                        quote(tableId),
+                        quotedColumn,
+                        quotedColumn,
+                        chunkSize);
+        return jdbc.prepareQueryAndMap(
+                query,
+                ps -> ps.setObject(1, includedLowerBound),
+                rs -> {
+                    if (!rs.next()) {
+                        // this should never happen
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]", query));
+                    }
+                    return rs.getObject(1);
+                });
     }
 
     public static String buildSplitScanQuery(
@@ -56,9 +124,11 @@ public class StatementUtils {
             boolean isLastSplit,
             int limitSize,
             boolean isScanningData) {
-        String condition = null;
+        final String condition;
 
-        if (isFirstSplit) {
+        if (isFirstSplit && isLastSplit) {
+            condition = null;
+        } else if (isFirstSplit) {
             final StringBuilder sql = new StringBuilder();
             addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?");
             if (isScanningData) {
@@ -100,37 +170,6 @@ public class StatementUtils {
         }
     }
 
-    public static PreparedStatement readTableSplitStatement(
-            JdbcConnection jdbc,
-            String sql,
-            boolean isFirstSplit,
-            boolean isLastSplit,
-            Object[] maxPrimaryKey,
-            Object[] prevSplitEnd,
-            int primaryKeyNum,
-            int fetchSize) {
-        try {
-            final PreparedStatement statement = initStatement(jdbc, sql, fetchSize);
-            if (isFirstSplit) {
-                for (int i = 0; i < primaryKeyNum; i++) {
-                    statement.setObject(i + 1, maxPrimaryKey[i]);
-                }
-            } else if (isLastSplit) {
-                for (int i = 0; i < primaryKeyNum; i++) {
-                    statement.setObject(i + 1, maxPrimaryKey[i]);
-                }
-            } else {
-                for (int i = 0; i < primaryKeyNum; i++) {
-                    statement.setObject(i + 1, prevSplitEnd[i]);
-                    statement.setObject(i + 1 + primaryKeyNum, maxPrimaryKey[i]);
-                }
-            }
-            return statement;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to build the table split statement.", e);
-        }
-    }
-
     public static PreparedStatement readTableSplitDataStatement(
             JdbcConnection jdbc,
             String sql,
@@ -142,6 +181,9 @@ public class StatementUtils {
             int fetchSize) {
         try {
             final PreparedStatement statement = initStatement(jdbc, sql, fetchSize);
+            if (isFirstSplit && isLastSplit) {
+                return statement;
+            }
             if (isFirstSplit) {
                 for (int i = 0; i < primaryKeyNum; i++) {
                     statement.setObject(i + 1, splitEnd[i]);
@@ -164,30 +206,12 @@ public class StatementUtils {
         }
     }
 
-    public static String buildMaxSplitKeyQuery(TableId tableId, RowType splitKeyRowType) {
-        final String orderBy =
-                splitKeyRowType.getFieldNames().stream().collect(Collectors.joining(" DESC, "))
-                        + " DESC";
-        return buildSelectWithRowLimits(
-                tableId,
-                1,
-                splitKeyRowType.getFieldNames().stream().collect(Collectors.joining(",")),
-                Optional.empty(),
-                Optional.of(orderBy));
-    }
-
-    public static String buildMinMaxSplitKeyQuery(TableId tableId, String splitKeyFieldName) {
-        final String projection =
-                String.format("MIN(%s), MAX(%s)", splitKeyFieldName, splitKeyFieldName);
-        return buildSelectWithRowLimits(tableId, 1, projection, Optional.empty(), Optional.empty());
-    }
-
     public static String quote(String dbOrTableName) {
         return "`" + dbOrTableName + "`";
     }
 
     public static String quote(TableId tableId) {
-        return quote(tableId.catalog()) + "." + quote(tableId.table());
+        return tableId.toQuotedString('`');
     }
 
     private static PreparedStatement initStatement(JdbcConnection jdbc, String sql, int fetchSize)

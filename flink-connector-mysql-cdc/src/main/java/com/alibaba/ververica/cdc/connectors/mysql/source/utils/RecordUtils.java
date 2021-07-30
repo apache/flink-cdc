@@ -313,6 +313,10 @@ public class RecordUtils {
     /** Returns the specific key contains in the split key range or not. */
     public static boolean splitKeyRangeContains(
             Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
+        // for all range
+        if (splitKeyStart == null && splitKeyEnd == null) {
+            return true;
+        }
         // first split
         if (splitKeyStart == null) {
             int[] upperBoundRes = new int[key.length];

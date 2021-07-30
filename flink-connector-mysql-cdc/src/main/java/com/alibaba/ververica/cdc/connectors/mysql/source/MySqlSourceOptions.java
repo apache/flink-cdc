@@ -85,26 +85,31 @@ public class MySqlSourceOptions {
                             "A numeric ID or a numeric ID range of this database client, "
                                     + "The numeric ID syntax is like '5400', the numeric ID range syntax "
                                     + "is like '5400-5408', The numeric ID range syntax is recommended when "
-                                    + "'scan.snapshot.parallel-read' enabled. Every ID must be unique across all "
+                                    + "'scan.incremental.snapshot.enabled' enabled. Every ID must be unique across all "
                                     + "currently-running database processes in the MySQL cluster. This connector"
                                     + " joins the MySQL  cluster as another server (with this unique ID) "
                                     + "so it can read the binlog. By default, a random number is generated between"
                                     + " 5400 and 6400, though we recommend setting an explicit value.");
 
     public static final ConfigOption<Boolean> SCAN_SNAPSHOT_PARALLEL_READ =
-            ConfigOptions.key("scan.snapshot.parallel-read")
+            ConfigOptions.key("scan.incremental.snapshot.enabled")
                     .booleanType()
                     .defaultValue(true)
                     .withDescription(
-                            "Enable parallel read snapshot of table or not, false by default."
-                                    + "The 'server-id' is required to be a range syntax like '5400-5408'.");
+                            "Incremental snapshot is a new mechanism to read snapshot of a table. "
+                                    + "Compared to the old snapshot mechanism, the incremental snapshot has many advantages, including:\n"
+                                    + "(1) source can be parallel during snapshot reading, \n"
+                                    + "(2) source can perform checkpoints in the chunk granularity during snapshot reading, \n"
+                                    + "(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.\n"
+                                    + "If you would like the source run in parallel, each parallel reader should have an unique server id, "
+                                    + "so the 'server-id' must be a range like '5400-6400', and the range must be larger than the parallelism.");
 
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_CHUNK_SIZE =
-            ConfigOptions.key("scan.snapshot.chunk.size")
+            ConfigOptions.key("scan.incremental.snapshot.chunk.size")
                     .intType()
                     .defaultValue(8096)
                     .withDescription(
-                            "The chunk size of table snapshot, the table is cut to multiple chunks when read the snapshot of table.");
+                            "The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.");
 
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
             ConfigOptions.key("scan.snapshot.fetch.size")

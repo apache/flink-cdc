@@ -18,6 +18,7 @@
 
 package com.alibaba.ververica.cdc.connectors.mysql.source;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.Source;
@@ -30,13 +31,14 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.table.types.logical.RowType;
 
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlBinlogSplitAssigner;
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSplitAssigner;
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumState;
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumStateSerializer;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
@@ -46,8 +48,6 @@ import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSeriali
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -68,21 +68,18 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptio
  *
  * @param <T> The record type.
  */
+@Internal
 public class MySqlParallelSource<T>
-        implements Source<T, MySqlSplit, MySqlSourceEnumState>, ResultTypeQueryable<T> {
+        implements Source<T, MySqlSplit, PendingSplitsState>, ResultTypeQueryable<T> {
 
     private static final long serialVersionUID = 1L;
 
-    private final RowType splitKeyRowType;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
     private final Configuration config;
     private final String startupMode;
 
     public MySqlParallelSource(
-            RowType splitKeyRowType,
-            DebeziumDeserializationSchema<T> deserializationSchema,
-            Configuration config) {
-        this.splitKeyRowType = splitKeyRowType;
+            DebeziumDeserializationSchema<T> deserializationSchema, Configuration config) {
         this.deserializationSchema = deserializationSchema;
         this.config = config;
         this.startupMode = config.get(SCAN_STARTUP_MODE);
@@ -126,44 +123,34 @@ public class MySqlParallelSource<T>
     }
 
     @Override
-    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> createEnumerator(
-            SplitEnumeratorContext<MySqlSplit> enumContext) throws Exception {
+    public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
+            SplitEnumeratorContext<MySqlSplit> enumContext) {
 
         final MySqlSplitAssigner splitAssigner =
                 startupMode.equals("initial")
-                        ? new MySqlSnapshotSplitAssigner(
-                                config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>())
-                        : new MySqlBinlogSplitAssigner(
-                                config, this.splitKeyRowType, new ArrayList<>(), new ArrayList<>());
+                        ? new MySqlHybridSplitAssigner(config)
+                        : new MySqlBinlogSplitAssigner(config);
 
-        return new MySqlSourceEnumerator(
-                enumContext, splitAssigner, new HashMap<>(), new HashMap<>(), false);
+        return new MySqlSourceEnumerator(enumContext, splitAssigner);
     }
 
     @Override
-    public SplitEnumerator<MySqlSplit, MySqlSourceEnumState> restoreEnumerator(
-            SplitEnumeratorContext<MySqlSplit> enumContext, MySqlSourceEnumState checkpoint)
-            throws Exception {
+    public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
+            SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
 
-        final MySqlSplitAssigner splitAssigner =
-                startupMode.equals("initial")
-                        ? new MySqlSnapshotSplitAssigner(
-                                config,
-                                this.splitKeyRowType,
-                                checkpoint.getAlreadyProcessedTables(),
-                                checkpoint.getRemainingSplits())
-                        : new MySqlBinlogSplitAssigner(
-                                config,
-                                this.splitKeyRowType,
-                                checkpoint.getAlreadyProcessedTables(),
-                                checkpoint.getRemainingSplits());
+        final MySqlSplitAssigner splitAssigner;
+        if (checkpoint instanceof HybridPendingSplitsState) {
+            splitAssigner =
+                    new MySqlHybridSplitAssigner(config, (HybridPendingSplitsState) checkpoint);
+        } else if (checkpoint instanceof BinlogPendingSplitsState) {
+            splitAssigner =
+                    new MySqlBinlogSplitAssigner(config, (BinlogPendingSplitsState) checkpoint);
+        } else {
+            throw new UnsupportedOperationException(
+                    "Unsupported restored PendingSplitsState: " + checkpoint);
+        }
 
-        return new MySqlSourceEnumerator(
-                enumContext,
-                splitAssigner,
-                checkpoint.getAssignedSnapshotSplits(),
-                checkpoint.getFinishedSnapshotSplits(),
-                checkpoint.isBinlogSplitAssigned());
+        return new MySqlSourceEnumerator(enumContext, splitAssigner);
     }
 
     @Override
@@ -172,8 +159,8 @@ public class MySqlParallelSource<T>
     }
 
     @Override
-    public SimpleVersionedSerializer<MySqlSourceEnumState> getEnumeratorCheckpointSerializer() {
-        return new MySqlSourceEnumStateSerializer(getSplitSerializer());
+    public SimpleVersionedSerializer<PendingSplitsState> getEnumeratorCheckpointSerializer() {
+        return new PendingSplitsStateSerializer(getSplitSerializer());
     }
 
     @Override

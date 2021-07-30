@@ -123,14 +123,14 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
                                 + " primary key (id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
-                                + " 'scan.snapshot.parallel-read' = 'true',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.snapshot.chunk.size' = '1024',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '1024',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),

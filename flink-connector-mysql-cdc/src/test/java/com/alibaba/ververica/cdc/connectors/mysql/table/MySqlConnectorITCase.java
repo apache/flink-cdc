@@ -115,9 +115,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.snapshot.chunk.size' = '%s'"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -211,7 +211,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
         String sourceDDL =
                 String.format(
                         "CREATE TABLE full_types (\n"
-                                + "    id INT NOT NULL,\n"
+                                + "    `id` INT NOT NULL,\n"
                                 + "    tiny_c TINYINT,\n"
                                 + "    tiny_un_c SMALLINT ,\n"
                                 + "    small_c SMALLINT,\n"
@@ -233,7 +233,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + "    datetime6_c TIMESTAMP(6),\n"
                                 + "    timestamp_c TIMESTAMP(0),\n"
                                 + "    file_uuid BYTES,\n"
-                                + "    primary key (id) not enforced"
+                                + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -243,9 +243,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.snapshot.chunk.size' = '%s'"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -326,7 +326,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'latest-offset',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
@@ -412,7 +412,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'scan.startup.mode' = 'specific-offset',"
                                 + " 'scan.startup.specific-offset.file' = '%s',"
                                 + " 'scan.startup.specific-offset.pos' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -489,7 +489,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'earliest-offset',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -574,7 +574,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'timestamp',"
                                 + " 'scan.startup.timestamp-millis' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),

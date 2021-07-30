@@ -32,7 +32,7 @@ import org.apache.flink.util.Collector;
 import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.alibaba.ververica.cdc.connectors.mysql.source.assigner.MySqlSnapshotSplitAssigner;
+import com.alibaba.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -277,9 +277,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
     }
 
     private List<MySqlSplit> getMySQLSplits(Configuration configuration, RowType pkType) {
-        final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(
-                        configuration, pkType, new ArrayList<>(), new ArrayList<>());
+        final MySqlSnapshotSplitAssigner assigner = new MySqlSnapshotSplitAssigner(configuration);
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
@@ -314,7 +312,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
                         .collect(Collectors.toList());
         properties.put("table.whitelist", String.join(",", captureTableIds));
 
-        properties.put("scan.snapshot.chunk.size", "10");
+        properties.put("scan.incremental.snapshot.chunk.size", "10");
         properties.put("scan.snapshot.fetch.size", "2");
         return Configuration.fromMap(properties);
     }
