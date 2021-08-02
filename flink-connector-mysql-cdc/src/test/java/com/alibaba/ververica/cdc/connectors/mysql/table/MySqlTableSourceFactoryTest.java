@@ -44,9 +44,9 @@ import java.util.Map;
 import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.CONNECT_TIMEOUT;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_PARALLEL_READ;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -92,7 +92,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -133,9 +133,9 @@ public class MySqlTableSourceFactoryTest {
     @Test
     public void testEnableParallelReadSourceWithSingleServerId() {
         Map<String, String> properties = getAllOptions();
-        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123");
-        properties.put("scan.snapshot.chunk.size", "8000");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
 
@@ -182,8 +182,8 @@ public class MySqlTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         "123-126",
-                        SCAN_SNAPSHOT_PARALLEL_READ.defaultValue(),
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.latest());
@@ -214,7 +214,7 @@ public class MySqlTableSourceFactoryTest {
                         dbzProperties,
                         "4321",
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -247,7 +247,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         "4321",
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.specificOffset(offsetFile, offsetPos));
@@ -274,7 +274,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -301,7 +301,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.earliest());
@@ -328,7 +328,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.latest());
@@ -363,22 +363,6 @@ public class MySqlTableSourceFactoryTest {
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
                                     "The 'server-id' should contains single numeric ID like '5400' or numeric ID range '5400-5404', but actual is 123b")
-                            .isPresent());
-        }
-
-        // validate illegal server id range
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("server-id", "123");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The 'server-id' should be a range syntax like '5400-5404' when enable 'scan.incremental.snapshot.enabled', but actual is 123")
                             .isPresent());
         }
 

@@ -40,9 +40,9 @@ import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptio
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.HOSTNAME;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PASSWORD;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PORT;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_PARALLEL_READ;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
@@ -72,14 +72,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         int port = config.get(PORT);
-        int splitSize = config.get(SCAN_SNAPSHOT_CHUNK_SIZE);
+        int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
         String serverId = validateAndGetServerId(config);
-        boolean enableParallelRead = config.get(SCAN_SNAPSHOT_PARALLEL_READ);
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         StartupOptions startupOptions = getStartupOptions(config);
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
@@ -131,8 +131,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
-        options.add(SCAN_SNAPSHOT_PARALLEL_READ);
-        options.add(SCAN_SNAPSHOT_CHUNK_SIZE);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
         return options;
@@ -185,7 +185,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             throw new ValidationException(
                     String.format(
                             "The primary key is necessary when enable '%s' to 'true'",
-                            SCAN_SNAPSHOT_PARALLEL_READ));
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED));
         }
     }
 

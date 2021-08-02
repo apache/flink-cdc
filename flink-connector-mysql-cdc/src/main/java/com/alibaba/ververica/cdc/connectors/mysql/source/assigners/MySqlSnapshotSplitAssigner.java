@@ -49,7 +49,7 @@ import static com.alibaba.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createTableFilters;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
 import static com.alibaba.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -57,7 +57,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
  * range and chunk size.
  *
- * @see MySqlSourceOptions#SCAN_SNAPSHOT_CHUNK_SIZE
+ * @see MySqlSourceOptions#SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE
  */
 public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitAssigner.class);
@@ -114,13 +114,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.assignerFinished = assignerFinished;
         this.remainingTables = new LinkedList<>();
         this.tableFilters = createTableFilters(configuration);
-        this.chunkSize = configuration.get(SCAN_SNAPSHOT_CHUNK_SIZE);
+        this.chunkSize = configuration.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         // TODO: the check should happen in factory
         checkState(
                 chunkSize > 1,
                 String.format(
                         "The value of option '%s' must larger than 1, but is %d",
-                        SCAN_SNAPSHOT_CHUNK_SIZE.key(), chunkSize));
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), chunkSize));
     }
 
     @Override
