@@ -175,7 +175,7 @@ class ChunkSplitter {
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             if (count % SLEEP_INTERVAL == 0) {
                 try {
-                    Thread.sleep(1);
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
                     // nothing to do
                 }
