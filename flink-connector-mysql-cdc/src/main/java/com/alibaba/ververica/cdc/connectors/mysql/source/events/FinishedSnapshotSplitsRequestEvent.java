@@ -21,31 +21,16 @@ package com.alibaba.ververica.cdc.connectors.mysql.source.events;
 import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
-import com.alibaba.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
-import java.util.Map;
-
 /**
- * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
- * notify the snapshot split has read finished.
+ * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
+ * notify reader should report its finished snapshot splits, i.e. sending {@link
+ * FinishedSnapshotSplitsReportEvent}.
  */
-public class SourceReaderReportEvent implements SourceEvent {
+public class FinishedSnapshotSplitsRequestEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    private final Map<String, BinlogOffset> finishedSnapshotSplits;
-
-    public SourceReaderReportEvent(Map<String, BinlogOffset> finishedSnapshotSplits) {
-        this.finishedSnapshotSplits = finishedSnapshotSplits;
-    }
-
-    public Map<String, BinlogOffset> getFinishedSnapshotSplits() {
-        return finishedSnapshotSplits;
-    }
-
-    @Override
-    public String toString() {
-        return "SourceReaderReportEvent{" + "finishedSplits=" + finishedSnapshotSplits + '}';
-    }
+    public FinishedSnapshotSplitsRequestEvent() {}
 }

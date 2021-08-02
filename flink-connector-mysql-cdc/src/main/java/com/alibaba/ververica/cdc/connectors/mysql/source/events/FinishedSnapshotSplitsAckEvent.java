@@ -27,15 +27,16 @@ import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * notify the split has received.
+ * notify the finished snapshot splits has been received, i.e. acknowledge for {@link
+ * FinishedSnapshotSplitsReportEvent}.
  */
-public class EnumeratorAckEvent implements SourceEvent {
+public class FinishedSnapshotSplitsAckEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
     private final List<String> finishedSplits;
 
-    public EnumeratorAckEvent(List<String> finishedSplits) {
+    public FinishedSnapshotSplitsAckEvent(List<String> finishedSplits) {
         this.finishedSplits = finishedSplits;
     }
 

@@ -27,10 +27,8 @@ import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
-import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySqlSource;
 import com.alibaba.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
@@ -45,16 +43,14 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_PARALLEL_READ;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -132,10 +128,9 @@ public class MySqlTableSource implements ScanTableSource {
                 new RowDataDebeziumDeserializeSchema(
                         rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
         if (enableParallelRead) {
-            RowType pkRowType = validateAndGetPkType(physicalSchema);
             Configuration configuration = getParallelSourceConf();
             MySqlParallelSource<RowData> parallelSource =
-                    new MySqlParallelSource<>(pkRowType, deserializer, configuration);
+                    new MySqlParallelSource<>(deserializer, configuration);
             return SourceProvider.of(parallelSource);
         } else {
             MySqlSource.Builder<RowData> builder =
@@ -158,26 +153,6 @@ public class MySqlTableSource implements ScanTableSource {
         }
     }
 
-    private RowType validateAndGetPkType(TableSchema tableSchema) {
-        Preconditions.checkState(
-                physicalSchema.getPrimaryKey().isPresent(),
-                String.format(
-                        "The primary key is required when %s enabled, but actual is %s",
-                        SCAN_SNAPSHOT_PARALLEL_READ.key(), physicalSchema.getPrimaryKey()));
-
-        List<String> pkFieldNames = physicalSchema.getPrimaryKey().get().getColumns();
-        LogicalType[] pkFieldTypes =
-                pkFieldNames.stream()
-                        .map(
-                                fieldName ->
-                                        tableSchema
-                                                .getFieldDataType(fieldName)
-                                                .get()
-                                                .getLogicalType())
-                        .toArray(LogicalType[]::new);
-        return RowType.of(pkFieldTypes, pkFieldNames.toArray(new String[0]));
-    }
-
     private Configuration getParallelSourceConf() {
         Map<String, String> properties = new HashMap<>();
         if (dbzProperties != null) {
@@ -191,14 +166,14 @@ public class MySqlTableSource implements ScanTableSource {
         properties.put("database.history.skip.unparseable.ddl", String.valueOf(true));
         properties.put("database.server.name", DATABASE_SERVER_NAME);
 
-        /**
+        /*
          * The server id is required, it will be replaced to 'database.server.id' when build {@Link
          * MySQLSplitReader}
          */
         if (serverId != null) {
             properties.put(SERVER_ID.key(), serverId);
         }
-        properties.put(SCAN_SNAPSHOT_CHUNK_SIZE.key(), String.valueOf(splitSize));
+        properties.put(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), String.valueOf(splitSize));
         properties.put(SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
         properties.put("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
 

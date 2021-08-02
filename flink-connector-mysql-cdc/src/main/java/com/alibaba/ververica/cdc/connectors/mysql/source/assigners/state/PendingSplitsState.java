@@ -16,20 +16,18 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.mysql.source.events;
+package com.alibaba.ververica.cdc.connectors.mysql.source.assigners.state;
 
-import org.apache.flink.api.connector.source.SourceEvent;
-
-import com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
-import com.alibaba.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+import javax.annotation.Nullable;
 
 /**
- * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * notify reader should report its finished snapshot splits.
+ * A checkpoint of the current state of the containing the currently pending splits that are not yet
+ * assigned.
  */
-public class EnumeratorRequestReportEvent implements SourceEvent {
-
-    private static final long serialVersionUID = 1L;
-
-    public EnumeratorRequestReportEvent() {}
+public abstract class PendingSplitsState {
+    /**
+     * The splits are frequently serialized into checkpoints. Caching the byte representation makes
+     * repeated serialization cheap. This field is used by {@link PendingSplitsStateSerializer}.
+     */
+    @Nullable transient byte[] serializedFormCache;
 }

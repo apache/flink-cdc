@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
@@ -96,7 +95,7 @@ public class MySqlSplitSerializerTest {
 
         final MySqlSplit split =
                 new MySqlBinlogSplit(
-                        BINLOG_SPLIT_ID,
+                        "binlog-split",
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("card_no", new VarCharType()))),

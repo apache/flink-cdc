@@ -44,9 +44,9 @@ import java.util.Map;
 import java.util.Properties;
 
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.CONNECT_TIMEOUT;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static com.alibaba.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_PARALLEL_READ;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -92,7 +92,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -102,9 +102,9 @@ public class MySqlTableSourceFactoryTest {
     @Test
     public void testEnableParallelReadSource() {
         Map<String, String> properties = getAllOptions();
-        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123-126");
-        properties.put("scan.snapshot.chunk.size", "8000");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
 
@@ -133,9 +133,9 @@ public class MySqlTableSourceFactoryTest {
     @Test
     public void testEnableParallelReadSourceWithSingleServerId() {
         Map<String, String> properties = getAllOptions();
-        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123");
-        properties.put("scan.snapshot.chunk.size", "8000");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
 
@@ -164,7 +164,7 @@ public class MySqlTableSourceFactoryTest {
     @Test
     public void testEnableParallelReadSourceLatestOffset() {
         Map<String, String> properties = getAllOptions();
-        properties.put("scan.snapshot.parallel-read", "true");
+        properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123-126");
         properties.put("scan.startup.mode", "latest-offset");
 
@@ -182,8 +182,8 @@ public class MySqlTableSourceFactoryTest {
                         ZoneId.of("UTC"),
                         PROPERTIES,
                         "123-126",
-                        SCAN_SNAPSHOT_PARALLEL_READ.defaultValue(),
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.latest());
@@ -214,7 +214,7 @@ public class MySqlTableSourceFactoryTest {
                         dbzProperties,
                         "4321",
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -247,7 +247,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         "4321",
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.specificOffset(offsetFile, offsetPos));
@@ -274,7 +274,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -301,7 +301,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.earliest());
@@ -328,7 +328,7 @@ public class MySqlTableSourceFactoryTest {
                         PROPERTIES,
                         null,
                         false,
-                        SCAN_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.latest());
@@ -421,7 +421,7 @@ public class MySqlTableSourceFactoryTest {
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);
-        options.put("scan.snapshot.parallel-read", String.valueOf(false));
+        options.put("scan.incremental.snapshot.enabled", String.valueOf(false));
         return options;
     }
 

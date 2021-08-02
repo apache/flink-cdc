@@ -66,20 +66,20 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     // the debezium mysql connector use legacy implementation or not
     private final boolean useLegacyDezMySQL;
 
-    // enable the parallelRead(i.e: The new source MySQLParallelSource)
-    private final boolean parallelRead;
+    // enable the incrementalSnapshot (i.e: The new source MySQLParallelSource)
+    private final boolean incrementalSnapshot;
 
-    public MySqlConnectorITCase(boolean useLegacyDezMySQL, boolean parallelRead) {
+    public MySqlConnectorITCase(boolean useLegacyDezMySQL, boolean incrementalSnapshot) {
         this.useLegacyDezMySQL = useLegacyDezMySQL;
-        this.parallelRead = parallelRead;
+        this.incrementalSnapshot = incrementalSnapshot;
     }
 
-    @Parameterized.Parameters(name = "useLegacyDezImpl: {0}, parallelRead: {1}")
+    @Parameterized.Parameters(name = "useLegacyDezImpl: {0}, incrementalSnapshot: {1}")
     public static Object[] parameters() {
         return new Object[][] {
             new Object[] {true, false},
             new Object[] {false, false},
-            // the parallel read is base on new Debezium implementation
+            // the incremental snapshot read is base on new Debezium implementation
             new Object[] {false, true}
         };
     }
@@ -87,7 +87,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             env.setParallelism(4);
             env.enableCheckpointing(200);
         } else {
@@ -115,9 +115,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.snapshot.chunk.size' = '%s'"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -126,7 +126,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         getDezImplementation(),
-                        parallelRead,
+                        incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
         String sinkDDL =
@@ -211,7 +211,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
         String sourceDDL =
                 String.format(
                         "CREATE TABLE full_types (\n"
-                                + "    id INT NOT NULL,\n"
+                                + "    `id` INT NOT NULL,\n"
                                 + "    tiny_c TINYINT,\n"
                                 + "    tiny_un_c SMALLINT ,\n"
                                 + "    small_c SMALLINT,\n"
@@ -233,7 +233,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + "    datetime6_c TIMESTAMP(6),\n"
                                 + "    timestamp_c TIMESTAMP(0),\n"
                                 + "    file_uuid BYTES,\n"
-                                + "    primary key (id) not enforced"
+                                + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -243,9 +243,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.snapshot.chunk.size' = '%s'"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -254,7 +254,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         fullTypesDatabase.getDatabaseName(),
                         "full_types",
                         getDezImplementation(),
-                        parallelRead,
+                        incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
         tEnv.executeSql(sourceDDL);
@@ -326,7 +326,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'latest-offset',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
@@ -336,7 +336,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        parallelRead,
+                        incrementalSnapshot,
                         getServerId(),
                         getDezImplementation());
         tEnv.executeSql(sourceDDL);
@@ -379,7 +379,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     @Test
     public void testStartupFromSpecificOffset() throws Exception {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // not support yet
             return;
         }
@@ -412,7 +412,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'scan.startup.mode' = 'specific-offset',"
                                 + " 'scan.startup.specific-offset.file' = '%s',"
                                 + " 'scan.startup.specific-offset.pos' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -423,7 +423,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         "products",
                         offset.f0,
                         offset.f1,
-                        parallelRead,
+                        incrementalSnapshot,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -468,7 +468,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     @Test
     public void testStartupFromEarliestOffset() throws Exception {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // not support yet
             return;
         }
@@ -489,7 +489,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'earliest-offset',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -498,7 +498,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        parallelRead,
+                        incrementalSnapshot,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -552,7 +552,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     @Test
     public void testStartupFromTimestamp() throws Exception {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // not support yet
             return;
         }
@@ -574,7 +574,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'timestamp',"
                                 + " 'scan.startup.timestamp-millis' = '%s',"
-                                + " 'scan.snapshot.parallel-read' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -584,7 +584,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),
-                        parallelRead,
+                        incrementalSnapshot,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -633,14 +633,14 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     private String getServerId() {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             return serverId + "-" + (serverId + env.getParallelism());
         }
         return String.valueOf(serverId);
     }
 
     private int getSplitSize() {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // test parallel read
             return 4;
         }

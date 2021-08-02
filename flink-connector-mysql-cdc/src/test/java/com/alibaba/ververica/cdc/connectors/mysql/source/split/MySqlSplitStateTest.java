@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.alibaba.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator.BINLOG_SPLIT_ID;
 import static com.alibaba.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializerTest.getTestTableSchema;
 import static org.junit.Assert.assertEquals;
 
@@ -137,7 +136,7 @@ public class MySqlSplitStateTest {
         tableSchemas.put(tableId, getTestTableSchema());
 
         return new MySqlBinlogSplit(
-                BINLOG_SPLIT_ID,
+                "binlog-split",
                 new RowType(Arrays.asList(new RowType.RowField("card_no", new VarCharType()))),
                 startingOffset,
                 BinlogOffset.NO_STOPPING_OFFSET,
