@@ -58,6 +58,7 @@ import static org.apache.flink.table.api.DataTypes.ROW;
  */
 class ChunkSplitter {
     private static final Logger LOG = LoggerFactory.getLogger(ChunkSplitter.class);
+    private static final int SLEEP_INTERVAL = 10;
 
     private final MySqlConnection jdbc;
     private final MySqlSchema mySqlSchema;
@@ -168,11 +169,21 @@ class ChunkSplitter {
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
         Object chunkEnd = nextChunkEnd(min, tableId, splitColumnName, max);
+        int count = 0;
         while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
+            if (count % SLEEP_INTERVAL == 0) {
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    // nothing to do
+                }
+            }
+
             chunkStart = chunkEnd;
             chunkEnd = nextChunkEnd(chunkEnd, tableId, splitColumnName, max);
+            count++;
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
