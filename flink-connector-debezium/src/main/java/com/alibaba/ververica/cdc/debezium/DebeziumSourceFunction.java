@@ -36,6 +36,7 @@ import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
@@ -158,6 +159,13 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      * to the implementation of the {@link DatabaseHistory}.
      */
     private static final ConcurrentMap<String, Collection<SchemaRecord>> HISTORY =
+            new ConcurrentHashMap<>();
+
+    /**
+     * The schema history will be clean up once {@link DatabaseHistory#stop()}, the checkpoint
+     * should fail when this happens.
+     */
+    private static final ConcurrentMap<String, Boolean> HISTORY_CLEANUP_STATUS =
             new ConcurrentHashMap<>();
 
     /**
@@ -294,7 +302,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             }
         }
         if (engineInstanceName != null) {
-            StateUtils.registerHistory(engineInstanceName, historyRecords);
+            registerHistory(engineInstanceName, historyRecords);
         }
         LOG.info(
                 "Consumer subtask {} restored history records state: {} with {} records.",
@@ -307,6 +315,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
         if (handover.hasError()) {
             LOG.debug("snapshotState() called on closed source");
+            throw new FlinkRuntimeException(
+                    "Call snapshotState() on closed source, checkpoint failed.");
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
             snapshotHistoryRecordsState();
@@ -354,11 +364,17 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
         if (engineInstanceName != null) {
             schemaRecordsState.add(engineInstanceName);
-
-            Collection<SchemaRecord> records = StateUtils.retrieveHistory(engineInstanceName);
-            DocumentWriter writer = DocumentWriter.defaultWriter();
-            for (SchemaRecord record : records) {
-                schemaRecordsState.add(writer.write(record.toDocument()));
+            Collection<SchemaRecord> records = checkStatusAndRetrieveHistory(engineInstanceName);
+            if (records.isEmpty()) {
+                throw new FlinkRuntimeException(
+                        String.format(
+                                "The schema records for engine %s has been removed, checkpoint failed.",
+                                engineInstanceName));
+            } else {
+                DocumentWriter writer = DocumentWriter.defaultWriter();
+                for (SchemaRecord record : records) {
+                    schemaRecordsState.add(writer.write(record.toDocument()));
+                }
             }
         }
     }
@@ -545,7 +561,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private Class<?> determineDatabase() {
         boolean isCompatibleWithLegacy =
-                FlinkDatabaseHistory.isCompatible(StateUtils.retrieveHistory(engineInstanceName));
+                FlinkDatabaseHistory.isCompatible(retrieveHistory(engineInstanceName));
         if (LEGACY_IMPLEMENTATION_VALUE.equals(properties.get(LEGACY_IMPLEMENTATION_KEY))) {
             // specifies the legacy implementation but the state may be incompatible
             if (isCompatibleWithLegacy) {
@@ -554,8 +570,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 throw new IllegalStateException(
                         "The configured option 'debezium.internal.implementation' is 'legacy', but the state of source is incompatible with this implementation, you should remove the the option.");
             }
-        } else if (FlinkDatabaseSchemaHistory.isCompatible(
-                StateUtils.retrieveHistory(engineInstanceName))) {
+        } else if (FlinkDatabaseSchemaHistory.isCompatible(retrieveHistory(engineInstanceName))) {
             // tries the non-legacy first
             return FlinkDatabaseSchemaHistory.class;
         } else if (isCompatibleWithLegacy) {
@@ -567,22 +582,42 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
     }
 
-    // ---------------------------------------------------------------------------------------
-
-    /** Utils to get/put/remove the history of schema. */
-    public static final class StateUtils {
-
-        public static void registerHistory(
-                String engineName, Collection<SchemaRecord> engineHistory) {
+    /** Registers history of schema safely. */
+    public static void registerHistory(String engineName, Collection<SchemaRecord> engineHistory) {
+        synchronized (HISTORY) {
             HISTORY.put(engineName, engineHistory);
+            HISTORY_CLEANUP_STATUS.put(engineName, false);
         }
+    }
 
-        public static Collection<SchemaRecord> retrieveHistory(String engineName) {
-            return HISTORY.getOrDefault(engineName, Collections.emptyList());
-        }
-
-        public static void removeHistory(String engineName) {
+    /** Remove history of schema safely. */
+    public static void removeHistory(String engineName) {
+        synchronized (HISTORY) {
+            HISTORY_CLEANUP_STATUS.put(engineName, true);
             HISTORY.remove(engineName);
         }
+    }
+
+    /** Retrieves history of schema directly. */
+    public static Collection<SchemaRecord> retrieveHistory(String engineName) {
+        return HISTORY.getOrDefault(engineName, Collections.emptyList());
+    }
+
+    /**
+     * Retrieves history of schema safely, this method firstly checks the history status of specific
+     * engine, and then return the history of schema if the history exists(didn't clean up yet).
+     */
+    public static Collection<SchemaRecord> checkStatusAndRetrieveHistory(String engineName) {
+        synchronized (HISTORY) {
+            if (Boolean.FALSE.equals(HISTORY_CLEANUP_STATUS.get(engineName))) {
+                return HISTORY.get(engineName);
+            }
+            return Collections.emptyList();
+        }
+    }
+
+    @VisibleForTesting
+    public String getEngineInstanceName() {
+        return engineInstanceName;
     }
 }

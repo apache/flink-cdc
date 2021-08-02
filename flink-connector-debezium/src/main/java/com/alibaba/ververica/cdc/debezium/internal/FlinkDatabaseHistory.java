@@ -18,7 +18,6 @@
 
 package com.alibaba.ververica.cdc.debezium.internal;
 
-import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.StateUtils;
 import io.debezium.config.Configuration;
 import io.debezium.relational.history.AbstractDatabaseHistory;
 import io.debezium.relational.history.DatabaseHistoryException;
@@ -29,6 +28,10 @@ import io.debezium.relational.history.HistoryRecordComparator;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
+
+import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.registerHistory;
+import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.removeHistory;
+import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.retrieveHistory;
 
 /**
  * Inspired from {@link io.debezium.relational.history.MemoryDatabaseHistory} but we will store the
@@ -47,7 +50,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
     /** Gets the registered HistoryRecords under the given instance name. */
     private ConcurrentLinkedQueue<SchemaRecord> getRegisteredHistoryRecord(String instanceName) {
-        Collection<SchemaRecord> historyRecords = StateUtils.retrieveHistory(instanceName);
+        Collection<SchemaRecord> historyRecords = retrieveHistory(instanceName);
         return new ConcurrentLinkedQueue<>(historyRecords);
     }
 
@@ -63,13 +66,13 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
 
         // register the schema changes into state
         // every change should be visible to the source function
-        StateUtils.registerHistory(instanceName, schemaRecords);
+        registerHistory(instanceName, schemaRecords);
     }
 
     @Override
     public void stop() {
         super.stop();
-        StateUtils.removeHistory(instanceName);
+        removeHistory(instanceName);
     }
 
     @Override

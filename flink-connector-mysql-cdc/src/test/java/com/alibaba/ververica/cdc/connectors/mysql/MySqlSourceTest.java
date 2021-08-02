@@ -33,6 +33,7 @@ import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -79,6 +80,7 @@ import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertDelet
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertRead;
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertUpdate;
+import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.removeHistory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -845,6 +847,75 @@ public class MySqlSourceTest extends MySqlTestBase {
         } catch (Exception e) {
             assertTrue(e instanceof JsonParseException);
             assertTrue(e.getMessage().contains("Unrecognized token 'IllegalState'"));
+        }
+    }
+
+    @Test
+    public void testSchemaRemovedBeforeCheckpoint() throws Exception {
+        final TestingListState<byte[]> offsetState = new TestingListState<>();
+        final TestingListState<String> historyState = new TestingListState<>();
+
+        {
+            try (Connection connection = database.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                // Step-1: start the source from empty state
+                final DebeziumSourceFunction<SourceRecord> source = createMySqlBinlogSource();
+                final TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
+                // setup source with empty state
+                setupSource(source, false, offsetState, historyState, true, 0, 1);
+
+                final CheckedThread runThread =
+                        new CheckedThread() {
+                            @Override
+                            public void go() throws Exception {
+                                source.run(sourceContext);
+                            }
+                        };
+                runThread.start();
+
+                // wait until the source finishes the database snapshot
+                List<SourceRecord> records = drain(sourceContext, 9);
+                assertEquals(9, records.size());
+
+                // state is still empty
+                assertEquals(0, offsetState.list.size());
+                assertEquals(0, historyState.list.size());
+
+                statement.execute(
+                        "INSERT INTO `products` VALUES (110,'robot','Toy robot',1.304)"); // 110
+
+                int received = drain(sourceContext, 1).size();
+                assertEquals(1, received);
+
+                // Step-2: trigger a checkpoint
+                synchronized (sourceContext.getCheckpointLock()) {
+                    // trigger checkpoint-1
+                    source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
+                }
+
+                assertTrue(historyState.list.size() > 0);
+                assertTrue(offsetState.list.size() > 0);
+
+                // Step-3: mock the engine stop, remove the schema history before checkpoint
+                final String engineInstanceName = source.getEngineInstanceName();
+                removeHistory(engineInstanceName);
+
+                try {
+                    synchronized (sourceContext.getCheckpointLock()) {
+                        // trigger checkpoint-2
+                        source.snapshotState(new StateSnapshotContextSynchronousImpl(102, 102));
+                    }
+                    fail("Should fail.");
+                } catch (Exception e) {
+                    assertTrue(e instanceof FlinkRuntimeException);
+                    assertTrue(
+                            e.getMessage()
+                                    .contains(
+                                            String.format(
+                                                    "The schema records for engine %s has been removed, checkpoint failed.",
+                                                    engineInstanceName)));
+                }
+            }
         }
     }
 
