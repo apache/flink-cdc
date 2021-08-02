@@ -147,7 +147,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             TableId nextTable = remainingTables.pollFirst();
             if (nextTable != null) {
                 // split the given table into chunks (snapshot splits)
-                Collection<MySqlSnapshotSplit> splits = chunkSplitter.enumerateSplits(nextTable);
+                Collection<MySqlSnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
                 remainingSplits.addAll(splits);
                 alreadyProcessedTables.add(nextTable);
                 return getNext();

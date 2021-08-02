@@ -66,20 +66,20 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     // the debezium mysql connector use legacy implementation or not
     private final boolean useLegacyDezMySQL;
 
-    // enable the parallelRead(i.e: The new source MySQLParallelSource)
-    private final boolean parallelRead;
+    // enable the incrementalSnapshot (i.e: The new source MySQLParallelSource)
+    private final boolean incrementalSnapshot;
 
-    public MySqlConnectorITCase(boolean useLegacyDezMySQL, boolean parallelRead) {
+    public MySqlConnectorITCase(boolean useLegacyDezMySQL, boolean incrementalSnapshot) {
         this.useLegacyDezMySQL = useLegacyDezMySQL;
-        this.parallelRead = parallelRead;
+        this.incrementalSnapshot = incrementalSnapshot;
     }
 
-    @Parameterized.Parameters(name = "useLegacyDezImpl: {0}, parallelRead: {1}")
+    @Parameterized.Parameters(name = "useLegacyDezImpl: {0}, incrementalSnapshot: {1}")
     public static Object[] parameters() {
         return new Object[][] {
             new Object[] {true, false},
             new Object[] {false, false},
-            // the parallel read is base on new Debezium implementation
+            // the incremental snapshot read is base on new Debezium implementation
             new Object[] {false, true}
         };
     }
@@ -87,7 +87,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             env.setParallelism(4);
             env.enableCheckpointing(200);
         } else {
@@ -126,7 +126,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         getDezImplementation(),
-                        parallelRead,
+                        incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
         String sinkDDL =
@@ -254,7 +254,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         fullTypesDatabase.getDatabaseName(),
                         "full_types",
                         getDezImplementation(),
-                        parallelRead,
+                        incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
         tEnv.executeSql(sourceDDL);
@@ -336,7 +336,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        parallelRead,
+                        incrementalSnapshot,
                         getServerId(),
                         getDezImplementation());
         tEnv.executeSql(sourceDDL);
@@ -379,7 +379,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     @Test
     public void testStartupFromSpecificOffset() throws Exception {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // not support yet
             return;
         }
@@ -423,7 +423,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         "products",
                         offset.f0,
                         offset.f1,
-                        parallelRead,
+                        incrementalSnapshot,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -468,7 +468,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     @Test
     public void testStartupFromEarliestOffset() throws Exception {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // not support yet
             return;
         }
@@ -498,7 +498,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        parallelRead,
+                        incrementalSnapshot,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -552,7 +552,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
 
     @Test
     public void testStartupFromTimestamp() throws Exception {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // not support yet
             return;
         }
@@ -584,7 +584,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),
-                        parallelRead,
+                        incrementalSnapshot,
                         getDezImplementation());
         String sinkDDL =
                 "CREATE TABLE sink "
@@ -633,14 +633,14 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     private String getServerId() {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             return serverId + "-" + (serverId + env.getParallelism());
         }
         return String.valueOf(serverId);
     }
 
     private int getSplitSize() {
-        if (parallelRead) {
+        if (incrementalSnapshot) {
             // test parallel read
             return 4;
         }

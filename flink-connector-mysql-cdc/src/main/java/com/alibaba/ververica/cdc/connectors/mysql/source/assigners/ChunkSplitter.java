@@ -58,7 +58,6 @@ import static org.apache.flink.table.api.DataTypes.ROW;
  */
 class ChunkSplitter {
     private static final Logger LOG = LoggerFactory.getLogger(ChunkSplitter.class);
-    private static final int SLEEP_INTERVAL = 10;
 
     private final MySqlConnection jdbc;
     private final MySqlSchema mySqlSchema;
@@ -71,7 +70,7 @@ class ChunkSplitter {
     }
 
     /** Generates all snapshot splits (chunks) for the give table path. */
-    public Collection<MySqlSnapshotSplit> enumerateSplits(TableId tableId) {
+    public Collection<MySqlSnapshotSplit> generateSplits(TableId tableId) {
         long start = System.currentTimeMillis();
 
         Table schema = mySqlSchema.getTableSchema(tableId).getTable();
@@ -129,7 +128,7 @@ class ChunkSplitter {
         }
 
         final List<ChunkRange> chunks;
-        if (splitColumnUniformlyDistributed(splitColumn)) {
+        if (splitColumnEvenlyDistributed(splitColumn)) {
             // use evenly-sized chunks which is much efficient
             chunks = splitEvenlySizedChunks(min, max);
         } else {
@@ -173,17 +172,10 @@ class ChunkSplitter {
         while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
-            if (count % SLEEP_INTERVAL == 0) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    // nothing to do
-                }
-            }
-
+            // may sleep a while to avoid DDOS on MySQL server
+            maySleep(count++);
             chunkStart = chunkEnd;
             chunkEnd = nextChunkEnd(chunkEnd, tableId, splitColumnName, max);
-            count++;
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
@@ -231,9 +223,9 @@ class ChunkSplitter {
 
     // ------------------------------------------------------------------------------------------
 
-    /** Checks whether split column is uniformly distributed across its range. */
-    private static boolean splitColumnUniformlyDistributed(Column splitColumn) {
-        // only column is auto-incremental are recognized as uniformly distributed.
+    /** Checks whether split column is evenly distributed across its range. */
+    private static boolean splitColumnEvenlyDistributed(Column splitColumn) {
+        // only column is auto-incremental are recognized as evenly distributed.
         // TODO: we may use MAX,MIN,COUNT to calculate the distribution in the future.
         if (splitColumn.isAutoIncremented()) {
             DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn);
@@ -255,5 +247,16 @@ class ChunkSplitter {
         return (RowType)
                 ROW(FIELD(splitColumn.name(), MySqlTypeUtils.fromDbzColumn(splitColumn)))
                         .getLogicalType();
+    }
+
+    private static void maySleep(int count) {
+        // every 100 queries to sleep 1s
+        if (count % 10 == 0) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // nothing to do
+            }
+        }
     }
 }

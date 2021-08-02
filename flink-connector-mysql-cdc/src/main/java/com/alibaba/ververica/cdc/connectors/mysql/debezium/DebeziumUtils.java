@@ -66,7 +66,9 @@ public class DebeziumUtils {
     /** Closes the given {@link MySqlConnection}. */
     public static void closeMySqlConnection(MySqlConnection jdbc) {
         try {
-            jdbc.close();
+            if (jdbc != null) {
+                jdbc.close();
+            }
         } catch (SQLException e) {
             LOG.error("Failed to close MySQL connection", e);
             throw new FlinkRuntimeException("Failed to close MySQL connection", e);
