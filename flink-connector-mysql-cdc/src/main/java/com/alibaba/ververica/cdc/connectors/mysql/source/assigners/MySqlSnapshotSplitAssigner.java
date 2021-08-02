@@ -148,11 +148,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             if (nextTable != null) {
                 // split the given table into chunks (snapshot splits)
                 Collection<MySqlSnapshotSplit> splits = chunkSplitter.enumerateSplits(nextTable);
-                try {
-                    remainingSplits.addAll(splits);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                remainingSplits.addAll(splits);
                 alreadyProcessedTables.add(nextTable);
                 return getNext();
             } else {
