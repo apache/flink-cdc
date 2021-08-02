@@ -19,8 +19,6 @@
 package com.alibaba.ververica.cdc.connectors.mysql.source.assigners;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.ExceptionUtils;
 
 import com.alibaba.ververica.cdc.connectors.mysql.MySqlTestBase;
@@ -69,9 +67,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         "customers [1012] [1015]",
                         "customers [1015] [1018]",
                         "customers [1018] null");
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<String> splits = getTestAssignSnapshotSplits(4, pkType, new String[] {"customers"});
+        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"customers"});
         assertEquals(expected, splits);
     }
 
@@ -93,10 +89,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         "customers_1 [1012] [1015]",
                         "customers_1 [1015] [1018]",
                         "customers_1 [1018] null");
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<String> splits =
-                getTestAssignSnapshotSplits(4, pkType, new String[] {"customers", "customers_1"});
+                getTestAssignSnapshotSplits(4, new String[] {"customers", "customers_1"});
         assertEquals(expected, splits);
     }
 
@@ -104,12 +98,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     public void testEnableAutoIncrementedKeyOptimization() {
         List<String> expected =
                 Arrays.asList("shopping_cart_big null [3]", "shopping_cart_big [3] null");
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("product_no", DataTypes.DECIMAL(20, 0)))
-                                .getLogicalType();
-        List<String> splits =
-                getTestAssignSnapshotSplits(2, pkType, new String[] {"shopping_cart_big"});
+        List<String> splits = getTestAssignSnapshotSplits(2, new String[] {"shopping_cart_big"});
         assertEquals(expected, splits);
     }
 
@@ -119,17 +108,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                 Arrays.asList(
                         "shopping_cart_dec null [124456.4560]",
                         "shopping_cart_dec [124456.4560] null");
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("product_no", DataTypes.DECIMAL(10, 4)))
-                                .getLogicalType();
-        List<String> splits =
-                getTestAssignSnapshotSplits(2, pkType, new String[] {"shopping_cart_dec"});
+        List<String> splits = getTestAssignSnapshotSplits(2, new String[] {"shopping_cart_dec"});
         assertEquals(expected, splits);
     }
 
-    private List<String> getTestAssignSnapshotSplits(
-            int splitSize, RowType pkType, String[] captureTables) {
+    private List<String> getTestAssignSnapshotSplits(int splitSize, String[] captureTables) {
         Configuration configuration = getConfig();
         configuration.setString("scan.incremental.snapshot.chunk.size", String.valueOf(splitSize));
         List<String> captureTableIds =
@@ -177,28 +160,15 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         "customer_card [30009] [40001]",
                         "customer_card [40001] [50001]",
                         "customer_card [50001] null");
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
-                                        DataTypes.FIELD("level", DataTypes.STRING()))
-                                .getLogicalType();
-        List<String> splits =
-                getTestAssignSnapshotSplits(4, pkType, new String[] {"customer_card"});
+        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"customer_card"});
         assertEquals(expected, splits);
     }
 
     @Test
     public void testAssignTableWithSingleLine() {
         List<String> expected = Collections.singletonList("customer_card_single_line null null");
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
-                                        DataTypes.FIELD("level", DataTypes.STRING()))
-                                .getLogicalType();
         List<String> splits =
-                getTestAssignSnapshotSplits(4, pkType, new String[] {"customer_card_single_line"});
+                getTestAssignSnapshotSplits(4, new String[] {"customer_card_single_line"});
         assertEquals(expected, splits);
     }
 
@@ -210,15 +180,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         "shopping_cart [user_2] [user_4]",
                         "shopping_cart [user_4] [user_5]",
                         "shopping_cart [user_5] null");
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("product_no", DataTypes.INT()),
-                                        DataTypes.FIELD("user_id", DataTypes.STRING()),
-                                        DataTypes.FIELD("product_kind", DataTypes.STRING()))
-                                .getLogicalType();
-        List<String> splits =
-                getTestAssignSnapshotSplits(4, pkType, new String[] {"shopping_cart"});
+        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"shopping_cart"});
         assertEquals(expected, splits);
     }
 
@@ -230,15 +192,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         "shopping_cart [user_2] [user_4]",
                         "shopping_cart [user_4] [user_5]",
                         "shopping_cart [user_5] null");
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("user_id", DataTypes.STRING()),
-                                        DataTypes.FIELD("product_no", DataTypes.INT()),
-                                        DataTypes.FIELD("product_kind", DataTypes.STRING()))
-                                .getLogicalType();
-        List<String> splits =
-                getTestAssignSnapshotSplits(4, pkType, new String[] {"shopping_cart"});
+        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"shopping_cart"});
         assertEquals(expected, splits);
     }
 
@@ -266,29 +220,21 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         "customers [1017] [1018]",
                         "customers [1018] [1019]",
                         "customers [1019] null");
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<String> splits = getTestAssignSnapshotSplits(2, pkType, new String[] {"customers"});
+        List<String> splits = getTestAssignSnapshotSplits(2, new String[] {"customers"});
         assertEquals(expected, splits);
     }
 
     @Test
     public void testAssignMaxSplitSize() {
         List<String> expected = Collections.singletonList("customers null null");
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<String> splits = getTestAssignSnapshotSplits(2000, pkType, new String[] {"customers"});
+        List<String> splits = getTestAssignSnapshotSplits(2000, new String[] {"customers"});
         assertEquals(expected, splits);
     }
 
     @Test
     public void testInvalidSplitSize() {
         try {
-            final RowType pkType =
-                    (RowType)
-                            DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT()))
-                                    .getLogicalType();
-            getTestAssignSnapshotSplits(1, pkType, new String[] {"customers"});
+            getTestAssignSnapshotSplits(1, new String[] {"customers"});
             fail("should fail.");
         } catch (IllegalStateException e) {
             assertThat(
@@ -300,12 +246,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
 
     @Test
     public void testUnMatchedPrimaryKey() {
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("card_no", DataTypes.BIGINT()))
-                                .getLogicalType();
         try {
-            getTestAssignSnapshotSplits(4, pkType, new String[] {"customer_card"});
+            getTestAssignSnapshotSplits(4, new String[] {"customer_card"});
         } catch (Throwable t) {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
