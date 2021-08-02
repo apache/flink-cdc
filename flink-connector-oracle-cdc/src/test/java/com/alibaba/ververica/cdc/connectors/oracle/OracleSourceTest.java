@@ -25,17 +25,17 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
+import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
-import com.alibaba.ververica.cdc.connectors.oracle.utils.UniqueDatabase;
+import com.alibaba.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import com.alibaba.ververica.cdc.connectors.utils.TestSourceContext;
 import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -43,7 +43,14 @@ import com.jayway.jsonpath.JsonPath;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Container;
+import org.testcontainers.containers.OracleContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -51,43 +58,55 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
+import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
+import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
+import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertRead;
+import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertUpdate;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link OracleSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class OracleSourceTest extends OracleTestBase {
+public class OracleSourceTest extends AbstractTestBase {
 
-    private final UniqueDatabase database =
-            new UniqueDatabase(ORACLE_CONTAINER, "debezium", "system", "oracle", "inventory_1");
+    private static final Logger LOG = LoggerFactory.getLogger(OracleSourceTest.class);
+
+    private OracleContainer oracleContainer;
+
+    private static final DockerImageName OC_IMAGE =
+            DockerImageName.parse("thake/oracle-xe-11g").asCompatibleSubstituteFor("oracle");
 
     @Before
     public void before() throws Exception {
+        oracleContainer =
+                new OracleContainer(OC_IMAGE)
+                        .withClasspathResourceMapping(
+                                "docker/setup.sh", "/etc/logminer_conf.sh", BindMode.READ_WRITE)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(oracleContainer)).join();
+        LOG.info("Containers are started.");
+
         Container.ExecResult execResult1 =
-                ORACLE_CONTAINER.execInContainer("chmod", "+x", "/etc/logminer_conf.sh");
+                oracleContainer.execInContainer("chmod", "+x", "/etc/logminer_conf.sh");
 
         execResult1.getStdout();
         execResult1.getStderr();
 
-        // Container.ExecResult execResult12  = ORACLE_CONTAINER.execInContainer("chmod", "-R",
-        // "777", "/u01/app/oracle/");
-        // execResult12 = ORACLE_CONTAINER.execInContainer("su - oracle");
-
-        // execResult12.getStdout();
-        // execResult12.getStderr();
         Container.ExecResult execResult =
-                ORACLE_CONTAINER.execInContainer("/bin/sh", "-c", "/etc/logminer_conf.sh");
+                oracleContainer.execInContainer("/bin/sh", "-c", "/etc/logminer_conf.sh");
         execResult.getStdout();
         execResult.getStderr();
-        // database.createAndInitialize();
-
     }
 
     @Test
@@ -97,7 +116,7 @@ public class OracleSourceTest extends OracleTestBase {
 
         setupSource(source);
 
-        try (Connection connection = database.getJdbcConnection();
+        try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
                 Statement statement = connection.createStatement()) {
 
             // start the source
@@ -113,18 +132,18 @@ public class OracleSourceTest extends OracleTestBase {
             List<SourceRecord> records = drain(sourceContext, 9);
             assertEquals(9, records.size());
             for (int i = 0; i < records.size(); i++) {
-                // assertInsert(records.get(i), "ID", 101 + i);
+                assertRead(records.get(i), "ID", 101 + i);
             }
 
             statement.execute(
                     "INSERT INTO debezium.products VALUES (110,'robot','Toy robot',1.304)"); // 110
             records = drain(sourceContext, 1);
-            // assertInsert(records.get(0), "id", 110);
+            assertInsert(records.get(0), "ID", 110);
 
             statement.execute(
                     "INSERT INTO debezium.products VALUES (1001,'roy','old robot',1234.56)"); // 1001
             records = drain(sourceContext, 1);
-            // assertInsert(records.get(0), "id", 1001);
+            assertInsert(records.get(0), "ID", 1001);
 
             // ---------------------------------------------------------------------------------------------------------------
             // Changing the primary key of a row should result in 2 events: INSERT, DELETE
@@ -133,15 +152,15 @@ public class OracleSourceTest extends OracleTestBase {
             statement.execute(
                     "UPDATE debezium.products SET id=2001, description='really old robot' WHERE id=1001");
             records = drain(sourceContext, 2);
-            // assertDelete(records.get(0), "id", 1001);
-            // assertInsert(records.get(1), "id", 2001);
+            assertDelete(records.get(0), "ID", 1001);
+            assertInsert(records.get(1), "ID", 2001);
 
             // ---------------------------------------------------------------------------------------------------------------
             // Simple UPDATE (with no schema changes)
             // ---------------------------------------------------------------------------------------------------------------
             statement.execute("UPDATE debezium.products SET weight=1345.67 WHERE id=2001");
             records = drain(sourceContext, 1);
-            // assertUpdate(records.get(0), "id", 2001);
+            assertUpdate(records.get(0), "ID", 2001);
 
             // ---------------------------------------------------------------------------------------------------------------
             // Change our schema with a fully-qualified name; we should still see this event
@@ -152,7 +171,7 @@ public class OracleSourceTest extends OracleTestBase {
                     String.format("ALTER TABLE %s.products ADD  volume FLOAT", "debezium"));
             statement.execute("UPDATE debezium.products SET volume=13.5 WHERE id=2001");
             records = drain(sourceContext, 1);
-            // assertUpdate(records.get(0), "id", 2001);
+            assertUpdate(records.get(0), "ID", 2001);
 
             // cleanup
             source.cancel();
@@ -249,14 +268,14 @@ public class OracleSourceTest extends OracleTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-            try (Connection connection = database.getJdbcConnection();
+            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
                         "INSERT INTO debezium.products VALUES (110,'robot','Toy robot',1.304)"); // 110
                 List<SourceRecord> records = drain(sourceContext2, 1);
                 assertEquals(1, records.size());
-                /// assertInsert(records.get(0), "id", 110);
+                assertInsert(records.get(0), "ID", 110);
 
                 // ---------------------------------------------------------------------------
                 // Step-4: trigger checkpoint-2 during DML operations
@@ -303,19 +322,19 @@ public class OracleSourceTest extends OracleTestBase {
 
             // consume the unconsumed binlog
             List<SourceRecord> records = drain(sourceContext3, 2);
-            // assertInsert(records.get(0), "id", 1001);
-            // assertUpdate(records.get(1), "id", 1001);
+            assertInsert(records.get(0), "ID", 1001);
+            assertUpdate(records.get(1), "ID", 1001);
 
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
 
             // can continue to receive new events
-            try (Connection connection = database.getJdbcConnection();
+            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
                     Statement statement = connection.createStatement()) {
                 statement.execute("DELETE FROM debezium.products WHERE id=1001");
             }
             records = drain(sourceContext3, 1);
-            // assertDelete(records.get(0), "id", 1001);
+            assertDelete(records.get(0), "ID", 1001);
 
             // ---------------------------------------------------------------------------
             // Step-6: trigger checkpoint-2 to make sure we can continue to to further checkpoints
@@ -379,7 +398,7 @@ public class OracleSourceTest extends OracleTestBase {
         final TestingListState<String> historyState = new TestingListState<>();
 
         {
-            try (Connection connection = database.getJdbcConnection();
+            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
                     Statement statement = connection.createStatement()) {
                 // Step-1: start the source from empty state
                 final DebeziumSourceFunction<SourceRecord> source = createOracleLogminerSource();
@@ -453,13 +472,13 @@ public class OracleSourceTest extends OracleTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-            try (Connection connection = database.getJdbcConnection();
+            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
                     Statement statement = connection.createStatement()) {
                 statement.execute(
                         "INSERT INTO debezium.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT) VALUES (113,'Airplane','Toy airplane',1.304)"); // 113
                 List<SourceRecord> records = drain(sourceContext2, 1);
                 assertEquals(1, records.size());
-                // assertInsert(records.get(0), "id", 113);
+                assertInsert(records.get(0), "ID", 113);
 
                 source2.cancel();
                 source2.close();
@@ -478,8 +497,8 @@ public class OracleSourceTest extends OracleTestBase {
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder()
-                            .tableList(database.getDatabaseName() + "." + "category")
+                    basicSourceBuilder(oracleContainer)
+                            .tableList("debezium" + "." + "category")
                             .build();
             // we use blocking context to block the source to emit before last snapshot record
             final BlockingSourceContext<SourceRecord> sourceContext =
@@ -513,7 +532,7 @@ public class OracleSourceTest extends OracleTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext));
 
-            try (Connection connection = database.getJdbcConnection();
+            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute("INSERT INTO debezium.category VALUES (1, 'book')");
@@ -521,9 +540,9 @@ public class OracleSourceTest extends OracleTestBase {
                 statement.execute("UPDATE debezium.category SET category_name='books' WHERE id=1");
                 List<SourceRecord> records = drain(sourceContext, 3);
                 assertEquals(3, records.size());
-                // assertInsert(records.get(0), "id", 1);
-                // assertInsert(records.get(1), "id", 2);
-                // assertUpdate(records.get(2), "id", 1);
+                assertInsert(records.get(0), "ID", 1);
+                assertInsert(records.get(1), "ID", 2);
+                assertUpdate(records.get(2), "ID", 1);
 
                 // ---------------------------------------------------------------------------
                 // Step-4: trigger checkpoint-2 during DML operations
@@ -548,97 +567,42 @@ public class OracleSourceTest extends OracleTestBase {
     private void assertHistoryState(TestingListState<String> historyState) {
         // assert the DDL is stored in the history state
         assertTrue(historyState.list.size() > 0);
-        boolean hasDDL =
+        boolean hasTable =
                 historyState.list.stream()
                         .skip(1)
                         .anyMatch(
                                 history ->
-                                        JsonPath.read(history, "$.source.server")
-                                                        .equals("oracle_logminer")
-                                                && JsonPath.read(history, "$.position.snapshot")
-                                                        .toString()
-                                                        .equals("true")
-                                                && JsonPath.read(history, "$.ddl")
-                                                        .toString()
-                                                        .contains("CREATE TABLE \"DEBEZIUM\"."));
-
-        assertTrue(hasDDL);
+                                        !((Map<?, ?>) JsonPath.read(history, "$.table")).isEmpty()
+                                                && (JsonPath.read(history, "$.type")
+                                                                .toString()
+                                                                .equals("CREATE")
+                                                        || JsonPath.read(history, "$.type")
+                                                                .toString()
+                                                                .equals("ALTER")));
+        assertTrue(hasTable);
     }
 
     // ------------------------------------------------------------------------------------------
     // Public Utilities
     // ------------------------------------------------------------------------------------------
 
-    /** Gets the latest offset of current MySQL server. */
-    public static Tuple2<String, Integer> currentMySQLLatestOffset(
-            UniqueDatabase database, String table, int expectedRecordCount) throws Exception {
-        DebeziumSourceFunction<SourceRecord> source =
-                OracleSource.<SourceRecord>builder()
-                        .hostname(ORACLE_CONTAINER.getHost())
-                        .port(ORACLE_CONTAINER.getOraclePort())
-                        .database(database.getDatabaseName())
-                        .tableList(database.getDatabaseName() + "." + table)
-                        .username(ORACLE_CONTAINER.getUsername())
-                        .password(ORACLE_CONTAINER.getPassword())
-                        .deserializer(new OracleSourceTest.ForwardDeserializeSchema())
-                        .build();
-        final TestingListState<byte[]> offsetState = new TestingListState<>();
-        final TestingListState<String> historyState = new TestingListState<>();
-
-        // ---------------------------------------------------------------------------
-        // Step-1: start source
-        // ---------------------------------------------------------------------------
-        TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
-        setupSource(source, false, offsetState, historyState, true, 0, 1);
-        final CheckedThread runThread =
-                new CheckedThread() {
-                    @Override
-                    public void go() throws Exception {
-                        source.run(sourceContext);
-                    }
-                };
-        runThread.start();
-
-        drain(sourceContext, expectedRecordCount);
-
-        // ---------------------------------------------------------------------------
-        // Step-2: trigger checkpoint-1 after snapshot finished
-        // ---------------------------------------------------------------------------
-        synchronized (sourceContext.getCheckpointLock()) {
-            // trigger checkpoint-1
-            source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
-        }
-
-        assertEquals(1, offsetState.list.size());
-        String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-        String offsetFile = JsonPath.read(state, "$.sourceOffset.file");
-        int offsetPos = JsonPath.read(state, "$.sourceOffset.pos");
-
-        source.cancel();
-        source.close();
-        runThread.sync();
-
-        return Tuple2.of(offsetFile, offsetPos);
-    }
-
     // ------------------------------------------------------------------------------------------
     // Utilities
     // ------------------------------------------------------------------------------------------
 
     private DebeziumSourceFunction<SourceRecord> createOracleLogminerSource() {
-        return basicSourceBuilder().build();
+        return basicSourceBuilder(oracleContainer).build();
     }
 
-    private OracleSource.Builder<SourceRecord> basicSourceBuilder() {
+    private OracleSource.Builder<SourceRecord> basicSourceBuilder(OracleContainer oracleContainer) {
 
         return OracleSource.<SourceRecord>builder()
-                .hostname(ORACLE_CONTAINER.getHost())
-                .port(ORACLE_CONTAINER.getOraclePort())
+                .hostname(oracleContainer.getHost())
+                .port(oracleContainer.getOraclePort())
                 .database("XE")
-                .tableList(
-                        database.getDatabaseName() + "." + "products") // monitor table "products"
-                .username(ORACLE_CONTAINER.getUsername())
-                .password(ORACLE_CONTAINER.getPassword())
+                .tableList("debezium" + "." + "products") // monitor table "products"
+                .username(oracleContainer.getUsername())
+                .password(oracleContainer.getPassword())
                 .deserializer(new ForwardDeserializeSchema());
     }
 

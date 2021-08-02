@@ -78,14 +78,14 @@ EOF
 /u01/app/oracle/product/11.2.0/xe/bin/sqlplus sys/oracle@//localhost:1521/XE as sysdba <<- EOF
 
   CREATE TABLE debezium.products (
-    ID INTEGER NOT NULL,
+    ID NUMBER(9, 0) NOT NULL,
     NAME VARCHAR(255) NOT NULL,
     DESCRIPTION VARCHAR(512),
     WEIGHT FLOAT,
     PRIMARY KEY(ID)
   );
   CREATE TABLE debezium.category (
-    ID INTEGER NOT NULL,
+    ID NUMBER(9, 0) NOT NULL,
     CATEGORY_NAME VARCHAR(255),
     PRIMARY KEY(ID)
   );

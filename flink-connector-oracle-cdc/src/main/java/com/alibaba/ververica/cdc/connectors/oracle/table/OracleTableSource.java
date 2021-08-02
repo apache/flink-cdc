@@ -33,7 +33,6 @@ import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
-import java.time.ZoneId;
 import java.util.Objects;
 import java.util.Properties;
 
@@ -53,7 +52,6 @@ public class OracleTableSource implements ScanTableSource {
     private final String password;
     private final String tableName;
     private final String schemaName;
-    private final ZoneId serverTimeZone;
     private final Properties dbzProperties;
     private final StartupOptions startupOptions;
 
@@ -66,7 +64,6 @@ public class OracleTableSource implements ScanTableSource {
             String schemaName,
             String username,
             String password,
-            ZoneId serverTimeZone,
             Properties dbzProperties,
             StartupOptions startupOptions) {
         this.physicalSchema = physicalSchema;
@@ -77,7 +74,6 @@ public class OracleTableSource implements ScanTableSource {
         this.schemaName = checkNotNull(schemaName);
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
-        this.serverTimeZone = serverTimeZone;
         this.dbzProperties = dbzProperties;
         this.startupOptions = startupOptions;
     }
@@ -97,9 +93,12 @@ public class OracleTableSource implements ScanTableSource {
         RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
         TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
+
         DebeziumDeserializationSchema<RowData> deserializer =
-                new RowDataDebeziumDeserializeSchema(
-                        rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType(rowType)
+                        .setResultTypeInfo(typeInfo)
+                        .build();
         OracleSource.Builder<RowData> builder =
                 OracleSource.<RowData>builder()
                         .hostname(hostname)
@@ -129,7 +128,6 @@ public class OracleTableSource implements ScanTableSource {
                 schemaName,
                 username,
                 password,
-                serverTimeZone,
                 dbzProperties,
                 startupOptions);
     }
@@ -151,7 +149,6 @@ public class OracleTableSource implements ScanTableSource {
                 && Objects.equals(password, that.password)
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(schemaName, that.schemaName)
-                && Objects.equals(serverTimeZone, that.serverTimeZone)
                 && Objects.equals(dbzProperties, that.dbzProperties)
                 && Objects.equals(startupOptions, that.startupOptions);
     }
@@ -167,7 +164,6 @@ public class OracleTableSource implements ScanTableSource {
                 password,
                 tableName,
                 schemaName,
-                serverTimeZone,
                 dbzProperties,
                 startupOptions);
     }

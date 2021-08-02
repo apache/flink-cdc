@@ -30,7 +30,6 @@ import org.apache.flink.table.utils.TableSchemaUtils;
 
 import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
 
-import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -88,12 +87,6 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Table name of the Oracle database to monitor.");
 
-    private static final ConfigOption<String> SERVER_TIME_ZONE =
-            ConfigOptions.key("server-time-zone")
-                    .stringType()
-                    .defaultValue("UTC")
-                    .withDescription("The session time zone in database server.");
-
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")
                     .stringType()
@@ -116,7 +109,6 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
         int port = config.get(PORT);
-        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
         StartupOptions startupOptions = getStartupOptions(config);
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
@@ -130,7 +122,6 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 schemaName,
                 username,
                 password,
-                serverTimeZone,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 startupOptions);
     }
@@ -156,7 +147,6 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
-        options.add(SERVER_TIME_ZONE);
         options.add(SCAN_STARTUP_MODE);
 
         return options;
