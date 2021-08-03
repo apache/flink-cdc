@@ -36,6 +36,7 @@ import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
@@ -54,7 +55,6 @@ import io.debezium.embedded.Connect;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
-import io.debezium.relational.history.DatabaseHistory;
 import org.apache.commons.collections.map.LinkedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,18 +63,17 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
 
 /**
  * The {@link DebeziumSourceFunction} is a streaming data source that pulls captured change data
@@ -152,13 +151,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     // ---------------------------------------------------------------------------------------
     // State
     // ---------------------------------------------------------------------------------------
-
-    /**
-     * Structure to maintain the current schema history. The content in {@link SchemaRecord} is up
-     * to the implementation of the {@link DatabaseHistory}.
-     */
-    private static final ConcurrentMap<String, Collection<SchemaRecord>> HISTORY =
-            new ConcurrentHashMap<>();
 
     /**
      * The offsets to restore to, if the consumer restores state from a checkpoint.
@@ -278,7 +270,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private void restoreHistoryRecordsState() throws Exception {
         DocumentReader reader = DocumentReader.defaultReader();
-        List<SchemaRecord> historyRecords = new ArrayList<>();
+        ConcurrentLinkedQueue<SchemaRecord> historyRecords = new ConcurrentLinkedQueue<>();
         int recordsCount = 0;
         boolean firstEntry = true;
         for (String record : schemaRecordsState.get()) {
@@ -294,7 +286,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             }
         }
         if (engineInstanceName != null) {
-            StateUtils.registerHistory(engineInstanceName, historyRecords);
+            registerHistory(engineInstanceName, historyRecords);
         }
         LOG.info(
                 "Consumer subtask {} restored history records state: {} with {} records.",
@@ -307,6 +299,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
         if (handover.hasError()) {
             LOG.debug("snapshotState() called on closed source");
+            throw new FlinkRuntimeException(
+                    "Call snapshotState() on closed source, checkpoint failed.");
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
             snapshotHistoryRecordsState();
@@ -354,8 +348,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
         if (engineInstanceName != null) {
             schemaRecordsState.add(engineInstanceName);
-
-            Collection<SchemaRecord> records = StateUtils.retrieveHistory(engineInstanceName);
+            Collection<SchemaRecord> records = retrieveHistory(engineInstanceName);
             DocumentWriter writer = DocumentWriter.defaultWriter();
             for (SchemaRecord record : records) {
                 schemaRecordsState.add(writer.write(record.toDocument()));
@@ -545,7 +538,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private Class<?> determineDatabase() {
         boolean isCompatibleWithLegacy =
-                FlinkDatabaseHistory.isCompatible(StateUtils.retrieveHistory(engineInstanceName));
+                FlinkDatabaseHistory.isCompatible(retrieveHistory(engineInstanceName));
         if (LEGACY_IMPLEMENTATION_VALUE.equals(properties.get(LEGACY_IMPLEMENTATION_KEY))) {
             // specifies the legacy implementation but the state may be incompatible
             if (isCompatibleWithLegacy) {
@@ -554,8 +547,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 throw new IllegalStateException(
                         "The configured option 'debezium.internal.implementation' is 'legacy', but the state of source is incompatible with this implementation, you should remove the the option.");
             }
-        } else if (FlinkDatabaseSchemaHistory.isCompatible(
-                StateUtils.retrieveHistory(engineInstanceName))) {
+        } else if (FlinkDatabaseSchemaHistory.isCompatible(retrieveHistory(engineInstanceName))) {
             // tries the non-legacy first
             return FlinkDatabaseSchemaHistory.class;
         } else if (isCompatibleWithLegacy) {
@@ -567,22 +559,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
     }
 
-    // ---------------------------------------------------------------------------------------
-
-    /** Utils to get/put/remove the history of schema. */
-    public static final class StateUtils {
-
-        public static void registerHistory(
-                String engineName, Collection<SchemaRecord> engineHistory) {
-            HISTORY.put(engineName, engineHistory);
-        }
-
-        public static Collection<SchemaRecord> retrieveHistory(String engineName) {
-            return HISTORY.getOrDefault(engineName, Collections.emptyList());
-        }
-
-        public static void removeHistory(String engineName) {
-            HISTORY.remove(engineName);
-        }
+    @VisibleForTesting
+    public String getEngineInstanceName() {
+        return engineInstanceName;
     }
 }
