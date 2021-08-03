@@ -33,7 +33,6 @@ import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
 import com.alibaba.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -907,12 +906,13 @@ public class MySqlSourceTest extends MySqlTestBase {
                     }
                     fail("Should fail.");
                 } catch (Exception e) {
-                    assertTrue(e instanceof FlinkRuntimeException);
+                    assertTrue(e instanceof IllegalStateException);
                     assertTrue(
                             e.getMessage()
                                     .contains(
                                             String.format(
-                                                    "The schema records for engine %s has been removed, checkpoint failed.",
+                                                    "Retrieve schema history failed, the schema records for engine %s has been removed,"
+                                                            + " this might because the debezium engine has been shutdown due to other errors.",
                                                     engineInstanceName)));
                 }
             }

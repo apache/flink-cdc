@@ -34,7 +34,7 @@ import java.util.Map;
 public class DatabaseHistoryUtil {
 
     private DatabaseHistoryUtil() {
-        // do no thing
+        // do nothing
     }
 
     /**
@@ -75,7 +75,8 @@ public class DatabaseHistoryUtil {
             if (Boolean.TRUE.equals(HISTORY_CLEANUP_STATUS.get(engineName))) {
                 throw new IllegalStateException(
                         String.format(
-                                "Retrieve schema history failed, the schema records for engine %s has been removed.",
+                                "Retrieve schema history failed, the schema records for engine %s has been removed,"
+                                        + " this might because the debezium engine has been shutdown due to other errors.",
                                 engineName));
             } else {
                 return HISTORY.getOrDefault(engineName, Collections.emptyList());
