@@ -365,7 +365,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         if (engineInstanceName != null) {
             schemaRecordsState.add(engineInstanceName);
             Collection<SchemaRecord> records = checkStatusAndRetrieveHistory(engineInstanceName);
-            if (records.isEmpty()) {
+            if (records == null) {
                 throw new FlinkRuntimeException(
                         String.format(
                                 "The schema records for engine %s has been removed, checkpoint failed.",
@@ -606,13 +606,16 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /**
      * Retrieves history of schema safely, this method firstly checks the history status of specific
      * engine, and then return the history of schema if the history exists(didn't clean up yet).
+     * Returns null when the history of schema has been clean up.
      */
+    @Nullable
     public static Collection<SchemaRecord> checkStatusAndRetrieveHistory(String engineName) {
         synchronized (HISTORY) {
-            if (Boolean.FALSE.equals(HISTORY_CLEANUP_STATUS.get(engineName))) {
-                return HISTORY.get(engineName);
+            if (Boolean.TRUE.equals(HISTORY_CLEANUP_STATUS.get(engineName))) {
+                return null;
+            } else {
+                return HISTORY.getOrDefault(engineName, Collections.emptyList());
             }
-            return Collections.emptyList();
         }
     }
 
