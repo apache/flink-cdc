@@ -55,7 +55,6 @@ import io.debezium.embedded.Connect;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
-import io.debezium.relational.history.DatabaseHistory;
 import org.apache.commons.collections.map.LinkedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,18 +63,17 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
 
 /**
  * The {@link DebeziumSourceFunction} is a streaming data source that pulls captured change data
@@ -153,20 +151,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     // ---------------------------------------------------------------------------------------
     // State
     // ---------------------------------------------------------------------------------------
-
-    /**
-     * Structure to maintain the current schema history. The content in {@link SchemaRecord} is up
-     * to the implementation of the {@link DatabaseHistory}.
-     */
-    private static final ConcurrentMap<String, Collection<SchemaRecord>> HISTORY =
-            new ConcurrentHashMap<>();
-
-    /**
-     * The schema history will be clean up once {@link DatabaseHistory#stop()}, the checkpoint
-     * should fail when this happens.
-     */
-    private static final ConcurrentMap<String, Boolean> HISTORY_CLEANUP_STATUS =
-            new ConcurrentHashMap<>();
 
     /**
      * The offsets to restore to, if the consumer restores state from a checkpoint.
@@ -286,7 +270,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private void restoreHistoryRecordsState() throws Exception {
         DocumentReader reader = DocumentReader.defaultReader();
-        List<SchemaRecord> historyRecords = new ArrayList<>();
+        ConcurrentLinkedQueue<SchemaRecord> historyRecords = new ConcurrentLinkedQueue<>();
         int recordsCount = 0;
         boolean firstEntry = true;
         for (String record : schemaRecordsState.get()) {
@@ -364,17 +348,10 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
         if (engineInstanceName != null) {
             schemaRecordsState.add(engineInstanceName);
-            Collection<SchemaRecord> records = checkStatusAndRetrieveHistory(engineInstanceName);
-            if (records == null) {
-                throw new FlinkRuntimeException(
-                        String.format(
-                                "The schema records for engine %s has been removed, checkpoint failed.",
-                                engineInstanceName));
-            } else {
-                DocumentWriter writer = DocumentWriter.defaultWriter();
-                for (SchemaRecord record : records) {
-                    schemaRecordsState.add(writer.write(record.toDocument()));
-                }
+            Collection<SchemaRecord> records = retrieveHistory(engineInstanceName);
+            DocumentWriter writer = DocumentWriter.defaultWriter();
+            for (SchemaRecord record : records) {
+                schemaRecordsState.add(writer.write(record.toDocument()));
             }
         }
     }
@@ -579,43 +556,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         } else {
             // impossible
             throw new IllegalStateException("Can't determine which DatabaseHistory to use.");
-        }
-    }
-
-    /** Registers history of schema safely. */
-    public static void registerHistory(String engineName, Collection<SchemaRecord> engineHistory) {
-        synchronized (HISTORY) {
-            HISTORY.put(engineName, engineHistory);
-            HISTORY_CLEANUP_STATUS.put(engineName, false);
-        }
-    }
-
-    /** Remove history of schema safely. */
-    public static void removeHistory(String engineName) {
-        synchronized (HISTORY) {
-            HISTORY_CLEANUP_STATUS.put(engineName, true);
-            HISTORY.remove(engineName);
-        }
-    }
-
-    /** Retrieves history of schema directly. */
-    public static Collection<SchemaRecord> retrieveHistory(String engineName) {
-        return HISTORY.getOrDefault(engineName, Collections.emptyList());
-    }
-
-    /**
-     * Retrieves history of schema safely, this method firstly checks the history status of specific
-     * engine, and then return the history of schema if the history exists(didn't clean up yet).
-     * Returns null when the history of schema has been clean up.
-     */
-    @Nullable
-    public static Collection<SchemaRecord> checkStatusAndRetrieveHistory(String engineName) {
-        synchronized (HISTORY) {
-            if (Boolean.TRUE.equals(HISTORY_CLEANUP_STATUS.get(engineName))) {
-                return null;
-            } else {
-                return HISTORY.getOrDefault(engineName, Collections.emptyList());
-            }
         }
     }
 

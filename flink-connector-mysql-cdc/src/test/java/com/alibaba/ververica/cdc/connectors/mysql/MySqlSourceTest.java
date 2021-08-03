@@ -80,7 +80,7 @@ import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertDelet
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertRead;
 import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertUpdate;
-import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.removeHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.removeHistory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

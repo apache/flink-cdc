@@ -29,9 +29,9 @@ import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
-import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.registerHistory;
-import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.removeHistory;
-import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.retrieveHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.removeHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
 
 /**
  * Inspired from {@link io.debezium.relational.history.MemoryDatabaseHistory} but we will store the

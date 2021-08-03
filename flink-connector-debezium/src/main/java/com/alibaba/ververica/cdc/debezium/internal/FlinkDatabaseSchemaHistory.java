@@ -36,9 +36,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.registerHistory;
-import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.removeHistory;
-import static com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction.retrieveHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.removeHistory;
+import static com.alibaba.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
 import static io.debezium.relational.history.TableChanges.TableChange;
 
 /**
