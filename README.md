@@ -56,18 +56,18 @@ Include following Maven dependency (available through Maven Central):
 
 ```
 <dependency>
-  <groupId>com.alibaba.ververica</groupId>
+  <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>1.2.0</version>
+  <version>2.0.0</version>
 </dependency>
 ```
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.connectors.mysql.MySqlSource;
+import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
