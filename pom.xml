@@ -182,6 +182,7 @@ under the License.
                         <exclude>**/*.md</exclude>
                         <exclude>docs/Makefile</exclude>
                         <exclude>docs/make.bat</exclude>
+                        <exclude>docs/_templates/version.html</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                     </excludes>
