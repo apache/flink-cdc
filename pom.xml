@@ -180,6 +180,8 @@ under the License.
                         <exclude>**/*.iml</exclude>
                         <!-- Docs -->
                         <exclude>**/*.md</exclude>
+                        <exclude>docs/Makefile</exclude>
+                        <exclude>docs/make.bat</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                     </excludes>
