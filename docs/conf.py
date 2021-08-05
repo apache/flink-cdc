@@ -61,8 +61,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
-    'recommonmark',
-    'sphinx-markdown-tables',
+    'myst_parser',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -73,10 +72,10 @@ templates_path = ['_templates']
 #
 html_theme = 'sphinx_rtd_theme'
 
-from recommonmark.parser import CommonMarkParser
+import myst_parser
 
 source_parsers = {
-    '.md': CommonMarkParser
+    '.md': myst_parser
 }
 source_suffix = ['.md']
 
