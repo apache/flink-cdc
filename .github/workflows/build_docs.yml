@@ -1,0 +1,28 @@
+name: build_docs
+ 
+# execute this docs build workflow automatically when new push happens in any branch
+on:
+  push:
+ 
+jobs:
+ 
+  build_docs_job:
+    runs-on: ubuntu-latest
+    container: debian:buster-slim
+ 
+    steps:
+ 
+    - name: Prereqs
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        apt-get update
+        apt-get install -y git
+        git clone "https://token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
+      shell: bash
+ 
+    - name: Execute script to build our documentation and update pages
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: "docs/build_docs.sh"
+      shell: bash
