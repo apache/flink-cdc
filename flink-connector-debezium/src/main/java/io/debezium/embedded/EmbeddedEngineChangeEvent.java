@@ -6,7 +6,7 @@
 
 package io.debezium.embedded;
 
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumChangeFetcher;
+import com.ververica.cdc.debezium.internal.DebeziumChangeFetcher;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.RecordChangeEvent;
 import org.apache.kafka.connect.source.SourceRecord;
