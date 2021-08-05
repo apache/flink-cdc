@@ -25,19 +25,19 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
     }
 
     @Test
     public void testReadSingleTableWithMultipleParallelism() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
     }
 
     @Test
     public void testReadMultipleTableWithSingleParallelism() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
@@ -46,7 +46,7 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
 
     @Test
     public void testReadMultipleTableWithMultipleParallelism() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 4,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
@@ -56,37 +56,37 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
     // Failover tests
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testTaskManagerFailoverInBinlogPhase() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 FailoverType.TM, FailoverPhase.BINLOG, new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testJobManagerFailoverInBinlogPhase() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 FailoverType.JM, FailoverPhase.BINLOG, new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testTaskManagerFailoverSingleParallelism() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
     }
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
-        testMySQLParallelSource(
+        testMySqlParallelSource(
                 1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
     }
 }

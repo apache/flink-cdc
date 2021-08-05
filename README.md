@@ -71,7 +71,7 @@ import com.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
-    SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
+    SourceFunction<String> sourceFunction = MySqlSource.<String>builder()
       .hostname("localhost")
       .port(3306)
       .databaseList("inventory") // monitor all tables under inventory database

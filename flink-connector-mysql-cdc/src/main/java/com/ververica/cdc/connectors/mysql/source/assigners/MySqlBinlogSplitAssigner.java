@@ -23,8 +23,6 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
-import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
@@ -32,7 +30,6 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsSt
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -46,6 +43,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMySqlConnection;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createTableFilters;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
+import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
+import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
@@ -75,13 +78,13 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     private MySqlBinlogSplitAssigner(Configuration configuration, boolean isBinlogSplitAssigned) {
         this.configuration = configuration;
-        this.tableFilters = DebeziumUtils.createTableFilters(configuration);
+        this.tableFilters = createTableFilters(configuration);
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
     }
 
     @Override
     public void open() {
-        jdbc = DebeziumUtils.openMySqlConnection(configuration);
+        jdbc = openMySqlConnection(configuration);
     }
 
     @Override
@@ -123,7 +126,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void close() {
         if (jdbc != null) {
-            DebeziumUtils.closeMySqlConnection(jdbc);
+            closeMySqlConnection(jdbc);
         }
     }
 
@@ -139,7 +142,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         return new MySqlBinlogSplit(
                 BINLOG_SPLIT_ID,
                 splitKeyType,
-                DebeziumUtils.currentBinlogOffset(jdbc),
+                currentBinlogOffset(jdbc),
                 BinlogOffset.NO_STOPPING_OFFSET,
                 Collections.emptyList(),
                 tableSchemas);
@@ -148,7 +151,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     private Map<TableId, TableChange> discoverCapturedTableSchemas() {
         final List<TableId> capturedTableIds;
         try {
-            capturedTableIds = TableDiscoveryUtils.listTables(jdbc, tableFilters);
+            capturedTableIds = listTables(jdbc, tableFilters);
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Failed to discover captured tables", e);
         }
@@ -161,8 +164,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         }
 
         // fetch table schemas
-        MySqlSchema mySqlSchema =
-                new MySqlSchema(StatefulTaskContext.toDebeziumConfig(configuration), jdbc);
+        MySqlSchema mySqlSchema = new MySqlSchema(toDebeziumConfig(configuration), jdbc);
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
         for (TableId tableId : capturedTableIds) {
             TableChange tableSchema = mySqlSchema.getTableSchema(tableId);

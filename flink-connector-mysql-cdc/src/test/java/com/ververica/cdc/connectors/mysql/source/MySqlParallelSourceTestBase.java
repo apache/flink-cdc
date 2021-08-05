@@ -94,13 +94,13 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
         LOG.info("Containers are started.");
     }
 
-    protected void testMySQLParallelSource(
+    protected void testMySqlParallelSource(
             FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
             throws Exception {
-        testMySQLParallelSource(PARALLELISM, failoverType, failoverPhase, captureCustomerTables);
+        testMySqlParallelSource(PARALLELISM, failoverType, failoverPhase, captureCustomerTables);
     }
 
-    protected void testMySQLParallelSource(
+    protected void testMySqlParallelSource(
             int parallelism,
             FailoverType failoverType,
             FailoverPhase failoverPhase,

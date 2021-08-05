@@ -44,6 +44,9 @@ import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.Queue;
 
+import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getBinaryClient;
+import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.getConnection;
+
 /** The {@link SplitReader} implementation for the {@link MySqlParallelSource}. */
 public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
@@ -118,10 +121,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
             if (nextSplit.isSnapshotSplit()) {
                 if (currentReader == null) {
-                    final MySqlConnection jdbcConnection =
-                            StatefulTaskContext.getConnection(config);
-                    final BinaryLogClient binaryLogClient =
-                            StatefulTaskContext.getBinaryClient(config);
+                    final MySqlConnection jdbcConnection = getConnection(config);
+                    final BinaryLogClient binaryLogClient = getBinaryClient(config);
                     final StatefulTaskContext statefulTaskContext =
                             new StatefulTaskContext(config, binaryLogClient, jdbcConnection);
                     currentReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
@@ -132,8 +133,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                     LOG.info("It's turn to read binlog split, close current snapshot reader");
                     currentReader.close();
                 }
-                final MySqlConnection jdbcConnection = StatefulTaskContext.getConnection(config);
-                final BinaryLogClient binaryLogClient = StatefulTaskContext.getBinaryClient(config);
+                final MySqlConnection jdbcConnection = getConnection(config);
+                final BinaryLogClient binaryLogClient = getBinaryClient(config);
                 final StatefulTaskContext statefulTaskContext =
                         new StatefulTaskContext(config, binaryLogClient, jdbcConnection);
                 LOG.info("Create binlog reader");

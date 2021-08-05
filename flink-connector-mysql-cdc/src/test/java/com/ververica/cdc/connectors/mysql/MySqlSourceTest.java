@@ -603,7 +603,7 @@ public class MySqlSourceTest extends MySqlTestBase {
         }
 
         Tuple2<String, Integer> offset =
-                currentMySQLLatestOffset(database, "products", 10, useLegacyImplementation);
+                currentMySqlLatestOffset(database, "products", 10, useLegacyImplementation);
         final String offsetFile = offset.f0;
         final int offsetPos = offset.f1;
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -924,7 +924,7 @@ public class MySqlSourceTest extends MySqlTestBase {
     // ------------------------------------------------------------------------------------------
 
     /** Gets the latest offset of current MySQL server. */
-    public static Tuple2<String, Integer> currentMySQLLatestOffset(
+    public static Tuple2<String, Integer> currentMySqlLatestOffset(
             UniqueDatabase database,
             String table,
             int expectedRecordCount,

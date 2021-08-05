@@ -21,15 +21,12 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
-import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -48,7 +45,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMySqlConnection;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createTableFilters;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
+import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
@@ -111,7 +113,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerFinished = assignerFinished;
         this.remainingTables = new LinkedList<>();
-        this.tableFilters = DebeziumUtils.createTableFilters(configuration);
+        this.tableFilters = createTableFilters(configuration);
         this.chunkSize = configuration.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         // TODO: the check should happen in factory
         checkState(
@@ -124,7 +126,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void open() {
         // discover captured tables
-        jdbc = DebeziumUtils.openMySqlConnection(configuration);
+        jdbc = openMySqlConnection(configuration);
         chunkSplitter = createChunkSplitter(configuration, jdbc, chunkSize);
         if (!assignerFinished) {
             remainingTables.addAll(discoverCapturedTables());
@@ -210,7 +212,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void close() {
         if (jdbc != null) {
-            DebeziumUtils.closeMySqlConnection(jdbc);
+            closeMySqlConnection(jdbc);
         }
     }
 
@@ -248,7 +250,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private List<TableId> discoverCapturedTables() {
         final List<TableId> capturedTableIds;
         try {
-            capturedTableIds = TableDiscoveryUtils.listTables(jdbc, tableFilters);
+            capturedTableIds = listTables(jdbc, tableFilters);
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Failed to discover captured tables", e);
         }
@@ -264,8 +266,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     private static ChunkSplitter createChunkSplitter(
             Configuration configuration, MySqlConnection jdbc, int chunkSize) {
-        MySqlSchema mySqlSchema =
-                new MySqlSchema(StatefulTaskContext.toDebeziumConfig(configuration), jdbc);
+        MySqlSchema mySqlSchema = new MySqlSchema(toDebeziumConfig(configuration), jdbc);
         return new ChunkSplitter(jdbc, mySqlSchema, chunkSize);
     }
 }

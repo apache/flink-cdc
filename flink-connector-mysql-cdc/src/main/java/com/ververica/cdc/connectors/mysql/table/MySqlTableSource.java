@@ -166,9 +166,9 @@ public class MySqlTableSource implements ScanTableSource {
         properties.put("database.history.skip.unparseable.ddl", String.valueOf(true));
         properties.put("database.server.name", DATABASE_SERVER_NAME);
 
-        /*
-         * The server id is required, it will be replaced to 'database.server.id' when build {@Link
-         * MySQLSplitReader}
+        /**
+         * The server id is required, it will be replaced to 'database.server.id' when build {@link
+         * MySqlSplitReader}
          */
         if (serverId != null) {
             properties.put(SERVER_ID.key(), serverId);

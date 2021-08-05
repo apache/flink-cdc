@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.debezium.internal;
 
-import com.ververica.cdc.debezium.utils.DatabaseHistoryUtil;
 import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -37,6 +36,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
+import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.removeHistory;
+import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
 import static io.debezium.relational.history.TableChanges.TableChange;
 
 /**
@@ -77,7 +79,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
 
         // recover
         this.latestTables = new ConcurrentHashMap<>();
-        for (SchemaRecord schemaRecord : DatabaseHistoryUtil.retrieveHistory(instanceName)) {
+        for (SchemaRecord schemaRecord : retrieveHistory(instanceName)) {
             // validate here
             TableChange tableChange =
                     JsonTableChangeSerializer.fromDocument(
@@ -85,7 +87,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
             latestTables.put(tableChange.getId(), schemaRecord);
         }
         // register
-        DatabaseHistoryUtil.registerHistory(instanceName, latestTables.values());
+        registerHistory(instanceName, latestTables.values());
     }
 
     @Override
@@ -151,7 +153,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
     @Override
     public void stop() {
         if (instanceName != null) {
-            DatabaseHistoryUtil.removeHistory(instanceName);
+            removeHistory(instanceName);
         }
         listener.stopped();
     }

@@ -41,7 +41,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-import static com.ververica.cdc.connectors.mysql.MySqlSourceTest.currentMySQLLatestOffset;
+import static com.ververica.cdc.connectors.mysql.MySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
@@ -64,13 +64,13 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
 
     // the debezium mysql connector use legacy implementation or not
-    private final boolean useLegacyDezMySQL;
+    private final boolean useLegacyDezMySql;
 
-    // enable the incrementalSnapshot (i.e: The new source MySQLParallelSource)
+    // enable the incrementalSnapshot (i.e: The new source MySqlParallelSource)
     private final boolean incrementalSnapshot;
 
-    public MySqlConnectorITCase(boolean useLegacyDezMySQL, boolean incrementalSnapshot) {
-        this.useLegacyDezMySQL = useLegacyDezMySQL;
+    public MySqlConnectorITCase(boolean useLegacyDezMySql, boolean incrementalSnapshot) {
+        this.useLegacyDezMySql = useLegacyDezMySql;
         this.incrementalSnapshot = incrementalSnapshot;
     }
 
@@ -392,7 +392,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
         }
         Tuple2<String, Integer> offset =
-                currentMySQLLatestOffset(inventoryDatabase, "products", 9, useLegacyDezMySQL);
+                currentMySqlLatestOffset(inventoryDatabase, "products", 9, useLegacyDezMySql);
 
         String sourceDDL =
                 String.format(
@@ -627,7 +627,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     // ------------------------------------------------------------------------------------
 
     private String getDezImplementation() {
-        return useLegacyDezMySQL ? "legacy" : "";
+        return useLegacyDezMySql ? "legacy" : "";
     }
 
     private String getServerId() {
