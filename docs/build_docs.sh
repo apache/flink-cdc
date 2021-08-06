@@ -30,7 +30,7 @@ temp_docs_root=`mktemp -d`
 
 # step-2: build sites for all branches(for multiple versioned docs), excludes 'HEAD' and 'gh-pages'
 make -C docs clean
-branches="`git for-each-ref '--format=%(refname:lstrip=-1)' refs/remotes/origin/ | grep -viE '^(HEAD|gh-pages)$'`"
+branches="`git for-each-ref '--format=%(refname:lstrip=-1)' refs/remotes/origin/ | grep -viE '^(HEAD|gh-pages|release-1.0|release-1.1|release-1.2|release-1.3)$'| grep -iE '^(release-|master)'`"
 for current_branch in ${branches}; do
    export current_branch
    git checkout ${current_branch}
@@ -63,7 +63,7 @@ cat > index.html <<EOF
 <!DOCTYPE html>
 <html>
    <head>
-      <title>Flink CDC Connectors</title>
+      <title>Flink CDC</title>
       <meta http-equiv = "refresh" content="0; url='/${REPO_NAME}/master/'" />
    </head>
    <body>
