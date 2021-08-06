@@ -11,15 +11,15 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 
 ```
 <dependency>
-  <groupId>com.alibaba.ververica</groupId>
+  <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>1.4.0</version>
+  <version>2.0.0</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-mysql-cdc-1.4.0.jar](https://repo1.maven.org/maven2/com/alibaba/ververica/flink-sql-connector-mysql-cdc/1.4.0/flink-sql-connector-mysql-cdc-1.4.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.0.0/flink-sql-connector-mysql-cdc-2.0.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 Setup MySQL server
 ----------------
@@ -261,8 +261,8 @@ The MySQL CDC connector can also be a DataStream source. You can create a Source
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
+import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mysql.MySQLSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {

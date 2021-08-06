@@ -21,8 +21,8 @@ set -x
 
 # step-1: install dependencies
 apt-get update
-apt-get -y install git rsync python3-pip python3-sphinx python3-git python3-stemmer python3-virtualenv python3-setuptools
-python3 -m pip install myst-parser pygments sphinx-rtd-theme
+apt-get -y install git rsync python3-pip python3-git python3-stemmer python3-virtualenv python3-setuptools
+python3 -m pip install -U sphinx==4.1.1 myst-parser pygments sphinx-rtd-theme
 
 export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
 export REPO_NAME="${GITHUB_REPOSITORY##*/}"
