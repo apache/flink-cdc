@@ -39,9 +39,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'Flink CDC Connectors'
-copyright = '2021, Leonard Xu'
-author = 'Leonard Xu'
+project = 'Flink CDC'
+copyright = '2021, ververica'
+author = 'ververica'
 
 # The full version, including alpha/beta/rc tags
 release = '2.0.0'
@@ -89,6 +89,12 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+html_context = {
+    'css_files': [
+        '_static/theme_overrides.css',  # overrides for wide tables in RTD theme
+    ],
+}
+
 # multiple version supports
 import sys, os
 sys.path.insert(0, os.path.abspath('.'))
@@ -121,3 +127,6 @@ for version in versions:
     html_context['versions'].append( (version, '/' +REPO_NAME+ '/' +version+ '/') )
 
 html_context['display_github'] = True
+html_context['github_user'] = 'ververica'
+html_context['github_repo'] = 'flink-cdc-connectors'
+html_context['github_version'] = current_version + '/docs/'
