@@ -26,3 +26,13 @@
     max-width: 100%;
     overflow: visible;
 }
+
+/* override style of li under ul */
+.wy-nav-content ul li {
+    list-style: disc;
+    margin-left: 36px;
+}
+
+.wy-nav-content ul li p {
+    margin: 0 0 8px;
+}
