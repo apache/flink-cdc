@@ -1,16 +1,31 @@
-# Flink CDC Connectors
+# About Flink CDC
 
-Flink CDC Connectors is a set of source connectors for Apache Flink, ingesting changes from different databases using change data capture (CDC).
+Flink CDC Connectors is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink</a>, ingesting changes from different databases using change data capture (CDC).
 The Flink CDC Connectors integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
-This README is meant as a brief walkthrough on the core features with Flink CDC Connectors. For a fully detailed documentation, please see [Documentation](https://github.com/ververica/flink-cdc-connectors/wiki).
-
-## Supported (Tested) Connectors
+## Supported Connectors
 
 | Database | Version |
 | --- | --- |
 | MySQL | Database: 5.7, 8.0.x <br/>JDBC Driver: 8.0.16 |
 | PostgreSQL | Database: 9.6, 10, 11, 12 <br/>JDBC Driver: 42.2.12|
+
+
+## Supported Formats
+
+| Format | Supported Connector | Flink Version |
+| --- | --- | --- |
+| <a href="https://github.com/ververica/flink-cdc-connectors/wiki/Changelog-JSON-Format">Changelog Json</a> | <a href="https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/connectors/kafka.html">Apache Kafka</a> | 1.11+ |
+
+## Supported Flink Versions 
+The version mapping between Flink CDC Connectors and Flink.
+| Flink CDC Connector Version | Flink Version |
+| --- | --- |
+|1.0.0 | 1.11.* |
+|1.1.0 | 1.11.* |
+|1.2.0 | 1.12.* |
+|1.3.0 | 1.12.* |
+|1.4.0 | 1.13.* |
 
 ## Features
 

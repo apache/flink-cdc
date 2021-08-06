@@ -1,14 +1,16 @@
-# Welcome to Flink CDC Connectors' documentation!
+# Welcome to Flink CDC
 
 ```{toctree}
 :maxdepth: 2
 :caption: Contents
-content/README
-content/mysql-cdc
-content/postgres-cdc
+content/about
+content/connectors/index
+content/formats/index
+content/tutorials/index
+content/downloads
 ```
 
-# Indices and tables
+# Indices and Search
 
 * {ref}`genindex`
 * {ref}`search`
