@@ -1,16 +1,5 @@
 # Postgres CDC Connector
 
-* [Dependencies](#dependencies)
-  * [Maven dependency](#maven-dependency)
-  * [SQL Client JAR](#sql-client-jar)
-* [How to create a Postgres CDC table](#how-to-create-a-postgres-cdc-table)
-* [Connector Options](#connector-options)
-* [Features](#features)
-  * [Exactly-Once Processing](#exactly-once-processing)
-  * [Single Thread Reading](#single-thread-reading)
-  * [DataStream Source](#datastream-source)
-* [Data Type Mapping](#data-type-mapping)
-
 The Postgres CDC connector allows for reading snapshot data and incremental data from PostgreSQL database. This document describes how to setup the Postgres CDC connector to run SQL queries against PostgreSQL databases.
 
 Dependencies
@@ -24,13 +13,13 @@ In order to setup the Postgres CDC connector, the following table provides depen
 <dependency>
   <groupId>com.alibaba.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
-  <version>1.1.0</version>
+  <version>1.4.0</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-postgres-cdc-1.1.0.jar](https://repo1.maven.org/maven2/com/alibaba/ververica/flink-sql-connector-postgres-cdc/1.1.0/flink-sql-connector-postgres-cdc-1.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-1.4.0.jar](https://repo1.maven.org/maven2/com/alibaba/ververica/flink-sql-connector-postgres-cdc/1.4.0/flink-sql-connector-postgres-cdc-1.4.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 How to create a Postgres CDC table
 ----------------
@@ -63,8 +52,9 @@ SELECT * FROM shipments;
 Connector Options
 ----------------
 
-<table class="table table-bordered">
-    <thead>
+<div class="highlight">
+<table class="colwidths-auto docutils">
+   <thead>
       <tr>
         <th class="text-left" style="width: 25%">Option</th>
         <th class="text-left" style="width: 8%">Required</th>
@@ -75,63 +65,63 @@ Connector Options
     </thead>
     <tbody>
     <tr>
-      <td><h5>connector</h5></td>
+      <td>connector</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Specify what connector to use, here should be <code>'postgres-cdc'</code>.</td>
     </tr>
     <tr>
-      <td><h5>hostname</h5></td>
+      <td>hostname</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>IP address or hostname of the PostgreSQL database server.</td>
     </tr>
     <tr>
-      <td><h5>username</h5></td>
+      <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Name of the PostgreSQL database to use when connecting to the PostgreSQL database server.</td>
     </tr>
     <tr>
-      <td><h5>password</h5></td>
+      <td>password</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Password to use when connecting to the PostgreSQL database server.</td>
     </tr>
     <tr>
-      <td><h5>database-name</h5></td>
+      <td>database-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Database name of the PostgreSQL server to monitor.</td>
     </tr> 
     <tr>
-      <td><h5>schema-name</h5></td>
+      <td>schema-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Schema name of the PostgreSQL database to monitor.</td>
     </tr>
     <tr>
-      <td><h5>table-name</h5></td>
+      <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Table name of the PostgreSQL database to monitor.</td>
     </tr>
     <tr>
-      <td><h5>port</h5></td>
+      <td>port</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">5432</td>
       <td>Integer</td>
       <td>Integer port number of the PostgreSQL database server.</td>
     </tr>
     <tr>
-      <td><h5>decoding.plugin.name</h5></td>
+      <td>decoding.plugin.name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">decoderbufs</td>
       <td>String</td>
@@ -139,7 +129,7 @@ Connector Options
           Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and pgoutput.</td>
     </tr>    
     <tr>
-      <td><h5>slot.name</h5></td>
+      <td>slot.name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">flink</td>
       <td>String</td>
@@ -148,7 +138,7 @@ Connector Options
           <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
     </tr>  
    <tr>
-      <td><h5>debezium.*</h5></td>
+      <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -157,7 +147,8 @@ Connector Options
           See more about the <a href="https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td> 
     </tr>   
     </tbody>
-</table>
+</table>    
+</div>
 
 Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-property-slot-name).
 
@@ -209,7 +200,8 @@ public class PostgreSQLSourceExample {
 Data Type Mapping
 ----------------
 
-<table class="table table-bordered">
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
@@ -219,82 +211,83 @@ Data Type Mapping
     <tbody>
     <tr>
       <td></td>
-      <td><code>TINYINT</code></td>
+      <td>TINYINT</td>
     </tr>
     <tr>
       <td>
-        <code>SMALLINT</code><br>
-        <code>INT2</code><br>
-        <code>SMALLSERIAL</code><br>
-        <code>SERIAL2</code></td>
-      <td><code>SMALLINT</code></td>
+        SMALLINT<br>
+        INT2<br>
+        SMALLSERIAL<br>
+        SERIAL2</td>
+      <td>SMALLINT</td>
     </tr>
     <tr>
       <td>
-        <code>INTEGER</code><br>
-        <code>SERIAL</code></td>
-      <td><code>INT</code></td>
+        INTEGER<br>
+        SERIAL</td>
+      <td>INT</td>
     </tr>
     <tr>
       <td>
-        <code>BIGINT</code><br>
-        <code>BIGSERIAL</code></td>
-      <td><code>BIGINT</code></td>
+        BIGINT<br>
+        BIGSERIAL</td>
+      <td>BIGINT</td>
     </tr>
    <tr>
       <td></td>
-      <td><code>DECIMAL(20, 0)</code></td>
+      <td>DECIMAL(20, 0)</td>
     </tr>
     <tr>
-      <td><code>BIGINT</code></td>
-      <td><code>BIGINT</code></td>
-    </tr>
-    <tr>
-      <td>
-        <code>REAL</code><br>
-        <code>FLOAT4</code></td>
-      <td><code>FLOAT</code></td>
+      <td>BIGINT</td>
+      <td>BIGINT</td>
     </tr>
     <tr>
       <td>
-        <code>FLOAT8</code><br>
-        <code>DOUBLE PRECISION</code></td>
-      <td><code>DOUBLE</code></td>
+        REAL<br>
+        FLOAT4</td>
+      <td>FLOAT</td>
     </tr>
     <tr>
       <td>
-        <code>NUMERIC(p, s)</code><br>
-        <code>DECIMAL(p, s)</code></td>
-      <td><code>DECIMAL(p, s)</code></td>
-    </tr>
-    <tr>
-      <td><code>BOOLEAN</code></td>
-      <td><code>BOOLEAN</code></td>
-    </tr>
-    <tr>
-      <td><code>DATE</code></td>
-      <td><code>DATE</code></td>
-    </tr>
-    <tr>
-      <td><code>TIME [(p)] [WITHOUT TIMEZONE]</code></td>
-      <td><code>TIME [(p)] [WITHOUT TIMEZONE]</code></td>
-    </tr>
-    <tr>
-      <td><code>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</code></td>
-      <td><code>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</code></td>
+        FLOAT8<br>
+        DOUBLE PRECISION</td>
+      <td>DOUBLE</td>
     </tr>
     <tr>
       <td>
-        <code>CHAR(n)</code><br>
-        <code>CHARACTER(n)</code><br>
-        <code>VARCHAR(n)</code><br>
-        <code>CHARACTER VARYING(n)</code><br>
-        <code>TEXT</code></td>
-      <td><code>STRING</code></td>
+        NUMERIC(p, s)<br>
+        DECIMAL(p, s)</td>
+      <td>DECIMAL(p, s)</td>
     </tr>
     <tr>
-      <td><code>BYTEA</code></td>
-      <td><code>BYTES</code></td>
+      <td>BOOLEAN</td>
+      <td>BOOLEAN</td>
+    </tr>
+    <tr>
+      <td>DATE</td>
+      <td>DATE</td>
+    </tr>
+    <tr>
+      <td>TIME [(p)] [WITHOUT TIMEZONE]</td>
+      <td>TIME [(p)] [WITHOUT TIMEZONE]</td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
+      <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
+    </tr>
+    <tr>
+      <td>
+        CHAR(n)<br>
+        CHARACTER(n)<br>
+        VARCHAR(n)<br>
+        CHARACTER VARYING(n)<br>
+        TEXT</td>
+      <td>STRING</td>
+    </tr>
+    <tr>
+      <td>BYTEA</td>
+      <td>BYTES</td>
     </tr>
     </tbody>
 </table>
+</div>
