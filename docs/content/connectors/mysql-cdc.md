@@ -1,26 +1,5 @@
 # MySQL CDC Connector
 
-* [Dependencies](#dependencies)
-  * [Maven dependency](#maven-dependency)
-  * [SQL Client JAR](#sql-client-jar)
-* [Setup MySQL server](#setup-mysql-server)
-* [Notes](#notes)
-  * [How MySQL CDC source works](#how-mysql-cdc-source-works)
-  * [Grant RELOAD permission for MySQL user](#grant-reload-permission-for-mysql-user)
-  * [The global read lock](#the-global-read-lock-flush-tables-with-read-lock)
-  * [Set a differnet SERVER ID for each job](#set-a-differnet-server-id-for-each-job)
-  * [Can't perform checkpoint during scaning database tables](#cant-perform-checkpoint-during-scaning-database-tables)
-  * [Setting up MySQL session timeouts](#setting-up-mysql-session-timeouts)
-* [How to create a MySQL CDC table](#how-to-create-a-mysql-cdc-table)
-* [Connector Options](#connector-options)
-* [Features](#features)
-  * [Exactly-Once Processing](#exactly-once-processing)
-  * [Startup Reading Position](#startup-reading-position)
-  * [Single Thread Reading](#single-thread-reading)
-  * [DataStream Source](#datastream-source)
-* [Data Type Mapping](#data-type-mapping)
-* [FAQ](#faq)
-
 The MySQL CDC connector allows for reading snapshot data and incremental data from MySQL database. This document describes how to setup the MySQL CDC connector to run SQL queries against MySQL databases.
 
 Dependencies
@@ -34,13 +13,13 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 <dependency>
   <groupId>com.alibaba.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>1.1.0</version>
+  <version>1.4.0</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-mysql-cdc-1.1.0.jar](https://repo1.maven.org/maven2/com/alibaba/ververica/flink-sql-connector-mysql-cdc/1.1.0/flink-sql-connector-mysql-cdc-1.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc-1.4.0.jar](https://repo1.maven.org/maven2/com/alibaba/ververica/flink-sql-connector-mysql-cdc/1.4.0/flink-sql-connector-mysql-cdc-1.4.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 Setup MySQL server
 ----------------
@@ -136,68 +115,69 @@ SELECT * FROM orders;
 Connector Options
 ----------------
 
-<table class="table table-bordered">
+<div class="highlight">
+<table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width: 25%">Option</th>
+        <th class="text-left" style="width: 10%">Option</th>
         <th class="text-left" style="width: 8%">Required</th>
         <th class="text-left" style="width: 7%">Default</th>
         <th class="text-left" style="width: 10%">Type</th>
-        <th class="text-left" style="width: 50%">Description</th>
+        <th class="text-left" style="width: 65%">Description</th>
       </tr>
     </thead>
     <tbody>
     <tr>
-      <td><h5>connector</h5></td>
+      <td>connector</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Specify what connector to use, here should be <code>'mysql-cdc'</code>.</td>
     </tr>
     <tr>
-      <td><h5>hostname</h5></td>
+      <td>hostname</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>IP address or hostname of the MySQL database server.</td>
     </tr>
     <tr>
-      <td><h5>username</h5></td>
+      <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Name of the MySQL database to use when connecting to the MySQL database server.</td>
     </tr>
     <tr>
-      <td><h5>password</h5></td>
+      <td>password</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Password to use when connecting to the MySQL database server.</td>
     </tr>
     <tr>
-      <td><h5>database-name</h5></td>
+      <td>database-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Database name of the MySQL server to monitor. The database-name also supports regular expressions to monitor multiple tables matches the regular expression.</td>
     </tr> 
     <tr>
-      <td><h5>table-name</h5></td>
+      <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Table name of the MySQL database to monitor. The table-name also supports regular expressions to monitor multiple tables matches the regular expression.</td>
     </tr>
     <tr>
-      <td><h5>port</h5></td>
+      <td>port</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">3306</td>
       <td>Integer</td>
       <td>Integer port number of the MySQL database server.</td>
     </tr>
     <tr>
-      <td><h5>server-id</h5></td>
+      <td>server-id</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
@@ -206,7 +186,7 @@ Connector Options
           By default, a random number is generated between 5400 and 6400, though we recommend setting an explicit value.</td>
     </tr> 
     <tr>
-      <td><h5>scan.startup.mode</h5></td>
+      <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
@@ -215,7 +195,7 @@ Connector Options
            Please see <a href="#startup-reading-position">Startup Reading Position</a>section for more detailed information.</td>
     </tr> 
     <tr>
-      <td><h5>server-time-zone</h5></td>
+      <td>server-time-zone</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">UTC</td>
       <td>String</td>
@@ -224,7 +204,8 @@ Connector Options
           See more <a href="https://debezium.io/documentation/reference/1.2/connectors/mysql.html#_temporal_values">here</a>.</td>
     </tr>
     <tr>
-      <td><h5>debezium.min.row.count.to.stream.results</h5></td>
+      <td>debezium.min.row.
+      count.to.stream.result</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
@@ -232,15 +213,15 @@ Connector Options
 During a snapshot operation, the connector will query each included table to produce a read event for all rows in that table. This parameter determines whether the MySQL connection will pull all results for a table into memory (which is fast but requires large amounts of memory), or whether the results will instead be streamed (can be slower, but will work for very large tables). The value specifies the minimum number of rows a table must contain before the connector will stream results, and defaults to 1,000. Set this parameter to '0' to skip all table size checks and always stream all results during a snapshot.</td>
     </tr>
     <tr>
-      <td><h5>debezium.snapshot.fetch.size</h5></td>
+      <td>debezium.snapshot.
+      fetch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
       <td>Specifies the maximum number of rows that should be read in one go from each table while taking a snapshot. The connector will read the table contents in multiple batches of this size.</td>
     </tr>
-
    <tr>
-      <td><h5>debezium.*</h5></td>
+      <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -250,6 +231,7 @@ During a snapshot operation, the connector will query each included table to pro
     </tr>
     </tbody>
 </table>
+</div>
 
 Features
 --------
@@ -308,7 +290,8 @@ public class MySqlBinlogSourceExample {
 Data Type Mapping
 ----------------
 
-<table class="table table-bordered">
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
     <thead>
       <tr>
         <th class="text-left">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
@@ -317,104 +300,105 @@ Data Type Mapping
     </thead>
     <tbody>
     <tr>
-      <td><code>TINYINT</code></td>
-      <td><code>TINYINT</code></td>
+      <td>TINYINT</td>
+      <td>TINYINT</td>
     </tr>
     <tr>
       <td>
-        <code>SMALLINT</code><br>
-        <code>TINYINT UNSIGNED</code></td>
-      <td><code>SMALLINT</code></td>
+        SMALLINT<br>
+        TINYINT UNSIGNED</td>
+      <td>SMALLINT</td>
     </tr>
     <tr>
       <td>
-        <code>INT</code><br>
-        <code>MEDIUMINT</code><br>
-        <code>SMALLINT UNSIGNED</code></td>
-      <td><code>INT</code></td>
+        INT<br>
+        MEDIUMINT<br>
+        SMALLINT UNSIGNED</td>
+      <td>INT</td>
     </tr>
     <tr>
       <td>
-        <code>BIGINT</code><br>
-        <code>INT UNSIGNED</code></td>
-      <td><code>BIGINT</code></td>
+        BIGINT<br>
+        INT UNSIGNED</td>
+      <td>BIGINT</td>
     </tr>
    <tr>
-      <td><code>BIGINT UNSIGNED</code></td>
-      <td><code>DECIMAL(20, 0)</code></td>
+      <td>BIGINT UNSIGNED</td>
+      <td>DECIMAL(20, 0)</td>
     </tr>
     <tr>
-      <td><code>BIGINT</code></td>
-      <td><code>BIGINT</code></td>
+      <td>BIGINT</td>
+      <td>BIGINT</td>
     </tr>
     <tr>
-      <td><code>FLOAT</code></td>
-      <td><code>FLOAT</code></td>
-    </tr>
-    <tr>
-      <td>
-        <code>DOUBLE</code><br>
-        <code>DOUBLE PRECISION</code></td>
-      <td><code>DOUBLE</code></td>
+      <td>FLOAT</td>
+      <td>FLOAT</td>
     </tr>
     <tr>
       <td>
-        <code>NUMERIC(p, s)</code><br>
-         <code>DECIMAL(p, s)</code></td>
-      <td><code>DECIMAL(p, s)</code></td>
+        DOUBLE<br>
+        DOUBLE PRECISION</td>
+      <td>DOUBLE</td>
     </tr>
     <tr>
       <td>
-        <code>BOOLEAN</code><br>
-         <code>TINYINT(1)</code></td>
-      <td><code>BOOLEAN</code></td>
+        NUMERIC(p, s)<br>
+         DECIMAL(p, s)</td>
+      <td>DECIMAL(p, s)</td>
     </tr>
     <tr>
-      <td><code>DATE</code></td>
-      <td><code>DATE</code></td>
+      <td>
+        BOOLEAN<br>
+         TINYINT(1)</td>
+      <td>BOOLEAN</td>
     </tr>
     <tr>
-      <td><code>TIME [(p)]</code></td>
-      <td><code>TIME [(p)] [WITHOUT TIMEZONE]</code></td>
+      <td>DATE</td>
+      <td>DATE</td>
     </tr>
     <tr>
-      <td><code>DATETIME [(p)]</code></td>
-      <td><code>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</code></td>
+      <td>TIME [(p)]</td>
+      <td>TIME [(p)] [WITHOUT TIMEZONE]</td>
     </tr>
     <tr>
-      <td><code>TIMESTAMP [(p)]</code></td>
-      <td><code>TIMESTAMP [(p)]</code><br>
-          <code>TIMESTAMP [(p)] WITH LOCAL TIME ZONE</code>
+      <td>DATETIME [(p)]</td>
+      <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP [(p)]</td>
+      <td>TIMESTAMP [(p)]<br>
+          TIMESTAMP [(p)] WITH LOCAL TIME ZONE
       </td>
     </tr>
     <tr>
       <td>
-        <code>CHAR(n)</code><br>
-        <code>VARCHAR(n)</code><br>
-        <code>TEXT</code></td>
-      <td><code>STRING</code></td>
+        CHAR(n)<br>
+        VARCHAR(n)<br>
+        TEXT</td>
+      <td>STRING</td>
     </tr>
     <tr>
       <td>
-        <code>BINARY</code><br>
-        <code>VARBINARY</code><br>
-        <code>BLOB</code></td>
-      <td><code>BYTES</code></td>
+        BINARY<br>
+        VARBINARY<br>
+        BLOB</td>
+      <td>BYTES</td>
     </tr>
     </tbody>
 </table>
+</div>
 
 FAQ
 --------
 
-### How to skip snapshot and only read from binlog? 
+#### Q1: How to skip snapshot and only read from binlog? 
 
 Please see [Startup Reading Position](#startup-reading-position) section.
 
-### How to read a shared database that contains multiple tables, e.g. user_00, user_01, ..., user_99 ?
+#### Q2: How to read a shared database that contains multiple tables, e.g. user_00, user_01, ..., user_99 ?
 
 The `table-name` option supports regular expressions to monitor multiple tables matches the regular expression. So you can set `table-name` to `user_.*` to monitor all the `user_` prefix tables. The same to the `database-name` option. Note that the shared table should be in the same schema.
 
-### ConnectException: Received DML '...' for processing, binlog probably contains events generated with statement or mixed based replication format
+#### Q3: ConnectException: Received DML '...' for processing, binlog probably contains events generated with statement or mixed based replication format
 
 If there is above exception, please check `binlog_format` is `ROW`, you can check this by running `show variables like '%binlog_format%'` in MySQL client. Please note that even if the `binlog_format` configuration of your database is `ROW`, this configuration can be changed by other sessions, for example, `SET SESSION binlog_format='MIXED'; SET SESSION tx_isolation='REPEATABLE-READ'; COMMIT;`. Please also make sure there are no other session are changing this configuration.
