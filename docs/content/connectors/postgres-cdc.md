@@ -11,15 +11,15 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```
 <dependency>
-  <groupId>com.alibaba.ververica</groupId>
+  <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
-  <version>1.4.0</version>
+  <version>2.0.0</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-postgres-cdc-1.4.0.jar](https://repo1.maven.org/maven2/com/alibaba/ververica/flink-sql-connector-postgres-cdc/1.4.0/flink-sql-connector-postgres-cdc-1.4.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.0.0/flink-sql-connector-postgres-cdc-2.0.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 How to create a Postgres CDC table
 ----------------
@@ -170,8 +170,8 @@ The Postgres CDC connector can also be a DataStream source. You can create a Sou
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.connectors.postgres.PostgreSQLSource;
+import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
 
 public class PostgreSQLSourceExample {
   public static void main(String[] args) throws Exception {
