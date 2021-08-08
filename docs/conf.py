@@ -32,9 +32,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
@@ -95,10 +95,6 @@ html_context = {
     ],
 }
 
-# multiple version supports
-import sys, os
-sys.path.insert(0, os.path.abspath('.'))
-
 try:
     html_context
 except NameError:
@@ -112,6 +108,7 @@ else:
 
 from git import Repo
 repo = Repo( search_parent_directories=True )
+remote_refs = repo.remote().refs
 
 if 'current_version' in os.environ:
     current_version = os.environ['current_version']
@@ -120,13 +117,17 @@ else:
 
 html_context['current_version'] = current_version
 html_context['version'] = current_version
-html_context['versions'] = list()
+html_context['github_version'] = current_version
 
-versions = [branch.name for branch in repo.branches]
-for version in versions:
-    html_context['versions'].append( (version, '/' +REPO_NAME+ '/' +version+ '/') )
+html_context['versions'] = list()
+branches = [branch.name for branch in remote_refs]
+for branch in branches:
+    if 'origin/' in branch and ('master' in branch or 'release-' in branch)\
+            and 'HEAD' not in branch and 'gh-pages' not in branch\
+            and 'release-1.1' not in branch and 'release-1.2' not in branch and 'release-1.3' not in branch:
+        version = branch[7:]
+        html_context['versions'].append( (version, '/' +REPO_NAME+ '/' +version+ '/') )
 
 html_context['display_github'] = True
 html_context['github_user'] = 'ververica'
 html_context['github_repo'] = 'flink-cdc-connectors'
-html_context['github_version'] = current_version + '/docs/'
