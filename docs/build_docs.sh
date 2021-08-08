@@ -32,7 +32,7 @@ temp_docs_root=`mktemp -d`
 make -C docs clean
 branches="`git for-each-ref '--format=%(refname:lstrip=-1)' refs/remotes/origin/ | grep -viE '^(HEAD|gh-pages|release-1.0|release-1.1|release-1.2|release-1.3)$'| grep -iE '^(release-|master)'`"
 for current_branch in ${branches}; do
-   export current_branch
+   export current_version=${current_branch}
    git checkout ${current_branch}
 
    # skip the branch that has no docs
