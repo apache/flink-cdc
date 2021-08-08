@@ -123,8 +123,9 @@ html_context['versions'] = list()
 branches = [branch.name for branch in remote_refs]
 for branch in branches:
     if 'origin/' in branch and ('master' in branch or 'release-' in branch)\
-            and 'HEAD' not in branch and 'gh-pages' not in branch\
-            and 'release-1.1' not in branch and 'release-1.2' not in branch and 'release-1.3' not in branch:
+            and 'HEAD' not in branch and 'gh-pages' not in branch \
+            and 'release-1.0' not in branch and 'release-1.1' not in branch\
+            and 'release-1.2' not in branch and 'release-1.3' not in branch:
         version = branch[7:]
         html_context['versions'].append( (version, '/' +REPO_NAME+ '/' +version+ '/') )
 
