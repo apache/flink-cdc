@@ -32,7 +32,7 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
-import com.alibaba.ververica.cdc.connectors.mysql.MySqlValidator;
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
@@ -126,8 +126,7 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) {
-        MySqlValidator validator =
-                new MySqlValidator(io.debezium.config.Configuration.from(config.toMap()));
+        MySqlValidator validator = new MySqlValidator(config);
 
         final MySqlSplitAssigner splitAssigner =
                 startupMode.equals("initial")
@@ -140,8 +139,7 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
-        MySqlValidator validator =
-                new MySqlValidator(io.debezium.config.Configuration.from(config.toMap()));
+        MySqlValidator validator = new MySqlValidator(config);
         final MySqlSplitAssigner splitAssigner;
         if (checkpoint instanceof HybridPendingSplitsState) {
             splitAssigner =

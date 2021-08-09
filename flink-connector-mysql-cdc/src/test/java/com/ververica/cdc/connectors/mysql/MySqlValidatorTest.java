@@ -16,16 +16,12 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.mysql;
+package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableException;
-import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 
-import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
 import com.ververica.cdc.connectors.mysql.source.utils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
@@ -66,12 +62,9 @@ public class MySqlValidatorTest {
 
     private static TemporaryFolder tempFolder;
     private static File resourceFolder;
-    private static final RowType SPLIT_KEYS =
-            LogicalTypeUtils.toRowType(
-                    DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType());
     final boolean runInParallel;
 
-    @Parameterized.Parameters(name = "runInParallel = {0}")
+    @Parameterized.Parameters(name = "runIncrementalSnapshot = {0}")
     public static Object[] parameters() {
         return new Object[] {true, false};
     }
@@ -98,21 +91,42 @@ public class MySqlValidatorTest {
 
     @Test
     public void testValidateVersion() {
+        String version = "5.6";
         String message =
-                "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.7.";
-        runValidate("5.6", "docker/my.cnf", message);
+                String.format(
+                        "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.7, but actual is %s.",
+                        version);
+        doValidate(version, "docker/my.cnf", message);
     }
 
     @Test
-    public void testValidateRowFormat() {
+    public void testValidateBinlogFormat() {
+        String mode = "STATEMENT";
         String message =
-                "The MySQL server is not configured to use a ROW binlog_format, "
-                        + "which is required for this connector to work properly. "
-                        + "Change the MySQL configuration to use a binlog_format=ROW and restart the connector.";
-        runValidate("5.7", buildConfigFile("[mysqld]\nbinlog_format = STATEMENT"), message);
+                String.format(
+                        "The MySQL server is configured with row format %s rather than ROW, which is required for this "
+                                + "connector to work properly. Change the MySQL configuration to use a binlog_format=ROW "
+                                + "and restart the connector.",
+                        mode);
+        doValidate("5.7", buildMySqlConfigFile("[mysqld]\nbinlog_format = " + mode), message);
     }
 
-    private void runValidate(String tag, String configPath, String exceptionMessage) {
+    @Test
+    public void testValidateBinlogRowImage() {
+        String mode = "MINIMAL";
+        String message =
+                String.format(
+                        "The MySQL server is configured with binlog_row_image %s rather than FULL, which is "
+                                + "required for this connector to work properly. Change the MySQL configuration to use a "
+                                + "binlog_row_image=FULL and restart the connector.",
+                        mode);
+        doValidate(
+                "5.7",
+                buildMySqlConfigFile("[mysqld]\nbinlog_format = ROW\nbinlog_row_image = " + mode),
+                message);
+    }
+
+    private void doValidate(String tag, String configPath, String exceptionMessage) {
         MySqlContainer container = new MySqlContainer(tag).withConfigurationOverride(configPath);
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(container)).join();
@@ -145,7 +159,7 @@ public class MySqlValidatorTest {
         }
     }
 
-    private String buildConfigFile(String content) {
+    private String buildMySqlConfigFile(String content) {
         try {
             File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
             Path cnf = Files.createFile(get(folder.getPath(), "my.cnf"));

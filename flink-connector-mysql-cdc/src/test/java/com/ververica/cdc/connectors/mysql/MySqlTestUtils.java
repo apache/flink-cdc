@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 /** Utils to help test. */
 public class MySqlTestUtils {
 
-    static MySqlSource.Builder<SourceRecord> basicSourceBuilder(
+    public static MySqlSource.Builder<SourceRecord> basicSourceBuilder(
             UniqueDatabase database, boolean useLegacyImplementation) {
         Properties debeziumProps = createDebeziumProperties(useLegacyImplementation);
         return MySqlSource.<SourceRecord>builder()
@@ -63,14 +63,14 @@ public class MySqlTestUtils {
                 .debeziumProperties(debeziumProps);
     }
 
-    static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
+    public static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
         setupSource(
                 source, false, null, null,
                 true, // enable checkpointing; auto commit should be ignored
                 0, 1);
     }
 
-    static <T, S1, S2> void setupSource(
+    public static <T, S1, S2> void setupSource(
             DebeziumSourceFunction<T> source,
             boolean isRestored,
             ListState<S1> restoredOffsetState,
@@ -120,6 +120,8 @@ public class MySqlTestUtils {
         }
         return debeziumProps;
     }
+
+    // ---------------------------------------------------------------------------------------
 
     /**
      * A simple implementation of {@link DebeziumDeserializationSchema} which just forward the
@@ -216,6 +218,7 @@ public class MySqlTestUtils {
         }
     }
 
+    /** Test list state. */
     public static final class TestingListState<T> implements ListState<T> {
 
         public final List<T> list = new ArrayList<>();
