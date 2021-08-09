@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.oracle;
+package com.ververica.cdc.connectors.oracle;
 
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.KeyedStateStore;
@@ -35,11 +35,11 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
-import com.alibaba.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
-import com.alibaba.ververica.cdc.connectors.utils.TestSourceContext;
-import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.jayway.jsonpath.JsonPath;
+import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
+import com.ververica.cdc.connectors.utils.TestSourceContext;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,10 +67,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
-import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
-import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
-import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertRead;
-import static com.alibaba.ververica.cdc.connectors.utils.AssertUtils.assertUpdate;
+import static com.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
+import static com.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
+import static com.ververica.cdc.connectors.utils.AssertUtils.assertRead;
+import static com.ververica.cdc.connectors.utils.AssertUtils.assertUpdate;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

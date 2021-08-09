@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.oracle.table;
+package com.ververica.cdc.connectors.oracle.table;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
@@ -28,16 +28,16 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 
-import com.alibaba.ververica.cdc.debezium.table.DebeziumOptions;
+import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.alibaba.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 
 /**
  * Factory for creating configured instance of {@link
- * com.alibaba.ververica.cdc.connectors.oracle.table.OracleTableSource}.
+ * com.ververica.cdc.connectors.oracle.table.OracleTableSource}.
  */
 public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 

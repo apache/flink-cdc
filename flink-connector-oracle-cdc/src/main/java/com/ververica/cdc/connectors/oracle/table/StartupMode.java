@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.oracle.table;
+package com.ververica.cdc.connectors.oracle.table;
 
 /**
  * Startup modes for the Oracle CDC Consumer.
