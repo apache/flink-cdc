@@ -16,23 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.oracle.utils;
+package com.ververica.cdc.connectors.oracle;
 
-import org.testcontainers.containers.OracleContainer;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-
-/** Utility class for oracle tests. */
-public class OracleTestUtils {
-
-    public static final String ORACLE_USER = "system";
-
-    public static final String ORACLE_PWD = "oracle";
-
-    public static Connection getJdbcConnection(OracleContainer oracleContainer)
-            throws SQLException {
-        return DriverManager.getConnection(oracleContainer.getJdbcUrl(), ORACLE_USER, ORACLE_PWD);
-    }
-}
+/** This is used to generate a dummy docs jar for this module to pass OSS repository rule. */
+public class DummyDocs {}

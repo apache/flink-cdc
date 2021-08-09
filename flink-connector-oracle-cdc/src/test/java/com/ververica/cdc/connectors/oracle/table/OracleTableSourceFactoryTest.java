@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.oracle.table;
+package com.ververica.cdc.connectors.oracle.table;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
@@ -47,8 +47,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Test for {@link com.alibaba.ververica.cdc.connectors.oracle.table.OracleTableSource} created by
- * {@link com.alibaba.ververica.cdc.connectors.oracle.table.OracleTableSourceFactory}.
+ * Test for {@link com.ververica.cdc.connectors.oracle.table.OracleTableSource} created by {@link
+ * com.ververica.cdc.connectors.oracle.table.OracleTableSourceFactory}.
  */
 public class OracleTableSourceFactoryTest {
     private static final ResolvedSchema SCHEMA =

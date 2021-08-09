@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.oracle;
+package com.ververica.cdc.connectors.oracle;
 
-import com.alibaba.ververica.cdc.connectors.oracle.table.StartupOptions;
-import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.alibaba.ververica.cdc.debezium.internal.DebeziumOffset;
+import com.ververica.cdc.connectors.oracle.table.StartupOptions;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.internal.DebeziumOffset;
 import io.debezium.connector.oracle.OracleConnector;
 
 import java.util.Properties;

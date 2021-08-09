@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.alibaba.ververica.cdc.connectors.oracle.table;
+package com.ververica.cdc.connectors.oracle.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.api.TableSchema;
@@ -28,10 +28,10 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.alibaba.ververica.cdc.connectors.oracle.OracleSource;
-import com.alibaba.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.alibaba.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import com.ververica.cdc.connectors.oracle.OracleSource;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
 import java.util.Objects;
 import java.util.Properties;
