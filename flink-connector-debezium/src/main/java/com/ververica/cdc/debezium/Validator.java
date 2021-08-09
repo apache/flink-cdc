@@ -18,7 +18,7 @@
 
 package com.ververica.cdc.debezium;
 
-/** Validator to validate the connected database satisfied the requirement. */
+/** Validator to validate the connected database satisfies the cdc connector's requirements. */
 public interface Validator {
 
     void validate();

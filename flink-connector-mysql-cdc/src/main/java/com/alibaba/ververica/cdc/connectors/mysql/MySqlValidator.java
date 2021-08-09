@@ -59,7 +59,7 @@ public class MySqlValidator implements Validator, Serializable {
                 new MySqlConnection(new MySqlConnectionConfiguration(configuration))) {
             if (!isVersionSatisfied(connection)) {
                 throw new TableException(
-                        "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.7.");
+                        String.format("Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.7, but actual is %s", actual version));
             }
 
             MySqlConnectorConfig mySqlConnectorConfig = new MySqlConnectorConfig(configuration);

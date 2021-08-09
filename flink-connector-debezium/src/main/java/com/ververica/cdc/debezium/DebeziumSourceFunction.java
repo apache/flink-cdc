@@ -148,7 +148,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** Flag indicating whether the Debezium Engine is started. */
     private volatile boolean debeziumStarted = false;
 
-    /** Validator to validate the connected database satisfies the requirements. */
+    /** Validator to validate the connected database satisfies the cdc connector's requirements. */
     private final Validator validator;
 
     // ---------------------------------------------------------------------------------------
