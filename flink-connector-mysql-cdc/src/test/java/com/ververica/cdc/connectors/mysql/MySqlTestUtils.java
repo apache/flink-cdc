@@ -218,8 +218,7 @@ public class MySqlTestUtils {
         }
     }
 
-    /** Test list state. */
-    public static final class TestingListState<T> implements ListState<T> {
+    static final class TestingListState<T> implements ListState<T> {
 
         public final List<T> list = new ArrayList<>();
         private boolean clearCalled = false;

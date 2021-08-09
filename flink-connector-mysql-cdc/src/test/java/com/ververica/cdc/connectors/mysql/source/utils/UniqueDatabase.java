@@ -106,7 +106,7 @@ public class UniqueDatabase {
     public Map<String, String> getConfigMap() {
         Map<String, String> config = new HashMap<>();
         config.put("database.server.name", DATABASE_SERVER_NAME);
-        config.put("database.hostname", getHost());
+        config.put("database.hostname", checkNotNull(getHost()));
         config.put("database.user", checkNotNull(getUsername()));
         config.put("database.password", checkNotNull(getPassword()));
         config.put("database.port", String.valueOf(getDatabasePort()));

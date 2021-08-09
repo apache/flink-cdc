@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,11 +33,8 @@ import java.util.Arrays;
 import java.util.Properties;
 
 /**
- * The validator for MySQL: it only cares about the version of the database is larger than or equal
- * to 5.7. It also requires the binlog format in the database is ROW.
- *
- * <p>We adapt part of the logic from the Debzium to validate in the compile phase rather than in
- * runtime time.
+ * The validator for MySql: it only cares about the version of the database is larger than or equal
+ * to 5.7. It also requires the binlog format in the database is ROW and row image is FULL.
  */
 public class MySqlValidator implements Validator, Serializable {
 
