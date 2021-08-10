@@ -102,7 +102,7 @@ public class MySqlValidator implements Validator, Serializable {
         if (!BINLOG_FORMAT_ROW.equals(mode)) {
             throw new TableException(
                     String.format(
-                            "The MySQL server is configured with row format %s rather than %s, which is "
+                            "The MySQL server is configured with binlog_format %s rather than %s, which is "
                                     + "required for this connector to work properly. Change the MySQL configuration to use a "
                                     + "binlog_format=ROW and restart the connector.",
                             mode, BINLOG_FORMAT_ROW));
