@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Maps;
 
@@ -60,7 +61,8 @@ public class MySqlValidator implements Validator, Serializable {
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);
         } catch (SQLException ex) {
-            throw new TableException("Failed to validate the source.", ex);
+            throw new TableException(
+                    "Unexpected error while connecting to MySQL and validating", ex);
         }
     }
 
@@ -83,7 +85,7 @@ public class MySqlValidator implements Validator, Serializable {
             isSatisfied = versionNumbers[1] >= 7;
         }
         if (!isSatisfied) {
-            throw new TableException(
+            throw new ValidationException(
                     String.format(
                             "Currently Flink MySql CDC connector only supports MySql "
                                     + "whose version is larger or equal to 5.7, but actual is %s.%s.",
@@ -100,7 +102,7 @@ public class MySqlValidator implements Validator, Serializable {
                                 rs -> rs.next() ? rs.getString(2) : "")
                         .toUpperCase();
         if (!BINLOG_FORMAT_ROW.equals(mode)) {
-            throw new TableException(
+            throw new ValidationException(
                     String.format(
                             "The MySQL server is configured with binlog_format %s rather than %s, which is "
                                     + "required for this connector to work properly. Change the MySQL configuration to use a "
@@ -126,7 +128,7 @@ public class MySqlValidator implements Validator, Serializable {
                                 })
                         .toUpperCase();
         if (!rowImage.equals(BINLOG_FORMAT_IMAGE_FULL)) {
-            throw new TableException(
+            throw new ValidationException(
                     String.format(
                             "The MySQL server is configured with binlog_row_image %s rather than %s, which is "
                                     + "required for this connector to work properly. Change the MySQL configuration to use a "

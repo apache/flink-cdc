@@ -20,7 +20,7 @@ package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.table.api.TableException;
+import org.apache.flink.table.api.ValidationException;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
 import com.ververica.cdc.connectors.mysql.source.utils.MySqlContainer;
@@ -41,6 +41,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.Objects;
@@ -49,7 +50,6 @@ import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.basicSourceBuilder;
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.setupSource;
-import static java.nio.file.Paths.get;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -62,23 +62,26 @@ public class MySqlValidatorTest {
 
     private static TemporaryFolder tempFolder;
     private static File resourceFolder;
-    final boolean runInParallel;
+    final boolean runIncrementalSnapshot;
 
     @Parameterized.Parameters(name = "runIncrementalSnapshot = {0}")
     public static Object[] parameters() {
         return new Object[] {true, false};
     }
 
-    public MySqlValidatorTest(boolean runInParallel) {
-        this.runInParallel = runInParallel;
+    public MySqlValidatorTest(boolean runIncrementalSnapshot) {
+        this.runIncrementalSnapshot = runIncrementalSnapshot;
     }
 
     @BeforeClass
     public static void setup() throws Exception {
         resourceFolder =
-                get(Objects.requireNonNull(
-                                        MySqlValidatorTest.class.getClassLoader().getResource("."))
-                                .toURI())
+                Paths.get(
+                                Objects.requireNonNull(
+                                                MySqlValidatorTest.class
+                                                        .getClassLoader()
+                                                        .getResource("."))
+                                        .toURI())
                         .toFile();
         tempFolder = new TemporaryFolder(resourceFolder);
         tempFolder.create();
@@ -104,7 +107,7 @@ public class MySqlValidatorTest {
         String mode = "STATEMENT";
         String message =
                 String.format(
-                        "The MySQL server is configured with row format %s rather than ROW, which is required for this "
+                        "The MySQL server is configured with binlog_format %s rather than ROW, which is required for this "
                                 + "connector to work properly. Change the MySQL configuration to use a binlog_format=ROW "
                                 + "and restart the connector.",
                         mode);
@@ -140,13 +143,13 @@ public class MySqlValidatorTest {
             startSource(database);
             fail("Should fail.");
         } catch (Exception e) {
-            assertTrue(e instanceof TableException);
+            assertTrue(e instanceof ValidationException);
             assertEquals(exceptionMessage, e.getMessage());
         }
     }
 
     private void startSource(UniqueDatabase database) throws Exception {
-        if (runInParallel) {
+        if (runIncrementalSnapshot) {
             MySqlParallelSource<?> mySqlParallelSource =
                     new MySqlParallelSource<>(
                             new MySqlTestUtils.ForwardDeserializeSchema(),
@@ -162,13 +165,13 @@ public class MySqlValidatorTest {
     private String buildMySqlConfigFile(String content) {
         try {
             File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
-            Path cnf = Files.createFile(get(folder.getPath(), "my.cnf"));
+            Path cnf = Files.createFile(Paths.get(folder.getPath(), "my.cnf"));
             Files.write(
                     cnf,
                     Collections.singleton(content),
                     StandardCharsets.UTF_8,
                     StandardOpenOption.APPEND);
-            return get(resourceFolder.getAbsolutePath()).relativize(cnf).toString();
+            return Paths.get(resourceFolder.getAbsolutePath()).relativize(cnf).toString();
         } catch (Exception e) {
             throw new RuntimeException("Failed to create my.cnf file.", e);
         }
