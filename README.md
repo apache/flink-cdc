@@ -23,7 +23,7 @@ This README is meant as a brief walkthrough on the core features with Flink CDC 
 We need several steps to setup a Flink cluster with the provided connector.
 
 1. Setup a Flink cluster with version 1.12+ and Java 8+ installed.
-2. Download the connector SQL jars from the [Download](https://github.com/ververica/flink-cdc-connectors/wiki/Downloads) page (or [build yourself](#building-from-source).
+2. Download the connector SQL jars from the [Download](https://github.com/ververica/flink-cdc-connectors/releases) page (or [build yourself](#building-from-source)).
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.
 
@@ -113,6 +113,10 @@ The code in this repository is licensed under the [Apache Software License 2](ht
 ## Contributing
 
 The Flink CDC Connectors welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/ververica/flink-cdc-connectors/issues).
+
+## Community
+* DingTalk User Group
+![image](https://user-images.githubusercontent.com/5163645/128969750-6a6c9832-eab3-4c72-8c76-32dd66539dbd.png)
 
 ## Documents
 To get started, please see https://ververica.github.io/flink-cdc-connectors/
