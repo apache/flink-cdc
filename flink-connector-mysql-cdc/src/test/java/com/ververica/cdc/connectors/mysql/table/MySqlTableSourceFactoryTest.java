@@ -223,35 +223,26 @@ public class MySqlTableSourceFactoryTest {
 
     @Test
     public void testStartupFromSpecificOffset() {
-        final String offsetFile = "mysql-bin.000003";
-        final int offsetPos = 100203;
+        try {
+            final String offsetFile = "mysql-bin.000003";
+            final int offsetPos = 100203;
 
-        Map<String, String> options = getAllOptions();
-        options.put("port", "3307");
-        options.put("server-id", "4321");
-        options.put("scan.startup.mode", "specific-offset");
-        options.put("scan.startup.specific-offset.file", offsetFile);
-        options.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
+            Map<String, String> properties = getAllOptions();
+            properties.put("port", "3307");
+            properties.put("server-id", "4321");
+            properties.put("scan.startup.mode", "specific-offset");
+            properties.put("scan.startup.specific-offset.file", offsetFile);
+            properties.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
 
-        DynamicTableSource actualSource = createTableSource(options);
-        MySqlTableSource expectedSource =
-                new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
-                        3307,
-                        MY_LOCALHOST,
-                        MY_DATABASE,
-                        MY_TABLE,
-                        MY_USERNAME,
-                        MY_PASSWORD,
-                        ZoneId.of("UTC"),
-                        PROPERTIES,
-                        "4321",
-                        false,
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
-                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
-                        CONNECT_TIMEOUT.defaultValue(),
-                        StartupOptions.specificOffset(offsetFile, offsetPos));
-        assertEquals(expectedSource, actualSource);
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "Unsupported option value 'specific-offset', the options [earliest-offset, specific-offset, timestamp] are not supported correctly, please do not use them until they're correctly supported")
+                            .isPresent());
+        }
     }
 
     @Test
@@ -283,29 +274,35 @@ public class MySqlTableSourceFactoryTest {
 
     @Test
     public void testStartupFromEarliestOffset() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.startup.mode", "earliest-offset");
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.startup.mode", "earliest-offset");
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "Unsupported option value 'earliest-offset', the options [earliest-offset, specific-offset, timestamp] are not supported correctly, please do not use them until they're correctly supported")
+                            .isPresent());
+        }
+    }
 
-        // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
-        MySqlTableSource expectedSource =
-                new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
-                        3306,
-                        MY_LOCALHOST,
-                        MY_DATABASE,
-                        MY_TABLE,
-                        MY_USERNAME,
-                        MY_PASSWORD,
-                        ZoneId.of("UTC"),
-                        PROPERTIES,
-                        null,
-                        false,
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
-                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
-                        CONNECT_TIMEOUT.defaultValue(),
-                        StartupOptions.earliest());
-        assertEquals(expectedSource, actualSource);
+    @Test
+    public void testStartupFromSpecificTimestamp() {
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.startup.mode", "timestamp");
+            properties.put("scan.startup.timestamp-millis", "0");
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "Unsupported option value 'timestamp', the options [earliest-offset, specific-offset, timestamp] are not supported correctly, please do not use them until they're correctly supported")
+                            .isPresent());
+        }
     }
 
     @Test
@@ -407,7 +404,7 @@ public class MySqlTableSourceFactoryTest {
         } catch (Throwable t) {
             String msg =
                     "Invalid value for option 'scan.startup.mode'. Supported values are "
-                            + "[initial, earliest-offset, latest-offset, specific-offset, timestamp], "
+                            + "[initial, latest-offset], "
                             + "but was: abc";
             assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
         }

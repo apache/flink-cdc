@@ -30,6 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 import com.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -377,6 +378,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Ignore
     @Test
     public void testStartupFromSpecificOffset() throws Exception {
         if (incrementalSnapshot) {
@@ -466,6 +468,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Ignore
     @Test
     public void testStartupFromEarliestOffset() throws Exception {
         if (incrementalSnapshot) {
@@ -551,6 +554,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     }
 
     @Test
+    @Ignore
     public void testStartupFromTimestamp() throws Exception {
         if (incrementalSnapshot) {
             // not support yet

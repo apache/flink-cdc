@@ -58,7 +58,7 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.getServerIdForSubTask;
 
 /**
- * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithms which supports parallel
+ * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithm which supports parallel
  * reading snapshot of table and then continue to capture data change from binlog.
  *
  * <pre>

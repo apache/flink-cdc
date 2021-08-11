@@ -33,7 +33,7 @@ import org.apache.kafka.connect.source.SourceRecord;
  * A dispatcher to dispatch watermark signal events.
  *
  * <p>The watermark signal event is used to describe the start point and end point of a split scan.
- * The Watermark Signal Algorithms is inspired by https://arxiv.org/pdf/2010.12597v1.pdf.
+ * The Watermark Signal Algorithm is inspired by https://arxiv.org/pdf/2010.12597v1.pdf.
  */
 public class SignalEventDispatcher {
 
