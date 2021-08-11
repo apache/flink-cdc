@@ -18,29 +18,16 @@
 
 package com.ververica.cdc.connectors.mysql;
 
-import org.apache.flink.api.common.state.BroadcastState;
-import org.apache.flink.api.common.state.KeyedStateStore;
-import org.apache.flink.api.common.state.ListState;
-import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.state.MapStateDescriptor;
-import org.apache.flink.api.common.state.OperatorStateStore;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.CheckedThread;
-import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
-import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
-import org.apache.flink.util.Collector;
-import org.apache.flink.util.Preconditions;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.jayway.jsonpath.JsonPath;
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils.TestingListState;
 import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentWriter;
@@ -61,20 +48,20 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.basicSourceBuilder;
+import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.drain;
+import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.setupSource;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertRead;
@@ -693,7 +680,7 @@ public class MySqlSourceTest extends MySqlTestBase {
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder()
+                    basicSourceBuilder(database, useLegacyImplementation)
                             .tableList(database.getDatabaseName() + "." + "category")
                             .build();
             // we use blocking context to block the source to emit before last snapshot record
@@ -938,7 +925,7 @@ public class MySqlSourceTest extends MySqlTestBase {
                         .tableList(database.getDatabaseName() + "." + table)
                         .username(MYSQL_CONTAINER.getUsername())
                         .password(MYSQL_CONTAINER.getPassword())
-                        .deserializer(new MySqlSourceTest.ForwardDeserializeSchema())
+                        .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
                         .debeziumProperties(createDebeziumProperties(useLegacyImplementation))
                         .build();
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -1048,44 +1035,13 @@ public class MySqlSourceTest extends MySqlTestBase {
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(
             String offsetFile, int offsetPos) {
-        return basicSourceBuilder()
+        return basicSourceBuilder(database, useLegacyImplementation)
                 .startupOptions(StartupOptions.specificOffset(offsetFile, offsetPos))
                 .build();
     }
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
-        return basicSourceBuilder().build();
-    }
-
-    private MySqlSource.Builder<SourceRecord> basicSourceBuilder() {
-        Properties debeziumProps = createDebeziumProperties(useLegacyImplementation);
-        return MySqlSource.<SourceRecord>builder()
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
-                .databaseList(database.getDatabaseName())
-                .tableList(
-                        database.getDatabaseName() + "." + "products") // monitor table "products"
-                .username(MYSQL_CONTAINER.getUsername())
-                .password(MYSQL_CONTAINER.getPassword())
-                .deserializer(new ForwardDeserializeSchema())
-                .debeziumProperties(debeziumProps);
-    }
-
-    private static <T> List<T> drain(TestSourceContext<T> sourceContext, int expectedRecordCount)
-            throws Exception {
-        List<T> allRecords = new ArrayList<>();
-        LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
-        while (allRecords.size() < expectedRecordCount) {
-            StreamRecord<T> record = queue.poll(100, TimeUnit.SECONDS);
-            if (record != null) {
-                allRecords.add(record.getValue());
-            } else {
-                throw new RuntimeException(
-                        "Can't receive " + expectedRecordCount + " elements before timeout.");
-            }
-        }
-
-        return allRecords;
+        return basicSourceBuilder(database, useLegacyImplementation).build();
     }
 
     private boolean waitForCheckpointLock(Object checkpointLock, Duration timeout)
@@ -1123,131 +1079,6 @@ public class MySqlSourceTest extends MySqlTestBase {
         return !sourceContext.getCollectedOutputs().isEmpty();
     }
 
-    private static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
-        setupSource(
-                source, false, null, null,
-                true, // enable checkpointing; auto commit should be ignored
-                0, 1);
-    }
-
-    private static <T, S1, S2> void setupSource(
-            DebeziumSourceFunction<T> source,
-            boolean isRestored,
-            ListState<S1> restoredOffsetState,
-            ListState<S2> restoredHistoryState,
-            boolean isCheckpointingEnabled,
-            int subtaskIndex,
-            int totalNumSubtasks)
-            throws Exception {
-
-        // run setup procedure in operator life cycle
-        source.setRuntimeContext(
-                new MockStreamingRuntimeContext(
-                        isCheckpointingEnabled, totalNumSubtasks, subtaskIndex));
-        source.initializeState(
-                new MockFunctionInitializationContext(
-                        isRestored,
-                        new MockOperatorStateStore(restoredOffsetState, restoredHistoryState)));
-        source.open(new Configuration());
-    }
-
-    /**
-     * A simple implementation of {@link DebeziumDeserializationSchema} which just forward the
-     * {@link SourceRecord}.
-     */
-    public static class ForwardDeserializeSchema
-            implements DebeziumDeserializationSchema<SourceRecord> {
-
-        private static final long serialVersionUID = 2975058057832211228L;
-
-        @Override
-        public void deserialize(SourceRecord record, Collector<SourceRecord> out) throws Exception {
-            out.collect(record);
-        }
-
-        @Override
-        public TypeInformation<SourceRecord> getProducedType() {
-            return TypeInformation.of(SourceRecord.class);
-        }
-    }
-
-    private static class MockOperatorStateStore implements OperatorStateStore {
-
-        private final ListState<?> restoredOffsetListState;
-        private final ListState<?> restoredHistoryListState;
-
-        private MockOperatorStateStore(
-                ListState<?> restoredOffsetListState, ListState<?> restoredHistoryListState) {
-            this.restoredOffsetListState = restoredOffsetListState;
-            this.restoredHistoryListState = restoredHistoryListState;
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public <S> ListState<S> getUnionListState(ListStateDescriptor<S> stateDescriptor)
-                throws Exception {
-            if (stateDescriptor.getName().equals(DebeziumSourceFunction.OFFSETS_STATE_NAME)) {
-                return (ListState<S>) restoredOffsetListState;
-            } else if (stateDescriptor
-                    .getName()
-                    .equals(DebeziumSourceFunction.HISTORY_RECORDS_STATE_NAME)) {
-                return (ListState<S>) restoredHistoryListState;
-            } else {
-                throw new IllegalStateException("Unknown state.");
-            }
-        }
-
-        @Override
-        public <K, V> BroadcastState<K, V> getBroadcastState(
-                MapStateDescriptor<K, V> stateDescriptor) throws Exception {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <S> ListState<S> getListState(ListStateDescriptor<S> stateDescriptor)
-                throws Exception {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Set<String> getRegisteredStateNames() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Set<String> getRegisteredBroadcastStateNames() {
-            throw new UnsupportedOperationException();
-        }
-    }
-
-    private static class MockFunctionInitializationContext
-            implements FunctionInitializationContext {
-
-        private final boolean isRestored;
-        private final OperatorStateStore operatorStateStore;
-
-        private MockFunctionInitializationContext(
-                boolean isRestored, OperatorStateStore operatorStateStore) {
-            this.isRestored = isRestored;
-            this.operatorStateStore = operatorStateStore;
-        }
-
-        @Override
-        public boolean isRestored() {
-            return isRestored;
-        }
-
-        @Override
-        public OperatorStateStore getOperatorStateStore() {
-            return operatorStateStore;
-        }
-
-        @Override
-        public KeyedStateStore getKeyedStateStore() {
-            throw new UnsupportedOperationException();
-        }
-    }
-
     private static class BlockingSourceContext<T> extends TestSourceContext<T> {
 
         private final Semaphore blocker = new Semaphore(0);
@@ -1269,54 +1100,6 @@ public class MySqlSourceTest extends MySqlTestBase {
                 } catch (InterruptedException e) {
                     // ignore
                 }
-            }
-        }
-    }
-
-    private static final class TestingListState<T> implements ListState<T> {
-
-        private final List<T> list = new ArrayList<>();
-        private boolean clearCalled = false;
-
-        @Override
-        public void clear() {
-            list.clear();
-            clearCalled = true;
-        }
-
-        @Override
-        public Iterable<T> get() throws Exception {
-            return list;
-        }
-
-        @Override
-        public void add(T value) throws Exception {
-            Preconditions.checkNotNull(value, "You cannot add null to a ListState.");
-            list.add(value);
-        }
-
-        public List<T> getList() {
-            return list;
-        }
-
-        boolean isClearCalled() {
-            return clearCalled;
-        }
-
-        @Override
-        public void update(List<T> values) throws Exception {
-            clear();
-
-            addAll(values);
-        }
-
-        @Override
-        public void addAll(List<T> values) throws Exception {
-            if (values != null) {
-                values.forEach(
-                        v -> Preconditions.checkNotNull(v, "You cannot add null to a ListState."));
-
-                list.addAll(values);
             }
         }
     }

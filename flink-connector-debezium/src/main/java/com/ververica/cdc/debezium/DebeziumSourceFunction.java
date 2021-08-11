@@ -148,6 +148,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     /** Flag indicating whether the Debezium Engine is started. */
     private volatile boolean debeziumStarted = false;
 
+    /** Validator to validate the connected database satisfies the cdc connector's requirements. */
+    private final Validator validator;
+
     // ---------------------------------------------------------------------------------------
     // State
     // ---------------------------------------------------------------------------------------
@@ -199,14 +202,17 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public DebeziumSourceFunction(
             DebeziumDeserializationSchema<T> deserializer,
             Properties properties,
-            @Nullable DebeziumOffset specificOffset) {
+            @Nullable DebeziumOffset specificOffset,
+            Validator validator) {
         this.deserializer = deserializer;
         this.properties = properties;
         this.specificOffset = specificOffset;
+        this.validator = validator;
     }
 
     @Override
     public void open(Configuration parameters) throws Exception {
+        validator.validate();
         super.open(parameters);
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-engine").build();

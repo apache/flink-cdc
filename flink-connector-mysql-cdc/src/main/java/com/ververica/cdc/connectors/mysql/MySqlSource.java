@@ -227,7 +227,8 @@ public class MySqlSource {
                 }
             }
 
-            return new DebeziumSourceFunction<>(deserializer, props, specificOffset);
+            return new DebeziumSourceFunction<>(
+                    deserializer, props, specificOffset, new MySqlValidator(props));
         }
     }
 }
