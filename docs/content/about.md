@@ -38,11 +38,11 @@ The version mapping between Flink CDC Connectors and Flink.
 We need several steps to setup a Flink cluster with the provided connector.
 
 1. Setup a Flink cluster with version 1.12+ and Java 8+ installed.
-2. Download the connector SQL jars from the [Download](https://github.com/ververica/flink-cdc-connectors/wiki/Downloads) page (or [build yourself](#building-from-source).
+2. Download the connector SQL jars from the [Downloads](downloads.md) page (or [build yourself](#building-from-source)).
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.
 
-The example shows how to create a MySQL CDC source in [Flink SQL Client](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sqlClient.html) and execute queries on it.
+The example shows how to create a MySQL CDC source in [Flink SQL Client](https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/sqlClient.html) and execute queries on it.
 
 ```sql
 -- creates a mysql cdc table source
