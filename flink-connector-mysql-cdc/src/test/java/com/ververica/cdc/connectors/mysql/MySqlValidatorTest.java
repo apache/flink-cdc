@@ -131,6 +131,7 @@ public class MySqlValidatorTest {
 
     private void doValidate(String tag, String configPath, String exceptionMessage) {
         MySqlContainer container = new MySqlContainer(tag).withConfigurationOverride(configPath);
+
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(container)).join();
         LOG.info("Containers are started.");
