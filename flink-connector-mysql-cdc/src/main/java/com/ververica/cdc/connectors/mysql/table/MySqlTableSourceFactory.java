@@ -151,31 +151,27 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             case SCAN_STARTUP_MODE_VALUE_INITIAL:
                 return StartupOptions.initial();
 
-            case SCAN_STARTUP_MODE_VALUE_EARLIEST:
-                return StartupOptions.earliest();
-
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
 
+            case SCAN_STARTUP_MODE_VALUE_EARLIEST:
             case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET:
-                String offsetFile = config.get(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
-                int offsetPos = config.get(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
-                return StartupOptions.specificOffset(offsetFile, offsetPos);
-
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
-                long millis = config.get(SCAN_STARTUP_TIMESTAMP_MILLIS);
-                return StartupOptions.timestamp(millis);
+                throw new ValidationException(
+                        String.format(
+                                "Unsupported option value '%s', the options [%s, %s, %s] are not supported correctly, please do not use them until they're correctly supported",
+                                modeString,
+                                SCAN_STARTUP_MODE_VALUE_EARLIEST,
+                                SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET,
+                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP));
 
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s, %s, %s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s], but was: %s",
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
-                                SCAN_STARTUP_MODE_VALUE_EARLIEST,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
-                                SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET,
-                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
         }
     }
