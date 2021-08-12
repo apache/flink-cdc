@@ -36,3 +36,8 @@
 .wy-nav-content ul li p {
     margin: 0 0 8px;
 }
+
+/* override max-width of content */
+.wy-nav-content {
+    max-width: 80%;
+}
