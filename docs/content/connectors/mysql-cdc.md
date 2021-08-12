@@ -361,8 +361,8 @@ The Incremental Snapshot Reading feature of MySQL CDC Source only exposes in SQL
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.alibaba.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import com.alibaba.ververica.cdc.connectors.mysql.MySQLSource;
+import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mysql.MySQLSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
