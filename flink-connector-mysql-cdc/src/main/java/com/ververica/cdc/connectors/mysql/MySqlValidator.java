@@ -28,7 +28,6 @@ import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.connector.mysql.MySqlConnection;
 
-import java.io.Serializable;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Properties;
@@ -37,7 +36,7 @@ import java.util.Properties;
  * The validator for MySql: it only cares about the version of the database is larger than or equal
  * to 5.7. It also requires the binlog format in the database is ROW and row image is FULL.
  */
-public class MySqlValidator implements Validator, Serializable {
+public class MySqlValidator implements Validator {
 
     private static final long serialVersionUID = 1L;
 
