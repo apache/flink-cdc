@@ -51,7 +51,8 @@ CREATE TABLE mysql_binlog (
  id INT NOT NULL,
  name STRING,
  description STRING,
- weight DECIMAL(10,3)
+ weight DECIMAL(10,3),
+ PRIMARY KEY(id) NOT ENFORCED
 ) WITH (
  'connector' = 'mysql-cdc',
  'hostname' = 'localhost',
@@ -87,7 +88,7 @@ import com.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
-    SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
+    SourceFunction<String> sourceFunction = MySqlSource.<String>builder()
       .hostname("localhost")
       .port(3306)
       .databaseList("inventory") // monitor all tables under inventory database
