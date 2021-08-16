@@ -144,20 +144,20 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Postgres server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.5/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td> 
     </tr>   
     </tbody>
 </table>    
 </div>
 
-Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#postgresql-property-slot-name).
+Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.5/connectors/postgresql.html#postgresql-property-slot-name).
 
 Features
 --------
 
 ### Exactly-Once Processing
 
-The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.2/connectors/postgresql.html#how-the-postgresql-connector-works). 
+The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.5/connectors/postgresql.html#how-the-postgresql-connector-works). 
 
 ### Single Thread Reading
 
