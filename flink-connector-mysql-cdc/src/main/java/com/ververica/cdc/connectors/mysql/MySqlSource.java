@@ -102,7 +102,7 @@ public class MySqlSource {
         /**
          * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
          * TIMESTAMP type in MYSQL converted to STRING. See more
-         * https://debezium.io/documentation/reference/1.2/connectors/mysql.html#_temporal_values
+         * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
          */
         public Builder<T> serverTimeZone(String timeZone) {
             this.serverTimeZone = timeZone;
