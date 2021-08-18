@@ -242,7 +242,7 @@ During a snapshot operation, the connector will query each included table to pro
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from MySQL server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.5/connectors/mysql.html#_required_debezium_mysql_connector_configuration_properties">Debezium's MySQL Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
     </tbody>
 </table>
