@@ -18,11 +18,11 @@
 
 package com.ververica.cdc.connectors.mysql;
 
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
 import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -55,7 +55,6 @@ public class MySqlSourceITCase extends MySqlTestBase {
 
         env.execute("Print MySQL Snapshot + Binlog");
     }
-
 
     @Test
     public void testConsumingAllEventsWithJsonFormat() throws Exception {
