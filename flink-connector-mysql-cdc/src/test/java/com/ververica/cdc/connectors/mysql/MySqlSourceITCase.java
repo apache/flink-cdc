@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql;
 
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
@@ -47,6 +48,29 @@ public class MySqlSourceITCase extends MySqlTestBase {
                         .username(inventoryDatabase.getUsername())
                         .password(inventoryDatabase.getPassword())
                         .deserializer(new StringDebeziumDeserializationSchema())
+                        .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.addSource(sourceFunction).print().setParallelism(1);
+
+        env.execute("Print MySQL Snapshot + Binlog");
+    }
+
+
+    @Test
+    public void testConsumingAllEventsWithJsonFormat() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        SourceFunction<String> sourceFunction =
+                MySqlSource.<String>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(
+                                inventoryDatabase
+                                        .getDatabaseName()) // monitor all tables under inventory
+                        // database
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
+                        .deserializer(new JsonDebeziumDeserializationSchema())
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
