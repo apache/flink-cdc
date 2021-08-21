@@ -24,6 +24,8 @@ import org.apache.flink.util.Collector;
 
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.apache.kafka.connect.storage.ConverterConfig;
+import org.apache.kafka.connect.storage.ConverterType;
 
 import java.util.HashMap;
 
@@ -36,7 +38,8 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
 
     public JsonDebeziumDeserializationSchema() {
         HashMap<String, Object> map = new HashMap<>();
-        CONVERTER.configure(map, true);
+        map.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
+        CONVERTER.configure(map);
     }
 
     @Override
