@@ -85,7 +85,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         Map<String, MySqlSnapshotSplit> assignedSplits = new HashMap<>();
         Map<String, BinlogOffset> splitFinishedOffsets = new HashMap<>();
 
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 5; i++) {
             String splitId = customerDatabase.getDatabaseName() + "." + "customers" + ":" + i;
             Object[] splitStart = i == 0 ? null : new Object[] {i * 2};
             Object[] splitEnd = new Object[] {i * 2 + 2};
