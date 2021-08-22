@@ -17,8 +17,9 @@
  */
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static org.junit.Assert.assertEquals;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.types.logical.RowType;
 
 import com.google.common.collect.Lists;
 import com.ververica.cdc.connectors.mysql.MySqlTestBase;
@@ -33,6 +34,9 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,42 +46,36 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.types.logical.RowType;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
-/**
- * Tests for {@link MySqlHybridSplitAssigner}.
- */
+import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
+import static org.junit.Assert.assertEquals;
+
+/** Tests for {@link MySqlHybridSplitAssigner}. */
 public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
 
     private static final UniqueDatabase customerDatabase =
-        new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
     @BeforeClass
     public static void init() {
         customerDatabase.createAndInitialize();
     }
 
-
     @Test
     public void testAssignMySqlBinlogSplitWhenAllSnapshotSplitFinished() {
 
-        String[] captureTables = new String[]{"customers"};
+        String[] captureTables = new String[] {"customers"};
         Configuration configuration = getConfig();
         List<String> captureTableIds =
-            Arrays.stream(captureTables)
-                .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                .collect(Collectors.toList());
+                Arrays.stream(captureTables)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
         // step 1. mock MySqlHybridSplitAssigner Obj
-        TableId tableId = new TableId(null, customerDatabase.getDatabaseName(),
-            "customers");
+        TableId tableId = new TableId(null, customerDatabase.getDatabaseName(), "customers");
         RowType splitKeyType =
-            (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
+                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
 
         List<TableId> alreadyProcessedTables = Lists.newArrayList(tableId);
         List<MySqlSnapshotSplit> remainingSplits = new ArrayList<>();
@@ -87,34 +85,34 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
 
         for (int i = 0; i < 1; i++) {
             String splitId = customerDatabase.getDatabaseName() + "." + "customers" + ":" + i;
-            Object[] splitStart = i == 0 ? null : new Object[]{i * 2};
-            Object[] splitEnd = new Object[]{i * 2 + 2};
+            Object[] splitStart = i == 0 ? null : new Object[] {i * 2};
+            Object[] splitEnd = new Object[] {i * 2 + 2};
             BinlogOffset highWatermark = new BinlogOffset("mysql-bin.00001", i + 1);
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
-            MySqlSnapshotSplit sqlSnapshotSplit = new MySqlSnapshotSplit(tableId,
-                splitId,
-                splitKeyType,
-                splitStart,
-                splitEnd,
-                highWatermark,
-                tableSchemas
-            );
+            MySqlSnapshotSplit sqlSnapshotSplit =
+                    new MySqlSnapshotSplit(
+                            tableId,
+                            splitId,
+                            splitKeyType,
+                            splitStart,
+                            splitEnd,
+                            highWatermark,
+                            tableSchemas);
             assignedSplits.put(splitId, sqlSnapshotSplit);
             splitFinishedOffsets.put(splitId, highWatermark);
         }
 
-        SnapshotPendingSplitsState snapshotPendingSplitsState = new SnapshotPendingSplitsState(
-            alreadyProcessedTables,
-            remainingSplits,
-            assignedSplits,
-            splitFinishedOffsets,
-            true
-        );
-        HybridPendingSplitsState checkpoint = new HybridPendingSplitsState(
-            snapshotPendingSplitsState,
-            false);
-        final MySqlHybridSplitAssigner assigner = new MySqlHybridSplitAssigner(configuration,
-            checkpoint);
+        SnapshotPendingSplitsState snapshotPendingSplitsState =
+                new SnapshotPendingSplitsState(
+                        alreadyProcessedTables,
+                        remainingSplits,
+                        assignedSplits,
+                        splitFinishedOffsets,
+                        true);
+        HybridPendingSplitsState checkpoint =
+                new HybridPendingSplitsState(snapshotPendingSplitsState, false);
+        final MySqlHybridSplitAssigner assigner =
+                new MySqlHybridSplitAssigner(configuration, checkpoint);
 
         // step 2. get a MySqlBinlogSplit after all snapshot split finished
         Optional<MySqlSplit> binlogSplit = assigner.getNext();
@@ -122,30 +120,29 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
 
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         final List<MySqlSnapshotSplit> assignedSnapshotSplit =
-            assignedSplits.values().stream()
-                .sorted(Comparator.comparing(MySqlSplit::splitId))
-                .collect(Collectors.toList());
+                assignedSplits.values().stream()
+                        .sorted(Comparator.comparing(MySqlSplit::splitId))
+                        .collect(Collectors.toList());
         for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
             finishedSnapshotSplitInfos.add(
-                new FinishedSnapshotSplitInfo(
-                    split.getTableId(),
-                    split.splitId(),
-                    split.getSplitStart(),
-                    split.getSplitEnd(),
-                    split.getHighWatermark()));
+                    new FinishedSnapshotSplitInfo(
+                            split.getTableId(),
+                            split.splitId(),
+                            split.getSplitStart(),
+                            split.getSplitEnd(),
+                            split.getHighWatermark()));
         }
 
-        MySqlBinlogSplit expected = new MySqlBinlogSplit(
-            "binlog-split",
-            splitKeyType,
-            new BinlogOffset("mysql-bin.00001", 1),
-            BinlogOffset.NO_STOPPING_OFFSET,
-            finishedSnapshotSplitInfos,
-            new HashMap<>()
-        );
+        MySqlBinlogSplit expected =
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        splitKeyType,
+                        new BinlogOffset("mysql-bin.00001", 1),
+                        BinlogOffset.NO_STOPPING_OFFSET,
+                        finishedSnapshotSplitInfos,
+                        new HashMap<>());
         assertEquals(expected, mySqlBinlogSplit);
     }
-
 
     private Configuration getConfig() {
         Map<String, String> properties = new HashMap<>();
@@ -164,5 +161,4 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
         return Configuration.fromMap(properties);
     }
-
 }
