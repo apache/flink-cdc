@@ -143,11 +143,15 @@ VALUES (default,10001,'Beijing','Shanghai',false),
 5. Launch a Flink cluster, then start a Flink SQL CLI and execute following SQL statements inside: 
 
 ```sql
+-- checkpoint every 3000 milliseconds                       
+Flink SQL> SET 'execution.checkpointing.interval' = '3s';   
+
 -- Flink SQL
 CREATE TABLE products (
   id INT,
   name STRING,
-  description STRING
+  description STRING,
+  PRIMARY KEY (id) NOT ENFORCED
 ) WITH (
   'connector' = 'mysql-cdc',
   'hostname' = 'localhost',
@@ -164,7 +168,8 @@ CREATE TABLE orders (
   customer_name STRING,
   price DECIMAL(10, 5),
   product_id INT,
-  order_status BOOLEAN
+  order_status BOOLEAN,
+  PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
   'connector' = 'mysql-cdc',
   'hostname' = 'localhost',
@@ -180,7 +185,8 @@ CREATE TABLE shipments (
   order_id INT,
   origin STRING,
   destination STRING,
-  is_arrived BOOLEAN
+  is_arrived BOOLEAN,
+  PRIMARY KEY (shipment_id) NOT ENFORCED
 ) WITH (
   'connector' = 'postgres-cdc',
   'hostname' = 'localhost',
