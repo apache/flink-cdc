@@ -143,11 +143,15 @@ VALUES (default,10001,'Beijing','Shanghai',false),
 5. 然后启动 Flink 集群，再启动 SQL CLI.
 
 ```sql
+-- 设置checkpoint间隔3秒                     
+Flink SQL> SET 'execution.checkpointing.interval' = '3s';  
+
 --FlinkSQL
 CREATE TABLE products (
   id INT,
   name STRING,
-  description STRING
+  description STRING,
+  PRIMARY KEY (id) NOT ENFORCED
 ) WITH (
   'connector' = 'mysql-cdc',
   'hostname' = 'localhost',
@@ -164,7 +168,8 @@ CREATE TABLE orders (
   customer_name STRING,
   price DECIMAL(10, 5),
   product_id INT,
-  order_status BOOLEAN
+  order_status BOOLEAN,
+  PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
   'connector' = 'mysql-cdc',
   'hostname' = 'localhost',
@@ -180,7 +185,8 @@ CREATE TABLE shipments (
   order_id INT,
   origin STRING,
   destination STRING,
-  is_arrived BOOLEAN
+  is_arrived BOOLEAN,
+  RIMARY KEY (shipment_id) NOT ENFORCED
 ) WITH (
   'connector' = 'postgres-cdc',
   'hostname' = 'localhost',
