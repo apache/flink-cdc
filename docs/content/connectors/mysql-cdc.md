@@ -506,3 +506,8 @@ The `table-name` option supports regular expressions to monitor multiple tables 
 #### Q3: ConnectException: Received DML '...' for processing, binlog probably contains events generated with statement or mixed based replication format
 
 If there is above exception, please check `binlog_format` is `ROW`, you can check this by running `show variables like '%binlog_format%'` in MySQL client. Please note that even if the `binlog_format` configuration of your database is `ROW`, this configuration can be changed by other sessions, for example, `SET SESSION binlog_format='MIXED'; SET SESSION tx_isolation='REPEATABLE-READ'; COMMIT;`. Please also make sure there are no other session are changing this configuration.
+
+#### Q4: Mysql8.0 Public Key Retrieval is not allowed ?
+
+ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
+FLUSH PRIVILEGES;
