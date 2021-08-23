@@ -147,82 +147,82 @@ VALUES (default,10001,'Beijing','Shanghai',false),
 Flink SQL> SET 'execution.checkpointing.interval' = '3s';  
 
 --FlinkSQL
-CREATE TABLE products (
-  id INT,
-  name STRING,
-  description STRING,
-  PRIMARY KEY (id) NOT ENFORCED
-) WITH (
-  'connector' = 'mysql-cdc',
-  'hostname' = 'localhost',
-  'port' = '3306',
-  'username' = 'root',
-  'password' = '123456',
-  'database-name' = 'mydb',
-  'table-name' = 'products'
-);
+Flink SQL> CREATE TABLE products (
+>   id INT,
+>   name STRING,
+>   description STRING,
+>   PRIMARY KEY (id) NOT ENFORCED
+> ) WITH (
+>   'connector' = 'mysql-cdc',
+>   'hostname' = 'localhost',
+>   'port' = '3306',
+>   'username' = 'root',
+>   'password' = '123456',
+>   'database-name' = 'mydb',
+>   'table-name' = 'products'
+> );
 
-CREATE TABLE orders (
-  order_id INT,
-  order_date TIMESTAMP(0),
-  customer_name STRING,
-  price DECIMAL(10, 5),
-  product_id INT,
-  order_status BOOLEAN,
-  PRIMARY KEY (order_id) NOT ENFORCED
-) WITH (
-  'connector' = 'mysql-cdc',
-  'hostname' = 'localhost',
-  'port' = '3306',
-  'username' = 'root',
-  'password' = '123456',
-  'database-name' = 'mydb',
-  'table-name' = 'orders'
-);
+Flink SQL> CREATE TABLE orders (
+>   order_id INT,
+>   order_date TIMESTAMP(0),
+>   customer_name STRING,
+>   price DECIMAL(10, 5),
+>   product_id INT,
+>   order_status BOOLEAN,
+>   PRIMARY KEY (order_id) NOT ENFORCED
+> ) WITH (
+>   'connector' = 'mysql-cdc',
+>   'hostname' = 'localhost',
+>   'port' = '3306',
+>   'username' = 'root',
+>   'password' = '123456',
+>   'database-name' = 'mydb',
+>   'table-name' = 'orders'
+> );
 
-CREATE TABLE shipments (
-  shipment_id INT,
-  order_id INT,
-  origin STRING,
-  destination STRING,
-  is_arrived BOOLEAN,
-  RIMARY KEY (shipment_id) NOT ENFORCED
-) WITH (
-  'connector' = 'postgres-cdc',
-  'hostname' = 'localhost',
-  'port' = '5432',
-  'username' = 'postgres',
-  'password' = 'postgres',
-  'database-name' = 'postgres',
-  'schema-name' = 'public',
-  'table-name' = 'shipments'
-);
+Flink SQL> CREATE TABLE shipments (
+>   shipment_id INT,
+>   order_id INT,
+>   origin STRING,
+>   destination STRING,
+>   is_arrived BOOLEAN,
+>   RIMARY KEY (shipment_id) NOT ENFORCED
+> ) WITH (
+>   'connector' = 'postgres-cdc',
+>   'hostname' = 'localhost',
+>   'port' = '5432',
+>   'username' = 'postgres',
+>   'password' = 'postgres',
+>   'database-name' = 'postgres',
+>   'schema-name' = 'public',
+>   'table-name' = 'shipments'
+> );
 
-CREATE TABLE enriched_orders (
-  order_id INT,
-  order_date TIMESTAMP(0),
-  customer_name STRING,
-  price DECIMAL(10, 5),
-  product_id INT,
-  order_status BOOLEAN,
-  product_name STRING,
-  product_description STRING,
-  shipment_id INT,
-  origin STRING,
-  destination STRING,
-  is_arrived BOOLEAN,
-  PRIMARY KEY (order_id) NOT ENFORCED
-) WITH (
-    'connector' = 'elasticsearch-7',
-    'hosts' = 'http://localhost:9200',
-    'index' = 'enriched_orders'
-);
+Flink SQL> CREATE TABLE enriched_orders (
+>   order_id INT,
+>   order_date TIMESTAMP(0),
+>   customer_name STRING,
+>   price DECIMAL(10, 5),
+>   product_id INT,
+>   order_status BOOLEAN,
+>   product_name STRING,
+>   product_description STRING,
+>   shipment_id INT,
+>   origin STRING,
+>   destination STRING,
+>   is_arrived BOOLEAN,
+>   PRIMARY KEY (order_id) NOT ENFORCED
+> ) WITH (
+>     'connector' = 'elasticsearch-7',
+>     'hosts' = 'http://localhost:9200',
+>     'index' = 'enriched_orders'
+> );
 
-INSERT INTO enriched_orders
-SELECT o.*, p.name, p.description, s.shipment_id, s.origin, s.destination, s.is_arrived
-FROM orders AS o
-LEFT JOIN products AS p ON o.product_id = p.id
-LEFT JOIN shipments AS s ON o.order_id = s.order_id;
+Flink SQL> INSERT INTO enriched_orders
+> SELECT o.*, p.name, p.description, s.shipment_id, s.origin, s.destination, s.is_arrived
+> FROM orders AS o
+> LEFT JOIN products AS p ON o.product_id = p.id
+> LEFT JOIN shipments AS s ON o.order_id = s.order_id;
 ```
 
 6. 修改 mysql 和 postgres 里面的数据，观察 elasticsearch 里的结果。
@@ -252,25 +252,25 @@ DELETE FROM orders WHERE order_id = 10004;
 
 ```sql
 --Flink SQL
-CREATE TABLE kafka_gmv (
-  day_str STRING,
-  gmv DECIMAL(10, 5)
-) WITH (
-    'connector' = 'kafka',
-    'topic' = 'kafka_gmv',
-    'scan.startup.mode' = 'earliest-offset',
-    'properties.bootstrap.servers' = 'localhost:9092',
-    'format' = 'changelog-json'
-);
+Flink SQL> CREATE TABLE kafka_gmv (
+>   day_str STRING,
+>   gmv DECIMAL(10, 5)
+> ) WITH (
+>     'connector' = 'kafka',
+>     'topic' = 'kafka_gmv',
+>     'scan.startup.mode' = 'earliest-offset',
+>     'properties.bootstrap.servers' = 'localhost:9092',
+>     'format' = 'changelog-json'
+> );
 
-INSERT INTO kafka_gmv
-SELECT DATE_FORMAT(order_date, 'yyyy-MM-dd') as day_str, SUM(price) as gmv
-FROM orders
-WHERE order_status = true
-GROUP BY DATE_FORMAT(order_date, 'yyyy-MM-dd');
+Flink SQL> INSERT INTO kafka_gmv
+> SELECT DATE_FORMAT(order_date, 'yyyy-MM-dd') as day_str, SUM(price) as gmv
+> FROM orders
+> WHERE order_status = true
+> GROUP BY DATE_FORMAT(order_date, 'yyyy-MM-dd');
 
 -- 读取 Kafka 的 changelog 数据，观察 materialize 后的结果
-SELECT * FROM kafka_gmv;
+Flink SQL> SELECT * FROM kafka_gmv;
 ```
 观察 kafka 的输出：
 
