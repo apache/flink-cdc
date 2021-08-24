@@ -509,5 +509,8 @@ If there is above exception, please check `binlog_format` is `ROW`, you can chec
 
 #### Q4: Mysql8.0 Public Key Retrieval is not allowed ?
 
+This is because the MySQL user account uses sha256_password authentication which requires transporting password under protection like TLS protocol. A simple way is to enable the MySQL user account use naive password.
+~~~~~
 ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
 FLUSH PRIVILEGES;
+~~~~~
