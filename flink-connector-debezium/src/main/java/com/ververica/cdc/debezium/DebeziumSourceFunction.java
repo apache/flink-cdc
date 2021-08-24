@@ -370,9 +370,6 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             // restored from state
             properties.setProperty(FlinkOffsetBackingStore.OFFSET_STATE_VALUE, restoredOffsetState);
         }
-        // DO NOT include schema payload in change event
-        properties.setProperty("key.converter.schemas.enable", "false");
-        properties.setProperty("value.converter.schemas.enable", "false");
         // DO NOT include schema change, e.g. DDL
         properties.setProperty("include.schema.changes", "false");
         // disable the offset flush totally
