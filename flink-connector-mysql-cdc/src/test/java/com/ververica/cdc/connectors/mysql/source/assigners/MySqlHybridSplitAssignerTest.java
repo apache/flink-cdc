@@ -47,9 +47,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link MySqlHybridSplitAssigner}. */
@@ -64,18 +64,18 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
     }
 
     @Test
-    public void testAssignMySqlBinlogSplitWhenAllSnapshotSplitFinished() {
+    public void testAssignMySqlBinlogSplitAfterAllSnapshotSplitsFinished() {
 
-        String[] captureTables = new String[] {"customers"};
         Configuration configuration = getConfig();
+        final String captureTable = "customers";
         List<String> captureTableIds =
-                Arrays.stream(captureTables)
+                Arrays.stream(new String[] {captureTable})
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
-        // step 1. mock MySqlHybridSplitAssigner Obj
-        TableId tableId = new TableId(null, customerDatabase.getDatabaseName(), "customers");
+        // Step 1. Mock MySqlHybridSplitAssigner Object
+        TableId tableId = new TableId(null, customerDatabase.getDatabaseName(), captureTable);
         RowType splitKeyType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
 
@@ -86,7 +86,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         Map<String, BinlogOffset> splitFinishedOffsets = new HashMap<>();
 
         for (int i = 0; i < 5; i++) {
-            String splitId = customerDatabase.getDatabaseName() + "." + "customers" + ":" + i;
+            String splitId = customerDatabase.getDatabaseName() + "." + captureTable + ":" + i;
             Object[] splitStart = i == 0 ? null : new Object[] {i * 2};
             Object[] splitEnd = new Object[] {i * 2 + 2};
             BinlogOffset highWatermark = new BinlogOffset("mysql-bin.00001", i + 1);
@@ -116,7 +116,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         final MySqlHybridSplitAssigner assigner =
                 new MySqlHybridSplitAssigner(configuration, checkpoint);
 
-        // step 2. get a MySqlBinlogSplit after all snapshot split finished
+        // step 2. Get the MySqlBinlogSplit after all snapshot splits finished
         Optional<MySqlSplit> binlogSplit = assigner.getNext();
         MySqlBinlogSplit mySqlBinlogSplit = binlogSplit.get().asBinlogSplit();
 
@@ -155,12 +155,10 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         properties.put("database.user", customerDatabase.getUsername());
         properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id.range", "1001,1004");
-        properties.put("scan.snapshot.fetch.size", "2");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
+        properties.put("database.history.instance.name", UUID.randomUUID().toString());
         return Configuration.fromMap(properties);
     }
 }
