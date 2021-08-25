@@ -149,11 +149,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
 
-        BinlogOffset minBinlogOffset = BinlogOffset.INITIAL_OFFSET;
+        BinlogOffset minBinlogOffset = null;
         for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
             // find the min binlog offset
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
-            if (binlogOffset.compareTo(minBinlogOffset) < 0) {
+            if (minBinlogOffset == null || binlogOffset.compareTo(minBinlogOffset) < 0) {
                 minBinlogOffset = binlogOffset;
             }
             finishedSnapshotSplitInfos.add(
@@ -171,7 +171,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         return new MySqlBinlogSplit(
                 BINLOG_SPLIT_ID,
                 lastSnapshotSplit.getSplitKeyType(),
-                minBinlogOffset,
+                minBinlogOffset == null ? BinlogOffset.INITIAL_OFFSET : minBinlogOffset,
                 BinlogOffset.NO_STOPPING_OFFSET,
                 finishedSnapshotSplitInfos,
                 tableSchemas);

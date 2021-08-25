@@ -52,9 +52,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link SnapshotSplitReader}. */
@@ -301,11 +301,11 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
         properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.whitelist", customerDatabase.getDatabaseName());
         properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id-range", "1001-1002");
+        properties.put("server-id", "1001-1002");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
+        properties.put("database.history.instance.name", UUID.randomUUID().toString());
         List<String> captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
