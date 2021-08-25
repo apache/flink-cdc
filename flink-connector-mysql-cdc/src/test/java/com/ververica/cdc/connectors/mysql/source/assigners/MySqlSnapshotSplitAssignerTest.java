@@ -36,9 +36,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -266,12 +266,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         properties.put("database.user", customerDatabase.getUsername());
         properties.put("database.password", customerDatabase.getPassword());
         properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("server-id.range", "1001,1004");
         properties.put("scan.snapshot.fetch.size", "2");
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", DATABASE_HISTORY_INSTANCE_NAME);
+        properties.put("database.history.instance.name", UUID.randomUUID().toString());
         return Configuration.fromMap(properties);
     }
 }
