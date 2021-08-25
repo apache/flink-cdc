@@ -156,6 +156,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
         options.add(DECODING_PLUGIN_NAME);
+        options.add(SLOT_NAME);
         return options;
     }
 }
