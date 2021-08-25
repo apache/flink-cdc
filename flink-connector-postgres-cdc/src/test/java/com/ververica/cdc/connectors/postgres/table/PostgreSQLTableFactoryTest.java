@@ -96,6 +96,7 @@ public class PostgreSQLTableFactoryTest {
         options.put("port", "5444");
         options.put("decoding.plugin.name", "wal2json");
         options.put("debezium.snapshot.mode", "never");
+        options.put("slot.name", "flink");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
