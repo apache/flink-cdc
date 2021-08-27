@@ -203,13 +203,16 @@ public class VitessSource {
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("vitess.keyspace", checkNotNull(keyspace));
-
-            props.setProperty("vitess.vtctld.host", checkNotNull(vtctldConfig.hostname));
-            props.setProperty("vitess.vtctld.port", String.valueOf(vtctldConfig.port));
-            props.setProperty("vitess.vtctld.user", vtctldConfig.username);
-            props.setProperty("vitess.vtctld.password", vtctldConfig.password);
             props.setProperty("vitess.tablet.type", tabletType.name());
-            props.setProperty("vitess.shard", tabletType.name());
+            props.setProperty("vitess.vtctld.host", checkNotNull(vtctldConfig.getHostname()));
+            props.setProperty("vitess.vtctld.port", String.valueOf(vtctldConfig.getPort()));
+
+            if (vtctldConfig.getUsername() != null) {
+                props.setProperty("vitess.vtctld.user", vtctldConfig.getUsername());
+            }
+            if (vtctldConfig.getPassword() != null) {
+                props.setProperty("vitess.vtctld.password", vtctldConfig.getPassword());
+            }
 
             // The maximum number of tasks that should be created for this connector.
             // The Vitess connector always uses a single task and therefore does not use this value,

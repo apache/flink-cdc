@@ -23,11 +23,12 @@ import org.apache.flink.shaded.guava18.com.google.common.collect.Maps;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.connector.vitess.VitessConnector;
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.Properties;
 
 /** The validator for Vitess. */
-public class VitessValidator implements Validator {
+public class VitessValidator implements Validator, Serializable {
 
     private static final long serialVersionUID = 1L;
 

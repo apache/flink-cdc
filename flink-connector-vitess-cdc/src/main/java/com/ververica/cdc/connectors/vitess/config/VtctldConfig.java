@@ -21,10 +21,30 @@ package com.ververica.cdc.connectors.vitess.config;
 /** VTCtld server configuration options. */
 public class VtctldConfig {
 
-    public String hostname;
-    public int port = 15999; // default 15999 port
-    public String username;
-    public String password;
+    private String hostname;
+    private int port = 15999; // default 15999 port
+    private String username;
+    private String password;
+
+    public String getHostname() {
+        return hostname;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public static VtctldConfig.Builder builder() {
+        return new VtctldConfig.Builder();
+    }
 
     /** Builder class of {@link VtctldConfig}. */
     public static final class Builder {
