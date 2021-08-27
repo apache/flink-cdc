@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.postgres;
+package com.ververica.cdc.connectors.vitess;
 
 /** This is used to generate a dummy docs jar for this module to pass OSS repository rule. */
 public class DummyDocs {}

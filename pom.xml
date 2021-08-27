@@ -39,6 +39,7 @@ under the License.
         <module>flink-connector-oracle-cdc</module>
         <module>flink-connector-mongodb-cdc</module>
         <module>flink-connector-oceanbase-cdc</module>
+        <module>flink-connector-vitess-cdc</module>
         <module>flink-connector-sqlserver-cdc</module>
         <module>flink-connector-tidb-cdc</module>
         <module>flink-connector-db2-cdc</module>
@@ -47,6 +48,7 @@ under the License.
         <module>flink-sql-connector-mongodb-cdc</module>
         <module>flink-sql-connector-oracle-cdc</module>
         <module>flink-sql-connector-oceanbase-cdc</module>
+        <module>flink-sql-connector-vitess-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
         <module>flink-sql-connector-tidb-cdc</module>
         <module>flink-sql-connector-db2-cdc</module>
@@ -87,7 +89,6 @@ under the License.
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <hamcrest.version>1.3</hamcrest.version>
-        <version.awaitility>4.0.1</version.awaitility>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <spotless.version>2.4.2</spotless.version>
@@ -178,13 +179,6 @@ under the License.
             <artifactId>log4j-1.2-api</artifactId>
             <version>${log4j.version}</version>
             <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.awaitility</groupId>
-            <artifactId>awaitility</artifactId>
-            <type>jar</type>
-            <version>${version.awaitility}</version>
         </dependency>
     </dependencies>
 
