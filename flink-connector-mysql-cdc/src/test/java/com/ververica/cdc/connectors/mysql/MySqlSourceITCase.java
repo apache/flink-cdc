@@ -36,9 +36,7 @@ import org.junit.Test;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 
-/**
- * Integration tests for {@link MySqlSource}.
- */
+/** Integration tests for {@link MySqlSource}. */
 @Ignore
 public class MySqlSourceITCase extends MySqlTestBase {
 
@@ -89,7 +87,10 @@ public class MySqlSourceITCase extends MySqlTestBase {
         StreamTableEnvironment tEnv =
                 StreamTableEnvironment.create(
                         env,
-                        EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+                        EnvironmentSettings.newInstance()
+                                .useBlinkPlanner()
+                                .inStreamingMode()
+                                .build());
 
         DataStreamSource<String> dataStreamSource = env.addSource(sourceFunction);
         tEnv.createTemporaryView("full_types", dataStreamSource);
