@@ -18,9 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql;
 
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
@@ -29,6 +26,10 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+
+import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
