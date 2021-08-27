@@ -16,7 +16,30 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.postgres;
+package com.ververica.cdc.connectors.vitess;
 
-/** This is used to generate a dummy docs jar for this module to pass OSS repository rule. */
-public class DummyDocs {}
+import org.apache.flink.shaded.guava18.com.google.common.collect.Maps;
+
+import com.ververica.cdc.debezium.Validator;
+import io.debezium.connector.vitess.VitessConnector;
+
+import java.util.Map;
+import java.util.Properties;
+
+/** The validator for Vitess. */
+public class VitessValidator implements Validator {
+
+    private static final long serialVersionUID = 1L;
+
+    private final Map<String, String> configuration;
+
+    public VitessValidator(Properties properties) {
+        this.configuration = Maps.fromProperties(properties);
+    }
+
+    @Override
+    public void validate() {
+        VitessConnector c = new VitessConnector();
+        c.validate(configuration);
+    }
+}
