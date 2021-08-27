@@ -55,6 +55,7 @@ import static org.junit.Assert.assertEquals;
 /** Tests for {@link MySqlHybridSplitAssigner}. */
 public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
 
+    private static final int currentParallelism = 4;
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -114,7 +115,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
         final MySqlHybridSplitAssigner assigner =
-                new MySqlHybridSplitAssigner(configuration, checkpoint);
+                new MySqlHybridSplitAssigner(configuration, currentParallelism, checkpoint);
 
         // step 2. Get the MySqlBinlogSplit after all snapshot splits finished
         Optional<MySqlSplit> binlogSplit = assigner.getNext();

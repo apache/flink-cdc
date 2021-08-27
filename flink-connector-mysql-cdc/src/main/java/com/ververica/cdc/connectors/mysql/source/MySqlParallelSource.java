@@ -130,10 +130,11 @@ public class MySqlParallelSource<T>
     public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) {
         MySqlValidator validator = new MySqlValidator(config);
+        final int currentParallelism = enumContext.currentParallelism();
 
         final MySqlSplitAssigner splitAssigner =
                 startupMode.equals("initial")
-                        ? new MySqlHybridSplitAssigner(config)
+                        ? new MySqlHybridSplitAssigner(config, currentParallelism)
                         : new MySqlBinlogSplitAssigner(config);
 
         return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
@@ -144,9 +145,11 @@ public class MySqlParallelSource<T>
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
         MySqlValidator validator = new MySqlValidator(config);
         final MySqlSplitAssigner splitAssigner;
+        final int currentParallelism = enumContext.currentParallelism();
         if (checkpoint instanceof HybridPendingSplitsState) {
             splitAssigner =
-                    new MySqlHybridSplitAssigner(config, (HybridPendingSplitsState) checkpoint);
+                    new MySqlHybridSplitAssigner(
+                            config, currentParallelism, (HybridPendingSplitsState) checkpoint);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(config, (BinlogPendingSplitsState) checkpoint);
