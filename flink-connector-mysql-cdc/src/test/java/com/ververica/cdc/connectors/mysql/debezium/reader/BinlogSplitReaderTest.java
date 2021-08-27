@@ -75,6 +75,7 @@ import static org.junit.Assert.assertEquals;
 /** Tests for {@link BinlogSplitReader}. */
 public class BinlogSplitReaderTest extends MySqlTestBase {
 
+    private static final int currentParallelism = 4;
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -586,7 +587,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
     }
 
     private List<MySqlSnapshotSplit> getMySqlSplits(Configuration configuration, RowType pkType) {
-        final MySqlSnapshotSplitAssigner assigner = new MySqlSnapshotSplitAssigner(configuration);
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(configuration, currentParallelism);
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {

@@ -60,6 +60,7 @@ import static org.junit.Assert.assertEquals;
 /** Tests for {@link SnapshotSplitReader}. */
 public class SnapshotSplitReaderTest extends MySqlTestBase {
 
+    private static final int currentParallelism = 4;
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -277,7 +278,8 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
     }
 
     private List<MySqlSplit> getMySqlSplits(Configuration configuration, RowType pkType) {
-        final MySqlSnapshotSplitAssigner assigner = new MySqlSnapshotSplitAssigner(configuration);
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(configuration, currentParallelism);
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
