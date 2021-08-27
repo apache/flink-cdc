@@ -23,6 +23,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.util.Collector;
 
 import org.apache.kafka.connect.json.JsonConverter;
+import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.storage.ConverterConfig;
 import org.apache.kafka.connect.storage.ConverterType;
@@ -39,6 +40,7 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
     public JsonDebeziumDeserializationSchema() {
         HashMap<String, Object> map = new HashMap<>();
         map.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
+        map.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, false);
         CONVERTER.configure(map);
     }
 
