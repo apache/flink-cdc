@@ -69,6 +69,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private boolean assignerFinished;
 
     private final Configuration configuration;
+    private final int currentParallelism;
     private final LinkedList<TableId> remainingTables;
     private final RelationalTableFilters tableFilters;
     private final int chunkSize;
@@ -78,9 +79,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Nullable private Long checkpointIdToFinish;
 
-    public MySqlSnapshotSplitAssigner(Configuration configuration) {
+    public MySqlSnapshotSplitAssigner(Configuration configuration, int currentParallelism) {
         this(
                 configuration,
+                currentParallelism,
                 new ArrayList<>(),
                 new ArrayList<>(),
                 new HashMap<>(),
@@ -89,9 +91,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     public MySqlSnapshotSplitAssigner(
-            Configuration configuration, SnapshotPendingSplitsState checkpoint) {
+            Configuration configuration,
+            int currentParallelism,
+            SnapshotPendingSplitsState checkpoint) {
         this(
                 configuration,
+                currentParallelism,
                 checkpoint.getAlreadyProcessedTables(),
                 checkpoint.getRemainingSplits(),
                 checkpoint.getAssignedSplits(),
@@ -101,12 +106,14 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     private MySqlSnapshotSplitAssigner(
             Configuration configuration,
+            int currentParallelism,
             List<TableId> alreadyProcessedTables,
             List<MySqlSnapshotSplit> remainingSplits,
             Map<String, MySqlSnapshotSplit> assignedSplits,
             Map<String, BinlogOffset> splitFinishedOffsets,
             boolean assignerFinished) {
         this.configuration = configuration;
+        this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
@@ -166,8 +173,17 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     public void onFinishedSplits(Map<String, BinlogOffset> splitFinishedOffsets) {
         this.splitFinishedOffsets.putAll(splitFinishedOffsets);
         if (allSplitsFinished()) {
-            LOG.info(
-                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.");
+            // Skip the waiting checkpoint when current parallelism is 1 which means we do not need
+            // to care about the global output data order of snapshot splits and binlog split.
+            if (currentParallelism == 1) {
+                assignerFinished = true;
+                LOG.info(
+                        "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.");
+
+            } else {
+                LOG.info(
+                        "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.");
+            }
         }
     }
 

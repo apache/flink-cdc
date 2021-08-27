@@ -48,6 +48,7 @@ import static org.junit.Assert.fail;
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
 public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
 
+    private static final int currentParallelism = 4;
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -121,7 +122,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
                         .collect(Collectors.toList());
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
-        final MySqlSnapshotSplitAssigner assigner = new MySqlSnapshotSplitAssigner(configuration);
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(configuration, currentParallelism);
 
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();
