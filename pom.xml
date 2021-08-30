@@ -185,6 +185,7 @@ under the License.
                         <exclude>docs/_templates/version.html</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
+                        <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
                     </excludes>
                 </configuration>
             </plugin>

@@ -34,10 +34,11 @@ import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -103,22 +104,28 @@ public class MySqlSourceITCase extends MySqlTestBase {
                                 .useBlinkPlanner()
                                 .inStreamingMode()
                                 .build());
-        List<String> expectedList = readLines("file/debezium-data-schema-exclude.txt");
+        JSONObject expected =
+                JSONObject.parseObject(
+                        readLines("file/debezium-data-schema-exclude.json"), JSONObject.class);
+        JSONObject expectSnapshot = expected.getJSONObject("expect_snapshot");
         DataStreamSource<String> source = env.addSource(sourceFunction);
         tEnv.createTemporaryView("full_types", source);
         TableResult result = tEnv.executeSql("SELECT * FROM full_types");
         CloseableIterator<Row> snapshot = result.collect();
         waitForSnapshotStarted(snapshot);
         assertTrue(
-                compareDebeziumJson(fetchRows(snapshot, 1).get(0).toString(), expectedList.get(0)));
+                compareDebeziumJson(
+                        fetchRows(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
         CloseableIterator<Row> binlog = result.collect();
+        JSONObject expectBinlog = expected.getJSONObject("expect_binlog");
         assertTrue(
-                compareDebeziumJson(fetchRows(binlog, 1).get(0).toString(), expectedList.get(1)));
+                compareDebeziumJson(
+                        fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
         result.getJobClient().get().cancel().get();
     }
 
@@ -146,22 +153,29 @@ public class MySqlSourceITCase extends MySqlTestBase {
                                 .useBlinkPlanner()
                                 .inStreamingMode()
                                 .build());
-        List<String> expectedList = readLines("file/debezium-data-schema-include.txt");
+        JSONObject expected =
+                JSONObject.parseObject(
+                        readLines("file/debezium-data-schema-include.json"), JSONObject.class);
+        JSONObject expectSnapshot = expected.getJSONObject("expect_snapshot");
         DataStreamSource<String> source = env.addSource(sourceFunction);
         tEnv.createTemporaryView("full_types", source);
         TableResult result = tEnv.executeSql("SELECT * FROM full_types");
         CloseableIterator<Row> snapshot = result.collect();
         waitForSnapshotStarted(snapshot);
         assertTrue(
-                compareDebeziumJson(fetchRows(snapshot, 1).get(0).toString(), expectedList.get(0)));
+                compareDebeziumJson(
+                        fetchRows(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
+
         CloseableIterator<Row> binlog = result.collect();
+        JSONObject expectBinlog = expected.getJSONObject("expect_binlog");
         assertTrue(
-                compareDebeziumJson(fetchRows(binlog, 1).get(0).toString(), expectedList.get(1)));
+                compareDebeziumJson(
+                        fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
         result.getJobClient().get().cancel().get();
     }
 
@@ -182,11 +196,15 @@ public class MySqlSourceITCase extends MySqlTestBase {
         }
     }
 
-    private static List<String> readLines(String resource) throws IOException {
-        final URL url = MySqlSourceITCase.class.getClassLoader().getResource(resource);
-        assert url != null;
-        java.nio.file.Path path = new File(url.getFile()).toPath();
-        return Files.readAllLines(path);
+    private static byte[] readLines(String resource) throws IOException, URISyntaxException {
+        Path path =
+                Paths.get(
+                        Objects.requireNonNull(
+                                        MySqlSourceITCase.class
+                                                .getClassLoader()
+                                                .getResource(resource))
+                                .toURI());
+        return Files.readAllBytes(path);
     }
 
     private static boolean compareDebeziumJson(String actual, String expect) {
