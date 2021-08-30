@@ -130,7 +130,7 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.chunk.size' = '1024',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
