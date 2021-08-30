@@ -43,7 +43,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -62,15 +64,12 @@ public class MySqlValidatorTest {
 
     private static TemporaryFolder tempFolder;
     private static File resourceFolder;
-    final boolean runIncrementalSnapshot;
+
+    @Parameterized.Parameter public boolean runIncrementalSnapshot;
 
     @Parameterized.Parameters(name = "runIncrementalSnapshot = {0}")
-    public static Object[] parameters() {
-        return new Object[] {true, false};
-    }
-
-    public MySqlValidatorTest(boolean runIncrementalSnapshot) {
-        this.runIncrementalSnapshot = runIncrementalSnapshot;
+    public static List<Boolean> parameters() {
+        return Arrays.asList(true, false);
     }
 
     @BeforeClass

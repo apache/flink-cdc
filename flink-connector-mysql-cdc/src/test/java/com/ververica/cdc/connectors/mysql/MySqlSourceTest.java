@@ -44,6 +44,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.Statement;
@@ -79,15 +80,16 @@ public class MySqlSourceTest extends MySqlTestBase {
     private final UniqueDatabase database =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
 
-    private final boolean useLegacyImplementation;
+    @Override
+    public String getTempFilePath(String fileName) throws IOException {
+        return super.getTempFilePath(fileName);
+    }
+
+    @Parameterized.Parameter public boolean useLegacyImplementation;
 
     @Parameterized.Parameters(name = "UseLegacyImplementation: {0}")
     public static Collection<Boolean> parameters() {
         return Arrays.asList(false, true);
-    }
-
-    public MySqlSourceTest(boolean useLegacyImplementation) {
-        this.useLegacyImplementation = useLegacyImplementation;
     }
 
     @Before
