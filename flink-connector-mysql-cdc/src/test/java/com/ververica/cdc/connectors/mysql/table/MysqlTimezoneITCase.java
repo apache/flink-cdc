@@ -47,6 +47,7 @@ import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -72,18 +73,11 @@ public class MysqlTimezoneITCase {
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
 
-    private final boolean incrementalSnapshot;
+    @Parameterized.Parameter public Boolean incrementalSnapshot;
 
     @Parameterized.Parameters(name = "incrementalSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {true}
-            //            ,
-            //            new Object[] {false}
-        };
-    }
-
-    public MysqlTimezoneITCase(boolean incrementalSnapshot) {
-        this.incrementalSnapshot = incrementalSnapshot;
+    public static List<Boolean> parameters() {
+        return Arrays.asList(true, false);
     }
 
     @Before
