@@ -136,7 +136,11 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         jdbc = openMySqlConnection(configuration);
         chunkSplitter = createChunkSplitter(configuration, jdbc, chunkSize);
         if (!assignerFinished) {
-            remainingTables.addAll(discoverCapturedTables());
+            // TODO The discovery logic should move to {@link MySqlSourceEnumerator}
+            // and pass the remainingTables as one construct parameter
+            final List<TableId> discoverTables = discoverCapturedTables();
+            discoverTables.removeAll(alreadyProcessedTables);
+            remainingTables.addAll(discoverTables);
         }
     }
 
