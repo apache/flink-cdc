@@ -84,9 +84,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration);
 
         String[] expected =
                 new String[] {
@@ -113,9 +111,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration);
 
         String[] expected =
                 new String[] {
@@ -155,13 +151,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
-                                        DataTypes.FIELD("level", DataTypes.STRING()))
-                                .getLogicalType();
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration);
         String[] expected = new String[] {"+I[20001, LEVEL_1, user_1, user with level 1]"};
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
@@ -178,13 +168,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
-                                        DataTypes.FIELD("level", DataTypes.STRING()))
-                                .getLogicalType();
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration, pkType);
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(configuration);
 
         String[] expected =
                 new String[] {
@@ -277,7 +261,7 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
                 .collect(Collectors.toList());
     }
 
-    private List<MySqlSplit> getMySqlSplits(Configuration configuration, RowType pkType) {
+    private List<MySqlSplit> getMySqlSplits(Configuration configuration) {
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(configuration, currentParallelism);
         assigner.open();
