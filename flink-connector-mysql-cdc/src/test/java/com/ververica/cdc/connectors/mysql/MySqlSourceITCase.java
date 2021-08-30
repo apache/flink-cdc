@@ -27,14 +27,25 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import com.alibaba.fastjson.JSONObject;
 import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import static org.hamcrest.Matchers.startsWith;
-import static org.junit.Assert.assertThat;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+
+import static org.junit.Assert.assertTrue;
 
 /** Integration tests for {@link MySqlSource}. */
 @Ignore
@@ -84,6 +95,7 @@ public class MySqlSourceITCase extends MySqlTestBase {
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .build();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.enableCheckpointing(1000);
         StreamTableEnvironment tEnv =
                 StreamTableEnvironment.create(
                         env,
@@ -91,15 +103,106 @@ public class MySqlSourceITCase extends MySqlTestBase {
                                 .useBlinkPlanner()
                                 .inStreamingMode()
                                 .build());
-
-        DataStreamSource<String> dataStreamSource = env.addSource(sourceFunction);
-        tEnv.createTemporaryView("full_types", dataStreamSource);
+        List<String> expectedList = readLines("file/debezium-data-schema-exclude.txt");
+        DataStreamSource<String> source = env.addSource(sourceFunction);
+        tEnv.createTemporaryView("full_types", source);
         TableResult result = tEnv.executeSql("SELECT * FROM full_types");
-        CloseableIterator<Row> iterator = result.collect();
-        // ignore match `source` field
-        String expected =
-                "+I[{\"before\":null,\"after\":{\"id\":1,\"tiny_c\":127,\"tiny_un_c\":255,\"small_c\":32767,\"small_un_c\":65535,\"int_c\":2147483647,\"int_un_c\":4294967295,\"int11_c\":2147483647,\"big_c\":9223372036854775807,\"varchar_c\":\"Hello World\",\"char_c\":\"abc\",\"float_c\":123.10199737548828,\"double_c\":404.4443,\"decimal_c\":\"EtaH\",\"numeric_c\":\"AVo=\",\"boolean_c\":1,\"date_c\":18460,\"time_c\":64822000000,\"datetime3_c\":1595008822123,\"datetime6_c\":1595008822123456,\"timestamp_c\":\"2020-07-17T18:00:22Z\",\"file_uuid\":\"ZRrtCDkPSJOy8TaSPnt0AA==\"},";
-        assertThat(iterator.next().toString(), startsWith(expected));
+        CloseableIterator<Row> snapshot = result.collect();
+        waitForSnapshotStarted(snapshot);
+        assertTrue(
+                compareDebeziumJson(fetchRows(snapshot, 1).get(0).toString(), expectedList.get(0)));
+        try (Connection connection = fullTypesDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+        }
+        CloseableIterator<Row> binlog = result.collect();
+        assertTrue(
+                compareDebeziumJson(fetchRows(binlog, 1).get(0).toString(), expectedList.get(1)));
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testConsumingAllEventsWithIncludeSchemaJsonFormat() throws Exception {
+        fullTypesDatabase.createAndInitialize();
+        SourceFunction<String> sourceFunction =
+                MySqlSource.<String>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(
+                                fullTypesDatabase
+                                        .getDatabaseName()) // monitor all tables under inventory
+                        // database
+                        .username(fullTypesDatabase.getUsername())
+                        .password(fullTypesDatabase.getPassword())
+                        .deserializer(new JsonDebeziumDeserializationSchema(true))
+                        .build();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.enableCheckpointing(1000);
+        StreamTableEnvironment tEnv =
+                StreamTableEnvironment.create(
+                        env,
+                        EnvironmentSettings.newInstance()
+                                .useBlinkPlanner()
+                                .inStreamingMode()
+                                .build());
+        List<String> expectedList = readLines("file/debezium-data-schema-include.txt");
+        DataStreamSource<String> source = env.addSource(sourceFunction);
+        tEnv.createTemporaryView("full_types", source);
+        TableResult result = tEnv.executeSql("SELECT * FROM full_types");
+        CloseableIterator<Row> snapshot = result.collect();
+        waitForSnapshotStarted(snapshot);
+        assertTrue(
+                compareDebeziumJson(fetchRows(snapshot, 1).get(0).toString(), expectedList.get(0)));
+        try (Connection connection = fullTypesDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+        }
+        CloseableIterator<Row> binlog = result.collect();
+        assertTrue(
+                compareDebeziumJson(fetchRows(binlog, 1).get(0).toString(), expectedList.get(1)));
+        result.getJobClient().get().cancel().get();
+    }
+
+    private static List<Object> fetchRows(Iterator<Row> iter, int size) {
+        List<Object> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Row row = iter.next();
+            // ignore rowKind marker
+            rows.add(row.getField(0));
+            size--;
+        }
+        return rows;
+    }
+
+    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
+        while (!iterator.hasNext()) {
+            Thread.sleep(100);
+        }
+    }
+
+    private static List<String> readLines(String resource) throws IOException {
+        final URL url = MySqlSourceITCase.class.getClassLoader().getResource(resource);
+        assert url != null;
+        java.nio.file.Path path = new File(url.getFile()).toPath();
+        return Files.readAllLines(path);
+    }
+
+    private static boolean compareDebeziumJson(String actual, String expect) {
+        JSONObject actualJsonObject = JSONObject.parseObject(actual);
+        JSONObject expectJsonObject = JSONObject.parseObject(expect);
+        if (expectJsonObject.getJSONObject("payload") != null
+                && actualJsonObject.getJSONObject("payload") != null) {
+            expectJsonObject = expectJsonObject.getJSONObject("payload");
+            actualJsonObject = actualJsonObject.getJSONObject("payload");
+        }
+        return Objects.equals(
+                        expectJsonObject.getJSONObject("after"),
+                        actualJsonObject.getJSONObject("after"))
+                && Objects.equals(
+                        expectJsonObject.getJSONObject("before"),
+                        actualJsonObject.getJSONObject("before"))
+                && Objects.equals(expectJsonObject.get("op"), actualJsonObject.get("op"));
     }
 }

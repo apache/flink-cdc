@@ -67,6 +67,13 @@ under the License.
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.78</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- test dependencies on Flink -->
 
         <dependency>

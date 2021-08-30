@@ -38,10 +38,18 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
     static final JsonConverter CONVERTER = new JsonConverter();
 
     public JsonDebeziumDeserializationSchema() {
-        HashMap<String, Object> map = new HashMap<>();
-        map.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
-        map.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, false);
-        CONVERTER.configure(map);
+        config(false);
+    }
+
+    public JsonDebeziumDeserializationSchema(boolean includeSchema) {
+        config(includeSchema);
+    }
+
+    private void config(boolean includeSchema) {
+        HashMap<String, Object> configs = new HashMap<>();
+        configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
+        configs.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
+        CONVERTER.configure(configs);
     }
 
     @Override
