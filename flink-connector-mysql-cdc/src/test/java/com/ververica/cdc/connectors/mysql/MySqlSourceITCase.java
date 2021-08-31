@@ -49,7 +49,6 @@ import java.util.Objects;
 import static org.junit.Assert.assertTrue;
 
 /** Integration tests for {@link MySqlSource}. */
-@Ignore
 public class MySqlSourceITCase extends MySqlTestBase {
 
     private final UniqueDatabase inventoryDatabase =
@@ -59,16 +58,15 @@ public class MySqlSourceITCase extends MySqlTestBase {
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
 
     @Test
+    @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingAllEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
-                        .databaseList(
-                                inventoryDatabase
-                                        .getDatabaseName()) // monitor all tables under inventory
-                        // database
+                        // monitor all tables under inventory database
+                        .databaseList(inventoryDatabase.getDatabaseName())
                         .username(inventoryDatabase.getUsername())
                         .password(inventoryDatabase.getPassword())
                         .deserializer(new StringDebeziumDeserializationSchema())
@@ -81,68 +79,26 @@ public class MySqlSourceITCase extends MySqlTestBase {
     }
 
     @Test
-    public void testConsumingAllTypesWithJsonFormat() throws Exception {
-        fullTypesDatabase.createAndInitialize();
-        SourceFunction<String> sourceFunction =
-                MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        .databaseList(
-                                fullTypesDatabase
-                                        .getDatabaseName()) // monitor all tables under inventory
-                        // database
-                        .username(fullTypesDatabase.getUsername())
-                        .password(fullTypesDatabase.getPassword())
-                        .deserializer(new JsonDebeziumDeserializationSchema())
-                        .build();
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(1000);
-        StreamTableEnvironment tEnv =
-                StreamTableEnvironment.create(
-                        env,
-                        EnvironmentSettings.newInstance()
-                                .useBlinkPlanner()
-                                .inStreamingMode()
-                                .build());
-        JSONObject expected =
-                JSONObject.parseObject(
-                        readLines("file/debezium-data-schema-exclude.json"), JSONObject.class);
-        JSONObject expectSnapshot = expected.getJSONObject("expect_snapshot");
-        DataStreamSource<String> source = env.addSource(sourceFunction);
-        tEnv.createTemporaryView("full_types", source);
-        TableResult result = tEnv.executeSql("SELECT * FROM full_types");
-        CloseableIterator<Row> snapshot = result.collect();
-        waitForSnapshotStarted(snapshot);
-        assertTrue(
-                compareDebeziumJson(
-                        fetchRows(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
-        try (Connection connection = fullTypesDatabase.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
-        }
-        CloseableIterator<Row> binlog = result.collect();
-        JSONObject expectBinlog = expected.getJSONObject("expect_binlog");
-        assertTrue(
-                compareDebeziumJson(
-                        fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
-        result.getJobClient().get().cancel().get();
+    public void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
+        testConsumingAllEventsWithJsonFormat(true);
     }
 
     @Test
-    public void testConsumingAllEventsWithIncludeSchemaJsonFormat() throws Exception {
+    public void testConsumingAllTypesWithJsonFormatExcludeSchema() throws Exception {
+        testConsumingAllEventsWithJsonFormat(false);
+    }
+
+    private void testConsumingAllEventsWithJsonFormat(Boolean includeSchema) throws Exception {
         fullTypesDatabase.createAndInitialize();
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
-                        .databaseList(
-                                fullTypesDatabase
-                                        .getDatabaseName()) // monitor all tables under inventory
-                        // database
+                        // monitor all tables under column_type_test database
+                        .databaseList(fullTypesDatabase.getDatabaseName())
                         .username(fullTypesDatabase.getUsername())
                         .password(fullTypesDatabase.getPassword())
-                        .deserializer(new JsonDebeziumDeserializationSchema(true))
+                        .deserializer(new JsonDebeziumDeserializationSchema(includeSchema))
                         .build();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
@@ -153,17 +109,23 @@ public class MySqlSourceITCase extends MySqlTestBase {
                                 .useBlinkPlanner()
                                 .inStreamingMode()
                                 .build());
-        JSONObject expected =
-                JSONObject.parseObject(
-                        readLines("file/debezium-data-schema-include.json"), JSONObject.class);
-        JSONObject expectSnapshot = expected.getJSONObject("expect_snapshot");
+        final String expectedFile =
+                includeSchema
+                        ? "file/debezium-data-schema-include.json"
+                        : "file/debezium-data-schema-exclude.json";
+        final JSONObject expected =
+                JSONObject.parseObject(readLines(expectedFile), JSONObject.class);
+        JSONObject expectSnapshot = expected.getJSONObject("expected_snapshot");
+
         DataStreamSource<String> source = env.addSource(sourceFunction);
         tEnv.createTemporaryView("full_types", source);
         TableResult result = tEnv.executeSql("SELECT * FROM full_types");
+
+        // check the snapshot result
         CloseableIterator<Row> snapshot = result.collect();
         waitForSnapshotStarted(snapshot);
         assertTrue(
-                compareDebeziumJson(
+                dataInJsonIsEquals(
                         fetchRows(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -171,10 +133,11 @@ public class MySqlSourceITCase extends MySqlTestBase {
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
+        // check the binlog result
         CloseableIterator<Row> binlog = result.collect();
-        JSONObject expectBinlog = expected.getJSONObject("expect_binlog");
+        JSONObject expectBinlog = expected.getJSONObject("expected_binlog");
         assertTrue(
-                compareDebeziumJson(
+                dataInJsonIsEquals(
                         fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
         result.getJobClient().get().cancel().get();
     }
@@ -207,7 +170,7 @@ public class MySqlSourceITCase extends MySqlTestBase {
         return Files.readAllBytes(path);
     }
 
-    private static boolean compareDebeziumJson(String actual, String expect) {
+    private static boolean dataInJsonIsEquals(String actual, String expect) {
         JSONObject actualJsonObject = JSONObject.parseObject(actual);
         JSONObject expectJsonObject = JSONObject.parseObject(expect);
         if (expectJsonObject.getJSONObject("payload") != null

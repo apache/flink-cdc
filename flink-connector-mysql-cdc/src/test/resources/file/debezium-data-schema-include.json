@@ -1,5 +1,5 @@
 {
-    "expect_snapshot": {
+    "expected_snapshot": {
         "schema": {
             "type": "struct",
             "fields": [
@@ -458,7 +458,7 @@
             "transaction": null
         }
     },
-    "expect_binlog": {
+    "expected_binlog": {
         "schema": {
             "type": "struct",
             "fields": [

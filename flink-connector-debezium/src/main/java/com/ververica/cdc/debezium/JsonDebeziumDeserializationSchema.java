@@ -31,18 +31,20 @@ import org.apache.kafka.connect.storage.ConverterType;
 import java.util.HashMap;
 
 /**
- * A debezium-json message format implementation of {@link DebeziumDeserializationSchema} which
- * converts the received {@link SourceRecord} into JsonString.
+ * A JSON format implementation of {@link DebeziumDeserializationSchema} which deserializes the
+ * received {@link SourceRecord} to JSON String.
  */
 public class JsonDebeziumDeserializationSchema implements DebeziumDeserializationSchema<String> {
-    static final JsonConverter CONVERTER = new JsonConverter();
+
+    private static final long serialVersionUID = 1L;
+    private static final JsonConverter CONVERTER = new JsonConverter();
 
     public JsonDebeziumDeserializationSchema() {
         this(false);
     }
 
     public JsonDebeziumDeserializationSchema(boolean includeSchema) {
-        HashMap<String, Object> configs = new HashMap<>();
+        final HashMap<String, Object> configs = new HashMap<>();
         configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
         configs.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
         CONVERTER.configure(configs);

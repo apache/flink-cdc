@@ -1,5 +1,5 @@
 {
-    "expect_snapshot": {
+    "expected_snapshot": {
         "before": null,
         "after": {
             "id": 1,
@@ -28,7 +28,7 @@
         "op": "r",
         "transaction": null
     },
-    "expect_binlog": {
+    "expected_binlog": {
         "before": {
             "id": 1,
             "tiny_c": 127,
