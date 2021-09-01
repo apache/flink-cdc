@@ -181,6 +181,7 @@ under the License.
                         <!-- Docs -->
                         <exclude>**/*.md</exclude>
                         <exclude>docs/Makefile</exclude>
+                        <exclude>docs/Dockerfile</exclude>
                         <exclude>docs/make.bat</exclude>
                         <exclude>docs/_templates/version.html</exclude>
                         <!-- Tests -->
