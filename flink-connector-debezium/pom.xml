@@ -45,6 +45,10 @@ under the License.
                     <artifactId>kafka-log4j-appender</artifactId>
                     <groupId>org.apache.kafka</groupId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.glassfish.jersey.core</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
