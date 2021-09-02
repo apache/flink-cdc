@@ -25,6 +25,7 @@ import org.apache.flink.table.types.logical.VarCharType;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
+import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -38,7 +39,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link MySqlSplitSerializer}. */
 public class MySqlSplitSerializerTest {
@@ -124,6 +127,16 @@ public class MySqlSplitSerializerTest {
         assertSame(ser1, ser2);
     }
 
+    @Test
+    public void testEnumFieldSerializeAndDeserializeTableChange() throws Exception {
+        TableChange tableChange = getTestTableSchema();
+        Column enumColumn = tableChange.getTable().columnWithName("enum_c");
+        assertNotNull(enumColumn);
+        assertTrue(enumColumn.hasDefaultValue());
+        assertEquals("0", enumColumn.defaultValue());
+        assertEquals(Arrays.asList("0", "1"), enumColumn.enumValues());
+    }
+
     private MySqlSplit serializeAndDeserializeSplit(MySqlSplit split) throws Exception {
         final MySqlSplitSerializer sqlSplitSerializer = new MySqlSplitSerializer();
         byte[] serialized = sqlSplitSerializer.serialize(split);
@@ -146,7 +159,11 @@ public class MySqlSplitSerializerTest {
                         + "\"position\":3,\"optional\":false,\"autoIncremented\":false,\"generated\":"
                         + "false},{\"name\":\"note\",\"jdbcType\":12,\"typeName\":\"VARCHAR\","
                         + "\"typeExpression\":\"VARCHAR\",\"charsetName\":\"latin1\",\"length\":1024,"
-                        + "\"position\":4,\"optional\":true,\"autoIncremented\":false,\"generated\":false}]}}";
+                        + "\"position\":4,\"optional\":true,\"autoIncremented\":false,\"generated\":false},"
+                        + "{\"name\":\"enum_c\",\"jdbcType\":1,\"typeName\":\"ENUM\",\"typeExpression\":\"ENUM\","
+                        + "\"charsetName\":\"utf8\",\"length\":1,\"position\":23,\"optional\":false,"
+                        + "\"autoIncremented\":false,\"generated\":false,\"enumValues\":[\"0\",\"1\"],"
+                        + "\"defaultValue\":\"0\",\"hasDefaultValue\":true}]}}";
         final Document doc = DocumentReader.defaultReader().read(tableChangeJsonStr);
         return JsonTableChangeSerializer.fromDocument(doc, true);
     }

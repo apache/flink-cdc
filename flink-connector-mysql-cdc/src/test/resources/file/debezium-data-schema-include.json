@@ -434,7 +434,8 @@
                 "datetime3_c": 1595008822123,
                 "datetime6_c": 1595008822123456,
                 "timestamp_c": "2020-07-17T18:00:22Z",
-                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+                "enum_c": "0"
             },
             "source": {
                 "version": "1.5.2.Final",
@@ -597,6 +598,13 @@
                             "type": "bytes",
                             "optional": true,
                             "field": "file_uuid"
+                        },
+                        {
+                            "type": "string",
+                            "optional": false,
+                            "version": 1,
+                            "default": "0",
+                            "field": "enum_c"
                         }
                     ],
                     "optional": true,
@@ -738,6 +746,13 @@
                             "type": "bytes",
                             "optional": true,
                             "field": "file_uuid"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "version": 1,
+                            "default": "0",
+                            "field": "enum_c"
                         }
                     ],
                     "optional": true,
@@ -892,7 +907,8 @@
                 "datetime3_c": 1595008822123,
                 "datetime6_c": 1595008822123456,
                 "timestamp_c": "2020-07-17T18:00:22Z",
-                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+                "enum_c": "0"
             },
             "after": {
                 "id": 1,
@@ -916,7 +932,8 @@
                 "datetime3_c": 1595008822123,
                 "datetime6_c": 1595008822123456,
                 "timestamp_c": "2020-07-17T18:33:22Z",
-                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+                "enum_c": "1"
             },
             "source": {
                 "version": "1.5.2.Final",

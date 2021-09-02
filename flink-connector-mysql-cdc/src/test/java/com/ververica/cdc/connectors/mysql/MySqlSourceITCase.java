@@ -130,7 +130,7 @@ public class MySqlSourceITCase extends MySqlTestBase {
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22', enum_c = '1' WHERE id=1;");
         }
 
         // check the binlog result

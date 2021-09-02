@@ -322,6 +322,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + "    datetime6_c TIMESTAMP(6),\n"
                                 + "    timestamp_c TIMESTAMP(0),\n"
                                 + "    file_uuid BYTES,\n"
+                                + "    enum_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -372,7 +373,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + "datetime3_c,\n"
                                 + "datetime6_c,\n"
                                 + "timestamp_c,\n"
-                                + "TO_BASE64(DECODE(file_uuid, 'UTF-8')) FROM full_types");
+                                + "TO_BASE64(DECODE(file_uuid, 'UTF-8')),\n"
+                                + "enum_c\n"
+                                + "FROM full_types");
 
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
@@ -381,14 +384,14 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22', enum_c = '1' WHERE id=1;");
         }
 
         String[] expected =
                 new String[] {
-                    "+I[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]",
-                    "-U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]",
-                    "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]"
+                    "+I[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, 0]",
+                    "-U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, 0]",
+                    "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, 1]"
                 };
 
         assertThat(fetchRows(result.collect(), 3), containsInAnyOrder(expected));

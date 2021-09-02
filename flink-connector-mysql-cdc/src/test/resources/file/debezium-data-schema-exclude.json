@@ -23,7 +23,8 @@
             "datetime3_c": 1595008822123,
             "datetime6_c": 1595008822123456,
             "timestamp_c": "2020-07-17T18:00:22Z",
-            "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+            "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+            "enum_c": "0"
         },
         "op": "r",
         "transaction": null
@@ -51,7 +52,8 @@
             "datetime3_c": 1595008822123,
             "datetime6_c": 1595008822123456,
             "timestamp_c": "2020-07-17T18:00:22Z",
-            "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+            "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+            "enum_c": "0"
         },
         "after": {
             "id": 1,
@@ -75,7 +77,8 @@
             "datetime3_c": 1595008822123,
             "datetime6_c": 1595008822123456,
             "timestamp_c": "2020-07-17T18:33:22Z",
-            "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+            "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+            "enum_c": "1"
         },
         "op": "u",
         "transaction": null
