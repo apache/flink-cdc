@@ -83,7 +83,7 @@ Include following Maven dependency (available through Maven Central):
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
@@ -94,7 +94,7 @@ public class MySqlBinlogSourceExample {
       .databaseList("inventory") // monitor all tables under inventory database
       .username("flinkuser")
       .password("flinkpw")
-      .deserializer(new StringDebeziumDeserializationSchema()) // converts SourceRecord to String
+      .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
       .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -107,6 +107,57 @@ public class MySqlBinlogSourceExample {
   }
 }
 ```
+The following JSON shows the basic CDC events. 
+
+```json
+{
+  "before": {
+    "id": 111,
+    "name": "scooter",
+    "description": "Big 2-wheel scooter",
+    "weight": 5.18
+  },
+  "after": {
+    "id": 111,
+    "name": "scooter",
+    "description": "Big 2-wheel scooter",
+    "weight": 5.15
+  },
+  "source": {...},
+  "op": "u",
+  "ts_ms": 1589362330904,
+  "transaction": null
+}
+```
+Note: please refer to [Debezium documentation](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-events
+)  about the meaning of each fields.
+
+In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Constructor to include schema in the message. Then the Debezium JSON message may look like this:
+```json
+{
+  "schema": {...},
+  "payload": {
+    "before": {
+      "id": 111,
+      "name": "scooter",
+      "description": "Big 2-wheel scooter",
+      "weight": 5.18
+    },
+    "after": {
+      "id": 111,
+      "name": "scooter",
+      "description": "Big 2-wheel scooter",
+      "weight": 5.15
+    },
+    "source": {...},
+    "op": "u",
+    "ts_ms": 1589362330904,
+    "transaction": null
+  }
+}
+```
+Usually, this is not recommended to include schema because this makes the messages very verbose and reduces parsing performance.
+
 
 ## Building from source
 
