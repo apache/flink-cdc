@@ -55,7 +55,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 /**
- * Deserialization schema from Debezium object to Flink Table/SQL internal data structure {@link
+ * Deserialization schema from `Debezium object to Flink Table/SQL internal data structure {@link
  * RowData}.
  */
 public final class RowDataDebeziumDeserializeSchema
@@ -242,7 +242,7 @@ public final class RowDataDebeziumDeserializeSchema
             @Override
             public Object convert(Object dbzObj, Schema schema) {
                 if (dbzObj instanceof Boolean) {
-                    return (Boolean) dbzObj;
+                    return dbzObj;
                 } else if (dbzObj instanceof Byte) {
                     return (byte) dbzObj == 1;
                 } else if (dbzObj instanceof Short) {
@@ -262,7 +262,7 @@ public final class RowDataDebeziumDeserializeSchema
             @Override
             public Object convert(Object dbzObj, Schema schema) {
                 if (dbzObj instanceof Integer) {
-                    return (Integer) dbzObj;
+                    return dbzObj;
                 } else if (dbzObj instanceof Long) {
                     return ((Long) dbzObj).intValue();
                 } else {
@@ -282,7 +282,7 @@ public final class RowDataDebeziumDeserializeSchema
                 if (dbzObj instanceof Integer) {
                     return ((Integer) dbzObj).longValue();
                 } else if (dbzObj instanceof Long) {
-                    return (long) dbzObj;
+                    return dbzObj;
                 } else {
                     return Long.parseLong(dbzObj.toString());
                 }
@@ -300,7 +300,7 @@ public final class RowDataDebeziumDeserializeSchema
                 if (dbzObj instanceof Float) {
                     return ((Float) dbzObj).doubleValue();
                 } else if (dbzObj instanceof Double) {
-                    return (double) dbzObj;
+                    return dbzObj;
                 } else {
                     return Double.parseDouble(dbzObj.toString());
                 }
@@ -316,7 +316,7 @@ public final class RowDataDebeziumDeserializeSchema
             @Override
             public Object convert(Object dbzObj, Schema schema) {
                 if (dbzObj instanceof Float) {
-                    return (float) dbzObj;
+                    return dbzObj;
                 } else if (dbzObj instanceof Double) {
                     return ((Double) dbzObj).floatValue();
                 } else {
@@ -353,7 +353,7 @@ public final class RowDataDebeziumDeserializeSchema
                             return (int) ((long) dbzObj / 1000_000);
                     }
                 } else if (dbzObj instanceof Integer) {
-                    return (int) dbzObj;
+                    return dbzObj;
                 }
                 // get number of milliseconds of the day
                 return TemporalConversions.toLocalTime(dbzObj).toSecondOfDay() * 1000;
@@ -432,7 +432,7 @@ public final class RowDataDebeziumDeserializeSchema
             @Override
             public Object convert(Object dbzObj, Schema schema) {
                 if (dbzObj instanceof byte[]) {
-                    return (byte[]) dbzObj;
+                    return dbzObj;
                 } else if (dbzObj instanceof ByteBuffer) {
                     ByteBuffer byteBuffer = (ByteBuffer) dbzObj;
                     byte[] bytes = new byte[byteBuffer.remaining()];
