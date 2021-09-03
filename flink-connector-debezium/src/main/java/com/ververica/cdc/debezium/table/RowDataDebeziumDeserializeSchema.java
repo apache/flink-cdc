@@ -55,7 +55,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 /**
- * Deserialization schema from `Debezium object to Flink Table/SQL internal data structure {@link
+ * Deserialization schema from Debezium object to Flink Table/SQL internal data structure {@link
  * RowData}.
  */
 public final class RowDataDebeziumDeserializeSchema
