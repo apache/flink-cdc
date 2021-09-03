@@ -52,7 +52,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     private final Field isCopyingField;
 
-    private SourceRecord lastSnapshotRecord;
+    private SourceRecord currentLastSnapshotRecord;
 
     private boolean isInSnapshotPhase = false;
 
@@ -107,18 +107,18 @@ public class MongoDBConnectorSourceTask extends SourceTask {
                     markRecordTimestamp(current);
                     if (isSnapshotRecord(current)) {
                         markSnapshotRecord(current);
-                        if (lastSnapshotRecord != null) {
-                            outSourceRecords.add(lastSnapshotRecord);
+                        if (currentLastSnapshotRecord != null) {
+                            outSourceRecords.add(currentLastSnapshotRecord);
                         }
                         // Keep the current last snapshot record.
                         // When exit snapshot phase, mark it as the last of all snapshot records.
-                        lastSnapshotRecord = current;
+                        currentLastSnapshotRecord = current;
                     } else {
                         // Snapshot Phase Ended, Condition 1:
                         // Received non-snapshot record, exit snapshot phase immediately.
-                        if (lastSnapshotRecord != null) {
-                            outSourceRecords.add(markLastSnapshotRecord(lastSnapshotRecord));
-                            lastSnapshotRecord = null;
+                        if (currentLastSnapshotRecord != null) {
+                            outSourceRecords.add(markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
+                            currentLastSnapshotRecord = null;
                             isInSnapshotPhase = false;
                         }
                         outSourceRecords.add(current);
@@ -129,9 +129,11 @@ public class MongoDBConnectorSourceTask extends SourceTask {
                 // No changing stream event comes and source task is finished copying,
                 // then exit the snapshot phase.
                 if (!isCopying()) {
-                    outSourceRecords =
-                            Collections.singletonList(markLastSnapshotRecord(lastSnapshotRecord));
-                    lastSnapshotRecord = null;
+                    if (currentLastSnapshotRecord != null) {
+                        outSourceRecords =
+                                Collections.singletonList(markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
+                        currentLastSnapshotRecord = null;
+                    }
                     isInSnapshotPhase = false;
                 }
             }
@@ -172,7 +174,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         SnapshotRecord.TRUE.toSource(source);
     }
 
-    private SourceRecord markLastSnapshotRecord(SourceRecord record) {
+    private SourceRecord markLastSnapshotRecordOfAll(SourceRecord record) {
         final Struct value = (Struct) record.value();
         final Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         final SnapshotRecord snapshot = SnapshotRecord.fromSource(source);
