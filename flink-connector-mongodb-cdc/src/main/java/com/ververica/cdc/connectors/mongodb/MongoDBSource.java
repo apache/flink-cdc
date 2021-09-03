@@ -27,6 +27,7 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.heartbeat.Heartbeat;
+import org.apache.flink.annotation.PublicEvolving;
 
 import java.util.Locale;
 import java.util.Properties;
@@ -38,6 +39,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A builder to build a SourceFunction which can read snapshot and continue to consume change stream
  * events.
  */
+@PublicEvolving
 public class MongoDBSource {
 
     public static final String ERROR_TOLERANCE_NONE = ErrorTolerance.NONE.value();
