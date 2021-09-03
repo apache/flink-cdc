@@ -46,6 +46,8 @@ import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -60,6 +62,10 @@ import java.time.ZoneId;
  */
 public final class RowDataDebeziumDeserializeSchema
         implements DebeziumDeserializationSchema<RowData> {
+
+    private static final Logger LOG =
+            LoggerFactory.getLogger(RowDataDebeziumDeserializeSchema.class);
+
     private static final long serialVersionUID = -4852684966051743776L;
 
     /** Custom validator to validate the row value. */
@@ -95,6 +101,7 @@ public final class RowDataDebeziumDeserializeSchema
 
     @Override
     public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
+        LOG.debug("Deserialize source record: {}.", record);
         Envelope.Operation op = Envelope.operationFor(record);
         Struct value = (Struct) record.value();
         Schema valueSchema = record.valueSchema();
@@ -493,7 +500,7 @@ public final class RowDataDebeziumDeserializeSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convert(Object dbzObj, Schema schema) throws Exception {
+            public Object convert(Object dbzObj, Schema schema) {
                 Struct struct = (Struct) dbzObj;
                 int arity = fieldNames.length;
                 GenericRowData row = new GenericRowData(arity);
@@ -501,9 +508,17 @@ public final class RowDataDebeziumDeserializeSchema
                     String fieldName = fieldNames[i];
                     Object fieldValue = struct.get(fieldName);
                     Schema fieldSchema = schema.field(fieldName).schema();
-                    Object convertedField =
-                            convertField(fieldConverters[i], fieldValue, fieldSchema);
-                    row.setField(i, convertedField);
+                    try {
+                        Object convertedField =
+                                convertField(fieldConverters[i], fieldValue, fieldSchema);
+                        row.setField(i, convertedField);
+                    } catch (Exception e) {
+                        throw new IllegalArgumentException(
+                                String.format(
+                                        "Failed to deserialize %s with schema %s at field %s.",
+                                        dbzObj, schema, fieldName),
+                                e);
+                    }
                 }
                 return row;
             }

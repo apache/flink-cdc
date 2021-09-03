@@ -36,6 +36,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
+import com.ververica.cdc.connectors.mysql.source.utils.LogUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +77,7 @@ public class MySqlSourceReader<T>
 
     @Override
     public void start() {
+        suppressTrivialLog();
         if (getNumberOfCurrentlyAssignedSplits() == 0) {
             context.sendSplitRequest();
         }
@@ -178,5 +180,21 @@ public class MySqlSourceReader<T>
     @Override
     protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState.toMySqlSplit();
+    }
+
+    /** Suppress trivial logs to avoid too much log. */
+    private void suppressTrivialLog() {
+        try {
+            // the loggers to be suppressed are chosen according to experience
+            String[] trivialLoggers =
+                    new String[] {
+                        "io.debezium.relational.history.DatabaseHistoryMetrics",
+                        "io.debezium.connector.mysql.MySqlValueConverters"
+                    };
+            // we set the log level to be error to ignore trace/debug/info/warn logs
+            LogUtils.setLogLevelToError(trivialLoggers);
+        } catch (Exception e) {
+            LOG.warn("Failed to suppress trivial log for source reader", e);
+        }
     }
 }

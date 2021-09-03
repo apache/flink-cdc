@@ -122,11 +122,16 @@ class ChunkSplitter {
         final Object[] minMaxOfSplitColumn = queryMinMax(jdbc, tableId, splitColumnName);
         final Object min = minMaxOfSplitColumn[0];
         final Object max = minMaxOfSplitColumn[1];
+        LOG.info(
+                "Start to split table {} into chunks using column {}, the min and max value are {}, {}.",
+                tableId,
+                splitColumnName,
+                min,
+                max);
         if (min == null || max == null || min.equals(max)) {
             // empty table, or only one row, return full table scan as a chunk
             return Collections.singletonList(ChunkRange.all());
         }
-
         final List<ChunkRange> chunks;
         if (splitColumnEvenlyDistributed(splitColumn)) {
             // use evenly-sized chunks which is much efficient

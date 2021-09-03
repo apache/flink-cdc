@@ -31,6 +31,7 @@ import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRe
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void start() {
+        suppressTrivialLogs();
         validator.validate();
         splitAssigner.open();
         this.context.callAsync(
@@ -181,6 +183,22 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 context.sendEventToSourceReader(
                         subtaskId, new FinishedSnapshotSplitsRequestEvent());
             }
+        }
+    }
+
+    /** Suppress trivial logs to avoid too many logs. */
+    private static void suppressTrivialLogs() {
+        try {
+            // the loggers to be suppressed are chosen according to experience
+            String[] trivialLoggers =
+                    new String[] {
+                        "io.debezium.jdbc.JdbcConnection",
+                        "io.debezium.connector.mysql.SnapshotReader"
+                    };
+            // we set the log level to be error to ignore trace/debug/info/warn logs
+            LogUtils.setLogLevelToError(trivialLoggers);
+        } catch (Exception e) {
+            LOG.warn("Failed to suppress trivial log for source enumerator", e);
         }
     }
 }

@@ -63,6 +63,7 @@ public final class MySqlRecordEmitter<T>
     @Override
     public void emitRecord(SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
+        LOG.debug("Emit source record: {}.", element);
         if (isWatermarkEvent(element)) {
             BinlogOffset watermark = getWatermark(element);
             if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {

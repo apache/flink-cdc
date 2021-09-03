@@ -107,6 +107,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         executor.submit(
                 () -> {
                     try {
+                        LOG.info("Execute snapshot read task for mysql split {}", mySqlSplit);
                         currentTaskRunning = true;
                         // execute snapshot read task
                         final SnapshotSplitChangeEventSourceContextImpl sourceContext =
@@ -122,6 +123,10 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                                 appendBinlogSplit.getStartingOffset().getPosition());
                         // execute binlog read task
                         if (snapshotResult.isCompletedOrSkipped()) {
+                            LOG.info(
+                                    "Read binlog {} for snapshot split {}",
+                                    appendBinlogSplit,
+                                    mySqlSplit);
                             // we should only capture events for the current table,
                             // otherwise, we may can't find corresponding schema
                             Configuration dezConf =

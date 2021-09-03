@@ -121,6 +121,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
             if (nextSplit.isSnapshotSplit()) {
                 if (currentReader == null) {
+                    LOG.info("Create snapshot reader");
                     final MySqlConnection jdbcConnection = getConnection(config);
                     final BinaryLogClient binaryLogClient = getBinaryClient(config);
                     final StatefulTaskContext statefulTaskContext =
