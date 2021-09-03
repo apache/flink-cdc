@@ -132,7 +132,7 @@ The following JSON shows the basic CDC events.
 Note: please refer to [Debezium documentation](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-events
 )  about the meaning of each fields.
 
-In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Constructor to include schema in the message. Then the Debezium JSON message may look like this:
+In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Constructor to enabled include schema in the message. Then the Debezium JSON message may look like this:
 ```json
 {
   "schema": {...},
