@@ -73,7 +73,7 @@ under the License.
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.kafka.shaded.org.apache.kafka
+                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
                             </relocations>
