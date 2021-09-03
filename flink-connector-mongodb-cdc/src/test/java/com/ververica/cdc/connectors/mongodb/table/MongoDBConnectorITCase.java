@@ -29,6 +29,8 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.ververica.cdc.connectors.mongodb.MongoDBTestBase;
+import org.bson.BsonDateTime;
+import org.bson.BsonTimestamp;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.Before;
@@ -196,7 +198,10 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + "    md5Field STRING,\n"
                                 + "    dateField DATE,\n"
                                 + "    dateBefore1970 DATE,\n"
-                                + "    timestampField TIMESTAMP,\n"
+                                + "    dateToTimestampField TIMESTAMP(3),\n"
+                                + "    dateToLocalTimestampField TIMESTAMP_LTZ(3),\n"
+                                + "    timestampField TIMESTAMP(0),\n"
+                                + "    timestampToLocalTimestampField TIMESTAMP_LTZ(0),\n"
                                 + "    booleanField BOOLEAN,\n"
                                 + "    decimal128Field DECIMAL ,\n"
                                 + "    doubleField DOUBLE,\n"
@@ -234,7 +239,10 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                         + "    md5Field STRING,\n"
                         + "    dateField DATE,\n"
                         + "    dateBefore1970 DATE,\n"
-                        + "    timestampField TIMESTAMP,\n"
+                        + "    dateToTimestampField TIMESTAMP(3),\n"
+                        + "    dateToLocalTimestampField TIMESTAMP_LTZ(3),\n"
+                        + "    timestampField TIMESTAMP(0),\n"
+                        + "    timestampToLocalTimestampField TIMESTAMP_LTZ(0),\n"
                         + "    booleanField BOOLEAN,\n"
                         + "    decimal128Field DECIMAL ,\n"
                         + "    doubleField DOUBLE,\n"
@@ -269,7 +277,10 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + "md5Field,\n"
                                 + "dateField,\n"
                                 + "dateBefore1970,\n"
+                                + "dateToTimestampField,\n"
+                                + "dateToLocalTimestampField,\n"
                                 + "timestampField,\n"
+                                + "timestampToLocalTimestampField,\n"
                                 + "booleanField,\n"
                                 + "decimal128Field,\n"
                                 + "doubleField,\n"
@@ -299,25 +310,27 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                 Filters.eq("_id", new ObjectId("5d505646cf6d4fe581014ab2")),
                 Updates.set("int64Field", 510L));
 
-        waitForSinkSize("sink", 3);
+        // 2021-09-03T18:36:04.123Z
+        BsonDateTime updatedDateTime = new BsonDateTime(1630694164123L);
+        // 2021-09-03T18:36:04Z
+        BsonTimestamp updatedTimestamp = new BsonTimestamp(1630694164, 0);
+        fullTypes.updateOne(
+                Filters.eq("_id", new ObjectId("5d505646cf6d4fe581014ab2")),
+                Updates.combine(
+                        Updates.set("dateToTimestampField", updatedDateTime),
+                        Updates.set("dateToLocalTimestampField", updatedDateTime),
+                        Updates.set("timestampField", updatedTimestamp),
+                        Updates.set("timestampToLocalTimestampField", updatedTimestamp)));
+
+        waitForSinkSize("sink", 5);
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,"
-                                + "2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,"
-                                + "2019-08-11T17:47:44,true,11,10.5,10,50,hello,50,{inner_map={key=234}},"
-                                + "[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,"
-                                + "/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)",
-                        "-U(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,"
-                                + "2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,"
-                                + "2019-08-11T17:47:44,true,11,10.5,10,50,hello,50,{inner_map={key=234}},"
-                                + "[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,"
-                                + "/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)",
-                        "+U(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,"
-                                + "2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,"
-                                + "2019-08-11T17:47:44,true,11,10.5,10,510,hello,50,{inner_map={key=234}},"
-                                + "[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,"
-                                + "/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)");
+                        "+I(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,2019-08-11T17:54:14.692,2019-08-11T17:54:14.692Z,2019-08-11T17:47:44,2019-08-11T17:47:44Z,true,11,10.5,10,50,hello,50,{inner_map={key=234}},[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)",
+                        "-U(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,2019-08-11T17:54:14.692,2019-08-11T17:54:14.692Z,2019-08-11T17:47:44,2019-08-11T17:47:44Z,true,11,10.5,10,50,hello,50,{inner_map={key=234}},[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)",
+                        "+U(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,2019-08-11T17:54:14.692,2019-08-11T17:54:14.692Z,2019-08-11T17:47:44,2019-08-11T17:47:44Z,true,11,10.5,10,510,hello,50,{inner_map={key=234}},[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)",
+                        "-U(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,2019-08-11T17:54:14.692,2019-08-11T17:54:14.692Z,2019-08-11T17:47:44,2019-08-11T17:47:44Z,true,11,10.5,10,510,hello,50,{inner_map={key=234}},[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)",
+                        "+U(5d505646cf6d4fe581014ab2,hello,0bd1e27e-2829-4b47-8e21-dfef93da44e1,2078693f4c61ce3073b01be69ab76428,2019-08-11,1960-08-11,2021-09-03T18:36:04.123,2021-09-03T18:36:04.123Z,2021-09-03T18:36:04,2021-09-03T18:36:04Z,true,11,10.5,10,510,hello,50,{inner_map={key=234}},[hello, world],[1.0, 1.1, null],[hello0,51, hello1,53],MIN_KEY,MAX_KEY,/^H/i,null,null,[1, 2, 3],function() { x++; },ref_doc,5d505646cf6d4fe581014ab3)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
 

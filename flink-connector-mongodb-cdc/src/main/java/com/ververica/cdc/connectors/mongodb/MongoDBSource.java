@@ -18,6 +18,8 @@
 
 package com.ververica.cdc.connectors.mongodb;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
@@ -27,7 +29,6 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.heartbeat.Heartbeat;
-import org.apache.flink.annotation.PublicEvolving;
 
 import java.util.Locale;
 import java.util.Properties;

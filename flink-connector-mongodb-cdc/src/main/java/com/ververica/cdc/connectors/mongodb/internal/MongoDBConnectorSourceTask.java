@@ -117,7 +117,8 @@ public class MongoDBConnectorSourceTask extends SourceTask {
                         // Snapshot Phase Ended, Condition 1:
                         // Received non-snapshot record, exit snapshot phase immediately.
                         if (currentLastSnapshotRecord != null) {
-                            outSourceRecords.add(markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
+                            outSourceRecords.add(
+                                    markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
                             currentLastSnapshotRecord = null;
                             isInSnapshotPhase = false;
                         }
@@ -131,7 +132,8 @@ public class MongoDBConnectorSourceTask extends SourceTask {
                 if (!isCopying()) {
                     if (currentLastSnapshotRecord != null) {
                         outSourceRecords =
-                                Collections.singletonList(markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
+                                Collections.singletonList(
+                                        markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
                         currentLastSnapshotRecord = null;
                     }
                     isInSnapshotPhase = false;
