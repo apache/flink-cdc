@@ -198,89 +198,7 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
       },
       {
         "type": "struct",
-        "fields": [
-          {
-            "type": "string",
-            "optional": false,
-            "field": "version"
-          },
-          {
-            "type": "string",
-            "optional": false,
-            "field": "connector"
-          },
-          {
-            "type": "string",
-            "optional": false,
-            "field": "name"
-          },
-          {
-            "type": "int64",
-            "optional": false,
-            "field": "ts_ms"
-          },
-          {
-            "type": "string",
-            "optional": true,
-            "name": "io.debezium.data.Enum",
-            "version": 1,
-            "parameters": {
-              "allowed": "true,last,false"
-            },
-            "default": "false",
-            "field": "snapshot"
-          },
-          {
-            "type": "string",
-            "optional": false,
-            "field": "db"
-          },
-          {
-            "type": "string",
-            "optional": true,
-            "field": "sequence"
-          },
-          {
-            "type": "string",
-            "optional": true,
-            "field": "table"
-          },
-          {
-            "type": "int64",
-            "optional": false,
-            "field": "server_id"
-          },
-          {
-            "type": "string",
-            "optional": true,
-            "field": "gtid"
-          },
-          {
-            "type": "string",
-            "optional": false,
-            "field": "file"
-          },
-          {
-            "type": "int64",
-            "optional": false,
-            "field": "pos"
-          },
-          {
-            "type": "int32",
-            "optional": false,
-            "field": "row"
-          },
-          {
-            "type": "int64",
-            "optional": true,
-            "field": "thread"
-          },
-          {
-            "type": "string",
-            "optional": true,
-            "field": "query"
-          }
-        ],
+        "fields": {...}, 
         "optional": false,
         "name": "io.debezium.connector.mysql.Source",
         "field": "source"
@@ -294,28 +212,6 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
         "type": "int64",
         "optional": true,
         "field": "ts_ms"
-      },
-      {
-        "type": "struct",
-        "fields": [
-          {
-            "type": "string",
-            "optional": false,
-            "field": "id"
-          },
-          {
-            "type": "int64",
-            "optional": false,
-            "field": "total_order"
-          },
-          {
-            "type": "int64",
-            "optional": false,
-            "field": "data_collection_order"
-          }
-        ],
-        "optional": true,
-        "field": "transaction"
       }
     ],
     "optional": false,
