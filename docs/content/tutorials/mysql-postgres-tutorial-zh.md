@@ -22,6 +22,14 @@ services:
       - MYSQL_ROOT_PASSWORD=123456
       - MYSQL_USER=mysqluser
       - MYSQL_PASSWORD=mysqlpw
+  mongo:
+    image: "mongo:4.0-xenial"
+    command: --replSet rs0 --smallfiles --oplogSize 128
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mongouser
+      - MONGO_INITDB_ROOT_PASSWORD=mongopw
   elasticsearch:
     image: elastic/elasticsearch:7.6.0
     environment:
@@ -96,16 +104,16 @@ VALUES (default,"scooter","Small 2-wheel scooter"),
 CREATE TABLE orders (
   order_id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
   order_date DATETIME NOT NULL,
-  customer_name VARCHAR(255) NOT NULL,
+  customer_id INTEGER NOT NULL,
   price DECIMAL(10, 5) NOT NULL,
   product_id INTEGER NOT NULL,
   order_status BOOLEAN NOT NULL -- 是否下单
 ) AUTO_INCREMENT = 10001;
 
 INSERT INTO orders
-VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
-       (default, '2020-07-30 10:11:09', 'Sally', 15.00, 105, false),
-       (default, '2020-07-30 12:00:30', 'Edward', 25.25, 106, false);
+VALUES (default, '2020-07-30 10:08:22', 1001, 50.50, 102, false),
+       (default, '2020-07-30 10:11:09', 1002, 15.00, 105, false),
+       (default, '2020-07-30 12:00:30', 1003, 25.25, 106, false);
 
 ```
 
@@ -133,12 +141,28 @@ VALUES (default,10001,'Beijing','Shanghai',false),
        (default,10003,'Shanghai','Hangzhou',false);
 ```
 
+4. 进入mongo 容器，初始化副本集和数据：
+```
+docker-compose exec mongo /usr/bin/mongo -u mongouser -p mongopw
+```
 
+```javascript
+//初始化副本集
+rs.initiate();
+
+use mgdb;
+db.customers.insertMany([
+  { customer_id: 1001, name: 'Jark', address: 'Hangzhou' },
+  { customer_id: 1002, name: 'Sally', address: 'Beijing' },
+  { customer_id: 1003, name: 'Edward', address: 'Shanghai' }
+]);
+```
 
 4. 下载以下 jar 包到 `<FLINK_HOME>/lib/`:
 - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
 - [flink-sql-connector-mysql-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.0.0/flink-sql-connector-mysql-cdc-2.0.0.jar)
 - [flink-sql-connector-postgres-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.0.0/flink-sql-connector-postgres-cdc-2.0.0.jar)
+- [flink-sql-connector-mongodb-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.1.0/flink-sql-connector-postgres-cdc-2.1.0.jar)
 
 5. 然后启动 Flink 集群，再启动 SQL CLI.
 
@@ -164,7 +188,7 @@ Flink SQL> CREATE TABLE products (
 Flink SQL> CREATE TABLE orders (
    order_id INT,
    order_date TIMESTAMP(0),
-   customer_name STRING,
+   customer_id INT,
    price DECIMAL(10, 5),
    product_id INT,
    order_status BOOLEAN,
@@ -196,11 +220,24 @@ Flink SQL> CREATE TABLE shipments (
    'schema-name' = 'public',
    'table-name' = 'shipments'
  );
+ 
+ Flink SQL> CREATE TABLE customers (
+   _id STRING,
+   customer_id INT,
+   name STRING,
+   address STRING,
+   PRIMARY KEY (_id) NOT ENFORCED
+ ) WITH (
+   'connector' = 'mongodb-cdc',
+   'uri' = 'mongodb://mongouser:mongopw@localhost:27017',
+   'database' = 'mgdb',
+   'collection' = 'customers'
+ );
 
 Flink SQL> CREATE TABLE enriched_orders (
    order_id INT,
    order_date TIMESTAMP(0),
-   customer_name STRING,
+   customer_id INT,
    price DECIMAL(10, 5),
    product_id INT,
    order_status BOOLEAN,
@@ -210,6 +247,8 @@ Flink SQL> CREATE TABLE enriched_orders (
    origin STRING,
    destination STRING,
    is_arrived BOOLEAN,
+   customer_name STRING,
+   customer_address STRING,
    PRIMARY KEY (order_id) NOT ENFORCED
  ) WITH (
      'connector' = 'elasticsearch-7',
@@ -218,10 +257,11 @@ Flink SQL> CREATE TABLE enriched_orders (
  );
 
 Flink SQL> INSERT INTO enriched_orders
- SELECT o.*, p.name, p.description, s.shipment_id, s.origin, s.destination, s.is_arrived
+ SELECT o.*, p.name, p.description, s.shipment_id, s.origin, s.destination, s.is_arrived, c.name, c. address
  FROM orders AS o
  LEFT JOIN products AS p ON o.product_id = p.id
- LEFT JOIN shipments AS s ON o.order_id = s.order_id;
+ LEFT JOIN shipments AS s ON o.order_id = s.order_id
+ LEFT JOIN customers AS c ON o.customer_id = c.customer_id;
 ```
 
 6. 修改 mysql 和 postgres 里面的数据，观察 elasticsearch 里的结果。
@@ -229,17 +269,26 @@ Flink SQL> INSERT INTO enriched_orders
 ```sql
 --MySQL
 INSERT INTO orders
-VALUES (default, '2020-07-30 15:22:00', 'Jark', 29.71, 104, false);
+VALUES (default, '2020-07-30 15:22:00', 1004, 29.71, 104, false);
 
 --PG
 INSERT INTO shipments
 VALUES (default,10004,'Shanghai','Beijing',false);
+
+--MongoDB
+db.customers.insert({ customer_id: 1004, name: 'Jacob', address: 'Shanghai' });
 
 --MySQL
 UPDATE orders SET order_status = true WHERE order_id = 10004;
 
 --PG
 UPDATE shipments SET is_arrived = true WHERE shipment_id = 1004;
+
+--MongoDB
+db.customers.updateOne(
+  { customer_id: 1004 },
+  { $set: { address: 'Suzhou'} }
+);
 
 --MySQL
 DELETE FROM orders WHERE order_id = 10004;
@@ -285,7 +334,7 @@ UPDATE orders SET order_status = true WHERE order_id = 10002;
 UPDATE orders SET order_status = true WHERE order_id = 10003;
 
 INSERT INTO orders
-VALUES (default, '2020-07-30 17:33:00', 'Timo', 50.00, 104, true);
+VALUES (default, '2020-07-30 17:33:00', 1001, 50.00, 104, true);
 
 UPDATE orders SET price = 40.00 WHERE order_id = 10005;
 
