@@ -1,4 +1,4 @@
-# Tutorial
+# Streaming ETL from MySQL and Postgres to Elasticsearch
 
 1. Create `docker-compose.yml` file using following contents: 
 
@@ -145,7 +145,7 @@ VALUES (default,10001,'Beijing','Shanghai',false),
 ```sql
 -- Flink SQL
 -- checkpoint every 3000 milliseconds                       
-Flink SQL> SET 'execution.checkpointing.interval' = '3s';   
+Flink SQL> SET execution.checkpointing.interval = 3s;
 Flink SQL> CREATE TABLE products (
     id INT,
     name STRING,
