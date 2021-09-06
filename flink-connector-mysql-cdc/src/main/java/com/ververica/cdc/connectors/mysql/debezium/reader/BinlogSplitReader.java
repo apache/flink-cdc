@@ -64,18 +64,20 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executor;
+    private final MySqlBinlogSplit binlogSplit;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
     private volatile Throwable readException;
 
     private MySqlBinlogSplitReadTask binlogSplitReadTask;
-    private MySqlBinlogSplit currentBinlogSplit;
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
 
-    public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
+    public BinlogSplitReader(
+            StatefulTaskContext statefulTaskContext, int subTaskId, MySqlBinlogSplit binlogSplit) {
+        this.binlogSplit = binlogSplit;
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
@@ -83,28 +85,27 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         this.currentTaskRunning = false;
     }
 
-    public void submitSplit(MySqlSplit mySqlSplit) {
-        this.currentBinlogSplit = mySqlSplit.asBinlogSplit();
+    public void start() {
         configureFilter();
-        statefulTaskContext.configure(currentBinlogSplit);
+        statefulTaskContext.configure(binlogSplit);
         this.queue = statefulTaskContext.getQueue();
         final MySqlOffsetContext mySqlOffsetContext = statefulTaskContext.getOffsetContext();
         mySqlOffsetContext.setBinlogStartPoint(
-                currentBinlogSplit.getStartingOffset().getFilename(),
-                currentBinlogSplit.getStartingOffset().getPosition());
+                binlogSplit.getStartingOffset().getFilename(),
+                binlogSplit.getStartingOffset().getPosition());
         this.binlogSplitReadTask =
                 new MySqlBinlogSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
                         mySqlOffsetContext,
                         statefulTaskContext.getConnection(),
-                        statefulTaskContext.getDispatcher(),
+                        statefulTaskContext.getEventDispatcher(),
+                        statefulTaskContext.getSignalEventDispatcher(),
                         statefulTaskContext.getErrorHandler(),
                         StatefulTaskContext.getClock(),
                         statefulTaskContext.getTaskContext(),
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                        statefulTaskContext.getTopicSelector().getPrimaryTopic(),
-                        currentBinlogSplit);
+                        binlogSplit);
 
         executor.submit(
                 () -> {
@@ -116,7 +117,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                         LOG.error(
                                 String.format(
                                         "Execute binlog read task for mysql split %s fail",
-                                        currentBinlogSplit),
+                                        binlogSplit),
                                 e);
                         readException = e;
                     }
@@ -133,7 +134,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     @Override
     public boolean isFinished() {
-        return currentBinlogSplit == null || !currentTaskRunning;
+        return binlogSplit == null || !currentTaskRunning;
     }
 
     @Nullable
@@ -157,23 +158,14 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             throw new FlinkRuntimeException(
                     String.format(
                             "Read split %s error due to %s.",
-                            currentBinlogSplit, readException.getMessage()),
+                            binlogSplit, readException.getMessage()),
                     readException);
         }
     }
 
     @Override
     public void close() {
-        try {
-            if (statefulTaskContext.getConnection() != null) {
-                statefulTaskContext.getConnection().close();
-            }
-            if (statefulTaskContext.getBinaryLogClient() != null) {
-                statefulTaskContext.getBinaryLogClient().disconnect();
-            }
-        } catch (Exception e) {
-            LOG.error("Close binlog reader error", e);
-        }
+        LOG.info("Close binlog split reader for {}", binlogSplit);
     }
 
     /**
@@ -201,7 +193,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             }
             Object[] key =
                     getSplitKey(
-                            currentBinlogSplit.getSplitKeyType(),
+                            binlogSplit.getSplitKeyType(),
                             sourceRecord,
                             statefulTaskContext.getSchemaNameAdjuster());
             for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
@@ -221,12 +213,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     private void configureFilter() {
         List<FinishedSnapshotSplitInfo> finishedSplitInfos =
-                currentBinlogSplit.getFinishedSnapshotSplitInfos();
+                binlogSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
         if (finishedSplitInfos.isEmpty()) {
-            for (TableId tableId : currentBinlogSplit.getTableSchemas().keySet()) {
-                tableIdBinlogPositionMap.put(tableId, currentBinlogSplit.getStartingOffset());
+            for (TableId tableId : binlogSplit.getTableSchemas().keySet()) {
+                tableIdBinlogPositionMap.put(tableId, binlogSplit.getStartingOffset());
             }
         } else {
             for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {

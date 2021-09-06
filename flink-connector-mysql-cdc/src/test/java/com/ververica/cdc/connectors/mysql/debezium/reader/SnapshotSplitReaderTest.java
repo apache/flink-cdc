@@ -207,14 +207,14 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
 
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
-        SnapshotSplitReader snapshotSplitReader = new SnapshotSplitReader(statefulTaskContext, 0);
+        SnapshotSplitReader snapshotSplitReader;
 
         List<SourceRecord> result = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
             MySqlSplit sqlSplit = mySqlSplits.get(i);
-            if (snapshotSplitReader.isFinished()) {
-                snapshotSplitReader.submitSplit(sqlSplit);
-            }
+            snapshotSplitReader =
+                    new SnapshotSplitReader(statefulTaskContext, 0, sqlSplit.asSnapshotSplit());
+            snapshotSplitReader.start();
             Iterator<SourceRecord> res;
             while ((res = snapshotSplitReader.pollSplitRecords()) != null) {
                 while (res.hasNext()) {

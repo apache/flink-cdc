@@ -23,6 +23,7 @@ import org.apache.flink.configuration.Configuration;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
+import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -78,8 +79,8 @@ public class StatefulTaskContext {
     private final MySqlConnectorConfig connectorConfig;
     private final MySqlEventMetadataProvider metadataProvider;
     private final SchemaNameAdjuster schemaNameAdjuster;
-    private MySqlConnection connection;
-    private BinaryLogClient binaryLogClient;
+    private final MySqlConnection connection;
+    private final BinaryLogClient binaryLogClient;
 
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
@@ -87,7 +88,8 @@ public class StatefulTaskContext {
     private TopicSelector<TableId> topicSelector;
     private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
-    private EventDispatcherImpl<TableId> dispatcher;
+    private EventDispatcherImpl<TableId> eventDispatcher;
+    private SignalEventDispatcher signalEventDispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
 
@@ -143,7 +145,7 @@ public class StatefulTaskContext {
                         // no buffer any more, we use signal event
                         // .buffering()
                         .build();
-        this.dispatcher =
+        this.eventDispatcher =
                 new EventDispatcherImpl<>(
                         connectorConfig,
                         topicSelector,
@@ -153,6 +155,8 @@ public class StatefulTaskContext {
                         DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster);
+        this.signalEventDispatcher =
+                new SignalEventDispatcher(offsetContext, topicSelector.getPrimaryTopic(), queue);
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
@@ -295,8 +299,12 @@ public class StatefulTaskContext {
         return taskContext;
     }
 
-    public EventDispatcherImpl<TableId> getDispatcher() {
-        return dispatcher;
+    public EventDispatcherImpl<TableId> getEventDispatcher() {
+        return eventDispatcher;
+    }
+
+    public SignalEventDispatcher getSignalEventDispatcher() {
+        return signalEventDispatcher;
     }
 
     public ChangeEventQueue<DataChangeEvent> getQueue() {

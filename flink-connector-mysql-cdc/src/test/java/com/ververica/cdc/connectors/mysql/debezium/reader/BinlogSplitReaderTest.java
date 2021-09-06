@@ -338,8 +338,9 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         MySqlSplit binlogSplit = binlogSplitAssigner.getNext().get();
 
         // step-2: test read binlog split
-        BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
-        binlogReader.submitSplit(binlogSplit);
+        BinlogSplitReader binlogReader =
+                new BinlogSplitReader(statefulTaskContext, 0, binlogSplit.asBinlogSplit());
+        binlogReader.start();
 
         // step-3: make some binlog events
         TableId tableId = binlogSplit.getTableSchemas().keySet().iterator().next();
@@ -378,16 +379,14 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
             throws Exception {
         final StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
-        final SnapshotSplitReader snapshotSplitReader =
-                new SnapshotSplitReader(statefulTaskContext, 0);
 
         // step-1: read snapshot splits firstly
         List<SourceRecord> fetchedRecords = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
             MySqlSplit sqlSplit = sqlSplits.get(i);
-            if (snapshotSplitReader.isFinished()) {
-                snapshotSplitReader.submitSplit(sqlSplit);
-            }
+            SnapshotSplitReader snapshotSplitReader =
+                    new SnapshotSplitReader(statefulTaskContext, 0, sqlSplit.asSnapshotSplit());
+            snapshotSplitReader.start();
             Iterator<SourceRecord> res;
             while ((res = snapshotSplitReader.pollSplitRecords()) != null) {
                 while (res.hasNext()) {
@@ -415,8 +414,9 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                         tableSchemas);
 
         // step-3: test read binlog split
-        BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
-        binlogReader.submitSplit(binlogSplit);
+        BinlogSplitReader binlogReader =
+                new BinlogSplitReader(statefulTaskContext, 0, binlogSplit.asBinlogSplit());
+        binlogReader.start();
 
         // step-4: make some binlog events
         if (binlogChangeTableId.table().contains("customers")) {

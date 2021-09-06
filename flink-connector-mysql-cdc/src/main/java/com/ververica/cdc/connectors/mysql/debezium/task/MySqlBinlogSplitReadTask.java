@@ -50,7 +50,6 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     private static final Logger logger = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
     private final MySqlBinlogSplit binlogSplit;
     private final MySqlOffsetContext offsetContext;
-    private final EventDispatcherImpl<TableId> eventDispatcher;
     private final SignalEventDispatcher signalEventDispatcher;
     private final ErrorHandler errorHandler;
     private ChangeEventSourceContext context;
@@ -59,28 +58,26 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
             MySqlConnectorConfig connectorConfig,
             MySqlOffsetContext offsetContext,
             MySqlConnection connection,
-            EventDispatcherImpl<TableId> dispatcher,
+            EventDispatcherImpl<TableId> eventDispatcher,
+            SignalEventDispatcher signalEventDispatcher,
             ErrorHandler errorHandler,
             Clock clock,
             MySqlTaskContext taskContext,
             MySqlStreamingChangeEventSourceMetrics metrics,
-            String topic,
             MySqlBinlogSplit binlogSplit) {
         super(
                 connectorConfig,
                 offsetContext,
                 connection,
-                dispatcher,
+                eventDispatcher,
                 errorHandler,
                 clock,
                 taskContext,
                 metrics);
         this.binlogSplit = binlogSplit;
-        this.eventDispatcher = dispatcher;
+        this.signalEventDispatcher = signalEventDispatcher;
         this.offsetContext = offsetContext;
         this.errorHandler = errorHandler;
-        this.signalEventDispatcher =
-                new SignalEventDispatcher(offsetContext, topic, eventDispatcher.getQueue());
     }
 
     @Override

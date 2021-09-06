@@ -28,14 +28,10 @@ public interface DebeziumReader<T, Split> {
     /** Return the current split of the reader is finished or not. */
     boolean isFinished();
 
-    /**
-     * Add to split to read, this should call only the when reader is idle.
-     *
-     * @param splitToRead
-     */
-    void submitSplit(Split splitToRead);
+    /** Start the reader. */
+    void start();
 
-    /** Close the reader and releases all resources. */
+    /** Close the reader. */
     void close();
 
     /**

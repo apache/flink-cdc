@@ -139,7 +139,7 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
                         customDatabase.getPassword(),
                         customDatabase.getDatabaseName(),
                         getTableName(captureCustomerTables),
-                        getServerId());
+                        "5401");
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
                 new String[] {
