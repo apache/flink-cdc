@@ -1,4 +1,4 @@
-# 中文教程
+# 构建从 MySQL 和 Postgres 到 Elasticsearch 的流式 ETL
 
 1. 下载 `docker-compose.yml`
 
@@ -145,7 +145,7 @@ VALUES (default,10001,'Beijing','Shanghai',false),
 ```sql
 --Flink SQL
 -- 设置 checkpoint 间隔为 3 秒                     
-Flink SQL> SET 'execution.checkpointing.interval' = '3s';
+Flink SQL> SET execution.checkpointing.interval = 3s;
 Flink SQL> CREATE TABLE products (
    id INT,
    name STRING,
