@@ -33,6 +33,7 @@ import org.apache.flink.util.ExceptionUtils;
 
 import org.junit.Test;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -66,6 +67,7 @@ public class MongoDBTableFactoryTest {
     private static final String ERROR_TOLERANCE = "none";
     private static final Boolean ERROR_LOGS_ENABLE = true;
     private static final Boolean COPY_EXISTING = true;
+    private static final ZoneId LOCAL_TIME_ZONE = ZoneId.of("Asia/Shanghai");
 
     @Test
     public void testCommonProperties() {
@@ -87,7 +89,8 @@ public class MongoDBTableFactoryTest {
                         null,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
-                        null);
+                        null,
+                        ZoneId.of("UTC"));
         assertEquals(expectedSource, actualSource);
     }
 
@@ -103,6 +106,7 @@ public class MongoDBTableFactoryTest {
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
         options.put("heartbeat.interval.ms", "104");
+        options.put("local-time-zone", "Asia/Shanghai");
         DynamicTableSource actualSource = createTableSource(options);
 
         MongoDBTableSource expectedSource =
@@ -119,7 +123,8 @@ public class MongoDBTableFactoryTest {
                         101,
                         102,
                         103,
-                        104);
+                        104,
+                        LOCAL_TIME_ZONE);
         assertEquals(expectedSource, actualSource);
     }
 

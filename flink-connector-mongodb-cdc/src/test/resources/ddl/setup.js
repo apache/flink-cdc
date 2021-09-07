@@ -21,8 +21,9 @@
 // 2) 'superuser' - all privileges
 //
 
+//use admin;
 
-db.getSiblingDB('admin').createUser(
+db.createUser(
    {
      user: 'superuser',
      pwd: 'superpw',
@@ -30,7 +31,7 @@ db.getSiblingDB('admin').createUser(
    }
 )
 
-db.getSiblingDB('admin').createUser(
+db.createUser(
  {
    user: 'flinkuser',
    pwd: 'flinkpw',

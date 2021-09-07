@@ -13,15 +13,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// ----------------------------------------------------------------------------------------------------------------
-// DATABASE:  column_type_test
-// ----------------------------------------------------------------------------------------------------------------
-
-db.getSiblingDB('column_type_test').getCollection('full_types').insertOne({
+db.getCollection('full_types').insertOne({
     "_id": ObjectId("5d505646cf6d4fe581014ab2"),
     "stringField": "hello",
     "uuidField": UUID("0bd1e27e-2829-4b47-8e21-dfef93da44e1"),
     "md5Field": MD5("2078693f4c61ce3073b01be69ab76428"),
+    "timeField": ISODate("2019-08-11T17:54:14.692Z"),
     "dateField": ISODate("2019-08-11T17:54:14.692Z"),
     "dateBefore1970": ISODate("1960-08-11T17:54:14.692Z"),
     "dateToTimestampField": ISODate("2019-08-11T17:54:14.692Z"),

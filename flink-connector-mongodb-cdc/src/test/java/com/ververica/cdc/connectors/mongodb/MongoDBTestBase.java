@@ -35,6 +35,7 @@ import org.testcontainers.lifecycle.Startables;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -65,7 +66,7 @@ public class MongoDBTestBase extends AbstractTestBase {
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MONGODB_CONTAINER)).join();
-        executeCommandFile("setup");
+        executeCommandFileInDatabase("setup", "admin");
         initialClient();
         LOG.info("Containers are started.");
     }
@@ -86,13 +87,29 @@ public class MongoDBTestBase extends AbstractTestBase {
     }
 
     /** Executes a mongo command file. */
-    protected static void executeCommandFile(String cmdFile) {
-        final String ddlFile = String.format("ddl/%s.js", cmdFile);
+    protected static String executeCommandFile(String fileNameIgnoreSuffix) {
+        return executeCommandFileInDatabase(fileNameIgnoreSuffix, fileNameIgnoreSuffix);
+    }
+
+    /** Executes a mongo command file in separate database. */
+    protected static String executeCommandFileInSeparateDatabase(String fileNameIgnoreSuffix) {
+        return executeCommandFileInDatabase(
+                fileNameIgnoreSuffix,
+                fileNameIgnoreSuffix + "_" + Integer.toUnsignedString(new Random().nextInt(), 36));
+    }
+
+    /** Executes a mongo command file, specify a database name. */
+    protected static String executeCommandFileInDatabase(
+            String fileNameIgnoreSuffix, String databaseName) {
+        final String dbName = databaseName != null ? databaseName : fileNameIgnoreSuffix;
+        final String ddlFile = String.format("ddl/%s.js", fileNameIgnoreSuffix);
         final URL ddlTestFile = MongoDBTestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
 
         try {
-            String command =
+            // use database;
+            String command0 = String.format("db = db.getSiblingDB('%s');\n", dbName);
+            String command1 =
                     Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
                             .map(String::trim)
                             .filter(x -> !x.startsWith("//") && !x.isEmpty())
@@ -103,8 +120,9 @@ public class MongoDBTestBase extends AbstractTestBase {
                                     })
                             .collect(Collectors.joining("\n"));
 
-            MONGODB_CONTAINER.executeCommand(command);
+            MONGODB_CONTAINER.executeCommand(command0 + command1);
 
+            return dbName;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

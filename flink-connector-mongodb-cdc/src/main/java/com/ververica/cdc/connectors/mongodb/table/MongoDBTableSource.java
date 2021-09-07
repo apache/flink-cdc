@@ -34,6 +34,7 @@ import com.ververica.cdc.debezium.DebeziumSourceFunction;
 
 import javax.annotation.Nullable;
 
+import java.time.ZoneId;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -58,6 +59,7 @@ public class MongoDBTableSource implements ScanTableSource {
     private final Integer pollMaxBatchSize;
     private final Integer pollAwaitTimeMillis;
     private final Integer heartbeatIntervalMillis;
+    private final ZoneId localTimeZone;
 
     public MongoDBTableSource(
             TableSchema physicalSchema,
@@ -72,7 +74,8 @@ public class MongoDBTableSource implements ScanTableSource {
             @Nullable Integer copyExistingQueueSize,
             @Nullable Integer pollMaxBatchSize,
             @Nullable Integer pollAwaitTimeMillis,
-            @Nullable Integer heartbeatIntervalMillis) {
+            @Nullable Integer heartbeatIntervalMillis,
+            ZoneId localTimeZone) {
         this.physicalSchema = physicalSchema;
         this.uri = checkNotNull(uri);
         this.database = checkNotNull(database);
@@ -86,6 +89,7 @@ public class MongoDBTableSource implements ScanTableSource {
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
+        this.localTimeZone = localTimeZone;
     }
 
     @Override
@@ -104,7 +108,7 @@ public class MongoDBTableSource implements ScanTableSource {
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
 
         DebeziumDeserializationSchema<RowData> deserializer =
-                new MongoDBConnectorDeserializationSchema(rowType, typeInfo);
+                new MongoDBConnectorDeserializationSchema(rowType, typeInfo, localTimeZone);
 
         MongoDBSource.Builder<RowData> builder =
                 MongoDBSource.<RowData>builder()
@@ -143,7 +147,8 @@ public class MongoDBTableSource implements ScanTableSource {
                 copyExistingQueueSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
-                heartbeatIntervalMillis);
+                heartbeatIntervalMillis,
+                localTimeZone);
     }
 
     @Override
@@ -167,7 +172,8 @@ public class MongoDBTableSource implements ScanTableSource {
                 && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
-                && Objects.equals(heartbeatIntervalMillis, that.heartbeatIntervalMillis);
+                && Objects.equals(heartbeatIntervalMillis, that.heartbeatIntervalMillis)
+                && Objects.equals(localTimeZone, that.localTimeZone);
     }
 
     @Override
@@ -185,7 +191,8 @@ public class MongoDBTableSource implements ScanTableSource {
                 copyExistingQueueSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
-                heartbeatIntervalMillis);
+                heartbeatIntervalMillis,
+                localTimeZone);
     }
 
     @Override

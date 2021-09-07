@@ -30,6 +30,7 @@ import org.apache.flink.table.utils.TableSchemaUtils;
 
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -145,6 +146,12 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                                     + "have been published in the specified interval. This improves the resumability of the connector "
                                     + "for low volume namespaces. Use 0 to disable. Defaults to 0.");
 
+    public static final ConfigOption<String> LOCAL_TIME_ZONE =
+            ConfigOptions.key("local-time-zone")
+                    .stringType()
+                    .defaultValue("UTC")
+                    .withDescription("The local time zone. Defaults to UTC.");
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -170,6 +177,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         Integer copyExistingMaxThreads = config.getOptional(COPY_EXISTING_MAX_THREADS).orElse(null);
         Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
 
+        ZoneId localTimeZone = ZoneId.of(config.get(LOCAL_TIME_ZONE));
+
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
@@ -188,7 +197,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 copyExistingQueueSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
-                heartbeatIntervalMillis);
+                heartbeatIntervalMillis,
+                localTimeZone);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -223,6 +233,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(POLL_MAX_BATCH_SIZE);
         options.add(POLL_AWAIT_TIME_MILLIS);
         options.add(HEARTBEAT_INTERVAL_MILLIS);
+        options.add(LOCAL_TIME_ZONE);
         return options;
     }
 }

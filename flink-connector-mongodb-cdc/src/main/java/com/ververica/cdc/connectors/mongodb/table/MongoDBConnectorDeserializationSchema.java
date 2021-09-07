@@ -82,10 +82,11 @@ public class MongoDBConnectorDeserializationSchema
 
     private static final String OPERATION_TYPE_FIELD = "operationType";
 
-    private static final ZoneId TIME_ZONE = ZoneId.of("UTC");
-
     /** TypeInformation of the produced {@link RowData}. */
     private final TypeInformation<RowData> resultTypeInfo;
+
+    /** Local Time zone. */
+    private final ZoneId localTimeZone;
 
     /**
      * Runtime converter that converts {@link
@@ -95,9 +96,10 @@ public class MongoDBConnectorDeserializationSchema
     private final DeserializationRuntimeConverter runtimeConverter;
 
     public MongoDBConnectorDeserializationSchema(
-            RowType rowType, TypeInformation<RowData> resultTypeInfo) {
+            RowType rowType, TypeInformation<RowData> resultTypeInfo, ZoneId localTimeZone) {
         this.runtimeConverter = createConverter(rowType);
         this.resultTypeInfo = resultTypeInfo;
+        this.localTimeZone = localTimeZone;
     }
 
     @Override
@@ -434,11 +436,11 @@ public class MongoDBConnectorDeserializationSchema
     }
 
     private LocalDateTime convertInstantToLocalDateTime(Instant instant) {
-        return instant.atZone(TIME_ZONE).toLocalDateTime();
+        return LocalDateTime.ofInstant(instant, localTimeZone);
     }
 
     private Instant convertToInstant(BsonTimestamp bsonTimestamp) {
-        return Instant.ofEpochSecond(bsonTimestamp.getTime() * 1000L);
+        return Instant.ofEpochSecond(bsonTimestamp.getTime());
     }
 
     private Instant convertToInstant(BsonDateTime bsonDateTime) {
@@ -489,11 +491,14 @@ public class MongoDBConnectorDeserializationSchema
 
     private TimestampData convertToTimestamp(BsonValue docObj) {
         if (docObj.isDateTime()) {
-            return TimestampData.fromEpochMillis(docObj.asDateTime().getValue());
+            return TimestampData.fromLocalDateTime(
+                    convertInstantToLocalDateTime(convertToInstant(docObj.asDateTime())));
         }
         if (docObj.isTimestamp()) {
-            return TimestampData.fromEpochMillis(docObj.asTimestamp().getTime() * 1000L);
+            return TimestampData.fromLocalDateTime(
+                    convertInstantToLocalDateTime(convertToInstant(docObj.asTimestamp())));
         }
+
         throw new IllegalArgumentException(
                 "Unable to convert to timestamp from unexpected value '"
                         + docObj

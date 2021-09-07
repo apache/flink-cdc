@@ -13,7 +13,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-db.getSiblingDB('inventory').getCollection('products').insertMany([
+db.getCollection('products').insertMany([
 {"_id": ObjectId("100000000000000000000101"), "name": "scooter", "description": "Small 2-wheel scooter", "weight": 3.14},
 {"_id": ObjectId("100000000000000000000102"), "name": "car battery", "description": "12V car battery", "weight": 8.1},
 {"_id": ObjectId("100000000000000000000103"), "name": "12-pack drill bits", "description": "12-pack of drill bits with sizes ranging from #40 to #3", "weight": 0.8},
