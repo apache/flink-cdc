@@ -54,6 +54,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     private final Queue<MySqlSplit> splits;
     private final MySqlSourceConfig sourceConfig;
     private final int subtaskId;
+    private final MySqlConnection jdbcConnection;
+    private final BinaryLogClient binaryLogClient;
+    private final StatefulTaskContext statefulTaskContext;
 
     @Nullable private DebeziumReader<SourceRecord, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
@@ -62,6 +65,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
         this.sourceConfig = sourceConfig;
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
+        this.jdbcConnection = getConnection(config);
+        this.binaryLogClient = getBinaryClient(config);
+        this.statefulTaskContext = new StatefulTaskContext(config, binaryLogClient, jdbcConnection);
     }
 
     @Override
@@ -97,12 +103,17 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
     @Override
     public void close() throws Exception {
-        if (currentReader != null) {
-            LOG.info(
-                    "Close current debezium reader {}",
-                    currentReader.getClass().getCanonicalName());
-            currentReader.close();
-            currentSplitId = null;
+        LOG.info("Close MySQL split reader");
+        closeCurrentReader();
+        try {
+            if (jdbcConnection != null) {
+                jdbcConnection.close();
+            }
+            if (binaryLogClient != null) {
+                binaryLogClient.disconnect();
+            }
+        } catch (Exception e) {
+            LOG.error("Close MySQL split reader error", e);
         }
     }
 
@@ -118,33 +129,26 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                 throw new IOException("Cannot fetch from another split - no split remaining");
             }
             currentSplitId = nextSplit.splitId();
-
+            // close current reader and then create a new reader to read split
+            closeCurrentReader();
             if (nextSplit.isSnapshotSplit()) {
-                if (currentReader == null) {
-                    final MySqlConnection jdbcConnection =
-                            createMySqlConnection(sourceConfig.getDbzConfiguration());
-                    final BinaryLogClient binaryLogClient =
-                            createBinaryClient(sourceConfig.getDbzConfiguration());
-                    final StatefulTaskContext statefulTaskContext =
-                            new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
-                    currentReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
-                }
+                currentReader =
+                        new SnapshotSplitReader(
+                                statefulTaskContext, nextSplit.asSnapshotSplit(), subtaskId);
             } else {
-                // point from snapshot split to binlog split
-                if (currentReader != null) {
-                    LOG.info("It's turn to read binlog split, close current snapshot reader");
-                    currentReader.close();
-                }
-                final MySqlConnection jdbcConnection =
-                        createMySqlConnection(sourceConfig.getDbzConfiguration());
-                final BinaryLogClient binaryLogClient =
-                        createBinaryClient(sourceConfig.getDbzConfiguration());
-                final StatefulTaskContext statefulTaskContext =
-                        new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
-                LOG.info("Create binlog reader");
-                currentReader = new BinlogSplitReader(statefulTaskContext, subtaskId);
+                // start to read binlog split
+                LOG.info("It's turn to read binlog split, create binlog reader");
+                currentReader =
+                        new BinlogSplitReader(
+                                statefulTaskContext, nextSplit.asBinlogSplit(), subtaskId);
             }
-            currentReader.submitSplit(nextSplit);
+            currentReader.start();
+        }
+    }
+
+    private void closeCurrentReader() {
+        if (currentReader != null) {
+            currentReader.close();
         }
     }
 

@@ -65,6 +65,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executor;
+    private final MySqlSnapshotSplit snapshotSplit;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -72,13 +73,16 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     // task to read snapshot for current split
     private MySqlSnapshotSplitReadTask splitSnapshotReadTask;
-    private MySqlSnapshotSplit currentSnapshotSplit;
     private SchemaNameAdjuster nameAdjuster;
     public AtomicBoolean hasNextElement;
     public AtomicBoolean reachEnd;
 
-    public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
+    public SnapshotSplitReader(
+            StatefulTaskContext statefulTaskContext,
+            MySqlSnapshotSplit snapshotSplit,
+            int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
+        this.snapshotSplit = snapshotSplit;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subtaskId).build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
@@ -87,9 +91,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         this.reachEnd = new AtomicBoolean(false);
     }
 
-    public void submitSplit(MySqlSplit mySqlSplit) {
-        this.currentSnapshotSplit = mySqlSplit.asSnapshotSplit();
-        statefulTaskContext.configure(currentSnapshotSplit);
+    public void start() {
+        statefulTaskContext.configure(snapshotSplit);
         this.queue = statefulTaskContext.getQueue();
         this.nameAdjuster = statefulTaskContext.getSchemaNameAdjuster();
         this.hasNextElement.set(true);
@@ -104,7 +107,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         statefulTaskContext.getDispatcher(),
                         statefulTaskContext.getTopicSelector(),
                         StatefulTaskContext.getClock(),
-                        currentSnapshotSplit);
+                        snapshotSplit);
         executor.submit(
                 () -> {
                     try {
@@ -140,14 +143,14 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                                     new IllegalStateException(
                                             String.format(
                                                     "Read snapshot for mysql split %s fail",
-                                                    currentSnapshotSplit));
+                                                    snapshotSplit));
                         }
                     } catch (Exception e) {
                         currentTaskRunning = false;
                         LOG.error(
                                 String.format(
                                         "Execute snapshot read task for mysql split %s fail",
-                                        currentSnapshotSplit),
+                                        snapshotSplit),
                                 e);
                         readException = e;
                     }
@@ -157,12 +160,12 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     private MySqlBinlogSplit createBackfillBinlogSplit(
             SnapshotSplitChangeEventSourceContextImpl sourceContext) {
         return new MySqlBinlogSplit(
-                currentSnapshotSplit.splitId(),
-                currentSnapshotSplit.getSplitKeyType(),
+                snapshotSplit.splitId(),
+                snapshotSplit.getSplitKeyType(),
                 sourceContext.getLowWatermark(),
                 sourceContext.getHighWatermark(),
                 new ArrayList<>(),
-                currentSnapshotSplit.getTableSchemas());
+                snapshotSplit.getTableSchemas());
     }
 
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(
@@ -179,7 +182,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         .getSourceConfig()
                         .getDbzConfiguration()
                         .edit()
-                        .with("table.whitelist", currentSnapshotSplit.getTableId())
+                        .with("table.whitelist", snapshotSplit.getTableId())
                         .build();
         // task to read binlog and backfill for current split
         return new MySqlBinlogSplitReadTask(
@@ -211,7 +214,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     @Override
     public boolean isFinished() {
-        return currentSnapshotSplit == null
+        return snapshotSplit == null
                 || (!currentTaskRunning && !hasNextElement.get() && reachEnd.get());
     }
 
@@ -238,8 +241,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             }
             // snapshot split return its data once
             hasNextElement.set(false);
-            return normalizedSplitRecords(currentSnapshotSplit, sourceRecords, nameAdjuster)
-                    .iterator();
+            return normalizedSplitRecords(snapshotSplit, sourceRecords, nameAdjuster).iterator();
         }
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
@@ -251,23 +253,14 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             throw new FlinkRuntimeException(
                     String.format(
                             "Read split %s error due to %s.",
-                            currentSnapshotSplit, readException.getMessage()),
+                            snapshotSplit, readException.getMessage()),
                     readException);
         }
     }
 
     @Override
     public void close() {
-        try {
-            if (statefulTaskContext.getConnection() != null) {
-                statefulTaskContext.getConnection().close();
-            }
-            if (statefulTaskContext.getBinaryLogClient() != null) {
-                statefulTaskContext.getBinaryLogClient().disconnect();
-            }
-        } catch (Exception e) {
-            LOG.error("Close snapshot reader error", e);
-        }
+        LOG.debug("Close snapshot split reader for {}", snapshotSplit);
     }
 
     /**
