@@ -208,6 +208,13 @@ Connector Options
       <td>Integer</td>
       <td>The length of time in milliseconds between sending heartbeat messages. Use 0 to disable.</td>
     </tr>
+    <tr>
+      <td>local-time-zone</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">UTC</td>
+      <td>String</td>
+      <td>The local time zone.</td>
+    </tr>
     </tbody>
 </table>    
 </div>
@@ -329,11 +336,12 @@ Data Type Mapping
     </tr>
     <tr>
       <td>Date</td>
-      <td>TIMESTAMP_LTZ(3)</td>
+      <td>TIMESTAMP(3)</br>TIMESTAMP_LTZ(3)</td>
     </tr>
     <tr>
       <td>Timestamp</td>
-      <td>TIMESTAMP_LTZ(0)</td>
+      <td>TIMESTAMP(0)</br>TIMESTAMP_LTZ(0)
+      </td>
     </tr>
     <tr>
       <td>
