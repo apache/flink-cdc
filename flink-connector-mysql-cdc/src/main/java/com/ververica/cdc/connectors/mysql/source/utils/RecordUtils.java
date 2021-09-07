@@ -235,6 +235,21 @@ public class RecordUtils {
         return new BinlogOffset(file, position);
     }
 
+    public static Long getMessageTimestamp(SourceRecord record) {
+        Schema schema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        if (schema.field(Envelope.FieldName.SOURCE) == null) {
+            return null;
+        }
+
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        if (source.schema().field(Envelope.FieldName.TIMESTAMP) == null) {
+            return null;
+        }
+
+        return source.getInt64(Envelope.FieldName.TIMESTAMP);
+    }
+
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
         if (keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name())) {

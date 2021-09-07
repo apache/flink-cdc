@@ -41,6 +41,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSp
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
+import com.ververica.cdc.connectors.mysql.source.reader.MySqlCDCMetricRecorder;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
@@ -102,12 +103,19 @@ public class MySqlParallelSource<T>
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
         final Configuration readerConfiguration = getReaderConfig(readerContext);
+        final MySqlCDCMetricRecorder metricRecorder =
+                new MySqlCDCMetricRecorder(readerContext.metricGroup());
+        metricRecorder.registerMetrics();
         Supplier<MySqlSplitReader> splitReaderSupplier =
-                () -> new MySqlSplitReader(readerConfiguration, readerContext.getIndexOfSubtask());
+                () ->
+                        new MySqlSplitReader(
+                                readerConfiguration,
+                                readerContext.getIndexOfSubtask(),
+                                metricRecorder);
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
-                new MySqlRecordEmitter<>(deserializationSchema),
+                new MySqlRecordEmitter<>(deserializationSchema, metricRecorder),
                 readerConfiguration,
                 readerContext);
     }

@@ -24,6 +24,7 @@ import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
+import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
@@ -55,9 +56,13 @@ public final class MySqlRecordEmitter<T>
             new JsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
+    private final MySqlCDCMetricRecorder metricRecorder;
 
-    public MySqlRecordEmitter(DebeziumDeserializationSchema<T> debeziumDeserializationSchema) {
+    public MySqlRecordEmitter(
+            DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
+            MySqlCDCMetricRecorder metricRecorder) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
+        this.metricRecorder = metricRecorder;
     }
 
     @Override
@@ -80,6 +85,10 @@ public final class MySqlRecordEmitter<T>
             if (splitState.isBinlogSplitState()) {
                 BinlogOffset position = getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
+            }
+            Long messageTimestamp = RecordUtils.getMessageTimestamp(element);
+            if (messageTimestamp != null) {
+                metricRecorder.setEmitDelay(System.currentTimeMillis() - messageTimestamp);
             }
             debeziumDeserializationSchema.deserialize(
                     element,

@@ -20,6 +20,8 @@ package com.ververica.cdc.connectors.mysql.source.split;
 
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 
+import com.ververica.cdc.connectors.mysql.source.reader.MySqlCDCMetricRecorder;
+import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import javax.annotation.Nullable;
@@ -37,14 +39,19 @@ public final class MySqlRecords implements RecordsWithSplitIds<SourceRecord> {
     @Nullable private Iterator<SourceRecord> recordsForCurrentSplit;
     @Nullable private final Iterator<SourceRecord> recordsForSplit;
     private final Set<String> finishedSnapshotSplits;
+    private final long fetchTimestamp;
+    private final MySqlCDCMetricRecorder metricRecorder;
 
     public MySqlRecords(
             @Nullable String splitId,
             @Nullable Iterator recordsForSplit,
-            Set<String> finishedSnapshotSplits) {
+            Set<String> finishedSnapshotSplits,
+            MySqlCDCMetricRecorder metricRecorder) {
         this.splitId = splitId;
         this.recordsForSplit = recordsForSplit;
         this.finishedSnapshotSplits = finishedSnapshotSplits;
+        this.fetchTimestamp = System.currentTimeMillis();
+        this.metricRecorder = metricRecorder;
     }
 
     @Nullable
@@ -65,7 +72,12 @@ public final class MySqlRecords implements RecordsWithSplitIds<SourceRecord> {
         final Iterator<SourceRecord> recordsForSplit = this.recordsForCurrentSplit;
         if (recordsForSplit != null) {
             if (recordsForSplit.hasNext()) {
-                return recordsForSplit.next();
+                SourceRecord sourceRecord = recordsForSplit.next();
+                Long messageTimestamp = RecordUtils.getMessageTimestamp(sourceRecord);
+                if (messageTimestamp != null) {
+                    metricRecorder.setFetchDelay(fetchTimestamp - messageTimestamp);
+                }
+                return sourceRecord;
             } else {
                 return null;
             }
@@ -80,11 +92,14 @@ public final class MySqlRecords implements RecordsWithSplitIds<SourceRecord> {
     }
 
     public static MySqlRecords forRecords(
-            final String splitId, final Iterator<SourceRecord> recordsForSplit) {
-        return new MySqlRecords(splitId, recordsForSplit, Collections.emptySet());
+            final String splitId,
+            final Iterator<SourceRecord> recordsForSplit,
+            MySqlCDCMetricRecorder metricRecorder) {
+        return new MySqlRecords(splitId, recordsForSplit, Collections.emptySet(), metricRecorder);
     }
 
-    public static MySqlRecords forFinishedSplit(final String splitId) {
-        return new MySqlRecords(null, null, Collections.singleton(splitId));
+    public static MySqlRecords forFinishedSplit(
+            final String splitId, MySqlCDCMetricRecorder metricRecorder) {
+        return new MySqlRecords(null, null, Collections.singleton(splitId), metricRecorder);
     }
 }
