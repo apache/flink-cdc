@@ -22,6 +22,7 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.api.constraints.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
@@ -214,12 +215,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                                     + "have been published in the specified interval. This improves the resumability of the connector "
                                     + "for low volume namespaces. Use 0 to disable. Defaults to 0.");
 
-    public static final ConfigOption<String> LOCAL_TIME_ZONE =
-            ConfigOptions.key("local-time-zone")
-                    .stringType()
-                    .defaultValue("UTC")
-                    .withDescription("The local time zone. Defaults to UTC.");
-
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -227,6 +222,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
 
         final ReadableConfig config = helper.getOptions();
+
         String hosts = config.get(HOSTS);
         String user = config.getOptional(USER).orElse(null);
         String password = config.getOptional(PASSWORD).orElse(null);
@@ -258,7 +254,11 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         Integer copyExistingMaxThreads = config.getOptional(COPY_EXISTING_MAX_THREADS).orElse(null);
         Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
 
-        ZoneId localTimeZone = ZoneId.of(config.get(LOCAL_TIME_ZONE));
+        String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
+        ZoneId localTimeZone =
+                TableConfigOptions.LOCAL_TIME_ZONE.defaultValue().equals(zoneId)
+                        ? ZoneId.systemDefault()
+                        : ZoneId.of(zoneId);
 
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
@@ -330,7 +330,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(POLL_MAX_BATCH_SIZE);
         options.add(POLL_AWAIT_TIME_MILLIS);
         options.add(HEARTBEAT_INTERVAL_MILLIS);
-        options.add(LOCAL_TIME_ZONE);
         return options;
     }
 }

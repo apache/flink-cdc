@@ -70,7 +70,7 @@ public class MongoDBTableFactoryTest {
     private static final String ERROR_TOLERANCE = "none";
     private static final Boolean ERROR_LOGS_ENABLE = true;
     private static final Boolean COPY_EXISTING = true;
-    private static final ZoneId LOCAL_TIME_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final ZoneId LOCAL_TIME_ZONE = ZoneId.systemDefault();
 
     @Test
     public void testCommonProperties() {
@@ -101,7 +101,7 @@ public class MongoDBTableFactoryTest {
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
                         null,
-                        ZoneId.of("UTC"));
+                        LOCAL_TIME_ZONE);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -123,7 +123,6 @@ public class MongoDBTableFactoryTest {
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
         options.put("heartbeat.interval.ms", "104");
-        options.put("local-time-zone", "Asia/Shanghai");
         DynamicTableSource actualSource = createTableSource(options);
 
         MongoDBTableSource expectedSource =

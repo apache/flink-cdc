@@ -32,6 +32,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -66,6 +67,8 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
 
     @Test
     public void testTemporalTypesWithTimeZone() throws Exception {
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of(localTimeZone));
+
         String database = executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
@@ -85,8 +88,7 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
                                 + " 'user' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database' = '%s',"
-                                + " 'collection' = '%s',"
-                                + " 'local-time-zone' = '%s'"
+                                + " 'collection' = '%s'"
                                 + ")",
                         MONGODB_CONTAINER.getHostAndPort(),
                         FLINK_USER,
