@@ -69,14 +69,6 @@ under the License.
                                     </excludes>
                                 </filter>
                             </filters>
-                            <relocations>
-                                <relocation>
-                                    <pattern>org.apache.kafka</pattern>
-                                    <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
-                                    </shadedPattern>
-                                </relocation>
-                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
