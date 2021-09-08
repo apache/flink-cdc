@@ -229,7 +229,9 @@ Flink SQL> CREATE TABLE shipments (
    PRIMARY KEY (_id) NOT ENFORCED
  ) WITH (
    'connector' = 'mongodb-cdc',
-   'uri' = 'mongodb://mongouser:mongopw@localhost:27017',
+   'hosts' = 'localhost:27017',
+   'user' = 'mongodb',
+   'password' = 'mongopw',
    'database' = 'mgdb',
    'collection' = 'customers'
  );
@@ -292,51 +294,4 @@ db.customers.updateOne(
 
 --MySQL
 DELETE FROM orders WHERE order_id = 10004;
-```
-
-7. Kafka changelog json format
-
-在 SQL CLI 中：
-
-```sql
---Flink SQL
-Flink SQL> CREATE TABLE kafka_gmv (
-   day_str STRING,
-   gmv DECIMAL(10, 5)
- ) WITH (
-     'connector' = 'kafka',
-     'topic' = 'kafka_gmv',
-     'scan.startup.mode' = 'earliest-offset',
-     'properties.bootstrap.servers' = 'localhost:9092',
-     'format' = 'changelog-json'
- );
-
-Flink SQL> INSERT INTO kafka_gmv
- SELECT DATE_FORMAT(order_date, 'yyyy-MM-dd') as day_str, SUM(price) as gmv
- FROM orders
- WHERE order_status = true
- GROUP BY DATE_FORMAT(order_date, 'yyyy-MM-dd');
-
--- 读取 Kafka 的 changelog 数据，观察 materialize 后的结果
-Flink SQL> SELECT * FROM kafka_gmv;
-```
-观察 kafka 的输出：
-
-```
-docker-compose exec kafka bash -c 'kafka-console-consumer.sh --topic kafka_gmv --bootstrap-server kafka:9094 --from-beginning'
-```
-
-更新 orders 数据，观察SQL CLI 和 kafka console 的输出
-```sql
--- MySQL
-UPDATE orders SET order_status = true WHERE order_id = 10001;
-UPDATE orders SET order_status = true WHERE order_id = 10002;
-UPDATE orders SET order_status = true WHERE order_id = 10003;
-
-INSERT INTO orders
-VALUES (default, '2020-07-30 17:33:00', 1001, 50.00, 104, true);
-
-UPDATE orders SET price = 40.00 WHERE order_id = 10005;
-
-DELETE FROM orders WHERE order_id = 10005;
 ```
