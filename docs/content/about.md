@@ -107,6 +107,7 @@ public class MySqlBinlogSourceExample {
   }
 }
 ```
+### Deserialization
 The following JSON data show the change event in JSON format.
 
 ```json

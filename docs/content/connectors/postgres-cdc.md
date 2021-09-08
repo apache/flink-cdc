@@ -170,7 +170,7 @@ The Postgres CDC connector can also be a DataStream source. You can create a Sou
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
 
 public class PostgreSQLSourceExample {
@@ -182,7 +182,7 @@ public class PostgreSQLSourceExample {
       .schemaList("inventory") // monitor all tables under inventory schema
       .username("flinkuser")
       .password("flinkpw")
-      .deserializer(new StringDebeziumDeserializationSchema()) // converts SourceRecord to String
+      .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
       .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -195,7 +195,7 @@ public class PostgreSQLSourceExample {
   }
 }
 ```
-
+**Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.
 
 Data Type Mapping
 ----------------
