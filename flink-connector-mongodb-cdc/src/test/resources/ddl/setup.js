@@ -22,24 +22,27 @@
 //
 
 //use admin;
+if (db.system.users.find({user:'superuser'}).count() == 0) {
+  db.createUser(
+     {
+       user: 'superuser',
+       pwd: 'superpw',
+       roles: [ { role: 'root', db: 'admin' } ]
+     }
+  );
+}
 
-db.createUser(
+if (db.system.users.find({user:'flinkuser'}).count() == 0) {
+  db.createUser(
    {
-     user: 'superuser',
-     pwd: 'superpw',
-     roles: [ { role: 'root', db: 'admin' } ]
+     user: 'flinkuser',
+     pwd: 'flinkpw',
+     roles: [
+        { role: 'read', db: 'admin' },
+        { role: 'readAnyDatabase', db: 'admin' }
+     ]
    }
-)
-
-db.createUser(
- {
-   user: 'flinkuser',
-   pwd: 'flinkpw',
-   roles: [
-      { role: 'read', db: 'admin' },
-      { role: 'readAnyDatabase', db: 'admin' }
-   ]
- }
-)
+  );
+}
 
 rs.status()

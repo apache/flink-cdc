@@ -47,9 +47,17 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class MongoDBTableSource implements ScanTableSource {
 
     private final TableSchema physicalSchema;
-    private final String uri;
+    private final String hosts;
+    private final String user;
+    private final String password;
     private final String database;
     private final String collection;
+    private final String replicaSet;
+    private final String authSource;
+    private final Boolean sslEnabled;
+    private final Boolean sslInvalidHostnameAllowed;
+    private final Integer connectTimeoutMillis;
+    private final Integer socketTimeoutMillis;
     private final Boolean errorsLogEnable;
     private final String errorsTolerance;
     private final Boolean copyExisting;
@@ -63,9 +71,17 @@ public class MongoDBTableSource implements ScanTableSource {
 
     public MongoDBTableSource(
             TableSchema physicalSchema,
-            String uri,
+            String hosts,
+            @Nullable String user,
+            @Nullable String password,
             String database,
             String collection,
+            @Nullable String replicaSet,
+            @Nullable String authSource,
+            @Nullable Boolean sslEnabled,
+            @Nullable Boolean sslInvalidHostnameAllowed,
+            @Nullable Integer connectTimeoutMillis,
+            @Nullable Integer socketTimeoutMillis,
             @Nullable String errorsTolerance,
             @Nullable Boolean errorsLogEnable,
             @Nullable Boolean copyExisting,
@@ -77,9 +93,17 @@ public class MongoDBTableSource implements ScanTableSource {
             @Nullable Integer heartbeatIntervalMillis,
             ZoneId localTimeZone) {
         this.physicalSchema = physicalSchema;
-        this.uri = checkNotNull(uri);
+        this.hosts = checkNotNull(hosts);
+        this.user = user;
+        this.password = password;
         this.database = checkNotNull(database);
         this.collection = checkNotNull(collection);
+        this.replicaSet = replicaSet;
+        this.authSource = authSource;
+        this.sslEnabled = sslEnabled;
+        this.sslInvalidHostnameAllowed = sslInvalidHostnameAllowed;
+        this.connectTimeoutMillis = connectTimeoutMillis;
+        this.socketTimeoutMillis = socketTimeoutMillis;
         this.errorsTolerance = errorsTolerance;
         this.errorsLogEnable = errorsLogEnable;
         this.copyExisting = copyExisting;
@@ -112,7 +136,7 @@ public class MongoDBTableSource implements ScanTableSource {
 
         MongoDBSource.Builder<RowData> builder =
                 MongoDBSource.<RowData>builder()
-                        .connectionUri(uri)
+                        .hosts(hosts)
                         .database(database)
                         .collection(collection)
                         .deserializer(deserializer);
@@ -136,9 +160,17 @@ public class MongoDBTableSource implements ScanTableSource {
     public DynamicTableSource copy() {
         return new MongoDBTableSource(
                 physicalSchema,
-                uri,
+                hosts,
+                user,
+                password,
                 database,
                 collection,
+                replicaSet,
+                authSource,
+                sslEnabled,
+                sslInvalidHostnameAllowed,
+                connectTimeoutMillis,
+                socketTimeoutMillis,
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,
@@ -161,9 +193,17 @@ public class MongoDBTableSource implements ScanTableSource {
         }
         MongoDBTableSource that = (MongoDBTableSource) o;
         return Objects.equals(physicalSchema, that.physicalSchema)
-                && Objects.equals(uri, that.uri)
+                && Objects.equals(hosts, that.hosts)
+                && Objects.equals(user, that.user)
+                && Objects.equals(password, that.password)
                 && Objects.equals(database, that.database)
                 && Objects.equals(collection, that.collection)
+                && Objects.equals(replicaSet, that.replicaSet)
+                && Objects.equals(authSource, that.authSource)
+                && Objects.equals(sslEnabled, that.sslEnabled)
+                && Objects.equals(sslInvalidHostnameAllowed, that.sslInvalidHostnameAllowed)
+                && Objects.equals(connectTimeoutMillis, that.connectTimeoutMillis)
+                && Objects.equals(socketTimeoutMillis, that.socketTimeoutMillis)
                 && Objects.equals(errorsTolerance, that.errorsTolerance)
                 && Objects.equals(errorsLogEnable, that.errorsLogEnable)
                 && Objects.equals(copyExisting, that.copyExisting)
@@ -180,9 +220,17 @@ public class MongoDBTableSource implements ScanTableSource {
     public int hashCode() {
         return Objects.hash(
                 physicalSchema,
-                uri,
+                hosts,
+                user,
+                password,
                 database,
                 collection,
+                replicaSet,
+                authSource,
+                sslEnabled,
+                sslInvalidHostnameAllowed,
+                connectTimeoutMillis,
+                socketTimeoutMillis,
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,

@@ -64,7 +64,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
 
     @Test
     public void testConsumingAllEvents() throws ExecutionException, InterruptedException {
-        executeCommandFile("inventory");
+        String database = executeCommandFileInSeparateDatabase("inventory");
 
         String sourceDDL =
                 String.format(
@@ -76,12 +76,16 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + " PRIMARY KEY (_id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
-                                + " 'uri' = '%s',"
+                                + " 'hosts' = '%s',"
+                                + " 'user' = '%s',"
+                                + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        MONGODB_CONTAINER.getConnectionString(FLINK_USER, FLINK_USER_PASSWORD),
-                        "inventory",
+                        MONGODB_CONTAINER.getHostAndPort(),
+                        FLINK_USER,
+                        FLINK_USER_PASSWORD,
+                        database,
                         "products");
 
         String sinkDDL =
@@ -104,8 +108,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
 
         waitForSnapshotStarted("sink");
 
-        MongoCollection<Document> products =
-                getMongoDatabase("inventory").getCollection("products");
+        MongoCollection<Document> products = getMongoDatabase(database).getCollection("products");
 
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000106")),
@@ -224,11 +227,15 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + "    PRIMARY KEY (_id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
-                                + " 'uri' = '%s',"
+                                + " 'hosts' = '%s',"
+                                + " 'user' = '%s',"
+                                + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        MONGODB_CONTAINER.getConnectionString(FLINK_USER, FLINK_USER_PASSWORD),
+                        MONGODB_CONTAINER.getHostAndPort(),
+                        FLINK_USER,
+                        FLINK_USER_PASSWORD,
                         "column_type_test",
                         "full_types");
 

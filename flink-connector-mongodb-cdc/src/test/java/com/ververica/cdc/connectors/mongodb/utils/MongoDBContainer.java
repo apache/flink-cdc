@@ -79,13 +79,18 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
                 username, password, getLocalHost(), getMappedPort(MONGODB_PORT));
     }
 
+    public String getHostAndPort() {
+        return String.format("%s:%s", getLocalHost(), getMappedPort(MONGODB_PORT));
+    }
+
     public void executeCommand(String command) {
         try {
             LOG.info("Executing mongo command: {}", command);
             ExecResult execResult = execInContainer("mongo", "--eval", command);
             LOG.info(execResult.getStdout());
             if (execResult.getExitCode() != 0) {
-                throw new IllegalStateException("Execute mongo command failed");
+                throw new IllegalStateException(
+                        "Execute mongo command failed " + execResult.getStdout());
             }
         } catch (InterruptedException | IOException e) {
             throw new IllegalStateException("Execute mongo command failed", e);

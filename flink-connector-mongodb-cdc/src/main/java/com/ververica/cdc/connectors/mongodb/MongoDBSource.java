@@ -30,8 +30,16 @@ import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.heartbeat.Heartbeat;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -42,6 +50,12 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 @PublicEvolving
 public class MongoDBSource {
+
+    public static final String MONGODB_SCHEME = "mongodb";
+
+    public static final int CONNECT_TIMEOUT_MILLIS_DEFAULT = 10000;
+
+    public static final int SOCKET_TIMEOUT_MILLIS_DEFAULT = 0;
 
     public static final String ERROR_TOLERANCE_NONE = ErrorTolerance.NONE.value();
 
@@ -101,12 +115,28 @@ public class MongoDBSource {
         return new Builder<>();
     }
 
+    private static String encodeValue(String value) {
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
     /** Builder class of {@link MongoDBSource}. */
     public static class Builder<T> {
 
-        private String connectionUri;
+        private String hosts;
+        private String user;
+        private String password;
+        private String replicaSet;
+        private String authSource;
         private String database;
         private String collection;
+        private Boolean sslEnabled;
+        private Boolean sslInvalidHostnameAllowed;
+        private Integer connectTimeoutMillis = CONNECT_TIMEOUT_MILLIS_DEFAULT;
+        private Integer socketTimeoutMillis = SOCKET_TIMEOUT_MILLIS_DEFAULT;
         private String pipeline;
         private Integer batchSize;
         private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS_DEFAULT;
@@ -120,15 +150,21 @@ public class MongoDBSource {
         private Integer heartbeatIntervalMillis;
         private DebeziumDeserializationSchema<T> deserializer;
 
-        /**
-         * connection.uri
-         *
-         * <p>A valid MongoDB connection URI string eg. mongodb://username:password@localhost/
-         *
-         * <p>Accepted Values: A valid MongoDB connection URI string
-         */
-        public Builder<T> connectionUri(String connectionUri) {
-            this.connectionUri = connectionUri;
+        /** The comma-separated list of hostname and port pairs of mongodb servers. */
+        public Builder<T> hosts(String hosts) {
+            this.hosts = hosts;
+            return this;
+        }
+
+        /** Name of the database user to be used when connecting to MongoDB. */
+        public Builder<T> user(String user) {
+            this.user = user;
+            return this;
+        }
+
+        /** Password to be used when connecting to MongoDB. */
+        public Builder<T> password(String password) {
+            this.password = password;
             return this;
         }
 
@@ -141,6 +177,60 @@ public class MongoDBSource {
         /** Name of the collection in the database to watch for changes. */
         public Builder<T> collection(String collection) {
             this.collection = collection;
+            return this;
+        }
+
+        /**
+         * Specifies the name of the replica set. It is not necessary, but can speed up your
+         * connection times to explicitly state the servers configured by hosts.
+         */
+        public Builder<T> replicaSet(String replicaSet) {
+            this.replicaSet = replicaSet;
+            return this;
+        }
+
+        /**
+         * Database (authentication source) containing MongoDB credentials. This is required only
+         * when MongoDB is configured to use authentication with another authentication database
+         * than admin.
+         */
+        public Builder<T> authSource(String authSource) {
+            this.authSource = authSource;
+            return this;
+        }
+
+        /** Connector will use SSL to connect to MongoDB instances. */
+        public Builder<T> sslEnabled(boolean sslEnabled) {
+            this.sslEnabled = sslEnabled;
+            return this;
+        }
+
+        /**
+         * When SSL is enabled this setting controls whether strict hostname checking is disabled
+         * during connection.
+         */
+        public Builder<T> sslInvalidHostnameAllowed(boolean sslInvalidHostnameAllowed) {
+            this.sslInvalidHostnameAllowed = sslInvalidHostnameAllowed;
+            return this;
+        }
+
+        /**
+         * The time in milliseconds to attempt a connection before timing out. Default: 10000(10
+         * seconds)
+         */
+        public Builder<T> connectTimeoutMillis(int connectTimeoutMillis) {
+            checkArgument(connectTimeoutMillis >= 0);
+            this.connectTimeoutMillis = connectTimeoutMillis;
+            return this;
+        }
+
+        /**
+         * The time in milliseconds to attempt a send or receive on a socket before the attempt
+         * times out. A value of 0 disables this behavior. Default: 0
+         */
+        public Builder<T> socketTimeoutMillis(int socketTimeoutMillis) {
+            checkArgument(socketTimeoutMillis >= 0);
+            this.socketTimeoutMillis = socketTimeoutMillis;
             return this;
         }
 
@@ -158,7 +248,7 @@ public class MongoDBSource {
          *
          * <p>The cursor batch size. Default: 0
          */
-        public Builder<T> batchSize(Integer batchSize) {
+        public Builder<T> batchSize(int batchSize) {
             checkArgument(batchSize >= 0);
             this.batchSize = batchSize;
             return this;
@@ -207,7 +297,7 @@ public class MongoDBSource {
          * <p>The number of threads to use when performing the data copy. Defaults to the number of
          * processors. Default: defaults to the number of processors
          */
-        public Builder<T> copyExistingMaxThreads(Integer copyExistingMaxThreads) {
+        public Builder<T> copyExistingMaxThreads(int copyExistingMaxThreads) {
             checkArgument(copyExistingMaxThreads > 0);
             this.copyExistingMaxThreads = copyExistingMaxThreads;
             return this;
@@ -218,7 +308,7 @@ public class MongoDBSource {
          *
          * <p>The max size of the queue to use when copying data. Default: 16000
          */
-        public Builder<T> copyExistingQueueSize(Integer copyExistingQueueSize) {
+        public Builder<T> copyExistingQueueSize(int copyExistingQueueSize) {
             checkArgument(copyExistingQueueSize > 0);
             this.copyExistingQueueSize = copyExistingQueueSize;
             return this;
@@ -286,6 +376,51 @@ public class MongoDBSource {
             return this;
         }
 
+        /** Build connection uri if not specifics. */
+        private URI buildConnectionUri() {
+            String authority = checkNotNull(hosts);
+            if (user != null && password != null) {
+                authority =
+                        String.format("%s:%s@%s", encodeValue(user), encodeValue(password), hosts);
+            }
+
+            Map<String, String> params = new HashMap<>();
+            if (replicaSet != null) {
+                params.put("replicaSet", encodeValue(replicaSet));
+            }
+            if (authSource != null) {
+                params.put("authSource", encodeValue(authSource));
+            }
+            if (sslEnabled != null) {
+                params.put("tls", String.valueOf(sslEnabled));
+            }
+            if (sslInvalidHostnameAllowed != null) {
+                params.put("tlsAllowInvalidHostnames", String.valueOf(sslInvalidHostnameAllowed));
+            }
+            if (connectTimeoutMillis != null) {
+                params.put("connectTimeoutMS", String.valueOf(connectTimeoutMillis));
+            }
+            if (socketTimeoutMillis != null) {
+                params.put("socketTimeoutMS", String.valueOf(socketTimeoutMillis));
+            }
+
+            String path = null;
+            String query = null;
+            if (!params.isEmpty()) {
+                path = "/";
+                query =
+                        params.entrySet().stream()
+                                .map(e -> e.getKey() + "=" + e.getValue())
+                                .collect(Collectors.joining("&"));
+            }
+
+            try {
+                return new URI(MONGODB_SCHEME, authority, path, query, null);
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("Cannot build mongo connection uri");
+            }
+        }
+
         /**
          * The properties of mongodb kafka connector.
          * https://docs.mongodb.com/kafka-connector/current/kafka-source
@@ -297,7 +432,9 @@ public class MongoDBSource {
                     "connector.class", MongoDBConnectorSourceConnector.class.getCanonicalName());
             props.setProperty("name", "mongodb_binlog_source");
 
-            props.setProperty(MongoSourceConfig.CONNECTION_URI_CONFIG, checkNotNull(connectionUri));
+            props.setProperty(
+                    MongoSourceConfig.CONNECTION_URI_CONFIG, String.valueOf(buildConnectionUri()));
+
             props.setProperty(MongoSourceConfig.DATABASE_CONFIG, checkNotNull(database));
             props.setProperty(MongoSourceConfig.COLLECTION_CONFIG, checkNotNull(collection));
 

@@ -39,9 +39,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mongodb.MongoDBSource.CONNECT_TIMEOUT_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_ALL;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
+import static com.ververica.cdc.connectors.mongodb.MongoDBSource.SOCKET_TIMEOUT_MILLIS_DEFAULT;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -60,8 +62,9 @@ public class MongoDBTableFactoryTest {
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("_id")));
 
-    private static final String MY_URI =
-            "mongodb://flinkuser:flinkpw@localhost:27017,localhost:27018";
+    private static final String MY_HOSTS = "localhost:27017,localhost:27018";
+    private static final String USER = "flinkuser";
+    private static final String PASSWORD = "flinkpw";
     private static final String MY_DATABASE = "myDB";
     private static final String MY_TABLE = "myTable";
     private static final String ERROR_TOLERANCE = "none";
@@ -78,9 +81,17 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
-                        MY_URI,
+                        MY_HOSTS,
+                        USER,
+                        PASSWORD,
                         MY_DATABASE,
                         MY_TABLE,
+                        null,
+                        null,
+                        null,
+                        null,
+                        CONNECT_TIMEOUT_MILLIS_DEFAULT,
+                        SOCKET_TIMEOUT_MILLIS_DEFAULT,
                         ERROR_TOLERANCE,
                         ERROR_LOGS_ENABLE,
                         COPY_EXISTING,
@@ -97,6 +108,12 @@ public class MongoDBTableFactoryTest {
     @Test
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
+        options.put("mongodb.replicaset", "rs");
+        options.put("mongodb.authsource", "as");
+        options.put("mongodb.connect.timeout.ms", "20000");
+        options.put("mongodb.socket.timeout.ms", "30000");
+        options.put("mongodb.ssl.enabled", "true");
+        options.put("mongodb.ssl.invalid.hostname.allowed", "true");
         options.put("errors.tolerance", "all");
         options.put("errors.log.enable", "false");
         options.put("copy.existing", "false");
@@ -112,9 +129,17 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
-                        MY_URI,
+                        MY_HOSTS,
+                        USER,
+                        PASSWORD,
                         MY_DATABASE,
                         MY_TABLE,
+                        "rs",
+                        "as",
+                        true,
+                        true,
+                        20000,
+                        30000,
                         ERROR_TOLERANCE_ALL,
                         false,
                         false,
@@ -147,7 +172,9 @@ public class MongoDBTableFactoryTest {
     private Map<String, String> getAllOptions() {
         Map<String, String> options = new HashMap<>();
         options.put("connector", "mongodb-cdc");
-        options.put("uri", MY_URI);
+        options.put("hosts", MY_HOSTS);
+        options.put("user", USER);
+        options.put("password", PASSWORD);
         options.put("database", MY_DATABASE);
         options.put("collection", MY_TABLE);
         return options;

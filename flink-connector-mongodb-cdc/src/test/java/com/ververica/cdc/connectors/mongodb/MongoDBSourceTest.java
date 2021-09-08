@@ -44,7 +44,6 @@ import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.bson.Document;
 import org.bson.types.ObjectId;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -70,18 +69,14 @@ import static org.junit.Assert.assertTrue;
 /** Tests for {@link MongoDBSource} which also heavily tests {@link DebeziumSourceFunction}. */
 public class MongoDBSourceTest extends MongoDBTestBase {
 
-    @BeforeClass
-    public static void before() {
-        executeCommandFile("inventory");
-    }
-
     @Test
     public void testConsumingAllEvents() throws Exception {
-        DebeziumSourceFunction<SourceRecord> source = createMongoDBSource();
+        String database = executeCommandFileInSeparateDatabase("inventory");
+
+        DebeziumSourceFunction<SourceRecord> source = createMongoDBSource(database);
         TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
 
-        MongoCollection<Document> products =
-                getMongoDatabase("inventory").getCollection("products");
+        MongoCollection<Document> products = getMongoDatabase(database).getCollection("products");
 
         setupSource(source);
 
@@ -147,13 +142,15 @@ public class MongoDBSourceTest extends MongoDBTestBase {
 
     @Test
     public void testCheckpointAndRestore() throws Exception {
+        String database = executeCommandFileInSeparateDatabase("inventory");
+
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
         {
             // ---------------------------------------------------------------------------
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
-            final DebeziumSourceFunction<SourceRecord> source = createMongoDBSource();
+            final DebeziumSourceFunction<SourceRecord> source = createMongoDBSource(database);
             // we use blocking context to block the source to emit before last snapshot record
             final BlockingSourceContext<SourceRecord> sourceContext =
                     new BlockingSourceContext<>(8);
@@ -207,7 +204,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
             // Step-3: trigger checkpoint-2 after snapshot finished and streaming data received
             // ---------------------------------------------------------------------------
             MongoCollection<Document> products =
-                    getMongoDatabase("inventory").getCollection("products");
+                    getMongoDatabase(database).getCollection("products");
 
             products.updateOne(
                     Filters.eq("_id", new ObjectId("100000000000000000000102")),
@@ -237,7 +234,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
             // ---------------------------------------------------------------------------
             // Step-3: restore the source from state
             // ---------------------------------------------------------------------------
-            final DebeziumSourceFunction<SourceRecord> source2 = createMongoDBSource();
+            final DebeziumSourceFunction<SourceRecord> source2 = createMongoDBSource(database);
             final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
             setupSource(source2, true, offsetState, historyState, true, 0, 1);
             final CheckedThread runThread2 =
@@ -253,7 +250,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
             MongoCollection<Document> products =
-                    getMongoDatabase("inventory").getCollection("products");
+                    getMongoDatabase(database).getCollection("products");
 
             products.insertOne(
                     productDocOf("000000000000000000001002", "robot", "Toy robot", 1.304));
@@ -295,7 +292,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
             // ---------------------------------------------------------------------------
             // Step-5: restore the source from checkpoint-2
             // ---------------------------------------------------------------------------
-            final DebeziumSourceFunction<SourceRecord> source3 = createMongoDBSource();
+            final DebeziumSourceFunction<SourceRecord> source3 = createMongoDBSource(database);
             final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
             setupSource(source3, true, offsetState, historyState, true, 0, 1);
 
@@ -319,7 +316,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
 
             MongoCollection<Document> products =
-                    getMongoDatabase("inventory").getCollection("products");
+                    getMongoDatabase(database).getCollection("products");
 
             products.deleteOne(Filters.eq("_id", new ObjectId("000000000000000000001002")));
             records = drain(sourceContext3, 1);
@@ -354,11 +351,12 @@ public class MongoDBSourceTest extends MongoDBTestBase {
     // Utilities
     // ------------------------------------------------------------------------------------------
 
-    private DebeziumSourceFunction<SourceRecord> createMongoDBSource() {
+    private DebeziumSourceFunction<SourceRecord> createMongoDBSource(String database) {
         return MongoDBSource.<SourceRecord>builder()
-                .connectionUri(
-                        MONGODB_CONTAINER.getConnectionString(FLINK_USER, FLINK_USER_PASSWORD))
-                .database("inventory")
+                .hosts(MONGODB_CONTAINER.getHostAndPort())
+                .user(FLINK_USER)
+                .password(FLINK_USER_PASSWORD)
+                .database(database)
                 .collection("products")
                 .deserializer(new ForwardDeserializeSchema())
                 .build();

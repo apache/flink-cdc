@@ -81,12 +81,16 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
                                 + "    PRIMARY KEY (_id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
-                                + " 'uri' = '%s',"
+                                + " 'hosts' = '%s',"
+                                + " 'user' = '%s',"
+                                + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s',"
                                 + " 'local-time-zone' = '%s'"
                                 + ")",
-                        MONGODB_CONTAINER.getConnectionString(FLINK_USER, FLINK_USER_PASSWORD),
+                        MONGODB_CONTAINER.getHostAndPort(),
+                        FLINK_USER,
+                        FLINK_USER_PASSWORD,
                         database,
                         "full_types",
                         localTimeZone);
