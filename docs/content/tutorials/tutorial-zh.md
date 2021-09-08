@@ -1,4 +1,4 @@
-# Streaming ETL from MySQL and Postgres to Elasticsearch（中文）
+# 构建从 MySQL 和 Postgres 到 Elasticsearch 的流式 ETL
 
 1. 下载 `docker-compose.yml`
 

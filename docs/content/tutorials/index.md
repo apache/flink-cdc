@@ -1,8 +1,8 @@
 # Tutorials
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 
-mysql-postgres-tutorial
-mysql-postgres-tutorial-zh
+tutorial
+tutorial-zh
 ```
