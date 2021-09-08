@@ -318,61 +318,6 @@ under the License.
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>shade-flink</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <shadeTestJar>true</shadeTestJar>
-                            <shadedArtifactAttached>false</shadedArtifactAttached>
-                            <createDependencyReducedPom>true</createDependencyReducedPom>
-                            <dependencyReducedPomLocation>
-                                ${project.basedir}/target/dependency-reduced-pom.xml
-                            </dependencyReducedPomLocation>
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                            <artifactSet combine.self="override">
-                                <excludes>
-                                    <!-- log4j -->
-                                    <exclude>org.slf4j:slf4j-log4j12</exclude>
-                                    <exclude>log4j:log4j</exclude>
-                                    <!-- jars imported by parent -->
-                                    <exclude>org.slf4j:slf4j-api</exclude>
-                                    <exclude>com.google.code.findbugs:jsr305</exclude>
-                                    <!-- flink shaded jars -->
-                                    <exclude>org.apache.flink:flink-shaded-*</exclude>
-                                    <exclude>com.google.guava:guava</exclude>
-                                    <exclude>tv.cntt:*</exclude>
-                                    <exclude>io.netty:*</exclude>
-                                    <exclude>org.ow2.asm:*</exclude>
-                                    <!-- other third-party jars we must use -->
-                                    <exclude>commons-logging:commons-logging</exclude>
-                                    <exclude>commons-codec:commons-codec</exclude>
-                                    <exclude>commons-collections:commons-collections</exclude>
-                                    <exclude>org.apache.commons:commons-lang3</exclude>
-                                    <!-- flink dependencies are provided -->
-                                    <exclude>org.apache.flink:*</exclude>
-                                </excludes>
-                            </artifactSet>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <version>3.0.0-M1</version>
                 <executions>
@@ -413,6 +358,69 @@ under the License.
                 </configuration>
             </plugin>
         </plugins>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>shade-flink</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <shadeTestJar>true</shadeTestJar>
+                                <shadedArtifactAttached>false</shadedArtifactAttached>
+                                <createDependencyReducedPom>true</createDependencyReducedPom>
+                                <dependencyReducedPomLocation>
+                                    ${project.basedir}/target/dependency-reduced-pom.xml
+                                </dependencyReducedPomLocation>
+                                <filters>
+                                    <filter>
+                                        <artifact>*:*</artifact>
+                                        <excludes>
+                                            <exclude>META-INF/maven/**</exclude>
+                                            <exclude>META-INF/*.SF</exclude>
+                                            <exclude>META-INF/*.DSA</exclude>
+                                            <exclude>META-INF/*.RSA</exclude>
+                                        </excludes>
+                                    </filter>
+                                </filters>
+                                <artifactSet combine.self="override">
+                                    <excludes>
+                                        <!-- log4j -->
+                                        <exclude>org.slf4j:slf4j-log4j12</exclude>
+                                        <exclude>log4j:log4j</exclude>
+                                        <!-- jars imported by parent -->
+                                        <exclude>org.slf4j:slf4j-api</exclude>
+                                        <exclude>com.google.code.findbugs:jsr305</exclude>
+                                        <!-- flink shaded jars -->
+                                        <exclude>org.apache.flink:flink-shaded-*</exclude>
+                                        <exclude>com.google.guava:guava</exclude>
+                                        <exclude>tv.cntt:*</exclude>
+                                        <exclude>io.netty:*</exclude>
+                                        <exclude>org.ow2.asm:*</exclude>
+                                        <!-- other third-party jars we must use -->
+                                        <exclude>commons-logging:commons-logging</exclude>
+                                        <exclude>commons-codec:commons-codec</exclude>
+                                        <exclude>commons-collections:commons-collections</exclude>
+                                        <exclude>org.apache.commons:commons-lang3</exclude>
+                                        <!-- flink dependencies are provided -->
+                                        <exclude>org.apache.flink:*</exclude>
+                                    </excludes>
+                                </artifactSet>
+                                <!-- spi -->
+                                <transformers>
+                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                </transformers>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
 
     <profiles>
