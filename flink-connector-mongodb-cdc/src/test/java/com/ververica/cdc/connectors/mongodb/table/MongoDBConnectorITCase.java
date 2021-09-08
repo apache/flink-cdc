@@ -37,6 +37,7 @@ import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -60,6 +61,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of("UTC"));
     }
 
     @Test
