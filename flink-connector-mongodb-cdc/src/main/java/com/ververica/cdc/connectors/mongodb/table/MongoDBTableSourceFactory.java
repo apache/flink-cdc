@@ -57,8 +57,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                             "The comma-separated list of hostname and port pairs of the MongoDB servers. "
                                     + "eg. localhost:27017,localhost:27018");
 
-    private static final ConfigOption<String> USER =
-            ConfigOptions.key("user")
+    private static final ConfigOption<String> USERNAME =
+            ConfigOptions.key("username")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
@@ -224,7 +224,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         final ReadableConfig config = helper.getOptions();
 
         String hosts = config.get(HOSTS);
-        String user = config.getOptional(USER).orElse(null);
+        String user = config.getOptional(USERNAME).orElse(null);
         String password = config.getOptional(PASSWORD).orElse(null);
 
         String database = config.get(DATABASE);
@@ -313,7 +313,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(USER);
+        options.add(USERNAME);
         options.add(PASSWORD);
         options.add(REPLICA_SET);
         options.add(AUTH_SOURCE);

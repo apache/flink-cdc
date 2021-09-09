@@ -48,7 +48,7 @@ public class MongoDBTableSource implements ScanTableSource {
 
     private final TableSchema physicalSchema;
     private final String hosts;
-    private final String user;
+    private final String username;
     private final String password;
     private final String database;
     private final String collection;
@@ -72,7 +72,7 @@ public class MongoDBTableSource implements ScanTableSource {
     public MongoDBTableSource(
             TableSchema physicalSchema,
             String hosts,
-            @Nullable String user,
+            @Nullable String username,
             @Nullable String password,
             String database,
             String collection,
@@ -94,7 +94,7 @@ public class MongoDBTableSource implements ScanTableSource {
             ZoneId localTimeZone) {
         this.physicalSchema = physicalSchema;
         this.hosts = checkNotNull(hosts);
-        this.user = user;
+        this.username = username;
         this.password = password;
         this.database = checkNotNull(database);
         this.collection = checkNotNull(collection);
@@ -161,7 +161,7 @@ public class MongoDBTableSource implements ScanTableSource {
         return new MongoDBTableSource(
                 physicalSchema,
                 hosts,
-                user,
+                username,
                 password,
                 database,
                 collection,
@@ -194,7 +194,7 @@ public class MongoDBTableSource implements ScanTableSource {
         MongoDBTableSource that = (MongoDBTableSource) o;
         return Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hosts, that.hosts)
-                && Objects.equals(user, that.user)
+                && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
                 && Objects.equals(database, that.database)
                 && Objects.equals(collection, that.collection)
@@ -221,7 +221,7 @@ public class MongoDBTableSource implements ScanTableSource {
         return Objects.hash(
                 physicalSchema,
                 hosts,
-                user,
+                username,
                 password,
                 database,
                 collection,

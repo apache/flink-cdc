@@ -354,7 +354,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
     private DebeziumSourceFunction<SourceRecord> createMongoDBSource(String database) {
         return MongoDBSource.<SourceRecord>builder()
                 .hosts(MONGODB_CONTAINER.getHostAndPort())
-                .user(FLINK_USER)
+                .username(FLINK_USER)
                 .password(FLINK_USER_PASSWORD)
                 .database(database)
                 .collection("products")

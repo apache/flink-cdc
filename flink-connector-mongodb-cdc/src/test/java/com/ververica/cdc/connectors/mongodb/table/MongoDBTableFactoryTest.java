@@ -172,7 +172,7 @@ public class MongoDBTableFactoryTest {
         Map<String, String> options = new HashMap<>();
         options.put("connector", "mongodb-cdc");
         options.put("hosts", MY_HOSTS);
-        options.put("user", USER);
+        options.put("username", USER);
         options.put("password", PASSWORD);
         options.put("database", MY_DATABASE);
         options.put("collection", MY_TABLE);

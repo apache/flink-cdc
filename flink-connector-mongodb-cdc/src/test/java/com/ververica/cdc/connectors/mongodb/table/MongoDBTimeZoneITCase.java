@@ -85,7 +85,7 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
                                 + " 'hosts' = '%s',"
-                                + " 'user' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"

@@ -127,7 +127,7 @@ public class MongoDBSource {
     public static class Builder<T> {
 
         private String hosts;
-        private String user;
+        private String username;
         private String password;
         private String replicaSet;
         private String authSource;
@@ -157,8 +157,8 @@ public class MongoDBSource {
         }
 
         /** Name of the database user to be used when connecting to MongoDB. */
-        public Builder<T> user(String user) {
-            this.user = user;
+        public Builder<T> username(String username) {
+            this.username = username;
             return this;
         }
 
@@ -379,9 +379,10 @@ public class MongoDBSource {
         /** Build connection uri if not specifics. */
         private URI buildConnectionUri() {
             String authority = checkNotNull(hosts);
-            if (user != null && password != null) {
+            if (username != null && password != null) {
                 authority =
-                        String.format("%s:%s@%s", encodeValue(user), encodeValue(password), hosts);
+                        String.format(
+                                "%s:%s@%s", encodeValue(username), encodeValue(password), hosts);
             }
 
             Map<String, String> params = new HashMap<>();
