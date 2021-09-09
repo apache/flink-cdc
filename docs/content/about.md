@@ -232,7 +232,7 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
       "weight": 5.15
     },
     "source": {...},
-    "op": "u",  // the operation type, "u" means this this is an update event 
+    "op": "u",  // the operation type, "u" means this this is an update event
     "ts_ms": 1589362330904,  // the time at which the connector processed the event
     "transaction": null
   }
