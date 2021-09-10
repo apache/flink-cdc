@@ -35,11 +35,9 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.CONNECT_TIMEOUT_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_NONE;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.SOCKET_TIMEOUT_MILLIS_DEFAULT;
 import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** Factory for creating configured instance of {@link MongoDBTableSource}. */
@@ -86,53 +84,13 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Name of the collection in the database to watch for changes.");
 
-    private static final ConfigOption<String> REPLICA_SET =
-            ConfigOptions.key("mongodb.replicaset")
+    private static final ConfigOption<String> CONNECTION_OPTIONS =
+            ConfigOptions.key("connection.options")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "Specifies the name of the replica set. "
-                                    + "It is not necessary, but can speed up your "
-                                    + "connection times to explicitly state the servers configured by hosts.");
-
-    private static final ConfigOption<String> AUTH_SOURCE =
-            ConfigOptions.key("mongodb.authsource")
-                    .stringType()
-                    .defaultValue("admin")
-                    .withDescription(
-                            "Database (authentication source) containing MongoDB credentials."
-                                    + " This is required only when MongoDB is configured to use authentication"
-                                    + " with another authentication database than admin.");
-
-    private static final ConfigOption<Integer> CONNECT_TIMEOUT_MS =
-            ConfigOptions.key("mongodb.connect.timeout.ms")
-                    .intType()
-                    .defaultValue(CONNECT_TIMEOUT_MILLIS_DEFAULT)
-                    .withDescription(
-                            "The time in milliseconds to attempt a connection before timing out."
-                                    + "Defaults to 10000 (10 seconds)");
-
-    private static final ConfigOption<Integer> SOCKET_TIMEOUT_MS =
-            ConfigOptions.key("mongodb.socket.timeout.ms")
-                    .intType()
-                    .defaultValue(SOCKET_TIMEOUT_MILLIS_DEFAULT)
-                    .withDescription(
-                            "The time in milliseconds to attempt a send or receive on a socket before the attempt times out."
-                                    + " A value of 0 disables this behavior. Defaults to 0.");
-
-    private static final ConfigOption<Boolean> SSL_ENABLED =
-            ConfigOptions.key("mongodb.ssl.enabled")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription("Connector will use SSL to connect to MongoDB instances.");
-
-    private static final ConfigOption<Boolean> SSL_INVALID_HOSTNAME_ALLOWED =
-            ConfigOptions.key("mongodb.ssl.invalid.hostname.allowed")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription(
-                            "When SSL is enabled this setting controls whether "
-                                    + "strict hostname checking is disabled during connection phase.");
+                            "The ampersand-separated MongoDB connection options. "
+                                    + "eg. replicaSet=test&connectTimeoutMS=300000");
 
     private static final ConfigOption<String> ERRORS_TOLERANCE =
             ConfigOptions.key("errors.tolerance")
@@ -224,21 +182,13 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         final ReadableConfig config = helper.getOptions();
 
         String hosts = config.get(HOSTS);
-        String user = config.getOptional(USERNAME).orElse(null);
+        String connectionOptions = config.getOptional(CONNECTION_OPTIONS).orElse(null);
+
+        String username = config.getOptional(USERNAME).orElse(null);
         String password = config.getOptional(PASSWORD).orElse(null);
 
         String database = config.get(DATABASE);
         String collection = config.get(COLLECTION);
-
-        String replicaSet = config.getOptional(REPLICA_SET).orElse(null);
-        String authSource = config.getOptional(AUTH_SOURCE).orElse(null);
-
-        Boolean sslEnabled = config.getOptional(SSL_ENABLED).orElse(null);
-        Boolean sslInvalidHostnameAllowed =
-                config.getOptional(SSL_INVALID_HOSTNAME_ALLOWED).orElse(null);
-
-        Integer connectTimeoutMillis = config.get(CONNECT_TIMEOUT_MS);
-        Integer socketTimeoutMillis = config.get(SOCKET_TIMEOUT_MS);
 
         String errorsTolerance = config.get(ERRORS_TOLERANCE);
         Boolean errorsLogEnable = config.get(ERRORS_LOG_ENABLE);
@@ -268,16 +218,11 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         return new MongoDBTableSource(
                 physicalSchema,
                 hosts,
-                user,
+                username,
                 password,
                 database,
                 collection,
-                replicaSet,
-                authSource,
-                sslEnabled,
-                sslInvalidHostnameAllowed,
-                connectTimeoutMillis,
-                socketTimeoutMillis,
+                connectionOptions,
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,
@@ -315,12 +260,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(USERNAME);
         options.add(PASSWORD);
-        options.add(REPLICA_SET);
-        options.add(AUTH_SOURCE);
-        options.add(SSL_ENABLED);
-        options.add(SSL_INVALID_HOSTNAME_ALLOWED);
-        options.add(CONNECT_TIMEOUT_MS);
-        options.add(SOCKET_TIMEOUT_MS);
+        options.add(CONNECTION_OPTIONS);
         options.add(ERRORS_TOLERANCE);
         options.add(ERRORS_LOG_ENABLE);
         options.add(COPY_EXISTING);

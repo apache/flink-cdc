@@ -48,16 +48,11 @@ public class MongoDBTableSource implements ScanTableSource {
 
     private final TableSchema physicalSchema;
     private final String hosts;
+    private final String connectionOptions;
     private final String username;
     private final String password;
     private final String database;
     private final String collection;
-    private final String replicaSet;
-    private final String authSource;
-    private final Boolean sslEnabled;
-    private final Boolean sslInvalidHostnameAllowed;
-    private final Integer connectTimeoutMillis;
-    private final Integer socketTimeoutMillis;
     private final Boolean errorsLogEnable;
     private final String errorsTolerance;
     private final Boolean copyExisting;
@@ -76,12 +71,7 @@ public class MongoDBTableSource implements ScanTableSource {
             @Nullable String password,
             String database,
             String collection,
-            @Nullable String replicaSet,
-            @Nullable String authSource,
-            @Nullable Boolean sslEnabled,
-            @Nullable Boolean sslInvalidHostnameAllowed,
-            @Nullable Integer connectTimeoutMillis,
-            @Nullable Integer socketTimeoutMillis,
+            @Nullable String connectionOptions,
             @Nullable String errorsTolerance,
             @Nullable Boolean errorsLogEnable,
             @Nullable Boolean copyExisting,
@@ -98,12 +88,7 @@ public class MongoDBTableSource implements ScanTableSource {
         this.password = password;
         this.database = checkNotNull(database);
         this.collection = checkNotNull(collection);
-        this.replicaSet = replicaSet;
-        this.authSource = authSource;
-        this.sslEnabled = sslEnabled;
-        this.sslInvalidHostnameAllowed = sslInvalidHostnameAllowed;
-        this.connectTimeoutMillis = connectTimeoutMillis;
-        this.socketTimeoutMillis = socketTimeoutMillis;
+        this.connectionOptions = connectionOptions;
         this.errorsTolerance = errorsTolerance;
         this.errorsLogEnable = errorsLogEnable;
         this.copyExisting = copyExisting;
@@ -141,6 +126,9 @@ public class MongoDBTableSource implements ScanTableSource {
                         .collection(collection)
                         .deserializer(deserializer);
 
+        Optional.ofNullable(username).ifPresent(builder::username);
+        Optional.ofNullable(password).ifPresent(builder::password);
+        Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
         Optional.ofNullable(errorsLogEnable).ifPresent(builder::errorsLogEnable);
         Optional.ofNullable(errorsTolerance).ifPresent(builder::errorsTolerance);
         Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
@@ -165,12 +153,7 @@ public class MongoDBTableSource implements ScanTableSource {
                 password,
                 database,
                 collection,
-                replicaSet,
-                authSource,
-                sslEnabled,
-                sslInvalidHostnameAllowed,
-                connectTimeoutMillis,
-                socketTimeoutMillis,
+                connectionOptions,
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,
@@ -198,12 +181,7 @@ public class MongoDBTableSource implements ScanTableSource {
                 && Objects.equals(password, that.password)
                 && Objects.equals(database, that.database)
                 && Objects.equals(collection, that.collection)
-                && Objects.equals(replicaSet, that.replicaSet)
-                && Objects.equals(authSource, that.authSource)
-                && Objects.equals(sslEnabled, that.sslEnabled)
-                && Objects.equals(sslInvalidHostnameAllowed, that.sslInvalidHostnameAllowed)
-                && Objects.equals(connectTimeoutMillis, that.connectTimeoutMillis)
-                && Objects.equals(socketTimeoutMillis, that.socketTimeoutMillis)
+                && Objects.equals(connectionOptions, that.connectionOptions)
                 && Objects.equals(errorsTolerance, that.errorsTolerance)
                 && Objects.equals(errorsLogEnable, that.errorsLogEnable)
                 && Objects.equals(copyExisting, that.copyExisting)
@@ -225,12 +203,7 @@ public class MongoDBTableSource implements ScanTableSource {
                 password,
                 database,
                 collection,
-                replicaSet,
-                authSource,
-                sslEnabled,
-                sslInvalidHostnameAllowed,
-                connectTimeoutMillis,
-                socketTimeoutMillis,
+                connectionOptions,
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,

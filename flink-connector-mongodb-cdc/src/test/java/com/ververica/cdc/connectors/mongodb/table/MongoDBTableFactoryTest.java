@@ -39,11 +39,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.CONNECT_TIMEOUT_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_ALL;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.SOCKET_TIMEOUT_MILLIS_DEFAULT;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -87,11 +85,6 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         null,
-                        null,
-                        null,
-                        null,
-                        CONNECT_TIMEOUT_MILLIS_DEFAULT,
-                        SOCKET_TIMEOUT_MILLIS_DEFAULT,
                         ERROR_TOLERANCE,
                         ERROR_LOGS_ENABLE,
                         COPY_EXISTING,
@@ -108,12 +101,7 @@ public class MongoDBTableFactoryTest {
     @Test
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
-        options.put("mongodb.replicaset", "rs");
-        options.put("mongodb.authsource", "as");
-        options.put("mongodb.connect.timeout.ms", "20000");
-        options.put("mongodb.socket.timeout.ms", "30000");
-        options.put("mongodb.ssl.enabled", "true");
-        options.put("mongodb.ssl.invalid.hostname.allowed", "true");
+        options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
         options.put("errors.tolerance", "all");
         options.put("errors.log.enable", "false");
         options.put("copy.existing", "false");
@@ -133,12 +121,7 @@ public class MongoDBTableFactoryTest {
                         PASSWORD,
                         MY_DATABASE,
                         MY_TABLE,
-                        "rs",
-                        "as",
-                        true,
-                        true,
-                        20000,
-                        30000,
+                        "replicaSet=test&connectTimeoutMS=300000",
                         ERROR_TOLERANCE_ALL,
                         false,
                         false,

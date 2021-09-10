@@ -78,6 +78,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + " PRIMARY KEY (_id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
+                                + " 'connection.options' = 'connectTimeoutMS=12000&socketTimeoutMS=13000',"
                                 + " 'hosts' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
