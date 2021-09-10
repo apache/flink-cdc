@@ -118,7 +118,7 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Specify what connector to use, here should be <code>'mongodb-cdc'</code>.</td>
+      <td>Specify what connector to use, here should be <code>mongodb-cdc</code>.</td>
     </tr>
     <tr>
       <td>hosts</td>
@@ -126,7 +126,7 @@ Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The comma-separated list of hostname and port pairs of the MongoDB servers.<br>
-          eg. localhost:27017,localhost:27018
+          eg. <code>localhost:27017,localhost:27018</code>
       </td>
     </tr>
     <tr>
@@ -245,8 +245,8 @@ Connector Options
 </table>
 </div>
 
-Note: `heartbeat.interval.ms` is highly recommended to set a proper value larger than 0 if the collection changes slowly.
-The heartbeat event can pushing the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from checkpoint or savepoint.
+Note: `heartbeat.interval.ms` is highly recommended to set a proper value larger than 0 **if the collection changes slowly**.
+The heartbeat event can pushing the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from a checkpoint or savepoint.
 
 Features
 --------
@@ -257,16 +257,18 @@ The MongoDB CDC connector is a Flink Source connector which will read database s
 
 ### Snapshot When Startup Or Not
 
-The config option `copy.existing` specifies whether do snapshot when MongoDB CDC consumer startup. Defaults to `true`.
+The config option `copy.existing` specifies whether do snapshot when MongoDB CDC consumer startup. <br>Defaults to `true`.
 
 ### Snapshot Data Filters
 
-The config option `copy.existing.pipeline` describing the filters when copying existing data.
-This can improve the use of indexes by the copying manager and make copying more efficient.
+The config option `copy.existing.pipeline` describing the filters when copying existing data.<br>
+This can filter only required data and improve the use of indexes by the copying manager.
 
-In the following example, the $match aggregation operator ensures that only documents in which the closed field is set to false are copied.
-`copy.existing.pipeline=[ { "$match": { "closed": "false" } } ]`
+In the following example, the `$match` aggregation operator ensures that only documents in which the closed field is set to false are copied.
 
+```
+copy.existing.pipeline=[ { "$match": { "closed": "false" } } ]
+```
 
 ### Change Streams
 
@@ -276,19 +278,19 @@ Debezium's `EmbeddedEngine` provides a mechanism for running a single Kafka Conn
 
 We choose **MongoDB's official Kafka Connector** instead of the **Debezium's MongoDB Connector** cause they use a different change data capture mechanism.
 
-- For Debezium's MongoDB Connector, it read the `oplog.rs` collection of each replicaset's master node.
+- For Debezium's MongoDB Connector, it read the `oplog.rs` collection of each replica-set's master node.
 - For MongoDB's Kafka Connector, it subscribe `Change Stream` of MongoDB.
 
 MongoDB's `oplog.rs` collection doesn't keep the changed record's update before state, so it's hard to extract the full document state by a single `oplog.rs` record and convert it to change log stream accepted by Flink (Insert Only, Upsert, All).
-Additionally, MongoDB 5 (released in July) has changed the oplog format, so the current Debezium connector cannot be used with it.
+Additionally, MongoDB 5 (released in July 2021) has changed the oplog format, so the current Debezium connector cannot be used with it.
 
-**Change Stream** is a new feature provided by MongoDB 3.6 for replica sets and sharded clusters allows applications to access real-time data changes without the complexity and risk of tailing the oplog.
+**Change Stream** is a new feature provided by MongoDB 3.6 for replica sets and sharded clusters that allows applications to access real-time data changes without the complexity and risk of tailing the oplog.<br>
 Applications can use change streams to subscribe to all data changes on a single collection, a database, or an entire deployment, and immediately react to them.
 
-**Lookup Full Document for Update Operations** is a feature provided by **Change Stream** which can configure the change stream to return the most current majority-committed version of the updated document. Because of this, we can easily collect the latest full document and convert the change log to Flink's **Upsert Changelog Stream**. 
+**Lookup Full Document for Update Operations** is a feature provided by **Change Stream** which can configure the change stream to return the most current majority-committed version of the updated document. Because of this feature, we can easily collect the latest full document and convert the change log to Flink's **Upsert Changelog Stream**. 
 
-By the way, Debezium's MongoDB change streams exploration mentioned by [DBZ-435](https://issues.redhat.com/browse/DBZ-435) is on roadmap. 
-If it's done, we can support both for users to choose.
+By the way, Debezium's MongoDB change streams exploration mentioned by [DBZ-435](https://issues.redhat.com/browse/DBZ-435) is on roadmap.<br> 
+If it's done, we can consider integrating two kinds of source connector for users to choose.
 
 ### DataStream Source
 
@@ -297,7 +299,7 @@ The MongoDB CDC connector can also be a DataStream source. You can create a Sour
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.mongodb.MongoDBSource;
 
 public class MongoDBSourceExample {
@@ -308,7 +310,7 @@ public class MongoDBSourceExample {
                 .password("flinkpw")
                 .database("inventory")
                 .collection("products")
-                .deserializer(new StringDebeziumDeserializationSchema())
+                .deserializer(new JsonDebeziumDeserializationSchema())
                 .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -324,6 +326,14 @@ public class MongoDBSourceExample {
 
 Data Type Mapping
 ----------------
+[BSON](https://docs.mongodb.com/manual/reference/bson-types/) short for **Binary JSON** is a bin­ary-en­coded seri­al­iz­a­tion of JSON-like format used to store documents and make remote procedure calls in MongoDB.
+
+[Flink SQL Data Type](https://ci.apache.org/projects/flink/flink-docs-release-1.13/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
+
+In order to enable Flink SQL to process data from heterogeneous data sources, the data types of heterogeneous data sources need to be uniformly converted to Flink SQL data types.
+
+The following is the mapping of BSON type and Flink SQL type.
+
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -434,7 +444,8 @@ Reference
 - [Replication](https://docs.mongodb.com/manual/replication/)
 - [Sharding](https://docs.mongodb.com/manual/sharding/)
 - [Database User Roles](https://docs.mongodb.com/manual/reference/built-in-roles/#database-user-roles)
-- [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
 - [WiredTiger](https://docs.mongodb.com/manual/core/wiredtiger/#std-label-storage-wiredtiger)
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
+- [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
+- [Flink DataTypes](https://ci.apache.org/projects/flink/flink-docs-release-1.13/docs/dev/table/types/)

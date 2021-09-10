@@ -5,23 +5,6 @@
 ```
 version: '2.1'
 services:
-  postgres:
-    image: debezium/example-postgres:1.1
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_PASSWORD=1234
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-  mysql:
-    image: debezium/example-mysql:1.1
-    ports:
-      - "3306:3306"
-    environment:
-      - MYSQL_ROOT_PASSWORD=123456
-      - MYSQL_USER=mysqluser
-      - MYSQL_PASSWORD=mysqlpw
   mongo:
     image: "mongo:4.0-xenial"
     command: --replSet rs0 --smallfiles --oplogSize 128
@@ -53,152 +36,105 @@ services:
       - "5601:5601"
 ```
 
-2. Enter mysql's container and initialize data: 
-
-```
-docker-compose exec mysql mysql -uroot -p123456
-```
-
-```sql
--- MySQL
-CREATE DATABASE mydb;
-USE mydb;
-CREATE TABLE products (
-  id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  description VARCHAR(512)
-);
-ALTER TABLE products AUTO_INCREMENT = 101;
-
-INSERT INTO products
-VALUES (default,"scooter","Small 2-wheel scooter"),
-       (default,"car battery","12V car battery"),
-       (default,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3"),
-       (default,"hammer","12oz carpenter's hammer"),
-       (default,"hammer","14oz carpenter's hammer"),
-       (default,"hammer","16oz carpenter's hammer"),
-       (default,"rocks","box of assorted rocks"),
-       (default,"jacket","water resistent black wind breaker"),
-       (default,"spare tire","24 inch spare tire");
-
-CREATE TABLE orders (
-  order_id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  order_date DATETIME NOT NULL,
-  customer_id INTEGER NOT NULL,
-  price DECIMAL(10, 5) NOT NULL,
-  product_id INTEGER NOT NULL,
-  order_status BOOLEAN NOT NULL -- Whether order has been placed
-) AUTO_INCREMENT = 10001;
-
-INSERT INTO orders
-VALUES (default, '2020-07-30 10:08:22', 1001, 50.50, 102, false),
-       (default, '2020-07-30 10:11:09', 1002, 15.00, 105, false),
-       (default, '2020-07-30 12:00:30', 1003, 25.25, 106, false);
-
-```
-
-3. Enter Postgres's container and initialize data:
-
-```
-docker-compose exec postgres psql -h localhost -U postgres
-```
-
-```sql
--- PG
-CREATE TABLE shipments (
-  shipment_id SERIAL NOT NULL PRIMARY KEY,
-  order_id SERIAL NOT NULL,
-  origin VARCHAR(255) NOT NULL,
-  destination VARCHAR(255) NOT NULL,
-  is_arrived BOOLEAN NOT NULL
-);
-ALTER SEQUENCE public.shipments_shipment_id_seq RESTART WITH 1001;
-ALTER TABLE public.shipments REPLICA IDENTITY FULL;
-
-INSERT INTO shipments
-VALUES (default,10001,'Beijing','Shanghai',false),
-       (default,10002,'Hangzhou','Shanghai',false),
-       (default,10003,'Shanghai','Hangzhou',false);
-```
-
-4. Enter Mongodb's container and initialize replica set and data:
+2. Enter Mongodb's container and initialize replica set and data:
 ```
 docker-compose exec mongo /usr/bin/mongo -u mongouser -p mongopw
 ```
 
 ```javascript
-//initialize replica set
+// 1. initialize replica set
 rs.initiate();
+rs.status();
 
+// 2. switch database
 use mgdb;
+
+// 3. initialize data
+db.orders.insertMany([
+  {
+    order_id: 101,
+    order_date: ISODate("2020-07-30T10:08:22.001Z"),
+    customer_id: 1001,
+    price: NumberDecimal("50.50"),
+    product: {
+      name: 'scooter',
+      description: 'Small 2-wheel scooter'
+    },
+    order_status: false
+  },
+  {
+    order_id: 102, 
+    order_date: ISODate("2020-07-30T10:11:09.001Z"),
+    customer_id: 1002,
+    price: NumberDecimal("15.00"),
+    product: {
+      name: 'car battery',
+      description: '12V car battery'
+    },
+    order_status: false
+  },
+  {
+    order_id: 103,
+    order_date: ISODate("2020-07-30T12:00:30.001Z"),
+    customer_id: 1003,
+    price: NumberDecimal("25.25"),
+    product: {
+      name: 'hammer',
+      description: '16oz carpenter hammer'
+    },
+    order_status: false
+  }
+]);
+
 db.customers.insertMany([
-  { customer_id: 1001, name: 'Jark', address: 'Hangzhou' },
-  { customer_id: 1002, name: 'Sally', address: 'Beijing' },
-  { customer_id: 1003, name: 'Edward', address: 'Shanghai' }
+  { 
+    customer_id: 1001, 
+    name: 'Jark', 
+    address: 'Hangzhou' 
+  },
+  { 
+    customer_id: 1002, 
+    name: 'Sally',
+    address: 'Beijing'
+  },
+  { 
+    customer_id: 1003,
+    name: 'Edward',
+    address: 'Shanghai'
+  }
 ]);
 ```
 
-5. Download following JAR package to `<FLINK_HOME>/lib/`:
-- [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
-- [flink-sql-connector-mysql-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.0.0/flink-sql-connector-mysql-cdc-2.0.0.jar)
-- [flink-sql-connector-postgres-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.0.0/flink-sql-connector-postgres-cdc-2.0.0.jar)
-- [flink-sql-connector-mongodb-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.1.0/flink-sql-connector-postgres-cdc-2.1.0.jar)
+3. Download following JAR package to `<FLINK_HOME>/lib/`:
+ - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
+ - [flink-sql-connector-mongodb-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.1.0/flink-sql-connector-postgres-cdc-2.1.0.jar)
 
-6. Launch a Flink cluster, then start a Flink SQL CLI and execute following SQL statements inside: 
+4. Launch a Flink cluster, then start a Flink SQL CLI and execute following SQL statements inside: 
 
 ```sql
 -- Flink SQL
 -- checkpoint every 3000 milliseconds                       
 Flink SQL> SET execution.checkpointing.interval = 3s;
-Flink SQL> CREATE TABLE products (
-    id INT,
-    name STRING,
-    description STRING,
-    PRIMARY KEY (id) NOT ENFORCED
-  ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = 'mydb',
-    'table-name' = 'products'
-  );
+
+-- set local time zone as Asia/Shanghai
+Flink SQL> SET table.local-time-zone = Asia/Shanghai;
 
 Flink SQL> CREATE TABLE orders (
+   _id STRING,
    order_id INT,
-   order_date TIMESTAMP(0),
+   order_date TIMESTAMP_LTZ(3),
    customer_id INT,
    price DECIMAL(10, 5),
-   product_id INT,
+   product ROW<name STRING, description STRING>,
    order_status BOOLEAN,
-   PRIMARY KEY (order_id) NOT ENFORCED
+   PRIMARY KEY (_id) NOT ENFORCED
  ) WITH (
-   'connector' = 'mysql-cdc',
-   'hostname' = 'localhost',
-   'port' = '3306',
-   'username' = 'root',
-   'password' = '123456',
-   'database-name' = 'mydb',
-   'table-name' = 'orders'
- );
-
-Flink SQL> CREATE TABLE shipments (
-   shipment_id INT,
-   order_id INT,
-   origin STRING,
-   destination STRING,
-   is_arrived BOOLEAN,
-   PRIMARY KEY (shipment_id) NOT ENFORCED
- ) WITH (
-   'connector' = 'postgres-cdc',
-   'hostname' = 'localhost',
-   'port' = '5432',
-   'username' = 'postgres',
-   'password' = 'postgres',
-   'database-name' = 'postgres',
-   'schema-name' = 'public',
-   'table-name' = 'shipments'
+   'connector' = 'mongodb-cdc',
+   'hosts' = 'localhost:27017',
+   'username' = 'mongouser',
+   'password' = 'mongopw',
+   'database' = 'mgdb',
+   'collection' = 'orders'
  );
  
  Flink SQL> CREATE TABLE customers (
@@ -210,7 +146,7 @@ Flink SQL> CREATE TABLE shipments (
  ) WITH (
    'connector' = 'mongodb-cdc',
    'hosts' = 'localhost:27017',
-   'username' = 'mongodb',
+   'username' = 'mongouser',
    'password' = 'mongopw',
    'database' = 'mgdb',
    'collection' = 'customers'
@@ -218,17 +154,11 @@ Flink SQL> CREATE TABLE shipments (
 
 Flink SQL> CREATE TABLE enriched_orders (
    order_id INT,
-   order_date TIMESTAMP(0),
+   order_date TIMESTAMP_LTZ(3),
    customer_id INT,
    price DECIMAL(10, 5),
-   product_id INT,
+   product ROW<name STRING, description STRING>,
    order_status BOOLEAN,
-   product_name STRING,
-   product_description STRING,
-   shipment_id INT,
-   origin STRING,
-   destination STRING,
-   is_arrived BOOLEAN,
    customer_name STRING,
    customer_address STRING,
    PRIMARY KEY (order_id) NOT ENFORCED
@@ -239,39 +169,45 @@ Flink SQL> CREATE TABLE enriched_orders (
  );
 
 Flink SQL> INSERT INTO enriched_orders
- SELECT o.*, p.name, p.description, s.shipment_id, s.origin, s.destination, s.is_arrived, c.name, c. address
- FROM orders AS o
- LEFT JOIN products AS p ON o.product_id = p.id
- LEFT JOIN shipments AS s ON o.order_id = s.order_id
- LEFT JOIN customers AS c ON o.customer_id = c.customer_id;
+ SELECT o.order_id,
+        o.order_date,
+        o.customer_id,
+        o.price,
+        o.product,
+        o.order_status,
+        c.name,
+        c. address
+   FROM orders AS o
+   LEFT JOIN customers AS c ON o.customer_id = c.customer_id;
 ```
 
-7. Make some changes in MySQL and Postgres, then check the result in Elasticsearch: 
+5. Make some changes in MongoDB, then check the result in Elasticsearch: 
 
-```sql
---MySQL
-INSERT INTO orders
-VALUES (default, '2020-07-30 15:22:00', 1004, 29.71, 104, false);
+```javascript
+db.orders.insert({ 
+  order_id: 104, 
+  order_date: ISODate("2020-07-30T12:00:30.001Z"),
+  customer_id: 1004,
+  price: NumberDecimal("25.25"),
+  product: { 
+    name: 'rocks',
+    description: 'box of assorted rocks'
+  },
+  order_status: false
+});
 
---PG
-INSERT INTO shipments
-VALUES (default,10004,'Shanghai','Beijing',false);
+db.customers.insert({ 
+  customer_id: 1004,
+  name: 'Jacob', 
+  address: 'Shanghai' 
+});
 
---MongoDB
-db.customers.insert({ customer_id: 1004, name: 'Jacob', address: 'Shanghai' });
-
---MySQL
-UPDATE orders SET order_status = true WHERE order_id = 10004;
-
---PG
-UPDATE shipments SET is_arrived = true WHERE shipment_id = 1004;
-
---MongoDB
-db.customers.updateOne(
-  { customer_id: 1004 },
-  { $set: { address: 'Suzhou'} }
+db.orders.updateOne(
+  { order_id: 104 },
+  { $set: { order_status: true } }
 );
 
---MySQL
-DELETE FROM orders WHERE order_id = 10004;
+db.orders.deleteOne(
+  { order_id : 104 }
+);
 ```
