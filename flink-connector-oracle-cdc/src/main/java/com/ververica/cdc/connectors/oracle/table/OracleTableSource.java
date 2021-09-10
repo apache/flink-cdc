@@ -108,7 +108,6 @@ public class OracleTableSource implements ScanTableSource {
                         .schemaList(schemaName)
                         .username(username)
                         .password(password)
-                        .serverTimeZone(serverTimeZone.toString())
                         .debeziumProperties(dbzProperties)
                         .startupOptions(startupOptions)
                         .deserializer(deserializer);
