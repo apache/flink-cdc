@@ -82,7 +82,7 @@ CREATE TABLE products (
 ) WITH (
   'connector' = 'mongodb-cdc',
   'hosts' = 'localhost:27017,localhost:27018,localhost:27019',
-  'user' = 'flinkuser',
+  'username' = 'flinkuser',
   'password' = 'flinkpw',
   'database' = 'inventory',
   'collection' = 'products'
@@ -130,7 +130,7 @@ Connector Options
       </td>
     </tr>
     <tr>
-      <td>user</td>
+      <td>username</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -162,57 +162,12 @@ Connector Options
       <td>Name of the collection in the database to watch for changes.</td>
     </tr>
     <tr>
-      <td>mongodb.replicaset</td>
+      <td>connection.options</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Specifies the name of the replica set. <br>
-          It is not necessary, but can speed up your connection times to 
-          explicitly state the servers are in a replica set in the connection.
-      </td>
-    </tr>
-    <tr>
-      <td>mongodb.authsource</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">admin</td>
-      <td>String</td>
-      <td>Database (authentication source) containing MongoDB credentials. <br>
-          This is required only when MongoDB is configured to use authentication 
-          with another authentication database than admin.
-      </td>
-    </tr>
-    <tr>
-      <td>mongodb.connect.timeout.ms</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">10000</td>
-      <td>String</td>
-      <td>The time in milliseconds to attempt a connection before timing out. <br>
-          Defaults to 10 seconds.
-      </td>
-    </tr>
-    <tr>
-      <td>mongodb.socket.timeout.ms</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">0</td>
-      <td>String</td>
-      <td>The time in milliseconds to attempt a send or receive on a socket before the attempt times out. <br>
-          A value of 0 disables this behavior.
-      </td>
-    </tr>
-    <tr>
-      <td>mongodb.ssl.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>Connector will use SSL to connect to MongoDB instances.</td>
-    </tr>
-    <tr>
-      <td>mongodb.ssl.invalid.hostname.allowed</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>When SSL is enabled this setting controls 
-          whether strict hostname checking is disabled during connection phase.
+      <td>The ampersand-separated <a href="https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options">connection options</a> of MongoDB. eg. <br>
+          <code>replicaSet=test&connectTimeoutMS=300000</code>
       </td>
     </tr>
     <tr>
@@ -245,8 +200,10 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>An array of JSON objects describing the pipeline operations to run when copying existing data.
-          We can set <code>[{"$match": {"operationType": "insert"}}]</code> to observe only insert change events.
+      <td> An array of JSON objects describing the pipeline operations to run when copying existing data.<br>
+           This can improve the use of indexes by the copying manager and make copying more efficient.
+           eg. <code>[{"$match": {"closed": "false"}}]</code> ensures that 
+           only documents in which the closed field is set to false are copied.
       </td>
     </tr>
     <tr>
@@ -298,9 +255,18 @@ Features
 
 The MongoDB CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change stream events with **exactly-once processing** even failures happen. 
 
-### Whether Snapshot When Startup
+### Snapshot When Startup Or Not
 
 The config option `copy.existing` specifies whether do snapshot when MongoDB CDC consumer startup. Defaults to `true`.
+
+### Snapshot Data Filters
+
+The config option `copy.existing.pipeline` describing the filters when copying existing data.
+This can improve the use of indexes by the copying manager and make copying more efficient.
+
+In the following example, the $match aggregation operator ensures that only documents in which the closed field is set to false are copied.
+`copy.existing.pipeline=[ { "$match": { "closed": "false" } } ]`
+
 
 ### Change Streams
 
@@ -338,7 +304,7 @@ public class MongoDBSourceExample {
     public static void main(String[] args) throws Exception {
         SourceFunction<String> sourceFunction = MongoDBSource.<String>builder()
                 .hosts("localhost:27017")
-                .user("flink")
+                .username("flink")
                 .password("flinkpw")
                 .database("inventory")
                 .collection("products")
@@ -463,7 +429,7 @@ Data Type Mapping
 Reference
 --------
 
-- [MongoDB Kafaka Connector](https://docs.mongodb.com/kafka-connector/current/kafka-source/)
+- [MongoDB Kafka Connector](https://docs.mongodb.com/kafka-connector/current/kafka-source/)
 - [Change Streams](https://docs.mongodb.com/manual/changeStreams/)
 - [Replication](https://docs.mongodb.com/manual/replication/)
 - [Sharding](https://docs.mongodb.com/manual/sharding/)
@@ -471,3 +437,4 @@ Reference
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
 - [WiredTiger](https://docs.mongodb.com/manual/core/wiredtiger/#std-label-storage-wiredtiger)
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
+- [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)

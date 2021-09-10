@@ -51,26 +51,6 @@ services:
     image: elastic/kibana:7.6.0
     ports:
       - "5601:5601"
-  zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
-    ports:
-      - "2181:2181"
-  kafka:
-    image: wurstmeister/kafka:2.12-2.2.1
-    ports:
-      - "9092:9092"
-      - "9094:9094"
-    depends_on:
-      - zookeeper
-    environment:
-      - KAFKA_ADVERTISED_LISTENERS=INSIDE://:9094,OUTSIDE://localhost:9092
-      - KAFKA_LISTENERS=INSIDE://:9094,OUTSIDE://:9092
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
-      - KAFKA_INTER_BROKER_LISTENER_NAME=INSIDE
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CREATE_TOPICS="user_behavior:1:1"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
 ```
 
 2. 进入 mysql 容器，初始化数据：
