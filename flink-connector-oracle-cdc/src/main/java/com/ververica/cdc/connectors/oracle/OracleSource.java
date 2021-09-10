@@ -47,7 +47,6 @@ public class OracleSource {
         private String database;
         private String username;
         private String password;
-        private String serverTimeZone;
         private String[] tableList;
         private String[] schemaList;
         private Properties dbzProperties;
@@ -108,16 +107,6 @@ public class OracleSource {
             return this;
         }
 
-        /**
-         * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
-         * TIMESTAMP type in Oracle converted to STRING. See more
-         * https://debezium.io/documentation/reference/1.5/connectors/oracle.html#oracle-temporal-types
-         */
-        public Builder<T> serverTimeZone(String timeZone) {
-            this.serverTimeZone = timeZone;
-            return this;
-        }
-
         /** The Debezium Oracle connector properties. For example, "snapshot.mode". */
         public Builder<T> debeziumProperties(Properties properties) {
             this.dbzProperties = properties;
@@ -162,9 +151,6 @@ public class OracleSource {
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }
-            if (serverTimeZone != null) {
-                props.setProperty("database.serverTimezone", serverTimeZone);
-            }
 
             DebeziumOffset specificOffset = null;
             switch (startupOptions.startupMode) {
@@ -184,7 +170,8 @@ public class OracleSource {
                 dbzProperties.forEach(props::put);
             }
 
-            return new DebeziumSourceFunction<>(deserializer, props, specificOffset);
+            return new DebeziumSourceFunction<>(
+                    deserializer, props, specificOffset, new OracleValidator(props));
         }
     }
 }
