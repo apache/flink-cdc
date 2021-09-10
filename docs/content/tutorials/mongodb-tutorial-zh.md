@@ -210,7 +210,7 @@ Flink SQL> CREATE TABLE shipments (
  ) WITH (
    'connector' = 'mongodb-cdc',
    'hosts' = 'localhost:27017',
-   'user' = 'mongodb',
+   'username' = 'mongodb',
    'password' = 'mongopw',
    'database' = 'mgdb',
    'collection' = 'customers'
