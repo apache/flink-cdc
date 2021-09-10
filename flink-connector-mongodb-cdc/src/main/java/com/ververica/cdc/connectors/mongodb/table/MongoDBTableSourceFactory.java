@@ -29,8 +29,6 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 
-import com.ververica.cdc.debezium.table.DebeziumOptions;
-
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
@@ -177,7 +175,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
+        helper.validate();
 
         final ReadableConfig config = helper.getOptions();
 
