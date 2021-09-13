@@ -365,7 +365,7 @@ The Incremental Snapshot Reading feature of MySQL CDC Source only exposes in SQL
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
@@ -376,12 +376,11 @@ public class MySqlBinlogSourceExample {
       .databaseList("inventory") // monitor all tables under inventory database
       .username("flinkuser")
       .password("flinkpw")
-      .deserializer(new StringDebeziumDeserializationSchema()) // converts SourceRecord to String
+      .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
       .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-    
-    env.enableCheckpointing(3000); // checkpoint every 3000 milliseconds
+
     env
       .addSource(sourceFunction)
       .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
@@ -390,6 +389,8 @@ public class MySqlBinlogSourceExample {
   }
 }
 ```
+
+**Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.
 
 Data Type Mapping
 ----------------
