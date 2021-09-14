@@ -104,6 +104,17 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     }
 
     @Test
+    public void testAssignSnapshotSplitsWithRandomPrimaryKey() {
+        List<String> expected =
+                Arrays.asList(
+                        "address null [417111867899200427]",
+                        "address [417111867899200427] [417420106184475563]",
+                        "address [417420106184475563] null");
+        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"address"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
     public void testAssignSnapshotSplitsWithDecimalKey() {
         List<String> expected =
                 Arrays.asList(

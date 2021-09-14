@@ -57,6 +57,9 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     private final UniqueDatabase fullTypesDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
 
+    private final UniqueDatabase customerDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
@@ -391,7 +394,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                     "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]"
                 };
 
-        assertThat(fetchRows(result.collect(), 3), containsInAnyOrder(expected));
+        assertThat(fetchRows(result.collect(), expected.length), containsInAnyOrder(expected));
         result.getJobClient().get().cancel().get();
     }
 
@@ -463,6 +466,74 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
         assertThat(fetchRows(iterator, expected.length), containsInAnyOrder(expected));
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testPrimaryKeyWithSnowflakeAlgorithm() throws Exception {
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE address ("
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " country STRING,"
+                                + " city STRING,"
+                                + " detail_address STRING,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "address",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "SELECT id,\n" + "country,\n" + "city,\n" + "detail_address FROM address");
+
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE address SET city = 'Hangzhou' WHERE id=416927583791428523;");
+            statement.execute(
+                    "INSERT INTO address VALUES(418257940021724075, 'Germany', 'Berlin', 'West Town address 3')");
+        }
+
+        String[] expected =
+                new String[] {
+                    "+I[417271541558096811, America, New York, East Town address 2]",
+                    "+I[417272886855938987, America, New York, East Town address 3]",
+                    "+I[417111867899200427, America, New York, East Town address 1]",
+                    "+I[417420106184475563, Germany, Berlin, West Town address 1]",
+                    "+I[418161258277847979, Germany, Berlin, West Town address 2]",
+                    "+I[416874195632735147, China, Beijing, West Town address 1]",
+                    "+I[416927583791428523, China, Beijing, West Town address 2]",
+                    "+I[417022095255614379, China, Beijing, West Town address 3]",
+                    "-U[416927583791428523, China, Beijing, West Town address 2]",
+                    "+U[416927583791428523, China, Hangzhou, West Town address 2]",
+                    "+I[418257940021724075, Germany, Berlin, West Town address 3]",
+                };
+        assertThat(fetchRows(result.collect(), expected.length), containsInAnyOrder(expected));
         result.getJobClient().get().cancel().get();
     }
 
