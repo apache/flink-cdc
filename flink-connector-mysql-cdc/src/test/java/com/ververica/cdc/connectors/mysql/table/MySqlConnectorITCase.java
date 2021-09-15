@@ -51,14 +51,17 @@ import static org.junit.Assert.assertThat;
 @RunWith(Parameterized.class)
 public class MySqlConnectorITCase extends MySqlTestBase {
 
+    private static final String TEST_USER = "mysqluser";
+    private static final String TEST_PASSWORD = "mysqlpw";
+
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private final UniqueDatabase fullTypesDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", TEST_USER, TEST_PASSWORD);
 
     private final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -125,8 +128,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
+                        TEST_USER,
+                        TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         getDezImplementation(),
@@ -242,8 +245,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
+                        TEST_USER,
+                        TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         getDezImplementation(),
@@ -424,8 +427,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
+                        TEST_USER,
+                        TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         incrementalSnapshot,
@@ -578,8 +581,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
+                        TEST_USER,
+                        TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         offset.f0,
@@ -656,8 +659,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
+                        TEST_USER,
+                        TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         incrementalSnapshot,
@@ -742,8 +745,8 @@ public class MySqlConnectorITCase extends MySqlTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
+                        TEST_USER,
+                        TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),

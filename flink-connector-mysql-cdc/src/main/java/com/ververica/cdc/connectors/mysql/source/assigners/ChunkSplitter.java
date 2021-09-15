@@ -37,7 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -130,7 +129,6 @@ class ChunkSplitter {
             throws SQLException {
         final String splitColumnName = splitColumn.name();
         final Object[] minMaxOfSplitColumn = queryMinMax(jdbc, tableId, splitColumnName);
-        final long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
         final Object min = minMaxOfSplitColumn[0];
         final Object max = minMaxOfSplitColumn[1];
         if (min == null || max == null || min.equals(max)) {
@@ -139,7 +137,7 @@ class ChunkSplitter {
         }
 
         final List<ChunkRange> chunks;
-        if (splitColumnEvenlyDistributed(tableId, splitColumn, min, max, approximateRowCnt)) {
+        if (isSplitColumnEvenlyDistributed(jdbc, tableId, splitColumn, min, max, chunkSize)) {
             // use evenly-sized chunks which is much efficient
             chunks = splitEvenlySizedChunks(min, max);
         } else {
@@ -235,32 +233,39 @@ class ChunkSplitter {
     // ------------------------------------------------------------------------------------------
 
     /** Checks whether split column is evenly distributed across its range. */
-    private static boolean splitColumnEvenlyDistributed(
-            TableId tableId, Column splitColumn, Object min, Object max, long approximateRowCnt) {
+    private static boolean isSplitColumnEvenlyDistributed(
+            MySqlConnection jdbc,
+            TableId tableId,
+            Column splitColumn,
+            Object min,
+            Object max,
+            int chunkSize)
+            throws SQLException {
         DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn);
         LogicalTypeRoot typeRoot = flinkType.getLogicalType().getTypeRoot();
 
         // currently, we only support the optimization that split column with type BIGINT, INT,
         // DECIMAL
-        final boolean isNumericColumn =
-                typeRoot == LogicalTypeRoot.BIGINT
-                        || typeRoot == LogicalTypeRoot.INTEGER
-                        || typeRoot == LogicalTypeRoot.DECIMAL;
-
-        // only column is numeric and evenly distribution factor is less than
-        // MAX_EVENLY_DISTRIBUTION_FACTOR
-        // will be treated as evenly distributed.
-        if (isNumericColumn) {
-            final double evenlyDistributionFactor =
-                    calculateEvenlyDistributionFactor(min, max, approximateRowCnt);
-            LOG.info(
-                    "The evenly distribution factor for table {} is {}",
-                    tableId,
-                    evenlyDistributionFactor);
-            return evenlyDistributionFactor <= MAX_EVENLY_DISTRIBUTION_FACTOR;
-        } else {
+        if (!(typeRoot == LogicalTypeRoot.BIGINT
+                || typeRoot == LogicalTypeRoot.INTEGER
+                || typeRoot == LogicalTypeRoot.DECIMAL)) {
             return false;
         }
+
+        if (ObjectUtils.minus(max, min).compareTo(BigDecimal.valueOf(chunkSize)) <= 0) {
+            return true;
+        }
+
+        // only column is numeric and evenly distribution factor is less than
+        // MAX_EVENLY_DISTRIBUTION_FACTOR will be treated as evenly distributed.
+        final long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
+        final double evenlyDistributionFactor =
+                calculateEvenlyDistributionFactor(min, max, approximateRowCnt);
+        LOG.info(
+                "The evenly distribution factor for table {} is {}",
+                tableId,
+                evenlyDistributionFactor);
+        return evenlyDistributionFactor <= MAX_EVENLY_DISTRIBUTION_FACTOR;
     }
 
     /**
@@ -269,7 +274,6 @@ class ChunkSplitter {
      * @param min the min value of the split column
      * @param max the max value of the split column
      * @param approximateRowCnt the approximate row count of the table.
-     * @return
      */
     private static double calculateEvenlyDistributionFactor(
             Object min, Object max, long approximateRowCnt) {
@@ -279,26 +283,12 @@ class ChunkSplitter {
                             "Unsupported operation type, the MIN value type %s is different with MAX value type %s.",
                             min.getClass().getSimpleName(), max.getClass().getSimpleName()));
         }
-        BigDecimal subResult;
-        if (min instanceof Integer) {
-            subResult = BigDecimal.valueOf((int) max - (int) min);
-        } else if (min instanceof Long) {
-            subResult = BigDecimal.valueOf((long) max - (long) min);
-        } else if (min instanceof BigInteger) {
-            subResult = new BigDecimal(((BigInteger) max).subtract((BigInteger) min).toString());
-        } else if (min instanceof BigDecimal) {
-            subResult = ((BigDecimal) max).subtract((BigDecimal) min);
-        } else {
-            throw new UnsupportedOperationException(
-                    String.format(
-                            "Unsupported type %s for numeric subtract.",
-                            min.getClass().getSimpleName()));
-        }
         if (approximateRowCnt == 0) {
             return Double.MAX_VALUE;
         }
+        BigDecimal difference = ObjectUtils.minus(max, min);
         // factor = max - min + 1 / rowCount
-        final BigDecimal subRowCnt = subResult.add(BigDecimal.valueOf(1));
+        final BigDecimal subRowCnt = difference.add(BigDecimal.valueOf(1));
         return subRowCnt.divide(new BigDecimal(approximateRowCnt), 2, ROUND_CEILING).doubleValue();
     }
 

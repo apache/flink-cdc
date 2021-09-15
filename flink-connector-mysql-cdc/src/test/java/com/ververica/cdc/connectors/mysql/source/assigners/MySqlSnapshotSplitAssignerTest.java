@@ -73,6 +73,13 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     }
 
     @Test
+    public void testAssignTableWhoseRowCntLessSplitSize() {
+        List<String> expected = Arrays.asList("customers null null");
+        List<String> splits = getTestAssignSnapshotSplits(2000, new String[] {"customers"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
     public void testAssignMultipleTableSplits() {
         List<String> expected =
                 Arrays.asList(
