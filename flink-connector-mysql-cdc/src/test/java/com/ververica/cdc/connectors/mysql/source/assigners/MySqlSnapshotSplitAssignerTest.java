@@ -73,6 +73,13 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
     }
 
     @Test
+    public void testAssignTableWhoseRowCntLessSplitSize() {
+        List<String> expected = Arrays.asList("customers null null");
+        List<String> splits = getTestAssignSnapshotSplits(2000, new String[] {"customers"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
     public void testAssignMultipleTableSplits() {
         List<String> expected =
                 Arrays.asList(
@@ -100,6 +107,17 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         List<String> expected =
                 Arrays.asList("shopping_cart_big null [3]", "shopping_cart_big [3] null");
         List<String> splits = getTestAssignSnapshotSplits(2, new String[] {"shopping_cart_big"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignSnapshotSplitsWithRandomPrimaryKey() {
+        List<String> expected =
+                Arrays.asList(
+                        "address null [417111867899200427]",
+                        "address [417111867899200427] [417420106184475563]",
+                        "address [417420106184475563] null");
+        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"address"});
         assertEquals(expected, splits);
     }
 
