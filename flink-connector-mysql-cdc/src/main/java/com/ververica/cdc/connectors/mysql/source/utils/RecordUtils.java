@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.utils;
 
-import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
@@ -348,15 +347,8 @@ public class RecordUtils {
         }
     }
 
-    /** Return the split key type can use numeric optimization or not. */
-    public static boolean isOptimizedKeyType(LogicalTypeRoot typeRoot) {
-        return typeRoot == LogicalTypeRoot.BIGINT
-                || typeRoot == LogicalTypeRoot.INTEGER
-                || typeRoot == LogicalTypeRoot.DECIMAL;
-    }
-
     private static int compareObjects(Object o1, Object o2) {
-        if (o1 instanceof Comparable) {
+        if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
             return ((Comparable) o1).compareTo(o2);
         } else {
             return o1.toString().compareTo(o2.toString());
