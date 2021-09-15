@@ -58,6 +58,26 @@ public class StatementUtils {
                 });
     }
 
+    public static long queryApproximateRowCnt(MySqlConnection jdbc, TableId tableId)
+            throws SQLException {
+        // The statement used to get approximate row count which is less
+        // accurate than COUNT(*), but is more efficient for large table.
+        final String useDatabaseStatement = String.format("USE %s;", quote(tableId.catalog()));
+        final String rowCountQuery = String.format("SHOW TABLE STATUS LIKE '%s';", tableId.table());
+        jdbc.executeWithoutCommitting(useDatabaseStatement);
+        return jdbc.queryAndMap(
+                rowCountQuery,
+                rs -> {
+                    if (!rs.next() || rs.getMetaData().getColumnCount() < 5) {
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]",
+                                        rowCountQuery));
+                    }
+                    return rs.getLong(5);
+                });
+    }
+
     public static Object queryMin(
             MySqlConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
             throws SQLException {
