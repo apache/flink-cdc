@@ -36,6 +36,7 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -46,9 +47,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryApproximateRowCnt;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMin;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMinMax;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryNextChunkMax;
+import static java.math.BigDecimal.ROUND_CEILING;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
@@ -58,6 +61,12 @@ import static org.apache.flink.table.api.DataTypes.ROW;
  */
 class ChunkSplitter {
     private static final Logger LOG = LoggerFactory.getLogger(ChunkSplitter.class);
+
+    /**
+     * The maximum evenly distribution factor used to judge the data in table is evenly distributed
+     * or not, the factor could be calculated by MAX(id) - MIN(id) + 1 / rowCount.
+     */
+    public static final Double MAX_EVENLY_DISTRIBUTION_FACTOR = 2.0d;
 
     private final MySqlConnection jdbc;
     private final MySqlSchema mySqlSchema;
@@ -128,7 +137,7 @@ class ChunkSplitter {
         }
 
         final List<ChunkRange> chunks;
-        if (splitColumnEvenlyDistributed(splitColumn)) {
+        if (isSplitColumnEvenlyDistributed(jdbc, tableId, splitColumn, min, max, chunkSize)) {
             // use evenly-sized chunks which is much efficient
             chunks = splitEvenlySizedChunks(min, max);
         } else {
@@ -224,19 +233,63 @@ class ChunkSplitter {
     // ------------------------------------------------------------------------------------------
 
     /** Checks whether split column is evenly distributed across its range. */
-    private static boolean splitColumnEvenlyDistributed(Column splitColumn) {
-        // only column is auto-incremental are recognized as evenly distributed.
-        // TODO: we may use MAX,MIN,COUNT to calculate the distribution in the future.
-        if (splitColumn.isAutoIncremented()) {
-            DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn);
-            LogicalTypeRoot typeRoot = flinkType.getLogicalType().getTypeRoot();
-            // currently, we only support split column with type BIGINT, INT, DECIMAL
-            return typeRoot == LogicalTypeRoot.BIGINT
-                    || typeRoot == LogicalTypeRoot.INTEGER
-                    || typeRoot == LogicalTypeRoot.DECIMAL;
-        } else {
+    private static boolean isSplitColumnEvenlyDistributed(
+            MySqlConnection jdbc,
+            TableId tableId,
+            Column splitColumn,
+            Object min,
+            Object max,
+            int chunkSize)
+            throws SQLException {
+        DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn);
+        LogicalTypeRoot typeRoot = flinkType.getLogicalType().getTypeRoot();
+
+        // currently, we only support the optimization that split column with type BIGINT, INT,
+        // DECIMAL
+        if (!(typeRoot == LogicalTypeRoot.BIGINT
+                || typeRoot == LogicalTypeRoot.INTEGER
+                || typeRoot == LogicalTypeRoot.DECIMAL)) {
             return false;
         }
+
+        if (ObjectUtils.minus(max, min).compareTo(BigDecimal.valueOf(chunkSize)) <= 0) {
+            return true;
+        }
+
+        // only column is numeric and evenly distribution factor is less than
+        // MAX_EVENLY_DISTRIBUTION_FACTOR will be treated as evenly distributed.
+        final long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
+        final double evenlyDistributionFactor =
+                calculateEvenlyDistributionFactor(min, max, approximateRowCnt);
+        LOG.info(
+                "The evenly distribution factor for table {} is {}",
+                tableId,
+                evenlyDistributionFactor);
+        return evenlyDistributionFactor <= MAX_EVENLY_DISTRIBUTION_FACTOR;
+    }
+
+    /**
+     * Returns the evenly distribution factor of the table data.
+     *
+     * @param min the min value of the split column
+     * @param max the max value of the split column
+     * @param approximateRowCnt the approximate row count of the table.
+     */
+    private static double calculateEvenlyDistributionFactor(
+            Object min, Object max, long approximateRowCnt) {
+        if (!min.getClass().equals(max.getClass())) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unsupported operation type, the MIN value type %s is different with MAX value type %s.",
+                            min.getClass().getSimpleName(), max.getClass().getSimpleName()));
+        }
+        if (approximateRowCnt == 0) {
+            return Double.MAX_VALUE;
+        }
+        BigDecimal difference = ObjectUtils.minus(max, min);
+        // factor = max - min + 1 / rowCount
+        final BigDecimal subRowCnt = difference.add(BigDecimal.valueOf(1));
+        return subRowCnt.divide(new BigDecimal(approximateRowCnt), 2, ROUND_CEILING).doubleValue();
     }
 
     private static String splitId(TableId tableId, int chunkId) {

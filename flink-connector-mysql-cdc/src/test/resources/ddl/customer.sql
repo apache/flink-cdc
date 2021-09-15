@@ -172,3 +172,21 @@ insert into shopping_cart_dec
 VALUES (123456.123, 'KIND_001', 'user_1', 'my shopping cart'),
        (124456.456, 'KIND_002', 'user_1', 'my shopping cart'),
        (125489.6789, 'KIND_003', 'user_1', 'my shopping cart');
+
+-- create table whose primary key are produced by snowflake algorithm
+CREATE TABLE address (
+  id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  country VARCHAR(255) NOT NULL,
+  city VARCHAR(255) NOT NULL,
+  detail_address VARCHAR(1024)
+);
+
+INSERT INTO address
+VALUES (416874195632735147, 'China', 'Beijing', 'West Town address 1'),
+       (416927583791428523, 'China', 'Beijing', 'West Town address 2'),
+       (417022095255614379, 'China', 'Beijing', 'West Town address 3'),
+       (417111867899200427, 'America', 'New York', 'East Town address 1'),
+       (417271541558096811, 'America', 'New York', 'East Town address 2'),
+       (417272886855938987, 'America', 'New York', 'East Town address 3'),
+       (417420106184475563, 'Germany', 'Berlin', 'West Town address 1'),
+       (418161258277847979, 'Germany', 'Berlin', 'West Town address 2');
