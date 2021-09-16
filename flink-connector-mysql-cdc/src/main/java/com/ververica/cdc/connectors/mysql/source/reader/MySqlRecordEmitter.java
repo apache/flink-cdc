@@ -22,6 +22,7 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
+import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
@@ -56,13 +57,13 @@ public final class MySqlRecordEmitter<T>
             new JsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
-    private final MySqlCDCMetricRecorder metricRecorder;
+    private final MySqlSourceReaderMetrics sourceReaderMetrics;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
-            MySqlCDCMetricRecorder metricRecorder) {
+            MySqlSourceReaderMetrics sourceReaderMetrics) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
-        this.metricRecorder = metricRecorder;
+        this.sourceReaderMetrics = sourceReaderMetrics;
     }
 
     @Override
@@ -86,10 +87,7 @@ public final class MySqlRecordEmitter<T>
                 BinlogOffset position = getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
             }
-            Long messageTimestamp = RecordUtils.getMessageTimestamp(element);
-            if (messageTimestamp != null) {
-                metricRecorder.setEmitDelay(System.currentTimeMillis() - messageTimestamp);
-            }
+            reportMetrics(element);
             debeziumDeserializationSchema.deserialize(
                     element,
                     new Collector<T>() {
@@ -107,5 +105,21 @@ public final class MySqlRecordEmitter<T>
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
         }
+    }
+
+    private void reportMetrics(SourceRecord sourceRecord) {
+        // update process time
+        sourceReaderMetrics.recordProcessTime(System.currentTimeMillis());
+        Long messageTimestamp = RecordUtils.getMessageTimestamp(sourceRecord);
+        if (messageTimestamp == null) {
+            return;
+        }
+        // report fetch delay
+        Long fetchTimestamp = RecordUtils.getFetchTimestamp(sourceRecord);
+        if (fetchTimestamp != null) {
+            sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
+        }
+        // report emit delay
+        sourceReaderMetrics.recordEmitDelay(System.currentTimeMillis() - messageTimestamp);
     }
 }

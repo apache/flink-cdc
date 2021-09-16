@@ -250,6 +250,21 @@ public class RecordUtils {
         return source.getInt64(Envelope.FieldName.TIMESTAMP);
     }
 
+    /**
+     * Return the fetch timestamp of {@link SourceRecord}.
+     *
+     * <p>We use the optional field ts_ms in {@link SourceRecord} as the fetch timestamp for the
+     * field ts_ms represents the time at which the record is processed by debezium connector.
+     */
+    public static Long getFetchTimestamp(SourceRecord record) {
+        Schema schema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        if (schema.field(Envelope.FieldName.TIMESTAMP) == null) {
+            return null;
+        }
+        return value.getInt64(Envelope.FieldName.TIMESTAMP);
+    }
+
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
         if (keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name())) {

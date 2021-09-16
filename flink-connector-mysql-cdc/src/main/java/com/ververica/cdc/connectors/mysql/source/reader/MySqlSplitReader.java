@@ -54,17 +54,14 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     private final Queue<MySqlSplit> splits;
     private final Configuration config;
     private final int subtaskId;
-    private final MySqlCDCMetricRecorder metricRecorder;
 
     @Nullable private DebeziumReader<SourceRecord, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
 
-    public MySqlSplitReader(
-            Configuration config, int subtaskId, MySqlCDCMetricRecorder metricRecorder) {
+    public MySqlSplitReader(Configuration config, int subtaskId) {
         this.config = config;
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
-        this.metricRecorder = metricRecorder;
     }
 
     @Override
@@ -77,10 +74,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
             LOG.warn("fetch data failed.", e);
             throw new IOException(e);
         }
-        metricRecorder.setProcessTime(System.currentTimeMillis());
         return dataIt == null
                 ? finishedSnapshotSplit()
-                : MySqlRecords.forRecords(currentSplitId, dataIt, metricRecorder);
+                : MySqlRecords.forRecords(currentSplitId, dataIt);
     }
 
     @Override
@@ -124,7 +120,6 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
             currentSplitId = nextSplit.splitId();
 
             if (nextSplit.isSnapshotSplit()) {
-                metricRecorder.setInSnapshot(true);
                 if (currentReader == null) {
                     final MySqlConnection jdbcConnection = getConnection(config);
                     final BinaryLogClient binaryLogClient = getBinaryClient(config);
@@ -133,7 +128,6 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                     currentReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
                 }
             } else {
-                metricRecorder.setInSnapshot(false);
                 // point from snapshot split to binlog split
                 if (currentReader != null) {
                     LOG.info("It's turn to read binlog split, close current snapshot reader");
@@ -155,8 +149,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     }
 
     private MySqlRecords finishedSnapshotSplit() {
-        final MySqlRecords finishedRecords =
-                MySqlRecords.forFinishedSplit(currentSplitId, metricRecorder);
+        final MySqlRecords finishedRecords = MySqlRecords.forFinishedSplit(currentSplitId);
         currentSplitId = null;
         return finishedRecords;
     }

@@ -16,17 +16,23 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source.reader;
+package com.ververica.cdc.connectors.mysql.source.metrics;
 
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 
-/** A metric record wrapping metrics for mysql cdc. */
-public class MySqlCDCMetricRecorder {
+import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+
+/** A collection class for handling metrics in {@link MySqlSourceReader}. */
+public class MySqlSourceReaderMetrics {
 
     private final MetricGroup metricGroup;
 
-    /** The last record processing time. */
+    /**
+     * The last record processing time, which is updated after {@link MySqlSourceReader} fetches a
+     * batch of data. It's mainly used to report metrics sourceIdleTime for sourceIdleTime =
+     * System.currentTimeMillis() - processTime.
+     */
     private volatile long processTime = 0L;
 
     /**
@@ -41,10 +47,7 @@ public class MySqlCDCMetricRecorder {
      */
     private volatile long emitDelay = 0L;
 
-    /** Whether it's in snapshot phase or not. */
-    private volatile boolean inSnapshot;
-
-    public MySqlCDCMetricRecorder(MetricGroup metricGroup) {
+    public MySqlSourceReaderMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
     }
 
@@ -52,7 +55,6 @@ public class MySqlCDCMetricRecorder {
         metricGroup.gauge("currentFetchEventTimeLag", (Gauge<Long>) this::getFetchDelay);
         metricGroup.gauge("currentEmitEventTimeLag", (Gauge<Long>) this::getEmitDelay);
         metricGroup.gauge("sourceIdleTime", (Gauge<Long>) this::getIdleTime);
-        metricGroup.gauge("isInSnapshot", (Gauge<Boolean>) this::isInSnapshot);
     }
 
     public long getFetchDelay() {
@@ -64,26 +66,22 @@ public class MySqlCDCMetricRecorder {
     }
 
     public long getIdleTime() {
+        // no previous process time at the beginning, return 0 as idle time
+        if (processTime == 0) {
+            return 0;
+        }
         return System.currentTimeMillis() - processTime;
     }
 
-    public boolean isInSnapshot() {
-        return inSnapshot;
-    }
-
-    public void setProcessTime(long processTime) {
+    public void recordProcessTime(long processTime) {
         this.processTime = processTime;
     }
 
-    public void setFetchDelay(long fetchDelay) {
+    public void recordFetchDelay(long fetchDelay) {
         this.fetchDelay = fetchDelay;
     }
 
-    public void setEmitDelay(long emitDelay) {
+    public void recordEmitDelay(long emitDelay) {
         this.emitDelay = emitDelay;
-    }
-
-    public void setInSnapshot(boolean inSnapshot) {
-        this.inSnapshot = inSnapshot;
     }
 }
