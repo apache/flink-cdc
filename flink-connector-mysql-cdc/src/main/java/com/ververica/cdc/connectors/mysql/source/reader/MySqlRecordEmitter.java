@@ -22,6 +22,7 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
+import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -34,7 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getFetchTimestamp;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getMessageTimestamp;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getWatermark;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
@@ -55,9 +58,13 @@ public final class MySqlRecordEmitter<T>
             new JsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
+    private final MySqlSourceReaderMetrics sourceReaderMetrics;
 
-    public MySqlRecordEmitter(DebeziumDeserializationSchema<T> debeziumDeserializationSchema) {
+    public MySqlRecordEmitter(
+            DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
+            MySqlSourceReaderMetrics sourceReaderMetrics) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
+        this.sourceReaderMetrics = sourceReaderMetrics;
     }
 
     @Override
@@ -81,6 +88,7 @@ public final class MySqlRecordEmitter<T>
                 BinlogOffset position = getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
             }
+            reportMetrics(element);
             debeziumDeserializationSchema.deserialize(
                     element,
                     new Collector<T>() {
@@ -97,6 +105,23 @@ public final class MySqlRecordEmitter<T>
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
+        }
+    }
+
+    private void reportMetrics(SourceRecord element) {
+        long now = System.currentTimeMillis();
+        // record the latest process time
+        sourceReaderMetrics.recordProcessTime(now);
+        Long messageTimestamp = getMessageTimestamp(element);
+
+        if (messageTimestamp != null && messageTimestamp > 0L) {
+            // report fetch delay
+            Long fetchTimestamp = getFetchTimestamp(element);
+            if (fetchTimestamp != null) {
+                sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
+            }
+            // report emit delay
+            sourceReaderMetrics.recordEmitDelay(now - messageTimestamp);
         }
     }
 }

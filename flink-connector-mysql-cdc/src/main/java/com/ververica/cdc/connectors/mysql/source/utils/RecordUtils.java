@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
+import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -233,6 +234,42 @@ public class RecordUtils {
         String file = value.getString(BINLOG_FILENAME_OFFSET_KEY);
         Long position = value.getInt64(BINLOG_POSITION_OFFSET_KEY);
         return new BinlogOffset(file, position);
+    }
+
+    /**
+     * Return the timestamp when the change event is produced in MySQL.
+     *
+     * <p>The field `source.ts_ms` in {@link SourceRecord} data struct is the time when the change
+     * event is operated in MySQL.
+     */
+    public static Long getMessageTimestamp(SourceRecord record) {
+        Schema schema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        if (schema.field(Envelope.FieldName.SOURCE) == null) {
+            return null;
+        }
+
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        if (source.schema().field(Envelope.FieldName.TIMESTAMP) == null) {
+            return null;
+        }
+
+        return source.getInt64(Envelope.FieldName.TIMESTAMP);
+    }
+
+    /**
+     * Return the timestamp when the change event is fetched in {@link DebeziumReader}.
+     *
+     * <p>The field `ts_ms` in {@link SourceRecord} data struct is the time when the record fetched
+     * by debezium reader, use it as the process time in Source.
+     */
+    public static Long getFetchTimestamp(SourceRecord record) {
+        Schema schema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        if (schema.field(Envelope.FieldName.TIMESTAMP) == null) {
+            return null;
+        }
+        return value.getInt64(Envelope.FieldName.TIMESTAMP);
     }
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
