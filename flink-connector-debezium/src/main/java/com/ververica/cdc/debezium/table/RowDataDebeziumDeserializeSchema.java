@@ -20,15 +20,23 @@ package com.ververica.cdc.debezium.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.DecimalData;
+import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
+
+import com.esri.core.geometry.ogc.OGCGeometry;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.utils.TemporalConversions;
@@ -47,11 +55,16 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -294,9 +307,10 @@ public final class RowDataDebeziumDeserializeSchema
                 return convertToBinary();
             case DECIMAL:
                 return createDecimalConverter((DecimalType) type);
+            case ARRAY:
+                return createArrayConverter((ArrayType) type);
             case ROW:
                 return createRowConverter((RowType) type);
-            case ARRAY:
             case MAP:
             case MULTISET:
             case RAW:
@@ -484,13 +498,39 @@ public final class RowDataDebeziumDeserializeSchema
     }
 
     private DeserializationRuntimeConverter convertToString() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectWriter objectWriter = objectMapper.writer();
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
             @Override
             public Object convert(Object dbzObj, Schema schema) {
-                return StringData.fromString(dbzObj.toString());
+                // if the dbzObj is instance of Struct, assume it represents GEOMETRY
+                if (dbzObj instanceof Struct) {
+                    try {
+                        Struct geometryStruct = (Struct) dbzObj;
+                        byte[] wkb = geometryStruct.getBytes("wkb");
+                        String geoJson = OGCGeometry.fromBinary(ByteBuffer.wrap(wkb)).asGeoJson();
+                        JsonNode originGeoNode = objectMapper.readTree(geoJson);
+                        Optional<Integer> srid =
+                                Optional.ofNullable(geometryStruct.getInt32("srid"));
+                        Map<String, Object> geometryInfo =
+                                new HashMap<String, Object>() {
+                                    {
+                                        put("type", originGeoNode.get("type"));
+                                        put("coordinates", originGeoNode.get("coordinates"));
+                                        put("srid", srid.orElse(0));
+                                    }
+                                };
+                        return StringData.fromString(objectWriter.writeValueAsString(geometryInfo));
+                    } catch (Exception e) {
+                        throw new IllegalArgumentException(
+                                String.format("Failed to convert %s to geometry JSON.", dbzObj), e);
+                    }
+                } else {
+                    return StringData.fromString(dbzObj.toString());
+                }
             }
         };
     }
@@ -547,6 +587,39 @@ public final class RowDataDebeziumDeserializeSchema
                     }
                 }
                 return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
+            }
+        };
+    }
+
+    private DeserializationRuntimeConverter createArrayConverter(ArrayType arrayType) {
+        final Class<?> elementClass =
+                LogicalTypeUtils.toInternalConversionClass(arrayType.getElementType());
+        final DeserializationRuntimeConverter elementConverter =
+                createConverter(arrayType.getElementType());
+        return (dbzObj, schema) -> {
+            if (dbzObj instanceof List) {
+                List<?> elements = (List<?>) dbzObj;
+                final Object[] elementArray =
+                        (Object[]) Array.newInstance(elementClass, elements.size());
+                for (int i = 0; i < elements.size(); i++) {
+                    elementArray[i] = elementConverter.convert(elements.get(i), schema);
+                }
+                return new GenericArrayData(elementArray);
+            } else if (dbzObj instanceof String) {
+                // for SET datatype in mysql, debezium will always return a string split by comma
+                // like "a,b,c"
+                String[] elements = ((String) dbzObj).split(",");
+                final Object[] elementArray =
+                        (Object[]) Array.newInstance(elementClass, elements.length);
+                for (int i = 0; i < elements.length; i++) {
+                    elementArray[i] = elementConverter.convert(elements[i], schema);
+                }
+                return new GenericArrayData(elementArray);
+            } else {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Unable to convert to arrayType from unexpected value '%s', only List and String type can be converted to arrayType",
+                                dbzObj));
             }
         };
     }

@@ -460,29 +460,41 @@ Data Type Mapping
       <td>DECIMAL(20, 0)</td>
     </tr>
     <tr>
-      <td>BIGINT</td>
-      <td>BIGINT</td>
-    </tr>
-    <tr>
-      <td>FLOAT</td>
+      <td>
+        REAL<br>
+        FLOAT<br>
+        </td>
       <td>FLOAT</td>
     </tr>
     <tr>
       <td>
-        DOUBLE<br>
-        DOUBLE PRECISION</td>
+        DOUBLE
+      </td>
       <td>DOUBLE</td>
     </tr>
     <tr>
       <td>
         NUMERIC(p, s)<br>
-         DECIMAL(p, s)</td>
+        DECIMAL(p, s)<br>
+        where p <= 38<br>
+      </td>
       <td>DECIMAL(p, s)</td>
     </tr>
     <tr>
       <td>
+        NUMERIC(p, s)<br>
+        DECIMAL(p, s)<br>
+        where 38 < p <= 65<br>
+      </td>
+      <td>STRING</td>
+    </tr>
+    <tr>
+      <td>
         BOOLEAN<br>
-         TINYINT(1)</td>
+        TINYINT(1)<br>
+        BIT<br>
+        BIT(1)
+        </td>
       <td>BOOLEAN</td>
     </tr>
     <tr>
@@ -491,35 +503,118 @@ Data Type Mapping
     </tr>
     <tr>
       <td>TIME [(p)]</td>
-      <td>TIME [(p)] [WITHOUT TIMEZONE]</td>
+      <td>TIME [(p)]</td>
     </tr>
     <tr>
       <td>DATETIME [(p)]</td>
-      <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
+      <td>TIMESTAMP [(p)]</td>
     </tr>
     <tr>
       <td>TIMESTAMP [(p)]</td>
-      <td>TIMESTAMP [(p)]<br>
-          TIMESTAMP [(p)] WITH LOCAL TIME ZONE
+      <td>TIMESTAMP [(p)]
       </td>
     </tr>
     <tr>
       <td>
-        CHAR(n)<br>
-        VARCHAR(n)<br>
-        TEXT</td>
+        CHAR(n)
+      </td>
+      <td>CHAR(n)</td>
+    </tr>
+    <tr>
+      <td>
+        VARCHAR(n)
+      </td>
+      <td>VARCHAR(n)</td>
+    </tr>
+    <tr>
+      <td>
+        BIT(n)<br>
+        where n > 1
+      </td>
+      <td>BINARY(⌊n/8⌋)</td>
+    </tr>
+    <tr>
+      <td>
+        BINARY(n)
+      </td>
+      <td>BINARY(n)</td>
+    </tr>
+    <tr>
+      <td>
+        VARBINARY(N)
+      </td>
+      <td>VARBINARY(N)</td>
+    </tr>
+    <tr>
+      <td>
+        TINYTEXT<br>
+        TEXT<br>
+        MEDIUMTEXT<br>
+        LONGTEXT<br>
+      </td>
       <td>STRING</td>
     </tr>
     <tr>
       <td>
-        BINARY<br>
-        VARBINARY<br>
-        BLOB</td>
+        TINYBLOB<br>
+        BLOB<br>
+        MEDIUMBLOB<br>
+        LONGBLOB<br>
+      </td>
       <td>BYTES</td>
+    </tr>
+    <tr>
+      <td>
+        YEAR
+      </td>
+      <td>INT</td>
+    </tr>
+    <tr>
+      <td>
+        ENUM
+      </td>
+      <td>STRING</td>
+    </tr>
+    <tr>
+      <td>
+        JSON
+      </td>
+      <td>STRING</td>
+    </tr>
+    <tr>
+      <td>
+        SET
+      </td>
+      <td>ARRAY&lt;STRING&gt;</td>
+    </tr>
+    <tr>
+      <td>
+       GEOMETRY<br>
+       POINT<br>
+       LINESTRING<br>
+       POLYGON<br>
+       MULTIPOINT<br>
+       MULTILINESTRING<br>
+       MULTIPOLYGON<br>
+       GEOMETRYCOLLECTION<br>
+      </td>
+      <td>
+        STRING
+      </td>
     </tr>
     </tbody>
 </table>
 </div>
+
+**Note:**
+- The precision for DECIMAL data type is up to 65 in MySQL, but the precision for DECIMAL is limited to 38 in Flink.
+  So if you define a decimal column whose precision is greater than 38, you should map it to STRING to avoid precision loss.
+- The JSON data type in MySQL will be converted into STRING with JSON format in Flink.
+- Currently, for BLOB data type in MySQL, only the blob whose length isn't greater than 2,147,483,647(2 ** 31 - 1) is supported. 
+- The spatial data types in MySQL will be converted into STRING with a fixed format like:<br>
+  ```json
+  {"srid": 0, "type": "POINT", "coordinates": [1.0,1.0]}
+  ```
 
 FAQ
 --------

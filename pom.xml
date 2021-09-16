@@ -68,6 +68,7 @@ under the License.
     <properties>
         <flink.version>1.13.1</flink.version>
         <debezium.version>1.5.2.Final</debezium.version>
+        <geometry.version>2.0.0</geometry.version>
         <testcontainers.version>1.15.1</testcontainers.version>
         <java.version>1.8</java.version>
         <scala.binary.version>2.11</scala.binary.version>

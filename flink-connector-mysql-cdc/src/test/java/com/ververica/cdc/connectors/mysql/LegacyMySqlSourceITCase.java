@@ -152,12 +152,16 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
             expectJsonObject = expectJsonObject.getJSONObject("payload");
             actualJsonObject = actualJsonObject.getJSONObject("payload");
         }
-        return Objects.equals(
+        return jsonObjectEquals(
                         expectJsonObject.getJSONObject("after"),
                         actualJsonObject.getJSONObject("after"))
-                && Objects.equals(
+                && jsonObjectEquals(
                         expectJsonObject.getJSONObject("before"),
                         actualJsonObject.getJSONObject("before"))
                 && Objects.equals(expectJsonObject.get("op"), actualJsonObject.get("op"));
+    }
+
+    private static boolean jsonObjectEquals(JSONObject a, JSONObject b) {
+        return (a == b) || (a != null && a.toString().equals(b.toString()));
     }
 }

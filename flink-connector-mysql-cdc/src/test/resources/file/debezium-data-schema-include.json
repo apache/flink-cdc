@@ -34,6 +34,16 @@
                         {
                             "type": "int32",
                             "optional": true,
+                            "field": "medium_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "medium_un_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
                             "field": "int_c"
                         },
                         {
@@ -52,6 +62,11 @@
                             "field": "big_c"
                         },
                         {
+                            "type": "int64",
+                            "optional": true,
+                            "field": "big_un_c"
+                        },
+                        {
                             "type": "string",
                             "optional": true,
                             "field": "varchar_c"
@@ -60,6 +75,11 @@
                             "type": "string",
                             "optional": true,
                             "field": "char_c"
+                        },
+                        {
+                            "type": "double",
+                            "optional": true,
+                            "field": "real_c"
                         },
                         {
                             "type": "double",
@@ -92,6 +112,27 @@
                                 "connect.decimal.precision": "6"
                             },
                             "field": "numeric_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "name": "org.apache.kafka.connect.data.Decimal",
+                            "version": 1,
+                            "parameters": {
+                                "scale": "65",
+                                "connect.decimal.precision": "1"
+                            },
+                            "field": "big_decimal_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "bit1_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "tiny1_c"
                         },
                         {
                             "type": "int16",
@@ -138,6 +179,56 @@
                             "type": "bytes",
                             "optional": true,
                             "field": "file_uuid"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "bit_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "text_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "blob_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "enum_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "set_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "json_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "point_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "geometry_c"
                         }
                     ],
                     "optional": true,
@@ -175,6 +266,16 @@
                         {
                             "type": "int32",
                             "optional": true,
+                            "field": "medium_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "medium_un_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
                             "field": "int_c"
                         },
                         {
@@ -193,6 +294,11 @@
                             "field": "big_c"
                         },
                         {
+                            "type": "int64",
+                            "optional": true,
+                            "field": "big_un_c"
+                        },
+                        {
                             "type": "string",
                             "optional": true,
                             "field": "varchar_c"
@@ -201,6 +307,11 @@
                             "type": "string",
                             "optional": true,
                             "field": "char_c"
+                        },
+                        {
+                            "type": "double",
+                            "optional": true,
+                            "field": "real_c"
                         },
                         {
                             "type": "double",
@@ -233,6 +344,27 @@
                                 "connect.decimal.precision": "6"
                             },
                             "field": "numeric_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "name": "org.apache.kafka.connect.data.Decimal",
+                            "version": 1,
+                            "parameters": {
+                                "scale": "65",
+                                "connect.decimal.precision": "1"
+                            },
+                            "field": "big_decimal_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "bit1_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "tiny1_c"
                         },
                         {
                             "type": "int16",
@@ -279,6 +411,56 @@
                             "type": "bytes",
                             "optional": true,
                             "field": "file_uuid"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "bit_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "text_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "blob_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "enum_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "set_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "json_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "point_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "geometry_c"
                         }
                     ],
                     "optional": true,
@@ -418,23 +600,39 @@
                 "tiny_un_c": 255,
                 "small_c": 32767,
                 "small_un_c": 65535,
+                "medium_c": 8388607,
+                "medium_un_c": 16777215,
                 "int_c": 2147483647,
                 "int_un_c": 4294967295,
                 "int11_c": 2147483647,
                 "big_c": 9223372036854775807,
+                "big_un_c": "AP//////////",
                 "varchar_c": "Hello World",
                 "char_c": "abc",
+                "real_c": 123.102,
                 "float_c": 123.10199737548828,
                 "double_c": 404.4443,
                 "decimal_c": "EtaH",
                 "numeric_c": "AVo=",
+                "big_decimal_c": "FJqkSQ==",
+                "bit1_c": false,
+                "tiny1_c": 1,
                 "boolean_c": 1,
                 "date_c": 18460,
                 "time_c": 64822000000,
                 "datetime3_c": 1595008822123,
                 "datetime6_c": 1595008822123456,
                 "timestamp_c": "2020-07-17T18:00:22Z",
-                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+                "bit_c": "BAQEBAQEBAQ=",
+                "text_c": "text",
+                "blob_c": "EA==",
+                "year_c": 2021,
+                "enum_c": "red",
+                "set_c": "a,b",
+                "json_c": "{\"key1\": \"value1\"}",
+                "point_c": {"x":1.0,"y":1.0,"wkb":"AQEAAAAAAAAAAADwPwAAAAAAAPA/"},
+                "geometry_c":{"wkb":"AQMAAAACAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"}
             },
             "source": {
                 "version": "1.5.2.Final",
@@ -493,6 +691,16 @@
                         {
                             "type": "int32",
                             "optional": true,
+                            "field": "medium_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "medium_un_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
                             "field": "int_c"
                         },
                         {
@@ -511,6 +719,11 @@
                             "field": "big_c"
                         },
                         {
+                            "type": "int64",
+                            "optional": true,
+                            "field": "big_un_c"
+                        },
+                        {
                             "type": "string",
                             "optional": true,
                             "field": "varchar_c"
@@ -519,6 +732,11 @@
                             "type": "string",
                             "optional": true,
                             "field": "char_c"
+                        },
+                        {
+                            "type": "double",
+                            "optional": true,
+                            "field": "real_c"
                         },
                         {
                             "type": "double",
@@ -551,6 +769,27 @@
                                 "connect.decimal.precision": "6"
                             },
                             "field": "numeric_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "name": "org.apache.kafka.connect.data.Decimal",
+                            "version": 1,
+                            "parameters": {
+                                "scale": "65",
+                                "connect.decimal.precision": "1"
+                            },
+                            "field": "big_decimal_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "bit1_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "tiny1_c"
                         },
                         {
                             "type": "int16",
@@ -597,6 +836,56 @@
                             "type": "bytes",
                             "optional": true,
                             "field": "file_uuid"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "bit_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "text_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "blob_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "enum_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "set_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "json_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "point_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "geometry_c"
                         }
                     ],
                     "optional": true,
@@ -634,6 +923,16 @@
                         {
                             "type": "int32",
                             "optional": true,
+                            "field": "medium_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "medium_un_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
                             "field": "int_c"
                         },
                         {
@@ -652,6 +951,11 @@
                             "field": "big_c"
                         },
                         {
+                            "type": "int64",
+                            "optional": true,
+                            "field": "big_un_c"
+                        },
+                        {
                             "type": "string",
                             "optional": true,
                             "field": "varchar_c"
@@ -660,6 +964,11 @@
                             "type": "string",
                             "optional": true,
                             "field": "char_c"
+                        },
+                        {
+                            "type": "double",
+                            "optional": true,
+                            "field": "real_c"
                         },
                         {
                             "type": "double",
@@ -692,6 +1001,27 @@
                                 "connect.decimal.precision": "6"
                             },
                             "field": "numeric_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "name": "org.apache.kafka.connect.data.Decimal",
+                            "version": 1,
+                            "parameters": {
+                                "scale": "65",
+                                "connect.decimal.precision": "1"
+                            },
+                            "field": "big_decimal_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "bit1_c"
+                        },
+                        {
+                            "type": "int16",
+                            "optional": true,
+                            "field": "tiny1_c"
                         },
                         {
                             "type": "int16",
@@ -738,6 +1068,56 @@
                             "type": "bytes",
                             "optional": true,
                             "field": "file_uuid"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "bit_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "text_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "blob_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "int32",
+                            "optional": true,
+                            "field": "year_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "enum_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "set_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "json_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "point_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "geometry_c"
                         }
                     ],
                     "optional": true,
@@ -876,23 +1256,39 @@
                 "tiny_un_c": 255,
                 "small_c": 32767,
                 "small_un_c": 65535,
+                "medium_c": 8388607,
+                "medium_un_c": 16777215,
                 "int_c": 2147483647,
                 "int_un_c": 4294967295,
                 "int11_c": 2147483647,
                 "big_c": 9223372036854775807,
+                "big_un_c": "AP//////////",
                 "varchar_c": "Hello World",
                 "char_c": "abc",
+                "real_c": 123.102,
                 "float_c": 123.10199737548828,
                 "double_c": 404.4443,
                 "decimal_c": "EtaH",
                 "numeric_c": "AVo=",
+                "big_decimal_c": "FJqkSQ==",
+                "bit1_c": false,
+                "tiny1_c": 1,
                 "boolean_c": 1,
                 "date_c": 18460,
                 "time_c": 64822000000,
                 "datetime3_c": 1595008822123,
                 "datetime6_c": 1595008822123456,
                 "timestamp_c": "2020-07-17T18:00:22Z",
-                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+                "bit_c": "BAQEBAQEBAQ=",
+                "text_c": "text",
+                "blob_c": "EA==",
+                "year_c": 2021,
+                "enum_c": "red",
+                "set_c": "a,b",
+                "json_c": "{\"key1\":\"value1\"}",
+                "point_c": {"x":1.0,"y":1.0,"wkb":"AQEAAAAAAAAAAADwPwAAAAAAAPA/"},
+                "geometry_c":{"wkb":"AQMAAAACAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"}
             },
             "after": {
                 "id": 1,
@@ -900,23 +1296,39 @@
                 "tiny_un_c": 255,
                 "small_c": 32767,
                 "small_un_c": 65535,
+                "medium_c": 8388607,
+                "medium_un_c": 16777215,
                 "int_c": 2147483647,
                 "int_un_c": 4294967295,
                 "int11_c": 2147483647,
                 "big_c": 9223372036854775807,
+                "big_un_c": "AP//////////",
                 "varchar_c": "Hello World",
                 "char_c": "abc",
+                "real_c": 123.102,
                 "float_c": 123.10199737548828,
                 "double_c": 404.4443,
                 "decimal_c": "EtaH",
                 "numeric_c": "AVo=",
+                "big_decimal_c": "FJqkSQ==",
+                "bit1_c": false,
+                "tiny1_c": 1,
                 "boolean_c": 1,
                 "date_c": 18460,
                 "time_c": 64822000000,
                 "datetime3_c": 1595008822123,
                 "datetime6_c": 1595008822123456,
                 "timestamp_c": "2020-07-17T18:33:22Z",
-                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA=="
+                "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
+                "bit_c": "BAQEBAQEBAQ=",
+                "text_c": "text",
+                "blob_c": "EA==",
+                "year_c": 2021,
+                "enum_c": "red",
+                "set_c": "a,b",
+                "json_c": "{\"key1\":\"value1\"}",
+                "point_c": {"x":1.0,"y":1.0,"wkb":"AQEAAAAAAAAAAADwPwAAAAAAAPA/"},
+                "geometry_c":{"wkb":"AQMAAAACAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"}
             },
             "source": {
                 "version": "1.5.2.Final",
