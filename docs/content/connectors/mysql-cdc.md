@@ -429,18 +429,21 @@ Data Type Mapping
       <tr>
         <th class="text-left">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">NOTE</th>
       </tr>
     </thead>
     <tbody>
     <tr>
       <td>TINYINT</td>
       <td>TINYINT</td>
+      <td></td>
     </tr>
     <tr>
       <td>
         SMALLINT<br>
         TINYINT UNSIGNED</td>
       <td>SMALLINT</td>
+      <td></td>
     </tr>
     <tr>
       <td>
@@ -448,78 +451,251 @@ Data Type Mapping
         MEDIUMINT<br>
         SMALLINT UNSIGNED</td>
       <td>INT</td>
+      <td></td>
     </tr>
     <tr>
       <td>
         BIGINT<br>
         INT UNSIGNED</td>
       <td>BIGINT</td>
+      <td></td>
     </tr>
    <tr>
       <td>BIGINT UNSIGNED</td>
       <td>DECIMAL(20, 0)</td>
-    </tr>
-    <tr>
-      <td>BIGINT</td>
-      <td>BIGINT</td>
-    </tr>
-    <tr>
-      <td>FLOAT</td>
-      <td>FLOAT</td>
+      <td></td>
     </tr>
     <tr>
       <td>
-        DOUBLE<br>
-        DOUBLE PRECISION</td>
+        REAL<br>
+        FLOAT<br>
+        </td>
+      <td>FLOAT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        DOUBLE
+      </td>
       <td>DOUBLE</td>
+      <td></td>
     </tr>
     <tr>
       <td>
         NUMERIC(p, s)<br>
-         DECIMAL(p, s)</td>
+        DECIMAL(p, s)<br>
+        where p <= 38<br>
+      </td>
       <td>DECIMAL(p, s)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        NUMERIC(p, s)<br>
+        DECIMAL(p, s)<br>
+        where 38 < p <= 65<br>
+      </td>
+      <td>STRING</td>
+      <td>The precision for DECIMAL data type is up to 65 in MySQL, but the precision for DECIMAL is limited to 38 in Flink.
+  So if you define a decimal column whose precision is greater than 38, you should map it to STRING to avoid precision loss.</td>
     </tr>
     <tr>
       <td>
         BOOLEAN<br>
-         TINYINT(1)</td>
+        TINYINT(1)<br>
+        BIT(1)
+        </td>
       <td>BOOLEAN</td>
+      <td></td>
     </tr>
     <tr>
       <td>DATE</td>
       <td>DATE</td>
+      <td></td>
     </tr>
     <tr>
       <td>TIME [(p)]</td>
-      <td>TIME [(p)] [WITHOUT TIMEZONE]</td>
+      <td>TIME [(p)]</td>
+      <td></td>
     </tr>
     <tr>
-      <td>DATETIME [(p)]</td>
-      <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
-    </tr>
-    <tr>
-      <td>TIMESTAMP [(p)]</td>
       <td>TIMESTAMP [(p)]<br>
-          TIMESTAMP [(p)] WITH LOCAL TIME ZONE
+        DATETIME [(p)]
+      </td>
+      <td>TIMESTAMP [(p)]
+      </td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        CHAR(n)
+      </td>
+      <td>CHAR(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        VARCHAR(n)
+      </td>
+      <td>VARCHAR(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        BIT(n)
+      </td>
+      <td>BINARY(⌈n/8⌉)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        BINARY(n)
+      </td>
+      <td>BINARY(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        VARBINARY(N)
+      </td>
+      <td>VARBINARY(N)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        TINYTEXT<br>
+        TEXT<br>
+        MEDIUMTEXT<br>
+        LONGTEXT<br>
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        TINYBLOB<br>
+        BLOB<br>
+        MEDIUMBLOB<br>
+        LONGBLOB<br>
+      </td>
+      <td>BYTES</td>
+      <td>Currently, for BLOB data type in MySQL, only the blob whose length isn't greater than 2,147,483,647(2 ** 31 - 1) is supported. </td>
+    </tr>
+    <tr>
+      <td>
+        YEAR
+      </td>
+      <td>INT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        ENUM
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        JSON
+      </td>
+      <td>STRING</td>
+      <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
+    </tr>
+    <tr>
+      <td>
+        SET
+      </td>
+      <td>ARRAY&lt;STRING&gt;</td>
+      <td>As the SET data type in MySQL is a string object that can have zero or more values, 
+          it should always be mapped to an array of string
       </td>
     </tr>
     <tr>
       <td>
-        CHAR(n)<br>
-        VARCHAR(n)<br>
-        TEXT</td>
-      <td>STRING</td>
-    </tr>
-    <tr>
+       GEOMETRY<br>
+       POINT<br>
+       LINESTRING<br>
+       POLYGON<br>
+       MULTIPOINT<br>
+       MULTILINESTRING<br>
+       MULTIPOLYGON<br>
+       GEOMETRYCOLLECTION<br>
+      </td>
       <td>
-        BINARY<br>
-        VARBINARY<br>
-        BLOB</td>
-      <td>BYTES</td>
+        STRING
+      </td>
+      <td>
+      The spatial data types in MySQL will be converted into STRING with a fixed Json format.
+      Please see <a href="#mysql-spatial-data-types-mapping ">MySQL Spatial Data Types Mapping</a> section for more detailed information.
+      </td>
     </tr>
     </tbody>
 </table>
 </div>
+
+### MySQL Spatial Data Types Mapping
+The spatial data types except for `GEOMETRYCOLLECTION` in MySQL will be converted into Json String with a fixed format like:<br>
+```json
+{"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
+```
+The field `srid` identifies the SRS in which the geometry is defined, SRID 0 is the default for new geometry values if no SRID is specified.
+As only MySQL 8+ support to specific SRID when define spatial data type, the field `srid` will always be 0 in MySQL with a lower version.
+
+The field `type` identifies the spatial data type, such as `POINT`/`LINESTRING`/`POLYGON`.
+
+The field `coordinates` represents the `coordinates` of the spatial data.
+
+For `GEOMETRYCOLLECTION`, it will be converted into Json String with a fixed format like:<br>
+```json
+{"srid": 0 , "type": "GeometryCollection", "geometries": [{"type":"Point","coordinates":[10,10]}]}
+```
+
+The field `geometries` is an array contains all spatial data.
+
+The example for different spatial data types mapping is as follows:
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Spatial data in MySQL</th>
+        <th class="text-left">Json String converted in Flink</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>POINT(1 1)</td>
+        <td>{"coordinates":[1,1],"type":"Point","srid":0}</td>
+      </tr>
+      <tr>
+        <td>LINESTRING(3 0, 3 3, 3 5)</td>
+        <td>{"coordinates":[[3,0],[3,3],[3,5]],"type":"LineString","srid":0}</td>
+      </tr>
+      <tr>
+        <td>POLYGON((1 1, 2 1, 2 2,  1 2, 1 1))</td>
+        <td>{"coordinates":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],"type":"Polygon","srid":0}</td>
+      </tr>
+      <tr>
+        <td>MULTIPOINT((1 1),(2 2))</td>
+        <td>{"coordinates":[[1,1],[2,2]],"type":"MultiPoint","srid":0}</td>
+      </tr>
+      <tr>
+        <td>MultiLineString((1 1,2 2,3 3),(4 4,5 5))</td>
+        <td>{"coordinates":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],"type":"MultiLineString","srid":0}</td>
+      </tr>
+      <tr>
+        <td>MULTIPOLYGON(((0 0, 10 0, 10 10, 0 10, 0 0)), ((5 5, 7 5, 7 7, 5 7, 5 5)))</td>
+        <td>{"coordinates":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],"type":"MultiPolygon","srid":0}</td>
+      </tr>
+      <tr>
+        <td>GEOMETRYCOLLECTION(POINT(10 10), POINT(30 30), LINESTRING(15 15, 20 20))</td>
+        <td>{"geometries":[{"type":"Point","coordinates":[10,10]},{"type":"Point","coordinates":[30,30]},{"type":"LineString","coordinates":[[15,15],[20,20]]}],"type":"GeometryCollection","srid":0}</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+
 
 FAQ
 --------

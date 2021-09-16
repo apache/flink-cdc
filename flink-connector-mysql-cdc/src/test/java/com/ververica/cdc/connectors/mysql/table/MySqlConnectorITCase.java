@@ -322,16 +322,23 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "    tiny_un_c SMALLINT ,\n"
                                 + "    small_c SMALLINT,\n"
                                 + "    small_un_c INT,\n"
+                                + "    medium_c INT,\n"
+                                + "    medium_un_c INT,\n"
                                 + "    int_c INT ,\n"
                                 + "    int_un_c BIGINT,\n"
                                 + "    int11_c BIGINT,\n"
                                 + "    big_c BIGINT,\n"
-                                + "    varchar_c STRING,\n"
-                                + "    char_c STRING,\n"
+                                + "    big_un_c DECIMAL(20, 0),\n"
+                                + "    varchar_c VARCHAR(255),\n"
+                                + "    char_c CHAR(3),\n"
+                                + "    real_c FLOAT,\n"
                                 + "    float_c FLOAT,\n"
                                 + "    double_c DOUBLE,\n"
                                 + "    decimal_c DECIMAL(8, 4),\n"
                                 + "    numeric_c DECIMAL(6, 0),\n"
+                                + "    big_decimal_c STRING,\n"
+                                + "    bit1_c BOOLEAN,\n"
+                                + "    tiny1_c BOOLEAN,\n"
                                 + "    boolean_c BOOLEAN,\n"
                                 + "    date_c DATE,\n"
                                 + "    time_c TIME(0),\n"
@@ -339,6 +346,24 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "    datetime6_c TIMESTAMP(6),\n"
                                 + "    timestamp_c TIMESTAMP(0),\n"
                                 + "    file_uuid BYTES,\n"
+                                + "    bit_c BINARY(8),\n"
+                                + "    text_c STRING,\n"
+                                + "    tiny_blob_c BYTES,\n"
+                                + "    blob_c BYTES,\n"
+                                + "    medium_blob_c BYTES,\n"
+                                + "    long_blob_c BYTES,\n"
+                                + "    year_c INT,\n"
+                                + "    enum_c STRING,\n"
+                                + "    set_c ARRAY<STRING>,\n"
+                                + "    json_c STRING,\n"
+                                + "    point_c STRING,\n"
+                                + "    geometry_c STRING,\n"
+                                + "    linestring_c STRING,\n"
+                                + "    polygon_c STRING,\n"
+                                + "    multipoint_c STRING,\n"
+                                + "    multiline_c STRING,\n"
+                                + "    multipolygon_c STRING,\n"
+                                + "    geometrycollection_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -373,39 +398,135 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "tiny_un_c,\n"
                                 + "small_c,\n"
                                 + "small_un_c,\n"
+                                + "medium_c, \n"
+                                + "medium_un_c, \n"
                                 + "int_c,\n"
                                 + "int_un_c,\n"
                                 + "int11_c,\n"
                                 + "big_c,\n"
+                                + "big_un_c, \n"
                                 + "varchar_c,\n"
                                 + "char_c,\n"
+                                + "real_c, \n"
                                 + "float_c,\n"
                                 + "double_c,\n"
                                 + "decimal_c,\n"
                                 + "numeric_c,\n"
+                                + "big_decimal_c,\n"
+                                + "bit1_c,\n"
+                                + "tiny1_c,\n"
                                 + "boolean_c,\n"
                                 + "date_c,\n"
                                 + "time_c,\n"
                                 + "datetime3_c,\n"
                                 + "datetime6_c,\n"
                                 + "timestamp_c,\n"
-                                + "TO_BASE64(DECODE(file_uuid, 'UTF-8')) FROM full_types");
+                                + "TO_BASE64(DECODE(file_uuid, 'UTF-8')),\n"
+                                + "bit_c,\n"
+                                + "text_c,\n"
+                                + "tiny_blob_c,\n"
+                                + "blob_c,\n"
+                                + "medium_blob_c,\n"
+                                + "long_blob_c,\n"
+                                + "year_c,\n"
+                                + "enum_c,\n"
+                                + "set_c,\n"
+                                + "json_c, \n"
+                                + "point_c, \n"
+                                + "geometry_c, \n"
+                                + "linestring_c, \n"
+                                + "polygon_c, \n"
+                                + "multipoint_c, \n"
+                                + "multiline_c, \n"
+                                + "multipolygon_c, \n"
+                                + "geometrycollection_c \n"
+                                + " FROM full_types");
 
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
 
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-
             statement.execute(
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
-
+        String expectedPointJsonText = "{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}";
+        String expectedGeometryJsonText =
+                "{\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}";
+        String expectLinestringJsonText =
+                "{\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0}";
+        String expectPolygonJsonText =
+                "{\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}";
+        String expectMultipointJsonText =
+                "{\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0}";
+        String expectMultilineJsonText =
+                "{\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0}";
+        String expectMultipolygonJsonText =
+                "{\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0}";
+        String expectGeometryCollectionJsonText =
+                "{\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0}";
         String[] expected =
                 new String[] {
-                    "+I[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]",
-                    "-U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]",
-                    "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]"
+                    "+I[1, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, Hello World, abc, 123.102, 123.102, 404.4443, 123.4567, 346, 34567892.1, false, true, true,"
+                            + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, "
+                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
+                            + "{\"key1\": \"value1\"}, "
+                            + expectedPointJsonText
+                            + ", "
+                            + expectedGeometryJsonText
+                            + ", "
+                            + expectLinestringJsonText
+                            + ", "
+                            + expectPolygonJsonText
+                            + ", "
+                            + expectMultipointJsonText
+                            + ", "
+                            + expectMultilineJsonText
+                            + ", "
+                            + expectMultipolygonJsonText
+                            + ", "
+                            + expectGeometryCollectionJsonText
+                            + "]",
+                    "-U[1, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, Hello World, abc, 123.102, 123.102, 404.4443, 123.4567, 346, 34567892.1, false, true, true,"
+                            + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, "
+                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
+                            + "{\"key1\":\"value1\"}, "
+                            + expectedPointJsonText
+                            + ", "
+                            + expectedGeometryJsonText
+                            + ", "
+                            + expectLinestringJsonText
+                            + ", "
+                            + expectPolygonJsonText
+                            + ", "
+                            + expectMultipointJsonText
+                            + ", "
+                            + expectMultilineJsonText
+                            + ", "
+                            + expectMultipolygonJsonText
+                            + ", "
+                            + expectGeometryCollectionJsonText
+                            + "]",
+                    "+U[1, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, Hello World, abc, 123.102, 123.102, 404.4443, 123.4567, 346, 34567892.1, false, true, true,"
+                            + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, "
+                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
+                            + "{\"key1\":\"value1\"}, "
+                            + expectedPointJsonText
+                            + ", "
+                            + expectedGeometryJsonText
+                            + ", "
+                            + expectLinestringJsonText
+                            + ", "
+                            + expectPolygonJsonText
+                            + ", "
+                            + expectMultipointJsonText
+                            + ", "
+                            + expectMultilineJsonText
+                            + ", "
+                            + expectMultipolygonJsonText
+                            + ", "
+                            + expectGeometryCollectionJsonText
+                            + "]",
                 };
 
         assertEqualsInAnyOrder(

@@ -65,6 +65,7 @@ under the License.
                                     <include>com.zendesk:mysql-binlog-connector-java</include>
                                     <include>com.fasterxml.*:*</include>
                                     <include>com.google.guava:*</include>
+                                    <include>com.esri.geometry:esri-geometry-api</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -105,6 +106,10 @@ under the License.
                                     <shadedPattern>
                                         com.ververica.cdc.connectors.shaded.com.google
                                     </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.esri.geometry</pattern>
+                                    <shadedPattern>com.ververica.cdc.connectors.shaded.com.esri.geometry</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

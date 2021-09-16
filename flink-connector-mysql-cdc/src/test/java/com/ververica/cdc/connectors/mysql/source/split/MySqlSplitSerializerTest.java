@@ -22,10 +22,10 @@ import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.Test;
 
@@ -155,6 +155,6 @@ public class MySqlSplitSerializerTest {
                         + "\"typeExpression\":\"VARCHAR\",\"charsetName\":\"latin1\",\"length\":1024,"
                         + "\"position\":4,\"optional\":true,\"autoIncremented\":false,\"generated\":false}]}}";
         final Document doc = DocumentReader.defaultReader().read(tableChangeJsonStr);
-        return JsonTableChangeSerializer.fromDocument(doc, true);
+        return FlinkJsonTableChangeSerializer.fromDocument(doc, true);
     }
 }
