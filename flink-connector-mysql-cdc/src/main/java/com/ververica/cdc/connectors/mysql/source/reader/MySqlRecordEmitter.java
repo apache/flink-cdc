@@ -25,7 +25,6 @@ import org.apache.flink.util.Collector;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
-import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
@@ -36,7 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getFetchTimestamp;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getMessageTimestamp;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getWatermark;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
@@ -107,19 +108,20 @@ public final class MySqlRecordEmitter<T>
         }
     }
 
-    private void reportMetrics(SourceRecord sourceRecord) {
-        // update process time
-        sourceReaderMetrics.recordProcessTime(System.currentTimeMillis());
-        Long messageTimestamp = RecordUtils.getMessageTimestamp(sourceRecord);
-        if (messageTimestamp == null) {
-            return;
+    private void reportMetrics(SourceRecord element) {
+        long now = System.currentTimeMillis();
+        // record the latest process time
+        sourceReaderMetrics.recordProcessTime(now);
+        Long messageTimestamp = getMessageTimestamp(element);
+
+        if (messageTimestamp != null && messageTimestamp > 0L) {
+            // report fetch delay
+            Long fetchTimestamp = getFetchTimestamp(element);
+            if (fetchTimestamp != null) {
+                sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
+            }
+            // report emit delay
+            sourceReaderMetrics.recordEmitDelay(now - messageTimestamp);
         }
-        // report fetch delay
-        Long fetchTimestamp = RecordUtils.getFetchTimestamp(sourceRecord);
-        if (fetchTimestamp != null) {
-            sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
-        }
-        // report emit delay
-        sourceReaderMetrics.recordEmitDelay(System.currentTimeMillis() - messageTimestamp);
     }
 }

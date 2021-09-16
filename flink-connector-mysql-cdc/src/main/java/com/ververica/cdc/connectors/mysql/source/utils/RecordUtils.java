@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
+import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -235,6 +236,12 @@ public class RecordUtils {
         return new BinlogOffset(file, position);
     }
 
+    /**
+     * Return the timestamp when the change event is produced in MySQL.
+     *
+     * <p>The field `source.ts_ms` in {@link SourceRecord} data struct is the time when the change
+     * event is operated in MySQL.
+     */
     public static Long getMessageTimestamp(SourceRecord record) {
         Schema schema = record.valueSchema();
         Struct value = (Struct) record.value();
@@ -251,10 +258,10 @@ public class RecordUtils {
     }
 
     /**
-     * Return the fetch timestamp of {@link SourceRecord}.
+     * Return the timestamp when the change event is fetched in {@link DebeziumReader}.
      *
-     * <p>We use the optional field ts_ms in {@link SourceRecord} as the fetch timestamp for the
-     * field ts_ms represents the time at which the record is processed by debezium connector.
+     * <p>The field `ts_ms` in {@link SourceRecord} data struct is the time when the record fetched
+     * by debezium reader, use it as the process time in Source.
      */
     public static Long getFetchTimestamp(SourceRecord record) {
         Schema schema = record.valueSchema();
