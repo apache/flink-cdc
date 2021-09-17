@@ -47,8 +47,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl.HISTORY_RECORD_FIELD;
-import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_FILENAME_OFFSET_KEY;
-import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_POSITION_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.SIGNAL_EVENT_VALUE_SCHEMA_NAME;
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.SPLIT_ID_KEY;
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WATERMARK_KIND;
@@ -230,10 +228,7 @@ public class RecordUtils {
     }
 
     public static BinlogOffset getWatermark(SourceRecord watermarkEvent) {
-        Struct value = (Struct) watermarkEvent.value();
-        String file = value.getString(BINLOG_FILENAME_OFFSET_KEY);
-        Long position = value.getInt64(BINLOG_POSITION_OFFSET_KEY);
-        return new BinlogOffset(file, position);
+        return getBinlogPosition(watermarkEvent.sourceOffset());
     }
 
     /**
@@ -290,14 +285,12 @@ public class RecordUtils {
             MySqlSnapshotSplit split, SourceRecord highWatermark) {
         Struct value = (Struct) highWatermark.value();
         String splitId = value.getString(SPLIT_ID_KEY);
-        String file = value.getString(BINLOG_FILENAME_OFFSET_KEY);
-        Long position = value.getInt64(BINLOG_POSITION_OFFSET_KEY);
         return new FinishedSnapshotSplitInfo(
                 split.getTableId(),
                 splitId,
                 split.getSplitStart(),
                 split.getSplitEnd(),
-                new BinlogOffset(file, position));
+                getBinlogPosition(highWatermark.sourceOffset()));
     }
 
     /** Returns the start offset of the binlog split. */
@@ -339,11 +332,16 @@ public class RecordUtils {
     }
 
     public static BinlogOffset getBinlogPosition(SourceRecord dataRecord) {
-        Struct value = (Struct) dataRecord.value();
-        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-        String fileName = (String) source.get(BINLOG_FILENAME_OFFSET_KEY);
-        Long position = (Long) (source.get(BINLOG_POSITION_OFFSET_KEY));
-        return new BinlogOffset(fileName, position);
+        return getBinlogPosition(dataRecord.sourceOffset());
+    }
+
+    public static BinlogOffset getBinlogPosition(Map<String, ?> offset) {
+        Map<String, String> offsetStrMap = new HashMap<>();
+        for (Map.Entry<String, ?> entry : offset.entrySet()) {
+            offsetStrMap.put(
+                    entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
+        }
+        return new BinlogOffset(offsetStrMap);
     }
 
     /** Returns the specific key contains in the split key range or not. */

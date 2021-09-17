@@ -37,9 +37,8 @@ import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_FILENAME_OFFSET_KEY;
-import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.BINLOG_POSITION_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.NO_STOPPING_OFFSET;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 
 /**
  * Task to read all binlog for table and also supports read bounded (from lowWatermark to
@@ -47,7 +46,7 @@ import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.NO_S
  */
 public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
-    private static final Logger logger = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
     private final MySqlBinlogSplit binlogSplit;
     private final MySqlOffsetContext offsetContext;
     private final EventDispatcherImpl<TableId> eventDispatcher;
@@ -80,7 +79,8 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
         this.offsetContext = offsetContext;
         this.errorHandler = errorHandler;
         this.signalEventDispatcher =
-                new SignalEventDispatcher(offsetContext, topic, eventDispatcher.getQueue());
+                new SignalEventDispatcher(
+                        offsetContext.getPartition(), topic, eventDispatcher.getQueue());
     }
 
     @Override
@@ -94,14 +94,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
         super.handleEvent(event);
         // check do we need to stop for read binlog for snapshot split.
         if (isBoundedRead()) {
-            final BinlogOffset currentBinlogOffset =
-                    new BinlogOffset(
-                            offsetContext.getOffset().get(BINLOG_FILENAME_OFFSET_KEY).toString(),
-                            Long.parseLong(
-                                    offsetContext
-                                            .getOffset()
-                                            .get(BINLOG_POSITION_OFFSET_KEY)
-                                            .toString()));
+            final BinlogOffset currentBinlogOffset = getBinlogPosition(offsetContext.getOffset());
             // reach the high watermark, the binlog reader should finished
             if (currentBinlogOffset.isAtOrBefore(binlogSplit.getEndingOffset())) {
                 // send binlog end event
@@ -111,7 +104,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
                             currentBinlogOffset,
                             SignalEventDispatcher.WatermarkKind.BINLOG_END);
                 } catch (InterruptedException e) {
-                    logger.error("Send signal event error.", e);
+                    LOG.error("Send signal event error.", e);
                     errorHandler.setProducerThrowable(
                             new DebeziumException("Error processing binlog signal event", e));
                 }

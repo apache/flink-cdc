@@ -48,7 +48,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
 
     public static final MySqlSplitSerializer INSTANCE = new MySqlSplitSerializer();
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -98,7 +98,6 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             out.writeInt(BINLOG_SPLIT_FLAG);
             out.writeUTF(binlogSplit.splitId());
             out.writeUTF(binlogSplit.getSplitKeyType().asSerializableString());
-
             writeBinlogPosition(binlogSplit.getStartingOffset(), out);
             writeBinlogPosition(binlogSplit.getEndingOffset(), out);
             writeFinishedSplitsInfo(binlogSplit.getFinishedSnapshotSplitInfos(), out);
@@ -114,13 +113,16 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
 
     @Override
     public MySqlSplit deserialize(int version, byte[] serialized) throws IOException {
-        if (version == VERSION) {
-            return deserializeV1(serialized);
+        switch (version) {
+            case 1:
+            case 2:
+                return deserializeSplit(version, serialized);
+            default:
+                throw new IOException("Unknown version: " + version);
         }
-        throw new IOException("Unknown version: " + version);
     }
 
-    public MySqlSplit deserializeV1(byte[] serialized) throws IOException {
+    public MySqlSplit deserializeSplit(int version, byte[] serialized) throws IOException {
         final DataInputDeserializer in = new DataInputDeserializer(serialized);
 
         int splitKind = in.readInt();
@@ -130,7 +132,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
             Object[] splitBoundaryStart = serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = serializedStringToRow(in.readUTF());
-            BinlogOffset highWatermark = readBinlogPosition(in);
+            BinlogOffset highWatermark = readBinlogPosition(version, in);
             Map<TableId, TableChange> tableSchemas = readTableSchemas(in);
 
             return new MySqlSnapshotSplit(
@@ -144,9 +146,10 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         } else if (splitKind == BINLOG_SPLIT_FLAG) {
             String splitId = in.readUTF();
             RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
-            BinlogOffset startingOffset = readBinlogPosition(in);
-            BinlogOffset endingOffset = readBinlogPosition(in);
-            List<FinishedSnapshotSplitInfo> finishedSplitsInfo = readFinishedSplitsInfo(in);
+            BinlogOffset startingOffset = readBinlogPosition(version, in);
+            BinlogOffset endingOffset = readBinlogPosition(version, in);
+            List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
+                    readFinishedSplitsInfo(version, in);
             Map<TableId, TableChange> tableChangeMap = readTableSchemas(in);
             in.releaseArrays();
             return new MySqlBinlogSplit(
@@ -201,8 +204,8 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         }
     }
 
-    private static List<FinishedSnapshotSplitInfo> readFinishedSplitsInfo(DataInputDeserializer in)
-            throws IOException {
+    private static List<FinishedSnapshotSplitInfo> readFinishedSplitsInfo(
+            int version, DataInputDeserializer in) throws IOException {
         List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
@@ -210,7 +213,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             String splitId = in.readUTF();
             Object[] splitStart = serializedStringToRow(in.readUTF());
             Object[] splitEnd = serializedStringToRow(in.readUTF());
-            BinlogOffset highWatermark = readBinlogPosition(in);
+            BinlogOffset highWatermark = readBinlogPosition(version, in);
             finishedSplitsInfo.add(
                     new FinishedSnapshotSplitInfo(
                             tableId, splitId, splitStart, splitEnd, highWatermark));

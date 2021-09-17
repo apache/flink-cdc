@@ -18,22 +18,16 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.data.conversion.RowRowConverter;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.utils.TypeConversions;
-import org.apache.flink.types.Row;
-import org.apache.flink.util.Collector;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
-import com.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -41,9 +35,8 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -68,14 +61,13 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
 /** Tests for {@link BinlogSplitReader}. */
-public class BinlogSplitReaderTest extends MySqlTestBase {
+public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
 
-    private static final int currentParallelism = 4;
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -305,9 +297,6 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
-
         String[] expected =
                 new String[] {
                     "-U[103, user_3, Shanghai, 123567891234]",
@@ -324,7 +313,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
                 };
         List<String> actual =
                 readBinlogSplitsFromLatestOffset(dataType, configuration, expected.length);
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertThat(actual, containsInAnyOrder(expected));
     }
 
     private List<String> readBinlogSplitsFromLatestOffset(
@@ -359,7 +348,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
             while (recordIterator.hasNext()) {
                 fetchedRecords.add(recordIterator.next());
             }
-            actual = formatResult(fetchedRecords, dataType);
+            actual.addAll(formatResult(fetchedRecords, dataType));
+            fetchedRecords.clear();
             if (actual.size() >= expectedSize) {
                 break;
             }
@@ -436,7 +426,8 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
             while (recordIterator.hasNext()) {
                 fetchedRecords.add(recordIterator.next());
             }
-            actual = formatResult(fetchedRecords, dataType);
+            actual.addAll(formatResult(fetchedRecords, dataType));
+            fetchedRecords.clear();
             if (actual.size() >= expectedSize) {
                 break;
             }
@@ -447,6 +438,7 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
     private void makeCustomersBinlogEvents(
             JdbcConnection connection, String tableId, boolean firstSplitOnly) throws SQLException {
         // make binlog events for the first split
+        connection.setAutoCommit(false);
         connection.execute(
                 "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
                 "DELETE FROM " + tableId + " where id = 102",
@@ -558,36 +550,14 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         return finishedSplitsInfo;
     }
 
-    private List<String> formatResult(List<SourceRecord> records, DataType dataType)
-            throws Exception {
-        final RowType rowType = (RowType) dataType.getLogicalType();
-        final TypeInformation<RowData> typeInfo =
-                (TypeInformation<RowData>) TypeConversions.fromDataTypeToLegacyInfo(dataType);
-        final DebeziumDeserializationSchema<RowData> deserializationSchema =
-                new RowDataDebeziumDeserializeSchema(
-                        rowType, typeInfo, ((rowData, rowKind) -> {}), ZoneId.of("UTC"));
-        SimpleCollector collector = new SimpleCollector();
-        RowRowConverter rowRowConverter = RowRowConverter.create(dataType);
-        rowRowConverter.open(Thread.currentThread().getContextClassLoader());
-        // filter signal event
-        // filter schema change event
-        for (SourceRecord r : records) {
-            if (!isWatermarkEvent(r)) {
-                if (!isSchemaChangeEvent(r)) {
-                    deserializationSchema.deserialize(r, collector);
-                }
-            }
-        }
-        return collector.list.stream()
-                .map(rowRowConverter::toExternal)
-                .map(Row::toString)
-                .sorted()
-                .collect(Collectors.toList());
+    private List<String> formatResult(List<SourceRecord> records, DataType dataType) {
+        final RecordsFormatter formatter = new RecordsFormatter(dataType);
+        return formatter.format(records);
     }
 
     private List<MySqlSnapshotSplit> getMySqlSplits(Configuration configuration) {
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, currentParallelism);
+                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {
@@ -624,20 +594,5 @@ public class BinlogSplitReaderTest extends MySqlTestBase {
         properties.put("scan.snapshot.fetch.size", "2");
 
         return Configuration.fromMap(properties);
-    }
-
-    private static class SimpleCollector implements Collector<RowData> {
-
-        private List<RowData> list = new ArrayList<>();
-
-        @Override
-        public void collect(RowData record) {
-            list.add(record);
-        }
-
-        @Override
-        public void close() {
-            // do nothing
-        }
     }
 }
