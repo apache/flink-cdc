@@ -440,9 +440,10 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         TableResult result = tEnv.executeSql("SELECT * FROM debezium_source");
 
         // wait for the source startup, we don't have a better way to wait it, use sleep for now
-        while (result.getJobClient().get().getJobStatus().get() != RUNNING) {
+        do {
             Thread.sleep(5000L);
-        }
+        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+
         CloseableIterator<Row> iterator = result.collect();
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
