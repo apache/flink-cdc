@@ -59,7 +59,7 @@ import java.sql.Types;
 import java.time.Duration;
 import java.util.Calendar;
 
-import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.getCurrentBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
 
 /** Task to read snapshot split of table. */
 public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSource {
@@ -129,28 +129,27 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
             throws Exception {
         final RelationalSnapshotChangeEventSource.RelationalSnapshotContext ctx =
                 (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
+        ctx.offset = offsetContext;
+        final SignalEventDispatcher signalEventDispatcher =
+                new SignalEventDispatcher(
+                        offsetContext.getPartition(),
+                        topicSelector.topicNameFor(snapshotSplit.getTableId()),
+                        dispatcher.getQueue());
 
-        final BinlogOffset lowWatermark = getCurrentBinlogPosition(jdbcConnection);
+        final BinlogOffset lowWatermark = currentBinlogOffset(jdbcConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
                 snapshotSplit);
-        offsetContext.setBinlogStartPoint(lowWatermark.getFilename(), lowWatermark.getPosition());
-        ctx.offset = offsetContext;
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setLowWatermark(lowWatermark);
-
-        final SignalEventDispatcher signalEventDispatcher =
-                new SignalEventDispatcher(
-                        offsetContext,
-                        topicSelector.topicNameFor(snapshotSplit.getTableId()),
-                        dispatcher.getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
                 snapshotSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
 
         LOG.info("Snapshot step 2 - Snapshotting data");
         createDataEvents(ctx, snapshotSplit.getTableId());
-        final BinlogOffset highWatermark = getCurrentBinlogPosition(jdbcConnection);
+
+        final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,

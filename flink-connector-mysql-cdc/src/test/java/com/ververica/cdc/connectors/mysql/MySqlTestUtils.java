@@ -32,7 +32,7 @@ import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;

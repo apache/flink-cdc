@@ -26,8 +26,8 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import com.ververica.cdc.connectors.mysql.MySqlValidatorTest;
-import com.ververica.cdc.connectors.mysql.source.utils.MySqlContainer;
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;

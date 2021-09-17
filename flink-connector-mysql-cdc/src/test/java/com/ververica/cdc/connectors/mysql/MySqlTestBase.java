@@ -20,16 +20,13 @@ package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
-import com.ververica.cdc.connectors.mysql.source.utils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.stream.Stream;
 
 /**
@@ -43,7 +40,7 @@ public abstract class MySqlTestBase extends AbstractTestBase {
     protected static final MySqlContainer MYSQL_CONTAINER =
             (MySqlContainer)
                     new MySqlContainer()
-                            .withConfigurationOverride("docker/my.cnf")
+                            .withConfigurationOverride("docker/server/my.cnf")
                             .withSetupSQL("docker/setup.sql")
                             .withDatabaseName("flink-test")
                             .withUsername("flinkuser")
@@ -55,12 +52,5 @@ public abstract class MySqlTestBase extends AbstractTestBase {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
-    }
-
-    protected Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(
-                MYSQL_CONTAINER.getJdbcUrl(),
-                MYSQL_CONTAINER.getUsername(),
-                MYSQL_CONTAINER.getPassword());
     }
 }

@@ -35,6 +35,7 @@ import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +75,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
+    private Tables.TableFilter capturedTableFilter;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
@@ -87,11 +89,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         this.currentBinlogSplit = mySqlSplit.asBinlogSplit();
         configureFilter();
         statefulTaskContext.configure(currentBinlogSplit);
+        this.capturedTableFilter =
+                statefulTaskContext.getConnectorConfig().getTableFilters().dataCollectionFilter();
         this.queue = statefulTaskContext.getQueue();
         final MySqlOffsetContext mySqlOffsetContext = statefulTaskContext.getOffsetContext();
-        mySqlOffsetContext.setBinlogStartPoint(
-                currentBinlogSplit.getStartingOffset().getFilename(),
-                currentBinlogSplit.getStartingOffset().getPosition());
         this.binlogSplitReadTask =
                 new MySqlBinlogSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
@@ -195,20 +196,22 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         if (isDataChangeRecord(sourceRecord)) {
             TableId tableId = getTableId(sourceRecord);
             BinlogOffset position = getBinlogPosition(sourceRecord);
-            // aligned, all snapshot splits of the table has reached max highWatermark
-            if (position.isAtOrBefore(maxSplitHighWatermarkMap.get(tableId))) {
+            if (hasEnterPureBinlogPhase(tableId, position)) {
                 return true;
             }
-            Object[] key =
-                    getSplitKey(
-                            currentBinlogSplit.getSplitKeyType(),
-                            sourceRecord,
-                            statefulTaskContext.getSchemaNameAdjuster());
-            for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
-                if (RecordUtils.splitKeyRangeContains(
-                                key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
-                        && position.isAtOrBefore(splitInfo.getHighWatermark())) {
-                    return true;
+            // only the table who captured snapshot splits need to filter
+            if (finishedSplitsInfo.containsKey(tableId)) {
+                Object[] key =
+                        getSplitKey(
+                                currentBinlogSplit.getSplitKeyType(),
+                                sourceRecord,
+                                statefulTaskContext.getSchemaNameAdjuster());
+                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
+                    if (RecordUtils.splitKeyRangeContains(
+                                    key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
+                            && position.isAtOrBefore(splitInfo.getHighWatermark())) {
+                        return true;
+                    }
                 }
             }
             // not in the monitored splits scope, do not emit
@@ -219,16 +222,34 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         return true;
     }
 
+    private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
+        // the existed tables those have finished snapshot reading
+        if (maxSplitHighWatermarkMap.containsKey(tableId)
+                && position.isAtOrBefore(maxSplitHighWatermarkMap.get(tableId))) {
+            return true;
+        }
+        // capture dynamically new added tables
+        // TODO: there is still very little chance that we can't capture new added table.
+        //  That the tables dynamically added after discovering captured tables in enumerator
+        //  and before the lowest binlog offset of all table splits. This interval should be
+        //  very short, so we don't support it for now.
+        return !maxSplitHighWatermarkMap.containsKey(tableId)
+                && capturedTableFilter.isIncluded(tableId);
+    }
+
     private void configureFilter() {
         List<FinishedSnapshotSplitInfo> finishedSplitInfos =
                 currentBinlogSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
+        // latest-offset mode
         if (finishedSplitInfos.isEmpty()) {
             for (TableId tableId : currentBinlogSplit.getTableSchemas().keySet()) {
                 tableIdBinlogPositionMap.put(tableId, currentBinlogSplit.getStartingOffset());
             }
-        } else {
+        }
+        // initial mode
+        else {
             for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
                 TableId tableId = finishedSplitInfo.getTableId();
                 List<FinishedSnapshotSplitInfo> list =

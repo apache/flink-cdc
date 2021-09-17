@@ -43,7 +43,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.wr
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -96,22 +96,45 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
     @Override
     public PendingSplitsState deserialize(int version, byte[] serialized) throws IOException {
-        if (version == VERSION) {
-            final DataInputDeserializer in = new DataInputDeserializer(serialized);
-            final int splitVersion = in.readInt();
-            final int stateFlag = in.readInt();
-            if (stateFlag == SNAPSHOT_PENDING_SPLITS_STATE_FLAG) {
-                return deserializeSnapshotPendingSplitsState(splitVersion, in);
-            } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
-                return deserializeBinlogPendingSplitsState(in);
-            } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
-                return deserializeHybridPendingSplitsState(splitVersion, in);
-            } else {
-                throw new IOException(
-                        "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
-            }
+        switch (version) {
+            case 1:
+            case 2:
+                return deserializeV2(serialized);
+            default:
+                throw new IOException("Unknown version: " + version);
         }
-        throw new IOException("Unknown version: " + version);
+    }
+
+    public PendingSplitsState deserializeV1(byte[] serialized) throws IOException {
+        final DataInputDeserializer in = new DataInputDeserializer(serialized);
+        final int splitVersion = in.readInt();
+        final int stateFlag = in.readInt();
+        if (stateFlag == SNAPSHOT_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeSnapshotPendingSplitsState(1, splitVersion, in);
+        } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeBinlogPendingSplitsState(in);
+        } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeHybridPendingSplitsState(1, splitVersion, in);
+        } else {
+            throw new IOException(
+                    "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
+        }
+    }
+
+    public PendingSplitsState deserializeV2(byte[] serialized) throws IOException {
+        final DataInputDeserializer in = new DataInputDeserializer(serialized);
+        final int splitVersion = in.readInt();
+        final int stateFlag = in.readInt();
+        if (stateFlag == SNAPSHOT_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeSnapshotPendingSplitsState(2, splitVersion, in);
+        } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeBinlogPendingSplitsState(in);
+        } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeHybridPendingSplitsState(2, splitVersion, in);
+        } else {
+            throw new IOException(
+                    "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
+        }
     }
 
     // ------------------------------------------------------------------------------------------
@@ -143,12 +166,12 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     // ------------------------------------------------------------------------------------------
 
     private SnapshotPendingSplitsState deserializeSnapshotPendingSplitsState(
-            int splitVersion, DataInputDeserializer in) throws IOException {
+            int offsetVersion, int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(in);
         List<MySqlSnapshotSplit> remainingSplits = readMySqlSnapshotSplits(splitVersion, in);
         Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
-        Map<String, BinlogOffset> finishedOffsets = readFinishedOffsets(in);
+        Map<String, BinlogOffset> finishedOffsets = readFinishedOffsets(offsetVersion, in);
         boolean isAssignerFinished = in.readBoolean();
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
@@ -159,9 +182,9 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(
-            int splitVersion, DataInputDeserializer in) throws IOException {
+            int offsetVersion, int splitVersion, DataInputDeserializer in) throws IOException {
         SnapshotPendingSplitsState snapshotPendingSplitsState =
-                deserializeSnapshotPendingSplitsState(splitVersion, in);
+                deserializeSnapshotPendingSplitsState(offsetVersion, splitVersion, in);
         boolean isBinlogSplitAssigned = in.readBoolean();
         return new HybridPendingSplitsState(snapshotPendingSplitsState, isBinlogSplitAssigned);
     }
@@ -185,13 +208,13 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         }
     }
 
-    private Map<String, BinlogOffset> readFinishedOffsets(DataInputDeserializer in)
-            throws IOException {
+    private Map<String, BinlogOffset> readFinishedOffsets(
+            int offsetVersion, DataInputDeserializer in) throws IOException {
         Map<String, BinlogOffset> splitsInfo = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             String splitId = in.readUTF();
-            BinlogOffset binlogOffset = readBinlogPosition(in);
+            BinlogOffset binlogOffset = readBinlogPosition(offsetVersion, in);
             splitsInfo.put(splitId, binlogOffset);
         }
         return splitsInfo;
