@@ -87,7 +87,6 @@ public class RecordsFormatter {
         return collector.list.stream()
                 .map(rowRowConverter::toExternal)
                 .map(Row::toString)
-                .sorted()
                 .collect(Collectors.toList());
     }
 

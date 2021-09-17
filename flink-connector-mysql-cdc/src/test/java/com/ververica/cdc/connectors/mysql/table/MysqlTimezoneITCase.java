@@ -56,8 +56,8 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
+import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase.assertEqualsInAnyOrder;
+import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase.assertEqualsInOrder;
 
 /** Integration tests to check mysql-cdc works well under different MySQL server timezone. */
 @RunWith(Parameterized.class)
@@ -190,8 +190,8 @@ public class MysqlTimezoneITCase {
                 new String[] {
                     "+I[2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22]",
                 };
-        assertThat(
-                fetchRows(iterator, expectedSnapshot.length), containsInAnyOrder(expectedSnapshot));
+        assertEqualsInAnyOrder(
+                fetchRows(iterator, expectedSnapshot.length), Arrays.asList(expectedSnapshot));
 
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -206,7 +206,9 @@ public class MysqlTimezoneITCase {
                     "+U[2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22]"
                 };
 
-        assertThat(fetchRows(iterator, expectedBinlog.length), containsInAnyOrder(expectedBinlog));
+        assertEqualsInOrder(
+                fetchRows(iterator, expectedBinlog.length), Arrays.asList(expectedBinlog));
+
         result.getJobClient().get().cancel().get();
     }
 

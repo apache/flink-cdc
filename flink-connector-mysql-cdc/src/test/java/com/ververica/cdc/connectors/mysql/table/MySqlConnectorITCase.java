@@ -38,14 +38,13 @@ import org.junit.runners.Parameterized;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
 import static com.ververica.cdc.connectors.mysql.MySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
 
 /** Integration tests for MySQL binlog SQL source. */
 @RunWith(Parameterized.class)
@@ -208,7 +207,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
         result.getJobClient().get().cancel().get();
     }
 
@@ -270,8 +269,8 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "+I[108, jacket, water resistent black wind breaker, 0.100]",
                     "+I[109, spare tire, 24 inch spare tire, 22.200]"
                 };
-        assertThat(
-                fetchRows(iterator, expectedSnapshot.length), containsInAnyOrder(expectedSnapshot));
+        assertEqualsInAnyOrder(
+                fetchRows(iterator, expectedSnapshot.length), Arrays.asList(expectedSnapshot));
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -296,7 +295,8 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "+U[111, scooter, Big 2-wheel scooter , 5.170]",
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
-        assertThat(fetchRows(iterator, expectedBinlog.length), containsInAnyOrder(expectedBinlog));
+        assertEqualsInOrder(
+                fetchRows(iterator, expectedBinlog.length), Arrays.asList(expectedBinlog));
         result.getJobClient().get().cancel().get();
     }
 
@@ -397,7 +397,8 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=]"
                 };
 
-        assertThat(fetchRows(result.collect(), expected.length), containsInAnyOrder(expected));
+        assertEqualsInAnyOrder(
+                fetchRows(result.collect(), expected.length), Arrays.asList(expected));
         result.getJobClient().get().cancel().get();
     }
 
@@ -469,7 +470,8 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "+U[111, scooter, Big 2-wheel scooter , 5.170]",
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
-        assertThat(fetchRows(iterator, expected.length), containsInAnyOrder(expected));
+        assertEqualsInAnyOrder(
+                fetchRows(result.collect(), expected.length), Arrays.asList(expected));
         result.getJobClient().get().cancel().get();
     }
 
@@ -537,7 +539,8 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "+U[416927583791428523, China, Hangzhou, West Town address 2]",
                     "+I[418257940021724075, Germany, Berlin, West Town address 3]",
                 };
-        assertThat(fetchRows(result.collect(), expected.length), containsInAnyOrder(expected));
+        assertEqualsInAnyOrder(
+                fetchRows(result.collect(), expected.length), Arrays.asList(expected));
         result.getJobClient().get().cancel().get();
     }
 
@@ -626,7 +629,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
 
         result.getJobClient().get().cancel().get();
     }
@@ -711,7 +714,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
 
         result.getJobClient().get().cancel().get();
     }
@@ -786,7 +789,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
 
         result.getJobClient().get().cancel().get();
     }
