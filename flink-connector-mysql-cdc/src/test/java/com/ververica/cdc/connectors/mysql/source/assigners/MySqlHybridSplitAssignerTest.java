@@ -24,8 +24,8 @@ import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
 
-import com.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -33,7 +33,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.BeforeClass;
@@ -47,15 +47,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link MySqlHybridSplitAssigner}. */
-public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
+public class MySqlHybridSplitAssignerTest extends MySqlParallelSourceTestBase {
 
-    private static final int currentParallelism = 4;
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -115,7 +113,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
         final MySqlHybridSplitAssigner assigner =
-                new MySqlHybridSplitAssigner(configuration, currentParallelism, checkpoint);
+                new MySqlHybridSplitAssigner(configuration, DEFAULT_PARALLELISM, checkpoint);
 
         // step 2. Get the MySqlBinlogSplit after all snapshot splits finished
         Optional<MySqlSplit> binlogSplit = assigner.getNext();
@@ -159,7 +157,6 @@ public class MySqlHybridSplitAssignerTest extends MySqlTestBase {
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", UUID.randomUUID().toString());
         return Configuration.fromMap(properties);
     }
 }

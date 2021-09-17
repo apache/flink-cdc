@@ -58,9 +58,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
 import static io.debezium.config.CommonConnectorConfig.TOMBSTONES_ON_DELETE;
 
 /**
@@ -119,9 +120,7 @@ public class StatefulTaskContext {
                         schemaNameAdjuster,
                         tableIdCaseInsensitive);
         this.offsetContext =
-                (MySqlOffsetContext)
-                        loadStartingOffsetState(
-                                new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
+                loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
         this.taskContext =
@@ -174,22 +173,49 @@ public class StatefulTaskContext {
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
-    private OffsetContext loadStartingOffsetState(
+    private MySqlOffsetContext loadStartingOffsetState(
             OffsetContext.Loader loader, MySqlSplit mySqlSplit) {
-        Map<String, Object> previousOffset = new HashMap<>();
         BinlogOffset offset =
                 mySqlSplit.isSnapshotSplit()
                         ? BinlogOffset.INITIAL_OFFSET
                         : mySqlSplit.asBinlogSplit().getStartingOffset();
-        previousOffset.put("file", offset.getFilename());
-        previousOffset.put("pos", offset.getPosition());
 
-        if (previousOffset != null) {
-            OffsetContext offsetContext = loader.load(previousOffset);
-            return offsetContext;
-        } else {
-            return null;
+        MySqlOffsetContext mySqlOffsetContext =
+                (MySqlOffsetContext) loader.load(offset.getOffset());
+
+        if (!isBinlogAvailable(mySqlOffsetContext)) {
+            throw new IllegalStateException(
+                    "The connector is trying to read binlog starting at "
+                            + mySqlOffsetContext.getSourceInfo()
+                            + ", but this is no longer "
+                            + "available on the server. Reconfigure the connector to use a snapshot when needed.");
         }
+        return mySqlOffsetContext;
+    }
+
+    private boolean isBinlogAvailable(MySqlOffsetContext offset) {
+        String binlogFilename = offset.getSourceInfo().getString(BINLOG_FILENAME_OFFSET_KEY);
+        if (binlogFilename == null) {
+            return true; // start at current position
+        }
+        if (binlogFilename.equals("")) {
+            return true; // start at beginning
+        }
+
+        // Accumulate the available binlog filenames ...
+        List<String> logNames = connection.availableBinlogFiles();
+
+        // And compare with the one we're supposed to use ...
+        boolean found = logNames.stream().anyMatch(binlogFilename::equals);
+        if (!found) {
+            LOG.info(
+                    "Connector requires binlog file '{}', but MySQL only has {}",
+                    binlogFilename,
+                    String.join(", ", logNames));
+        } else {
+            LOG.info("MySQL has the binlog file '{}' required by the connector", binlogFilename);
+        }
+        return found;
     }
 
     private static MySqlValueConverters getValueConverters(MySqlConnectorConfig configuration) {

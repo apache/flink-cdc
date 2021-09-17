@@ -27,8 +27,8 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import com.ververica.cdc.connectors.mysql.MySqlTestBase;
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -49,7 +49,7 @@ import static org.junit.Assert.assertThat;
 
 /** Integration tests for MySQL binlog SQL source. */
 @RunWith(Parameterized.class)
-public class MySqlConnectorITCase extends MySqlTestBase {
+public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
 
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
@@ -95,7 +95,7 @@ public class MySqlConnectorITCase extends MySqlTestBase {
     public void before() {
         TestValuesTableFactory.clearAllData();
         if (incrementalSnapshot) {
-            env.setParallelism(4);
+            env.setParallelism(DEFAULT_PARALLELISM);
             env.enableCheckpointing(200);
         } else {
             env.setParallelism(1);

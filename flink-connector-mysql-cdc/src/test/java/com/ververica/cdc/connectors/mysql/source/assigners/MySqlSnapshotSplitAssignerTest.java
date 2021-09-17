@@ -21,10 +21,10 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.ExceptionUtils;
 
-import com.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -36,7 +36,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
@@ -46,9 +45,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
-public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
+public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase {
 
-    private static final int currentParallelism = 4;
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -141,7 +139,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, currentParallelism);
+                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
 
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();
@@ -290,7 +288,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlTestBase {
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", UUID.randomUUID().toString());
         return Configuration.fromMap(properties);
     }
 }
