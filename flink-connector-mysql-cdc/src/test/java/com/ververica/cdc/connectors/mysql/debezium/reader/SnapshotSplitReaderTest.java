@@ -46,8 +46,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-
 /** Tests for {@link SnapshotSplitReader}. */
 public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
 
@@ -89,7 +87,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
                     "+I[123, user_9, Shanghai, 123567891234]"
                 };
         List<String> actual = readTableSnapshotSplits(mySqlSplits, configuration, 1, dataType);
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     @Test
@@ -129,7 +127,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
                 };
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     @Test
@@ -145,7 +143,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
         String[] expected = new String[] {"+I[20001, LEVEL_1, user_1, user with level 1]"};
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     @Test
@@ -185,7 +183,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
                 };
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     private List<String> readTableSnapshotSplits(

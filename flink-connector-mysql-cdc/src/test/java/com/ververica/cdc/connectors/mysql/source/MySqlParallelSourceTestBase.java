@@ -31,7 +31,13 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing {@link MySqlParallelSource}. */
 public abstract class MySqlParallelSourceTestBase extends TestLogger {
@@ -64,5 +70,18 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
+    }
+
+    public static void assertEqualsInAnyOrder(List<String> actual, List<String> expected) {
+        assertTrue(actual != null && expected != null);
+        assertEqualsInOrder(
+                actual.stream().sorted().collect(Collectors.toList()),
+                expected.stream().sorted().collect(Collectors.toList()));
+    }
+
+    public static void assertEqualsInOrder(List<String> actual, List<String> expected) {
+        assertTrue(actual != null && expected != null);
+        assertEquals(actual.size(), expected.size());
+        assertArrayEquals(actual.toArray(new String[0]), expected.toArray(new String[0]));
     }
 }

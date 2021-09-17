@@ -45,9 +45,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
-
 /** IT tests for {@link MySqlParallelSource}. */
 public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
 
@@ -207,10 +204,9 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(100));
         }
-        String[] expectedSnapshot = expectedSnapshotData.toArray(new String[0]);
 
-        assertThat(
-                fetchRows(iterator, expectedSnapshot.length), containsInAnyOrder(expectedSnapshot));
+        assertEqualsInAnyOrder(
+                fetchRows(iterator, expectedSnapshotData.size()), expectedSnapshotData);
 
         // second step: check the binlog data
         for (String tableId : captureCustomerTables) {
@@ -244,8 +240,7 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
         for (int i = 0; i < captureCustomerTables.length; i++) {
             expectedBinlogData.addAll(Arrays.asList(binlogForSingleTable));
         }
-        String[] expectedBinlog = expectedBinlogData.toArray(new String[0]);
-        assertThat(fetchRows(iterator, expectedBinlog.length), containsInAnyOrder(expectedBinlog));
+        assertEqualsInAnyOrder(fetchRows(iterator, expectedBinlogData.size()), expectedBinlogData);
         tableResult.getJobClient().get().cancel().get();
     }
 
