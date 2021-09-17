@@ -23,8 +23,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.ValidationException;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
-import com.ververica.cdc.connectors.mysql.source.utils.MySqlContainer;
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.AfterClass;
@@ -98,7 +98,7 @@ public class MySqlValidatorTest {
                 String.format(
                         "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.7, but actual is %s.",
                         version);
-        doValidate(version, "docker/my.cnf", message);
+        doValidate(version, "docker/server/my.cnf", message);
     }
 
     @Test

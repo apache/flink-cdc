@@ -76,7 +76,7 @@ public class PendingSplitsStateSerializerTest {
         final PendingSplitsStateSerializer serializer =
                 new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
         byte[] serialized = serializer.serialize(state);
-        return serializer.deserialize(1, serialized);
+        return serializer.deserialize(2, serialized);
     }
 
     private static SnapshotPendingSplitsState getTestSnapshotPendingSplitsState() {
@@ -128,6 +128,7 @@ public class PendingSplitsStateSerializerTest {
     }
 
     private static MySqlSnapshotSplit getTestSnapshotSplit(TableId tableId, int splitNo) {
+        long restartSkipEvent = splitNo;
         return new MySqlSnapshotSplit(
                 tableId,
                 tableId.toString() + "-" + splitNo,
@@ -135,7 +136,8 @@ public class PendingSplitsStateSerializerTest {
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 new Object[] {100L + splitNo * 1000},
                 new Object[] {999L + splitNo * 1000},
-                new BinlogOffset("mysql-bin.000001", 78L + splitNo * 200),
+                new BinlogOffset(
+                        "mysql-bin.000001", 78L + splitNo * 200, restartSkipEvent, 0L, 0L, null, 0),
                 new HashMap<>());
     }
 

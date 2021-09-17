@@ -127,7 +127,7 @@ public class MySqlSplitSerializerTest {
     private MySqlSplit serializeAndDeserializeSplit(MySqlSplit split) throws Exception {
         final MySqlSplitSerializer sqlSplitSerializer = new MySqlSplitSerializer();
         byte[] serialized = sqlSplitSerializer.serialize(split);
-        return sqlSplitSerializer.deserializeV1(serialized);
+        return sqlSplitSerializer.deserialize(sqlSplitSerializer.getVersion(), serialized);
     }
 
     public static TableChange getTestTableSchema() throws Exception {

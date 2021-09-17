@@ -18,27 +18,18 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.data.conversion.RowRowConverter;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.utils.TypeConversions;
-import org.apache.flink.types.Row;
-import org.apache.flink.util.Collector;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
-import com.ververica.cdc.connectors.mysql.MySqlTestBase;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.BeforeClass;
@@ -58,9 +49,8 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link SnapshotSplitReader}. */
-public class SnapshotSplitReaderTest extends MySqlTestBase {
+public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
 
-    private static final int currentParallelism = 4;
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -234,36 +224,13 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
     }
 
     private List<String> formatResult(List<SourceRecord> records, DataType dataType) {
-        final RowType rowType = (RowType) dataType.getLogicalType();
-        final TypeInformation<RowData> typeInfo =
-                (TypeInformation<RowData>) TypeConversions.fromDataTypeToLegacyInfo(dataType);
-        final DebeziumDeserializationSchema<RowData> deserializationSchema =
-                new RowDataDebeziumDeserializeSchema(
-                        rowType, typeInfo, ((rowData, rowKind) -> {}), ZoneId.of("UTC"));
-        SimpleCollector collector = new SimpleCollector();
-        RowRowConverter rowRowConverter = RowRowConverter.create(dataType);
-        rowRowConverter.open(Thread.currentThread().getContextClassLoader());
-        records.stream()
-                // filter signal event
-                .filter(r -> !RecordUtils.isWatermarkEvent(r))
-                .forEach(
-                        r -> {
-                            try {
-                                deserializationSchema.deserialize(r, collector);
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
-                        });
-        return collector.list.stream()
-                .map(rowRowConverter::toExternal)
-                .map(Row::toString)
-                .sorted()
-                .collect(Collectors.toList());
+        final RecordsFormatter formatter = new RecordsFormatter(dataType);
+        return formatter.format(records);
     }
 
     private List<MySqlSplit> getMySqlSplits(Configuration configuration) {
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, currentParallelism);
+                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
@@ -301,20 +268,5 @@ public class SnapshotSplitReaderTest extends MySqlTestBase {
         properties.put("scan.incremental.snapshot.chunk.size", "10");
         properties.put("scan.snapshot.fetch.size", "2");
         return Configuration.fromMap(properties);
-    }
-
-    static class SimpleCollector implements Collector<RowData> {
-
-        private List<RowData> list = new ArrayList<>();
-
-        @Override
-        public void collect(RowData record) {
-            list.add(record);
-        }
-
-        @Override
-        public void close() {
-            // do nothing
-        }
     }
 }

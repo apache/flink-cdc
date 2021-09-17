@@ -22,6 +22,7 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetSerializer;
 import io.debezium.DebeziumException;
 import io.debezium.util.HexConverter;
 
@@ -40,13 +41,30 @@ public class SerializerUtils {
             throws IOException {
         out.writeBoolean(offset != null);
         if (offset != null) {
-            out.writeUTF(offset.getFilename());
-            out.writeLong(offset.getPosition());
+            byte[] binlogOffsetBytes = BinlogOffsetSerializer.INSTANCE.serialize(offset);
+            out.writeInt(binlogOffsetBytes.length);
+            out.write(binlogOffsetBytes);
         }
     }
 
-    public static BinlogOffset readBinlogPosition(DataInputDeserializer in) throws IOException {
-        return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : null;
+    public static BinlogOffset readBinlogPosition(int offsetVersion, DataInputDeserializer in)
+            throws IOException {
+        switch (offsetVersion) {
+            case 1:
+                return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : null;
+            case 2:
+                boolean offsetNonNull = in.readBoolean();
+                if (offsetNonNull) {
+                    int binlogOffsetBytesLength = in.readInt();
+                    byte[] binlogOffsetBytes = new byte[binlogOffsetBytesLength];
+                    in.readFully(binlogOffsetBytes);
+                    return BinlogOffsetSerializer.INSTANCE.deserialize(binlogOffsetBytes);
+                } else {
+                    return null;
+                }
+            default:
+                throw new IOException("Unknown version: " + offsetVersion);
+        }
     }
 
     public static String rowToSerializedString(Object[] splitBoundary) {

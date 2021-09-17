@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source.utils;
+package com.ververica.cdc.connectors.mysql.testutils;
 
 import java.net.URL;
 import java.nio.file.Files;
