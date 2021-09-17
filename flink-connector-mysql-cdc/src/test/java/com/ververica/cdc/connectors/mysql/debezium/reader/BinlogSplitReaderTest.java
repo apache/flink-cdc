@@ -61,9 +61,6 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 
 /** Tests for {@link BinlogSplitReader}. */
 public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
@@ -116,7 +113,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         1,
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     @Test
@@ -179,7 +176,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits.size(),
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     @Test
@@ -219,7 +216,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits.size(),
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     @Test
@@ -281,7 +278,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                                 customerDatabase.getDatabaseName()
                                         + "."
                                         + "customer_card_single_line"));
-        assertEquals(Arrays.stream(expected).sorted().collect(Collectors.toList()), actual);
+        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
     }
 
     @Test
@@ -305,15 +302,15 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                     "+I[102, user_2, Shanghai, 123567891234]",
                     "-U[103, user_3, Hangzhou, 123567891234]",
                     "+U[103, user_3, Shanghai, 123567891234]",
-                    "+U[1010, Hangzhou, Shanghai, 123567891234]",
                     "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+U[1010, Hangzhou, Shanghai, 123567891234]",
                     "+I[2001, user_22, Shanghai, 123567891234]",
                     "+I[2002, user_23, Shanghai, 123567891234]",
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual =
                 readBinlogSplitsFromLatestOffset(dataType, configuration, expected.length);
-        assertThat(actual, containsInAnyOrder(expected));
+        assertEqualsInOrder(actual, Arrays.asList(expected));
     }
 
     private List<String> readBinlogSplitsFromLatestOffset(
