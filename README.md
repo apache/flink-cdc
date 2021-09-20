@@ -66,19 +66,23 @@ Include following Maven dependency (available through Maven Central):
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
-    SourceFunction<String> sourceFunction = MySqlSource.<String>builder()
-      .hostname("localhost")
-      .port(3306)
-      .databaseList("inventory") // monitor all tables under inventory database
-      .username("flinkuser")
-      .password("flinkpw")
-      .deserializer(new StringDebeziumDeserializationSchema()) // converts SourceRecord to String
-      .build();
+    Properties debeziumProperties = new Properties();
+    debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
+    SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
+            .hostname("yourHostname")
+            .port(yourPort)
+            .databaseList("yourDatabaseName") // set captured database
+            .tableList("yourDatabaseName.yourTableName") // set captured table
+            .username("yourUsername")
+            .password("yourPassword")
+            .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+            .debeziumProperties(debeziumProperties)
+            .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
