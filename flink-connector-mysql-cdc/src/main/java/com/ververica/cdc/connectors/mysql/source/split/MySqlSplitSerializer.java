@@ -33,6 +33,7 @@ import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -133,7 +134,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             Object[] splitBoundaryStart = serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = serializedStringToRow(in.readUTF());
             BinlogOffset highWatermark = readBinlogPosition(version, in);
-            Map<TableId, TableChange> tableSchemas = readTableSchemas(in);
+            Map<TableId, TableChange> tableSchemas = readTableSchemas(version, in);
 
             return new MySqlSnapshotSplit(
                     tableId,
@@ -150,7 +151,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             BinlogOffset endingOffset = readBinlogPosition(version, in);
             List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
                     readFinishedSplitsInfo(version, in);
-            Map<TableId, TableChange> tableChangeMap = readTableSchemas(in);
+            Map<TableId, TableChange> tableChangeMap = readTableSchemas(version, in);
             in.releaseArrays();
             return new MySqlBinlogSplit(
                     splitId,
@@ -172,18 +173,36 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         out.writeInt(size);
         for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
             out.writeUTF(entry.getKey().toString());
-            out.writeUTF(documentWriter.write(jsonSerializer.toDocument(entry.getValue())));
+            final String tableChangeStr =
+                    documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
+            final byte[] tableChangeBytes = tableChangeStr.getBytes(StandardCharsets.UTF_8);
+            out.writeInt(tableChangeBytes.length);
+            out.write(tableChangeBytes);
         }
     }
 
-    private static Map<TableId, TableChange> readTableSchemas(DataInputDeserializer in)
+    private static Map<TableId, TableChange> readTableSchemas(int version, DataInputDeserializer in)
             throws IOException {
         DocumentReader documentReader = DocumentReader.defaultReader();
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             TableId tableId = TableId.parse(in.readUTF());
-            Document document = documentReader.read(in.readUTF());
+            final String tableChangeStr;
+            switch (version) {
+                case 1:
+                    tableChangeStr = in.readUTF();
+                    break;
+                case 2:
+                    final int len = in.readInt();
+                    final byte[] bytes = new byte[len];
+                    in.read(bytes);
+                    tableChangeStr = new String(bytes, StandardCharsets.UTF_8);
+                    break;
+                default:
+                    throw new IOException("Unknown version: " + version);
+            }
+            Document document = documentReader.read(tableChangeStr);
             TableChange tableChange = JsonTableChangeSerializer.fromDocument(document, true);
             tableSchemas.put(tableId, tableChange);
         }
