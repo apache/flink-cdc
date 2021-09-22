@@ -392,6 +392,25 @@ public class MySqlBinlogSourceExample {
 
 **Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.
 
+### Well-Supported to MySQL high available cluster
+
+When enabling GTID mode in MySQL with adding the following configurations to MySQL conf file,
+```yaml
+gtid_mode = on
+enforce_gtid_consistency = on
+```
+once the instance your job monitors fails in MySQL cluster, you only need to make the job monitor another available MySQL instance and restart the job manually.
+
+It's recommended to use DNS(Domain Name Service) or VIP(Virtual IP Address) to dynamically change the MySQL instance your job actually monitors.
+In that case, you don't need to modify/restart your job manually anymore.
+
+**NOTE:**
+
+If your job monitors the MySQL slave instance, you should add the following extra configuration to MySQL conf file to enable the slave to write binlog.
+```yaml
+log-slave-updates = 1
+```
+
 Data Type Mapping
 ----------------
 
