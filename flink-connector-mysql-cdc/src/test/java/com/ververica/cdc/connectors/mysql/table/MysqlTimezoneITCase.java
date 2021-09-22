@@ -188,10 +188,10 @@ public class MysqlTimezoneITCase {
         CloseableIterator<Row> iterator = result.collect();
         String[] expectedSnapshot =
                 new String[] {
-                    "+I[2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22]",
+                    "+I[2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22]"
                 };
         assertEqualsInAnyOrder(
-                fetchRows(iterator, expectedSnapshot.length), Arrays.asList(expectedSnapshot));
+                Arrays.asList(expectedSnapshot), fetchRows(iterator, expectedSnapshot.length));
 
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -207,7 +207,7 @@ public class MysqlTimezoneITCase {
                 };
 
         assertEqualsInOrder(
-                fetchRows(iterator, expectedBinlog.length), Arrays.asList(expectedBinlog));
+                Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
 
         result.getJobClient().get().cancel().get();
     }
