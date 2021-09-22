@@ -178,8 +178,9 @@ public class PostgreSQLSourceExample {
     SourceFunction<String> sourceFunction = PostgreSQLSource.<String>builder()
       .hostname("localhost")
       .port(5432)
-      .database("postgres")
-      .schemaList("inventory") // monitor all tables under inventory schema
+      .database("postgres") // monitor postgres database
+      .schemaList("inventory")  // monitor inventory schema
+      .tableList("inventory.products") // monitor products table
       .username("flinkuser")
       .password("flinkpw")
       .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
