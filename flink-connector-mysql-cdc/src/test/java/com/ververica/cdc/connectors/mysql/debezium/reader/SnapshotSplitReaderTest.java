@@ -87,7 +87,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
                     "+I[123, user_9, Shanghai, 123567891234]"
                 };
         List<String> actual = readTableSnapshotSplits(mySqlSplits, configuration, 1, dataType);
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     @Test
@@ -127,7 +127,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
                 };
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     @Test
@@ -143,7 +143,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
         String[] expected = new String[] {"+I[20001, LEVEL_1, user_1, user with level 1]"};
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     @Test
@@ -179,11 +179,11 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
                     "+I[40003, LEVEL_2, user_11, user with level 2]",
                     "+I[50001, LEVEL_1, user_12, user with level 1]",
                     "+I[50002, LEVEL_1, user_13, user with level 1]",
-                    "+I[50003, LEVEL_1, user_14, user with level 1]",
+                    "+I[50003, LEVEL_1, user_14, user with level 1]"
                 };
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, configuration, mySqlSplits.size(), dataType);
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     private List<String> readTableSnapshotSplits(

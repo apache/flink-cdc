@@ -207,7 +207,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
 
@@ -270,7 +270,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "+I[109, spare tire, 24 inch spare tire, 22.200]"
                 };
         assertEqualsInAnyOrder(
-                fetchRows(iterator, expectedSnapshot.length), Arrays.asList(expectedSnapshot));
+                Arrays.asList(expectedSnapshot), fetchRows(iterator, expectedSnapshot.length));
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -296,7 +296,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
         assertEqualsInOrder(
-                fetchRows(iterator, expectedBinlog.length), Arrays.asList(expectedBinlog));
+                Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -398,7 +398,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 };
 
         assertEqualsInAnyOrder(
-                fetchRows(result.collect(), expected.length), Arrays.asList(expected));
+                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -471,7 +471,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
         assertEqualsInAnyOrder(
-                fetchRows(result.collect(), expected.length), Arrays.asList(expected));
+                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -537,10 +537,10 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                     "+I[417022095255614379, China, Beijing, West Town address 3]",
                     "-U[416927583791428523, China, Beijing, West Town address 2]",
                     "+U[416927583791428523, China, Hangzhou, West Town address 2]",
-                    "+I[418257940021724075, Germany, Berlin, West Town address 3]",
+                    "+I[418257940021724075, Germany, Berlin, West Town address 3]"
                 };
         assertEqualsInAnyOrder(
-                fetchRows(result.collect(), expected.length), Arrays.asList(expected));
+                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -629,7 +629,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
     }
@@ -714,7 +714,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
     }
@@ -789,7 +789,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
     }

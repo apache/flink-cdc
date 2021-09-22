@@ -91,7 +91,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
                 };
         // the 2 records are produced by 1 operations
         List<String> actualRecords = consumeRecords(reader, dataType, 1);
-        assertEqualsInOrder(actualRecords, Arrays.asList(expectedRecords));
+        assertEqualsInOrder(Arrays.asList(expectedRecords), actualRecords);
         List<MySqlSplit> splitsState = reader.snapshotState(1L);
         // check the binlog split state
         assertEquals(1, splitsState.size());
@@ -112,7 +112,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
                 };
         // the 4 records are produced by 3 operations
         List<String> restRecords = consumeRecords(restartReader, dataType, 3);
-        assertEqualsInOrder(restRecords, Arrays.asList(expectedRestRecords));
+        assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
     }
 

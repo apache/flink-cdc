@@ -113,7 +113,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         1,
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     @Test
@@ -176,7 +176,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits.size(),
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     @Test
@@ -216,7 +216,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits.size(),
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     @Test
@@ -278,7 +278,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                                 customerDatabase.getDatabaseName()
                                         + "."
                                         + "customer_card_single_line"));
-        assertEqualsInAnyOrder(actual, Arrays.asList(expected));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     @Test
@@ -310,7 +310,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                 };
         List<String> actual =
                 readBinlogSplitsFromLatestOffset(dataType, configuration, expected.length);
-        assertEqualsInOrder(actual, Arrays.asList(expected));
+        assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
     private List<String> readBinlogSplitsFromLatestOffset(
