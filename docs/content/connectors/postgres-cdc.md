@@ -179,7 +179,7 @@ public class PostgreSQLSourceExample {
       .hostname("localhost")
       .port(5432)
       .database("postgres") // monitor postgres database 
-      .schemaList("inventory")  // monitor captured schema
+      .schemaList("inventory")  // monitor inventory schema
       .tableList("inventory.products") // monitor products table
       .username("flinkuser")
       .password("flinkpw")
