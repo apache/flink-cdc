@@ -178,7 +178,7 @@ public class PostgreSQLSourceExample {
     SourceFunction<String> sourceFunction = PostgreSQLSource.<String>builder()
       .hostname("localhost")
       .port(5432)
-      .database("postgres") // monitor postgres database 
+      .database("postgres") // monitor postgres database
       .schemaList("inventory")  // monitor inventory schema
       .tableList("inventory.products") // monitor products table
       .username("flinkuser")
