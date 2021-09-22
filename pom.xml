@@ -38,9 +38,11 @@ under the License.
         <module>flink-connector-mysql-cdc</module>
         <module>flink-connector-postgres-cdc</module>
         <module>flink-connector-mongodb-cdc</module>
+        <module>flink-connector-db2-cdc</module>
         <module>flink-sql-connector-mysql-cdc</module>
         <module>flink-sql-connector-postgres-cdc</module>
         <module>flink-sql-connector-mongodb-cdc</module>
+        <module>flink-sql-connector-db2-cdc</module>
         <module>flink-format-changelog-json</module>
     </modules>
 
@@ -189,6 +191,7 @@ under the License.
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                         <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
+                        <exclude>flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile</exclude>
                     </excludes>
                 </configuration>
             </plugin>
