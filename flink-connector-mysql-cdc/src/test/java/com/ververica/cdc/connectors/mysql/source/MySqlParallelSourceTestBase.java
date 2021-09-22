@@ -72,16 +72,16 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
         LOG.info("Containers are started.");
     }
 
-    public static void assertEqualsInAnyOrder(List<String> actual, List<String> expected) {
-        assertTrue(actual != null && expected != null);
+    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
         assertEqualsInOrder(
-                actual.stream().sorted().collect(Collectors.toList()),
-                expected.stream().sorted().collect(Collectors.toList()));
+                expected.stream().sorted().collect(Collectors.toList()),
+                actual.stream().sorted().collect(Collectors.toList()));
     }
 
-    public static void assertEqualsInOrder(List<String> actual, List<String> expected) {
-        assertTrue(actual != null && expected != null);
-        assertEquals(actual.size(), expected.size());
-        assertArrayEquals(actual.toArray(new String[0]), expected.toArray(new String[0]));
+    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
+        assertEquals(expected.size(), actual.size());
+        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
     }
 }

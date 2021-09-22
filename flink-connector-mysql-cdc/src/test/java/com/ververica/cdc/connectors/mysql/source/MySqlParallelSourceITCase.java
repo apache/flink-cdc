@@ -206,7 +206,7 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
         }
 
         assertEqualsInAnyOrder(
-                fetchRows(iterator, expectedSnapshotData.size()), expectedSnapshotData);
+                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
 
         // second step: check the binlog data
         for (String tableId : captureCustomerTables) {
@@ -234,13 +234,13 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
                     "+U[1010, user_11, Hangzhou, 123567891234]",
                     "+I[2001, user_22, Shanghai, 123567891234]",
                     "+I[2002, user_23, Shanghai, 123567891234]",
-                    "+I[2003, user_24, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> expectedBinlogData = new ArrayList<>();
         for (int i = 0; i < captureCustomerTables.length; i++) {
             expectedBinlogData.addAll(Arrays.asList(binlogForSingleTable));
         }
-        assertEqualsInAnyOrder(fetchRows(iterator, expectedBinlogData.size()), expectedBinlogData);
+        assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
         tableResult.getJobClient().get().cancel().get();
     }
 
