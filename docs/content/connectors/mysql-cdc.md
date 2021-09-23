@@ -379,7 +379,7 @@ public class MySqlBinlogSourceExample {
         .tableList("yourDatabaseName.yourTableName") // set captured table
         .username("yourUsername")
         .password("yourPassword")
-        .deserializer(new StringDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .deserializer(new StringDebeziumDeserializationSchema()) // converts SourceRecord to String
         .debeziumProperties(debeziumProperties)
         .build();
 
