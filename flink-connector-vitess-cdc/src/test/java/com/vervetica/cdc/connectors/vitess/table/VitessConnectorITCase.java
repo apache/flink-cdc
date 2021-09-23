@@ -23,13 +23,11 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.table.utils.LegacyRowResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import com.vervetica.cdc.connectors.vitess.VitessTestBase;
 import org.junit.Before;
-import org.junit.ClassRule;
 import org.junit.Test;
 
 import java.sql.Connection;
@@ -54,8 +52,6 @@ public class VitessConnectorITCase extends VitessTestBase {
             StreamTableEnvironment.create(
                     env,
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
-
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
     @Before
     public void before() {
@@ -143,13 +139,13 @@ public class VitessConnectorITCase extends VitessTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "scooter,3.140",
-                        "car battery,8.100",
-                        "12-pack drill bits,0.800",
-                        "hammer,2.625",
-                        "rocks,5.100",
-                        "jacket,0.600",
-                        "spare tire,22.200");
+                        "+I[scooter, 3.140]",
+                        "+I[car battery, 8.100]",
+                        "+I[12-pack drill bits, 0.800]",
+                        "+I[hammer, 2.625]",
+                        "+I[rocks, 5.100]",
+                        "+I[jacket, 0.600]",
+                        "+I[spare tire, 22.200]");
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertEqualsInAnyOrder(expected, actual);
@@ -223,9 +219,9 @@ public class VitessConnectorITCase extends VitessTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "1,127,255,32767,65535,2147483647,4294967295,2147483647,9223372036854775807,Hello World,abc,123.102,404.4443,123.4567,346,true",
-                        "1,127,255,32767,65535,2147483647,4294967295,2147483647,9223372036854775807,Hello World,abc,123.102,404.4443,123.4567,346,true",
-                        "1,127,255,32767,65535,2147483647,4294967295,2147483647,9223372036854775807,Bye World,abc,123.102,404.4443,123.4567,346,true");
+                        "+I[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true]",
+                        "-U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true]",
+                        "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Bye World, abc, 123.102, 404.4443, 123.4567, 346, true]");
 
         List<String> actual = fetchRows(result.collect(), expected.size());
         assertEquals(expected, actual);
