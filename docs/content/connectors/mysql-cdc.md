@@ -13,13 +13,13 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>2.0.0</version>
+  <version>2.1.0</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-mysql-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.0.0/flink-sql-connector-mysql-cdc-2.0.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1.0/flink-sql-connector-mysql-cdc-2.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 Setup MySQL server
 ----------------
