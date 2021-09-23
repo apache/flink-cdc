@@ -26,7 +26,7 @@ The version mapping between Flink CDC Connectors and Flink.
 |1.2.0 | 1.12.* |
 |1.3.0 | 1.12.* |
 |1.4.0 | 1.13.* |
-|2.0.0 | 1.13.* |
+|2.0.* | 1.13.* |
 
 ## Features
 
@@ -76,7 +76,7 @@ Include following Maven dependency (available through Maven Central):
   <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.2</version>
 </dependency>
 ```
 
