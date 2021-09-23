@@ -13,13 +13,13 @@ In order to setup the Changelog JSON format, the following table provides depend
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-format-changelog-json</artifactId>
-  <version>2.0.0</version>
+  <version>2.1.0</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-format-changelog-json-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-format-changelog-json/2.0.0/flink-format-changelog-json-2.0.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-format-changelog-json-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-format-changelog-json/2.1.0/flink-format-changelog-json-2.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 
 How to use Changelog JSON format
