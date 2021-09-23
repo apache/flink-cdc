@@ -21,7 +21,7 @@ package com.ververica.cdc.connectors.mysql;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import com.ververica.cdc.connectors.mysql.source.utils.UniqueDatabase;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
