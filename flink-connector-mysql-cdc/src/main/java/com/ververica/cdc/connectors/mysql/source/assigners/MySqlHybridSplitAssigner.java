@@ -50,17 +50,22 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
-    public MySqlHybridSplitAssigner(Configuration configuration, int currentParallelism) {
-        this(new MySqlSnapshotSplitAssigner(configuration, currentParallelism), false);
+    public MySqlHybridSplitAssigner(
+            Configuration configuration, int currentParallelism, int chunkSize) {
+        this(new MySqlSnapshotSplitAssigner(configuration, currentParallelism, chunkSize), false);
     }
 
     public MySqlHybridSplitAssigner(
             Configuration configuration,
             int currentParallelism,
+            int chunkSize,
             HybridPendingSplitsState checkpoint) {
         this(
                 new MySqlSnapshotSplitAssigner(
-                        configuration, currentParallelism, checkpoint.getSnapshotPendingSplits()),
+                        configuration,
+                        currentParallelism,
+                        chunkSize,
+                        checkpoint.getSnapshotPendingSplits()),
                 checkpoint.isBinlogSplitAssigned());
     }
 

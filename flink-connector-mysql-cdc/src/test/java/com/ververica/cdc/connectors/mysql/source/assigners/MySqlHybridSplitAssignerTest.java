@@ -113,7 +113,8 @@ public class MySqlHybridSplitAssignerTest extends MySqlParallelSourceTestBase {
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
         final MySqlHybridSplitAssigner assigner =
-                new MySqlHybridSplitAssigner(configuration, DEFAULT_PARALLELISM, checkpoint);
+                new MySqlHybridSplitAssigner(
+                        configuration, DEFAULT_PARALLELISM, DEFAULT_CHUNK_SIZE, checkpoint);
 
         // step 2. Get the MySqlBinlogSplit after all snapshot splits finished
         Optional<MySqlSplit> binlogSplit = assigner.getNext();
@@ -157,6 +158,10 @@ public class MySqlHybridSplitAssignerTest extends MySqlParallelSourceTestBase {
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        properties.put("database.responseBuffering", "adaptive");
+        properties.put("database.history.prefer.ddl", String.valueOf(true));
+        properties.put("tombstones.on.delete", String.valueOf(false));
+        properties.put("database.fetchSize", "2");
         return Configuration.fromMap(properties);
     }
 }

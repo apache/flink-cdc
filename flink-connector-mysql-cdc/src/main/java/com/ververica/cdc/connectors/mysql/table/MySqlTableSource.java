@@ -19,7 +19,6 @@
 package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -31,8 +30,8 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.mysql.MySqlSource;
-import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceBuilder;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -42,16 +41,10 @@ import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -128,9 +121,23 @@ public class MySqlTableSource implements ScanTableSource {
                 new RowDataDebeziumDeserializeSchema(
                         rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
         if (enableParallelRead) {
-            Configuration configuration = getParallelSourceConf();
             MySqlParallelSource<RowData> parallelSource =
-                    new MySqlParallelSource<>(deserializer, configuration);
+                    MySqlParallelSourceBuilder.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .databaseList(database)
+                            .tableList(database + "." + tableName)
+                            .username(username)
+                            .password(password)
+                            .serverTimeZone(serverTimeZone.toString())
+                            .startupOptions(startupOptions)
+                            .splitSize(splitSize)
+                            .fetchSize(fetchSize)
+                            .connectTimeout(connectTimeout)
+                            .serverId(serverId)
+                            .debeziumProperties(dbzProperties)
+                            .deserializer(deserializer)
+                            .build();
             return SourceProvider.of(parallelSource);
         } else {
             MySqlSource.Builder<RowData> builder =
@@ -151,57 +158,6 @@ public class MySqlTableSource implements ScanTableSource {
             DebeziumSourceFunction<RowData> sourceFunction = builder.build();
             return SourceFunctionProvider.of(sourceFunction, false);
         }
-    }
-
-    private Configuration getParallelSourceConf() {
-        Map<String, String> properties = new HashMap<>();
-        if (dbzProperties != null) {
-            dbzProperties.forEach((k, v) -> properties.put(k.toString(), v.toString()));
-        }
-        properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.hostname", checkNotNull(hostname));
-        properties.put("database.user", checkNotNull(username));
-        properties.put("database.password", checkNotNull(password));
-        properties.put("database.port", String.valueOf(port));
-        properties.put("database.history.skip.unparseable.ddl", String.valueOf(true));
-        properties.put("database.server.name", DATABASE_SERVER_NAME);
-
-        /**
-         * The server id is required, it will be replaced to 'database.server.id' when build {@link
-         * MySqlSplitReader}
-         */
-        if (serverId != null) {
-            properties.put(SERVER_ID.key(), serverId);
-        }
-        properties.put(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), String.valueOf(splitSize));
-        properties.put(SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
-        properties.put("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
-
-        if (database != null) {
-            properties.put("database.whitelist", database);
-        }
-        if (tableName != null) {
-            properties.put("table.whitelist", database + "." + tableName);
-        }
-        if (serverTimeZone != null) {
-            properties.put("database.serverTimezone", serverTimeZone.toString());
-        }
-
-        // set mode
-        switch (startupOptions.startupMode) {
-            case INITIAL:
-                properties.put("scan.startup.mode", "initial");
-                break;
-
-            case LATEST_OFFSET:
-                properties.put("scan.startup.mode", "latest-offset");
-                break;
-
-            default:
-                throw new UnsupportedOperationException();
-        }
-
-        return Configuration.fromMap(properties);
     }
 
     @Override

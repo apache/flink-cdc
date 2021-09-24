@@ -408,6 +408,19 @@ public class MySqlTableSourceFactoryTest {
                             + "but was: abc";
             assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
         }
+
+        // validate split size
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.chunk.size", "1");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            String msg =
+                    "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1";
+            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
+        }
     }
 
     private Map<String, String> getAllOptions() {

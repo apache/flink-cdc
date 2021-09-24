@@ -153,6 +153,7 @@ public class MySqlValidatorTest {
             MySqlParallelSource<?> mySqlParallelSource =
                     new MySqlParallelSource<>(
                             new MySqlTestUtils.ForwardDeserializeSchema(),
+                            new Configuration(),
                             Configuration.fromMap(database.getConfigMap()));
             mySqlParallelSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
         } else {

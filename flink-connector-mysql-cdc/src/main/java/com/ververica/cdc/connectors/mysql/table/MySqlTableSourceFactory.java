@@ -53,6 +53,7 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.TABLE
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.validateAndGetServerId;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
 public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
@@ -85,6 +86,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
             validateStartupOptionIfEnableParallel(startupOptions);
         }
+        validateSplitSize(splitSize);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
         return new MySqlTableSource(
@@ -194,5 +196,13 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
                                 + " but actual is %s",
                         startupOptions.startupMode));
+    }
+
+    private void validateSplitSize(int splitSize) {
+        checkState(
+                splitSize > 1,
+                String.format(
+                        "The value of option '%s' must larger than 1, but is %d",
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), splitSize));
     }
 }

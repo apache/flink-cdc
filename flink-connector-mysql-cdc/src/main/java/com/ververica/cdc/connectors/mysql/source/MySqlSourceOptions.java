@@ -32,6 +32,8 @@ public class MySqlSourceOptions {
 
     public static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
     public static final String DATABASE_SERVER_ID = "database.server.id";
+    public static final String DATABASE_WHITE_LIST = "database.whitelist";
+    public static final String TABLE_WHITE_LIST = "table.whitelist";
 
     public static final ConfigOption<String> HOSTNAME =
             ConfigOptions.key("hostname")

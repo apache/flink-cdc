@@ -23,7 +23,6 @@ import org.apache.flink.configuration.Configuration;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
-import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.AbstractSourceInfo;
@@ -47,7 +46,6 @@ import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.AbstractDatabaseHistory;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
@@ -62,7 +60,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
-import static io.debezium.config.CommonConnectorConfig.TOMBSTONES_ON_DELETE;
 
 /**
  * A stateful task context that contains entries the debezium mysql connector task required.
@@ -388,14 +385,6 @@ public class StatefulTaskContext {
     }
 
     public static io.debezium.config.Configuration toDebeziumConfig(Configuration configuration) {
-        return io.debezium.config.Configuration.from(configuration.toMap())
-                .edit()
-                .with(AbstractDatabaseHistory.INTERNAL_PREFER_DDL, true)
-                .with(TOMBSTONES_ON_DELETE, false)
-                .with("database.responseBuffering", "adaptive")
-                .with(
-                        "database.fetchSize",
-                        configuration.getInteger(MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE))
-                .build();
+        return io.debezium.config.Configuration.from(configuration.toMap());
     }
 }

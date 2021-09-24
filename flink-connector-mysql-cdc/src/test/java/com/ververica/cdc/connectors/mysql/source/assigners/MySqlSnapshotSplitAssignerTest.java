@@ -38,11 +38,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
 public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase {
@@ -131,7 +128,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
 
     private List<String> getTestAssignSnapshotSplits(int splitSize, String[] captureTables) {
         Configuration configuration = getConfig();
-        configuration.setString("scan.incremental.snapshot.chunk.size", String.valueOf(splitSize));
         List<String> captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
@@ -139,7 +135,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
         configuration.setString("table.whitelist", String.join(",", captureTableIds));
 
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM, splitSize);
 
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();
@@ -250,19 +246,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
     }
 
     @Test
-    public void testInvalidSplitSize() {
-        try {
-            getTestAssignSnapshotSplits(1, new String[] {"customers"});
-            fail("should fail.");
-        } catch (IllegalStateException e) {
-            assertThat(
-                    e,
-                    containsMessage(
-                            "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
-        }
-    }
-
-    @Test
     public void testUnMatchedPrimaryKey() {
         try {
             getTestAssignSnapshotSplits(4, new String[] {"customer_card"});
@@ -288,6 +271,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         properties.put("snapshot.mode", "initial");
         properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        properties.put("database.responseBuffering", "adaptive");
+        properties.put("database.history.prefer.ddl", String.valueOf(true));
+        properties.put("tombstones.on.delete", String.valueOf(false));
+        properties.put("database.fetchSize", "2");
         return Configuration.fromMap(properties);
     }
 }

@@ -45,6 +45,8 @@ public abstract class MySqlParallelSourceTestBase extends TestLogger {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlParallelSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
+    protected static final int DEFAULT_CHUNK_SIZE = 10;
+
     protected static final MySqlContainer MYSQL_CONTAINER =
             (MySqlContainer)
                     new MySqlContainer()

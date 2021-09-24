@@ -49,9 +49,7 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMyS
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createTableFilters;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
 import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
@@ -79,10 +77,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Nullable private Long checkpointIdToFinish;
 
-    public MySqlSnapshotSplitAssigner(Configuration configuration, int currentParallelism) {
+    public MySqlSnapshotSplitAssigner(
+            Configuration configuration, int currentParallelism, int chunkSize) {
         this(
                 configuration,
                 currentParallelism,
+                chunkSize,
                 new ArrayList<>(),
                 new ArrayList<>(),
                 new HashMap<>(),
@@ -93,10 +93,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     public MySqlSnapshotSplitAssigner(
             Configuration configuration,
             int currentParallelism,
+            int chunkSize,
             SnapshotPendingSplitsState checkpoint) {
         this(
                 configuration,
                 currentParallelism,
+                chunkSize,
                 checkpoint.getAlreadyProcessedTables(),
                 checkpoint.getRemainingSplits(),
                 checkpoint.getAssignedSplits(),
@@ -107,6 +109,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private MySqlSnapshotSplitAssigner(
             Configuration configuration,
             int currentParallelism,
+            int chunkSize,
             List<TableId> alreadyProcessedTables,
             List<MySqlSnapshotSplit> remainingSplits,
             Map<String, MySqlSnapshotSplit> assignedSplits,
@@ -114,6 +117,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             boolean assignerFinished) {
         this.configuration = configuration;
         this.currentParallelism = currentParallelism;
+        this.chunkSize = chunkSize;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
@@ -121,13 +125,6 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.assignerFinished = assignerFinished;
         this.remainingTables = new LinkedList<>();
         this.tableFilters = createTableFilters(configuration);
-        this.chunkSize = configuration.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
-        // TODO: the check should happen in factory
-        checkState(
-                chunkSize > 1,
-                String.format(
-                        "The value of option '%s' must larger than 1, but is %d",
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), chunkSize));
     }
 
     @Override

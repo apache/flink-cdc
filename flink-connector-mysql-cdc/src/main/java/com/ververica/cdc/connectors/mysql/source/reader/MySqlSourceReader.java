@@ -20,7 +20,6 @@ package com.ververica.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SourceReaderContext;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
@@ -62,13 +61,12 @@ public class MySqlSourceReader<T>
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
             Supplier<MySqlSplitReader> splitReaderSupplier,
             RecordEmitter<SourceRecord, T, MySqlSplitState> recordEmitter,
-            Configuration config,
             SourceReaderContext context) {
         super(
                 elementQueue,
                 new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
                 recordEmitter,
-                config,
+                context.getConfiguration(),
                 context);
         this.finishedUnackedSplits = new HashMap<>();
         this.subtaskId = context.getIndexOfSubtask();

@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
+import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
@@ -158,9 +159,15 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         if (capturedTableIds.isEmpty()) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
-                            configuration.get(MySqlSourceOptions.DATABASE_NAME),
-                            configuration.get(MySqlSourceOptions.TABLE_NAME)));
+                            "Can't find any matched tables %s in database %s, please check your configured database-name and table-name",
+                            configuration.getString(
+                                    ConfigOptions.key(MySqlSourceOptions.TABLE_WHITE_LIST)
+                                            .stringType()
+                                            .noDefaultValue()),
+                            configuration.getString(
+                                    ConfigOptions.key(MySqlSourceOptions.DATABASE_WHITE_LIST)
+                                            .stringType()
+                                            .noDefaultValue())));
         }
 
         // fetch table schemas

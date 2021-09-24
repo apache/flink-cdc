@@ -56,6 +56,7 @@ import java.util.function.Supplier;
 
 import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_ID;
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.getServerIdForSubTask;
 
@@ -78,17 +79,21 @@ public class MySqlParallelSource<T>
     private static final long serialVersionUID = 1L;
 
     private final DebeziumDeserializationSchema<T> deserializationSchema;
-    private final Configuration config;
+    private final Configuration flinkConf;
+    private final Configuration dbzConf;
     private final String startupMode;
     private final String historyInstanceName;
 
     public MySqlParallelSource(
-            DebeziumDeserializationSchema<T> deserializationSchema, Configuration config) {
+            DebeziumDeserializationSchema<T> deserializationSchema,
+            Configuration flinkConf,
+            Configuration dbzConf) {
         this.deserializationSchema = deserializationSchema;
-        this.config = config;
-        this.startupMode = config.get(SCAN_STARTUP_MODE);
+        this.flinkConf = flinkConf;
+        this.startupMode = flinkConf.get(SCAN_STARTUP_MODE);
+        this.dbzConf = dbzConf;
         this.historyInstanceName =
-                config.toMap()
+                dbzConf.toMap()
                         .getOrDefault(DATABASE_HISTORY_INSTANCE_NAME, UUID.randomUUID().toString());
     }
 
@@ -112,16 +117,14 @@ public class MySqlParallelSource<T>
                 elementsQueue,
                 splitReaderSupplier,
                 new MySqlRecordEmitter<>(deserializationSchema, sourceReaderMetrics),
-                readerConfiguration,
                 readerContext);
     }
 
     private Configuration getReaderConfig(SourceReaderContext readerContext) {
         // set the server id for each reader, will used by debezium reader
-        Configuration readerConfiguration = config.clone();
-        readerConfiguration.removeConfig(MySqlSourceOptions.SERVER_ID);
+        Configuration readerConfiguration = dbzConf.clone();
         final Optional<String> serverId =
-                getServerIdForSubTask(config, readerContext.getIndexOfSubtask());
+                getServerIdForSubTask(flinkConf, readerContext.getIndexOfSubtask());
         serverId.ifPresent(s -> readerConfiguration.setString(DATABASE_SERVER_ID, s));
         // set the DatabaseHistory name for each reader, will used by debezium reader
         readerConfiguration.setString(
@@ -133,13 +136,16 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) {
-        MySqlValidator validator = new MySqlValidator(config);
+        MySqlValidator validator = new MySqlValidator(dbzConf);
         final int currentParallelism = enumContext.currentParallelism();
 
         final MySqlSplitAssigner splitAssigner =
                 startupMode.equals("initial")
-                        ? new MySqlHybridSplitAssigner(config, currentParallelism)
-                        : new MySqlBinlogSplitAssigner(config);
+                        ? new MySqlHybridSplitAssigner(
+                                dbzConf,
+                                currentParallelism,
+                                flinkConf.getInteger(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE))
+                        : new MySqlBinlogSplitAssigner(dbzConf);
 
         return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
     }
@@ -147,16 +153,19 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
-        MySqlValidator validator = new MySqlValidator(config);
+        MySqlValidator validator = new MySqlValidator(dbzConf);
         final MySqlSplitAssigner splitAssigner;
         final int currentParallelism = enumContext.currentParallelism();
         if (checkpoint instanceof HybridPendingSplitsState) {
             splitAssigner =
                     new MySqlHybridSplitAssigner(
-                            config, currentParallelism, (HybridPendingSplitsState) checkpoint);
+                            dbzConf,
+                            currentParallelism,
+                            flinkConf.getInteger(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE),
+                            (HybridPendingSplitsState) checkpoint);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
-                    new MySqlBinlogSplitAssigner(config, (BinlogPendingSplitsState) checkpoint);
+                    new MySqlBinlogSplitAssigner(dbzConf, (BinlogPendingSplitsState) checkpoint);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);

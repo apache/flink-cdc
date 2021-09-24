@@ -228,7 +228,8 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
 
     private List<MySqlSplit> getMySqlSplits(Configuration configuration) {
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        configuration, DEFAULT_PARALLELISM, DEFAULT_CHUNK_SIZE);
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
@@ -262,9 +263,10 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
         properties.put("table.whitelist", String.join(",", captureTableIds));
-
-        properties.put("scan.incremental.snapshot.chunk.size", "10");
-        properties.put("scan.snapshot.fetch.size", "2");
+        properties.put("database.responseBuffering", "adaptive");
+        properties.put("database.history.prefer.ddl", String.valueOf(true));
+        properties.put("tombstones.on.delete", String.valueOf(false));
+        properties.put("database.fetchSize", "2");
         return Configuration.fromMap(properties);
     }
 }
