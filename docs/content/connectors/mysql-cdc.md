@@ -281,6 +281,27 @@ Incremental snapshot reading provides the ability to perform checkpoint in chunk
 
 The MySQL CDC source use **incremental snapshot algorithm**, which avoid acquiring global read lock (FLUSH TABLES WITH READ LOCK) and thus doesn't need `RELOAD` permission.
 
+#### MySQL High Availability Support
+
+The ```mysql-cdc``` connector offers high availability of MySQL high available cluster by using the [GTID](https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-concepts.html) information. To obtain the high availability, the MySQL cluster need enable the GTID mode, the GTID mode in your mysql config file should contain following settings:
+
+```yaml
+gtid_mode = on
+enforce_gtid_consistency = on
+```
+
+If the monitored MySQL server address contains slave instance, you need set following settings to the MySQL conf file. The setting ```log-slave-updates = 1``` enables the slave instance to also write the data that synchronized from master to its binlog, this makes sure that the ```mysql-cdc``` connector can consume entire data from the slave instance.
+
+```yaml
+gtid_mode = on
+enforce_gtid_consistency = on
+log-slave-updates = 1
+```
+
+After the server you monitored fails in MySQL cluster, you only need to change the monitored server address to other available server and then restart the job from the latest checkpoint/savepoint, the job will restore from the checkpoint/savepoint and won't miss any records.
+
+It's recommended to configure a DNS(Domain Name Service) or VIP(Virtual IP Address) for your MySQL cluster, using the DNS or VIP address for ```mysql-cdc``` connector, the DNS or VIP would automatically route the network request to the active MySQL server. In this way, you don't need to modify the address and restart your pipeline anymore.
+
 #### How Incremental Snapshot Reading works
 
 When the MySQL CDC source is started, it reads snapshot of table parallelly and then reads binlog of table with single parallelism.
@@ -391,25 +412,6 @@ public class MySqlBinlogSourceExample {
 ```
 
 **Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.
-
-### Well-Supported to MySQL high available cluster
-
-When enabling GTID mode in MySQL with adding the following configurations to MySQL conf file,
-```yaml
-gtid_mode = on
-enforce_gtid_consistency = on
-```
-once the instance your job monitors fails in MySQL cluster, you only need to make the job monitor another available MySQL instance and restart the job manually.
-
-It's recommended to use DNS(Domain Name Service) or VIP(Virtual IP Address) to dynamically change the MySQL instance your job actually monitors.
-In that case, you don't need to modify/restart your job manually anymore.
-
-**NOTE:**
-
-If your job monitors the MySQL slave instance, you should add the following extra configuration to MySQL conf file to enable the slave to write binlog.
-```yaml
-log-slave-updates = 1
-```
 
 Data Type Mapping
 ----------------
