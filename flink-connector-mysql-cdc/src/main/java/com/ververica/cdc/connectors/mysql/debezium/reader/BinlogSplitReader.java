@@ -20,8 +20,6 @@ package com.ververica.cdc.connectors.mysql.debezium.reader;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -48,8 +46,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
@@ -78,12 +74,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private Tables.TableFilter capturedTableFilter;
 
     public BinlogSplitReader(
-            StatefulTaskContext statefulTaskContext, MySqlBinlogSplit binlogSplit, int subTaskId) {
+            StatefulTaskContext statefulTaskContext,
+            MySqlBinlogSplit binlogSplit,
+            ExecutorService executor) {
         this.statefulTaskContext = statefulTaskContext;
         this.binlogSplit = binlogSplit;
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executor = executor;
         this.currentTaskRunning = false;
     }
 
@@ -135,7 +131,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     @Override
     public boolean isFinished() {
-        return binlogSplit == null || !currentTaskRunning;
+        return !currentTaskRunning;
     }
 
     @Nullable

@@ -20,8 +20,6 @@ package com.ververica.cdc.connectors.mysql.debezium.reader;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlSnapshotSplitReadTask;
@@ -50,8 +48,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.normalizedSplitRecords;
@@ -80,12 +76,10 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     public SnapshotSplitReader(
             StatefulTaskContext statefulTaskContext,
             MySqlSnapshotSplit snapshotSplit,
-            int subtaskId) {
+            ExecutorService executor) {
         this.statefulTaskContext = statefulTaskContext;
         this.snapshotSplit = snapshotSplit;
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subtaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executor = executor;
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
         this.reachEnd = new AtomicBoolean(false);
@@ -214,8 +208,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     @Override
     public boolean isFinished() {
-        return snapshotSplit == null
-                || (!currentTaskRunning && !hasNextElement.get() && reachEnd.get());
+        return !currentTaskRunning && !hasNextElement.get() && reachEnd.get();
     }
 
     @Nullable
