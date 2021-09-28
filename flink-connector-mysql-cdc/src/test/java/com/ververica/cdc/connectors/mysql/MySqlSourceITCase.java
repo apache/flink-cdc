@@ -26,6 +26,7 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.kafka.connect.json.JsonConverterConfig;
 
 import com.alibaba.fastjson.JSONObject;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Properties;
 
 import static org.junit.Assert.assertTrue;
 
@@ -90,6 +92,8 @@ public class MySqlSourceITCase extends MySqlTestBase {
 
     private void testConsumingAllEventsWithJsonFormat(Boolean includeSchema) throws Exception {
         fullTypesDatabase.createAndInitialize();
+        Properties dbzProperties = new Properties();
+        dbzProperties.setProperty(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, Boolean.toString(includeSchema));
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
@@ -98,7 +102,8 @@ public class MySqlSourceITCase extends MySqlTestBase {
                         .databaseList(fullTypesDatabase.getDatabaseName())
                         .username(fullTypesDatabase.getUsername())
                         .password(fullTypesDatabase.getPassword())
-                        .deserializer(new JsonDebeziumDeserializationSchema(includeSchema))
+                        .deserializer(new JsonDebeziumDeserializationSchema())
+                        .debeziumProperties(dbzProperties)
                         .build();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
