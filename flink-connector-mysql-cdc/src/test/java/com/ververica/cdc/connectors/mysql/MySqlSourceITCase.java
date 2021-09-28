@@ -26,12 +26,12 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.kafka.connect.json.JsonConverterConfig;
 
 import com.alibaba.fastjson.JSONObject;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
+import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -93,7 +93,8 @@ public class MySqlSourceITCase extends MySqlTestBase {
     private void testConsumingAllEventsWithJsonFormat(Boolean includeSchema) throws Exception {
         fullTypesDatabase.createAndInitialize();
         Properties dbzProperties = new Properties();
-        dbzProperties.setProperty(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, Boolean.toString(includeSchema));
+        dbzProperties.setProperty(
+                JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, Boolean.toString(includeSchema));
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
