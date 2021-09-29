@@ -152,14 +152,14 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the database to watch for changes.</td>
+      <td>Name of the database to watch for changes. If set to empty string, then all databases will be captured (databases can be filtered using the copy.existing.namespace.regex setting).</td>
     </tr>
     <tr>
       <td>collection</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the collection in the database to watch for changes.</td>
+      <td>Name of the collection in the database to watch for changes. If set to empty string, then all collections will be caputred (collections can be filtered using the copy.existing.namespace.regex setting)</td>
     </tr>
     <tr>
       <td>connection.options</td>
@@ -205,6 +205,13 @@ Connector Options
            eg. <code>[{"$match": {"closed": "false"}}]</code> ensures that 
            only documents in which the closed field is set to false are copied.
       </td>
+    </tr>
+    <tr>
+      <td>copy.existing.namespace.regex</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">16000</td>
+      <td>String</td>
+      <td>Regular expression that matches the namespaces from which to copy data. A namespace describes the database name and collection separated by a period, e.g. databaseName.collectionName.</td>
     </tr>
     <tr>
       <td>copy.existing.max.threads</td>

@@ -133,6 +133,7 @@ public class MongoDBSource {
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
         private String copyExistingPipeline;
+        private String copyExistingNamespaceRegex;
         private Boolean errorsLogEnable;
         private String errorsTolerance;
         private Integer heartbeatIntervalMillis;
@@ -320,6 +321,18 @@ public class MongoDBSource {
             return this;
         }
 
+        /**
+         * copy.existing.namespace.regex
+         *
+         * <p>Regular expression that matches the namespaces from which to copy data. A namespace
+         * describes the database name and collection separated by a period, e.g.
+         * databaseName.collectionName.
+         */
+        public Builder<T> copyExistingNamespaceRegex(String copyExistingNamespaceRegex) {
+            this.copyExistingNamespaceRegex = copyExistingNamespaceRegex;
+            return this;
+        }
+
         /** Build connection uri. */
         private URI buildConnectionUri() {
             String authority = checkNotNull(hosts);
@@ -416,6 +429,12 @@ public class MongoDBSource {
             if (copyExistingPipeline != null) {
                 props.setProperty(
                         MongoSourceConfig.COPY_EXISTING_PIPELINE_CONFIG, copyExistingPipeline);
+            }
+
+            if (copyExistingNamespaceRegex != null) {
+                props.setProperty(
+                        MongoSourceConfig.COPY_EXISTING_NAMESPACE_REGEX_CONFIG,
+                        copyExistingNamespaceRegex);
             }
 
             if (heartbeatIntervalMillis != null) {

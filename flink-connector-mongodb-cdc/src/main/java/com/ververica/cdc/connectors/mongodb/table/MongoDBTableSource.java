@@ -63,6 +63,7 @@ public class MongoDBTableSource implements ScanTableSource {
     private final Integer pollAwaitTimeMillis;
     private final Integer heartbeatIntervalMillis;
     private final ZoneId localTimeZone;
+    private final String copyExistingNamespaceRegex;
 
     public MongoDBTableSource(
             TableSchema physicalSchema,
@@ -78,6 +79,7 @@ public class MongoDBTableSource implements ScanTableSource {
             @Nullable String copyExistingPipeline,
             @Nullable Integer copyExistingMaxThreads,
             @Nullable Integer copyExistingQueueSize,
+            @Nullable String copyExistingNamespaceRegex,
             @Nullable Integer pollMaxBatchSize,
             @Nullable Integer pollAwaitTimeMillis,
             @Nullable Integer heartbeatIntervalMillis,
@@ -95,6 +97,7 @@ public class MongoDBTableSource implements ScanTableSource {
         this.copyExistingPipeline = copyExistingPipeline;
         this.copyExistingMaxThreads = copyExistingMaxThreads;
         this.copyExistingQueueSize = copyExistingQueueSize;
+        this.copyExistingNamespaceRegex = copyExistingNamespaceRegex;
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
@@ -135,6 +138,8 @@ public class MongoDBTableSource implements ScanTableSource {
         Optional.ofNullable(copyExistingPipeline).ifPresent(builder::copyExistingPipeline);
         Optional.ofNullable(copyExistingMaxThreads).ifPresent(builder::copyExistingMaxThreads);
         Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
+        Optional.ofNullable(copyExistingNamespaceRegex)
+                .ifPresent(builder::copyExistingNamespaceRegex);
         Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
         Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
         Optional.ofNullable(heartbeatIntervalMillis).ifPresent(builder::heartbeatIntervalMillis);
@@ -160,6 +165,7 @@ public class MongoDBTableSource implements ScanTableSource {
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,
+                copyExistingNamespaceRegex,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,

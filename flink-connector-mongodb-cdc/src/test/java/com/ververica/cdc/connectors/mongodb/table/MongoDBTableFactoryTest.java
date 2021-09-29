@@ -91,6 +91,7 @@ public class MongoDBTableFactoryTest {
                         null,
                         null,
                         null,
+                        null,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
                         null,
@@ -108,6 +109,7 @@ public class MongoDBTableFactoryTest {
         options.put("copy.existing.pipeline", "[ { \"$match\": { \"closed\": \"false\" } } ]");
         options.put("copy.existing.max.threads", "1");
         options.put("copy.existing.queue.size", "101");
+        options.put("copy.existing.namespace.regex", ".*");
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
         options.put("heartbeat.interval.ms", "104");
@@ -128,6 +130,7 @@ public class MongoDBTableFactoryTest {
                         "[ { \"$match\": { \"closed\": \"false\" } } ]",
                         1,
                         101,
+                        ".*",
                         102,
                         103,
                         104,
