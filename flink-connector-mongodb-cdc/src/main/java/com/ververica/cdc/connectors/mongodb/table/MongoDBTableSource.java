@@ -64,6 +64,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final Boolean errorsLogEnable;
     private final String errorsTolerance;
     private final Boolean copyExisting;
+    private final String copyExistingNamespaceRegex;
     private final String copyExistingPipeline;
     private final Integer copyExistingMaxThreads;
     private final Integer copyExistingQueueSize;
@@ -93,6 +94,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String errorsTolerance,
             @Nullable Boolean errorsLogEnable,
             @Nullable Boolean copyExisting,
+            @Nullable String copyExistingNamespaceRegex,
             @Nullable String copyExistingPipeline,
             @Nullable Integer copyExistingMaxThreads,
             @Nullable Integer copyExistingQueueSize,
@@ -110,6 +112,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.errorsTolerance = errorsTolerance;
         this.errorsLogEnable = errorsLogEnable;
         this.copyExisting = copyExisting;
+        this.copyExistingNamespaceRegex = copyExistingNamespaceRegex;
         this.copyExistingPipeline = copyExistingPipeline;
         this.copyExistingMaxThreads = copyExistingMaxThreads;
         this.copyExistingQueueSize = copyExistingQueueSize;
@@ -154,6 +157,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         Optional.ofNullable(errorsLogEnable).ifPresent(builder::errorsLogEnable);
         Optional.ofNullable(errorsTolerance).ifPresent(builder::errorsTolerance);
         Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
+        Optional.ofNullable(copyExistingNamespaceRegex)
+                .ifPresent(builder::copyExistingNamespaceRegex);
         Optional.ofNullable(copyExistingPipeline).ifPresent(builder::copyExistingPipeline);
         Optional.ofNullable(copyExistingMaxThreads).ifPresent(builder::copyExistingMaxThreads);
         Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
@@ -211,6 +216,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         errorsTolerance,
                         errorsLogEnable,
                         copyExisting,
+                        copyExistingNamespaceRegex,
                         copyExistingPipeline,
                         copyExistingMaxThreads,
                         copyExistingQueueSize,
@@ -242,6 +248,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(errorsTolerance, that.errorsTolerance)
                 && Objects.equals(errorsLogEnable, that.errorsLogEnable)
                 && Objects.equals(copyExisting, that.copyExisting)
+                && Objects.equals(copyExistingNamespaceRegex, that.copyExistingNamespaceRegex)
                 && Objects.equals(copyExistingPipeline, that.copyExistingPipeline)
                 && Objects.equals(copyExistingMaxThreads, that.copyExistingMaxThreads)
                 && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
@@ -266,6 +273,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,
+                copyExistingNamespaceRegex,
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,
