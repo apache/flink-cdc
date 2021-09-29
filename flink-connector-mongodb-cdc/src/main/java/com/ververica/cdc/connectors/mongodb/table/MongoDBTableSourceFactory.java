@@ -142,6 +142,15 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The max size of the queue to use when copying data. Defaults to 16000.");
 
+    private static final ConfigOption<String> COPY_EXISTING_NAMESPACE_REGEX =
+            ConfigOptions.key("copy.existing.namespace.regex")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Regular expression that matches the namespaces from which to copy data. "
+                                    + "A namespace describes the database name and collection separated by a period, "
+                                    + "e.g. databaseName.collectionName.");
+
     private static final ConfigOption<Integer> POLL_MAX_BATCH_SIZE =
             ConfigOptions.key("poll.max.batch.size")
                     .intType()
@@ -200,6 +209,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         String copyExistingPipeline = config.getOptional(COPY_EXISTING_PIPELINE).orElse(null);
         Integer copyExistingMaxThreads = config.getOptional(COPY_EXISTING_MAX_THREADS).orElse(null);
         Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
+        String copyExistingNamespaceRegex =
+                config.getOptional(COPY_EXISTING_NAMESPACE_REGEX).orElse(null);
 
         String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
         ZoneId localTimeZone =
@@ -225,6 +236,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,
+                copyExistingNamespaceRegex,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,
@@ -263,6 +275,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(COPY_EXISTING_PIPELINE);
         options.add(COPY_EXISTING_MAX_THREADS);
         options.add(COPY_EXISTING_QUEUE_SIZE);
+        options.add(COPY_EXISTING_NAMESPACE_REGEX);
         options.add(POLL_MAX_BATCH_SIZE);
         options.add(POLL_AWAIT_TIME_MILLIS);
         options.add(HEARTBEAT_INTERVAL_MILLIS);
