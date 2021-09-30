@@ -40,9 +40,12 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.utils.TemporalConversions;
+import io.debezium.data.EnumSet;
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
+import io.debezium.data.geometry.Geometry;
+import io.debezium.data.geometry.Point;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
@@ -307,10 +310,10 @@ public final class RowDataDebeziumDeserializeSchema
                 return convertToBinary();
             case DECIMAL:
                 return createDecimalConverter((DecimalType) type);
-            case ARRAY:
-                return createArrayConverter((ArrayType) type);
             case ROW:
                 return createRowConverter((RowType) type);
+            case ARRAY:
+                return createArrayConverter((ArrayType) type);
             case MAP:
             case MULTISET:
             case RAW:
@@ -506,8 +509,8 @@ public final class RowDataDebeziumDeserializeSchema
 
             @Override
             public Object convert(Object dbzObj, Schema schema) {
-                // if the dbzObj is instance of Struct, assume it represents GEOMETRY
-                if (dbzObj instanceof Struct) {
+                if (Point.LOGICAL_NAME.equals(schema.name())
+                        || Geometry.LOGICAL_NAME.equals(schema.name())) {
                     try {
                         Struct geometryStruct = (Struct) dbzObj;
                         byte[] wkb = geometryStruct.getBytes("wkb");
@@ -605,7 +608,7 @@ public final class RowDataDebeziumDeserializeSchema
                     elementArray[i] = elementConverter.convert(elements.get(i), schema);
                 }
                 return new GenericArrayData(elementArray);
-            } else if (dbzObj instanceof String) {
+            } else if (EnumSet.LOGICAL_NAME.equals(schema.name()) && dbzObj instanceof String) {
                 // for SET datatype in mysql, debezium will always return a string split by comma
                 // like "a,b,c"
                 String[] elements = ((String) dbzObj).split(",");
@@ -618,7 +621,7 @@ public final class RowDataDebeziumDeserializeSchema
             } else {
                 throw new IllegalArgumentException(
                         String.format(
-                                "Unable to convert to arrayType from unexpected value '%s', only List and String type can be converted to arrayType",
+                                "Unable convert to Flink ARRAY type from unexpected value '%s', only LIST and SET type could convert to ARRAY type",
                                 dbzObj));
             }
         };
