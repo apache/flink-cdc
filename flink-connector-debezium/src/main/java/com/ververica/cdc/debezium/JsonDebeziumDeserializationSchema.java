@@ -22,7 +22,6 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.util.Collector;
 
-import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -39,11 +38,14 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
 
     private static final long serialVersionUID = 1L;
 
-    private static final JsonConverter CONVERTER =  new JsonConverter();
+    private static final JsonConverter CONVERTER = new JsonConverter();
 
     private static final HashMap<String, Object> CONFIGS = new HashMap<>();
 
-    /** Configuration {@link JsonConverterConfig.SCHEMAS_ENABLE_CONFIG} enabled to include schema in the message. */
+    /**
+     * Configuration {@link JsonConverterConfig.SCHEMAS_ENABLE_CONFIG} enabled to include schema in
+     * the message.
+     */
     private final Boolean includeSchema;
 
     /** When the deserialize method is first called, Configure CONVERTER. */
@@ -59,7 +61,8 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
 
     @Override
     public void deserialize(SourceRecord record, Collector<String> out) throws Exception {
-        // Avoid occurred NullPointException in CONVERTER.FromConnectData() was performed when deploy on the cluster
+        // Avoid occurred NullPointException in CONVERTER.FromConnectData() was performed when
+        // deploy on the cluster
         // and can be instantiated by {@ link JsonDebeziumDeserializationSchema} constructor
         // to control whether to enable or disable inclusion patterns in messages.
         if (isFirst) {
@@ -69,7 +72,7 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
             isFirst = false;
         }
         byte[] bytes =
-            CONVERTER.fromConnectData(record.topic(), record.valueSchema(), record.value());
+                CONVERTER.fromConnectData(record.topic(), record.valueSchema(), record.value());
         out.collect(new String(bytes));
     }
 
