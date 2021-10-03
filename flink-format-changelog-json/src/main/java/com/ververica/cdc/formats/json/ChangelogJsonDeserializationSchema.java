@@ -90,7 +90,7 @@ public class ChangelogJsonDeserializationSchema implements DeserializationSchema
             // a big try catch to protect the processing.
             if (!ignoreParseErrors) {
                 throw new IOException(
-                        format("Corrupt Chagnelog JSON message '%s'.", new String(bytes)), t);
+                        format("Corrupt Changelog JSON message '%s'.", new String(bytes)), t);
             }
         }
     }
