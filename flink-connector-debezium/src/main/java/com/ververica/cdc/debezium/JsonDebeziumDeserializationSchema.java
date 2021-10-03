@@ -49,7 +49,7 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
     private final Boolean includeSchema;
 
     /** When the deserialize method is first called, Configure CONVERTER. */
-    private static Boolean isFirst = true;
+    private Boolean isFirst = true;
 
     public JsonDebeziumDeserializationSchema() {
         this(false);
