@@ -14,7 +14,7 @@ This README is meant as a brief walkthrough on the core features with Flink CDC 
 | MongoDB | Database: 4.0, 4.2, 5.0 <br/> MongoDB Driver: 4.3.1 |
 ## Features
 
-1. Supports reading database snapshot and continues to read binlogs with **exactly-once processing** even failures happen.
+1. Supports reading database snapshot and continues to read transaction logs with **exactly-once processing** even failures happen.
 2. CDC connectors for DataStream API, users can consume changes on multiple databases and tables in a single job without Debezium and Kafka deployed.
 3. CDC connectors for Table/SQL API, users can use SQL DDL to create a CDC source to monitor changes on a single table.
 
