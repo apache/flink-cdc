@@ -32,6 +32,8 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.toDebeziumConfig;
+
 /**
  * The validator for MySql: it only cares about the version of the database is larger than or equal
  * to 5.7. It also requires the binlog format in the database is ROW and row image is FULL.
@@ -55,7 +57,8 @@ public class MySqlValidator implements Validator {
 
     @Override
     public void validate() {
-        try (MySqlConnection connection = DebeziumUtils.openMySqlConnection(configuration)) {
+        try (MySqlConnection connection =
+                DebeziumUtils.openMySqlConnection(toDebeziumConfig(configuration))) {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);

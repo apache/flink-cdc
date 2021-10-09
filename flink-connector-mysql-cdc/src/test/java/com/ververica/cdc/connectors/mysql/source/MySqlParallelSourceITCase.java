@@ -20,7 +20,6 @@ package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -31,6 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.junit.Test;
@@ -322,7 +322,7 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
         properties.put("database.user", customDatabase.getUsername());
         properties.put("database.password", customDatabase.getPassword());
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
-        Configuration configuration = Configuration.fromMap(properties);
+        Configuration configuration = Configuration.from(properties);
         return StatefulTaskContext.getConnection(configuration);
     }
 

@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
@@ -37,6 +36,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -285,7 +285,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     public void testReadBinlogFromLatestOffset() throws Exception {
         customerDatabase.createAndInitialize();
         Configuration configuration = getConfig(new String[] {"customers"});
-        configuration.set(SCAN_STARTUP_MODE, "latest-offset");
+        configuration = configuration.edit().with(SCAN_STARTUP_MODE.key(), "latest-offset").build();
         binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
         mySqlConnection = StatefulTaskContext.getConnection(configuration);
         final DataType dataType =
@@ -592,6 +592,6 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
         properties.put("database.history.prefer.ddl", String.valueOf(true));
         properties.put("tombstones.on.delete", String.valueOf(false));
         properties.put("database.fetchSize", "2");
-        return Configuration.fromMap(properties);
+        return Configuration.from(properties);
     }
 }

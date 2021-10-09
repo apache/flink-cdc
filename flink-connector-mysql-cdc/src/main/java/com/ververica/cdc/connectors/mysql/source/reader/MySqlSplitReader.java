@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.reader;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitReader;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
@@ -32,6 +31,7 @@ import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskCont
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlRecords;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;

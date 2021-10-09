@@ -18,8 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import org.apache.flink.configuration.ConfigOptions;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -31,6 +29,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsSt
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -48,7 +47,6 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMyS
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createTableFilters;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
-import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
@@ -160,18 +158,12 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
             throw new IllegalArgumentException(
                     String.format(
                             "Can't find any matched tables %s in database %s, please check your configured database-name and table-name",
-                            configuration.getString(
-                                    ConfigOptions.key(MySqlSourceOptions.TABLE_WHITE_LIST)
-                                            .stringType()
-                                            .noDefaultValue()),
-                            configuration.getString(
-                                    ConfigOptions.key(MySqlSourceOptions.DATABASE_WHITE_LIST)
-                                            .stringType()
-                                            .noDefaultValue())));
+                            configuration.getString(MySqlSourceOptions.TABLE_WHITE_LIST),
+                            configuration.getString(MySqlSourceOptions.DATABASE_WHITE_LIST)));
         }
 
         // fetch table schemas
-        MySqlSchema mySqlSchema = new MySqlSchema(toDebeziumConfig(configuration), jdbc);
+        MySqlSchema mySqlSchema = new MySqlSchema(configuration, jdbc);
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
         for (TableId tableId : capturedTableIds) {
             TableChange tableSchema = mySqlSchema.getTableSchema(tableId);

@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
@@ -30,6 +29,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAss
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.BeforeClass;
@@ -267,6 +267,6 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
         properties.put("database.history.prefer.ddl", String.valueOf(true));
         properties.put("tombstones.on.delete", String.valueOf(false));
         properties.put("database.fetchSize", "2");
-        return Configuration.fromMap(properties);
+        return Configuration.from(properties);
     }
 }

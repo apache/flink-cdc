@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 
@@ -34,6 +33,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.BeforeClass;
@@ -71,7 +71,11 @@ public class MySqlHybridSplitAssignerTest extends MySqlParallelSourceTestBase {
                 Arrays.stream(new String[] {captureTable})
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
-        configuration.setString("table.whitelist", String.join(",", captureTableIds));
+        configuration =
+                configuration
+                        .edit()
+                        .with("table.whitelist", String.join(",", captureTableIds))
+                        .build();
 
         // Step 1. Mock MySqlHybridSplitAssigner Object
         TableId tableId = new TableId(null, customerDatabase.getDatabaseName(), captureTable);
@@ -162,6 +166,6 @@ public class MySqlHybridSplitAssignerTest extends MySqlParallelSourceTestBase {
         properties.put("database.history.prefer.ddl", String.valueOf(true));
         properties.put("tombstones.on.delete", String.valueOf(false));
         properties.put("database.fetchSize", "2");
-        return Configuration.fromMap(properties);
+        return Configuration.from(properties);
     }
 }

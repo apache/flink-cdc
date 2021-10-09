@@ -18,13 +18,13 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import io.debezium.config.Configuration;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -132,7 +132,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
-        configuration.setString("table.whitelist", String.join(",", captureTableIds));
+        configuration =
+                configuration
+                        .edit()
+                        .with("table.whitelist", String.join(",", captureTableIds))
+                        .build();
 
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM, splitSize);
@@ -275,6 +279,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
         properties.put("database.history.prefer.ddl", String.valueOf(true));
         properties.put("tombstones.on.delete", String.valueOf(false));
         properties.put("database.fetchSize", "2");
-        return Configuration.fromMap(properties);
+        return Configuration.from(properties);
     }
 }

@@ -412,6 +412,7 @@ public class MySqlTableSourceFactoryTest {
         // validate split size
         try {
             Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
             properties.put("scan.incremental.snapshot.chunk.size", "1");
 
             createTableSource(properties);

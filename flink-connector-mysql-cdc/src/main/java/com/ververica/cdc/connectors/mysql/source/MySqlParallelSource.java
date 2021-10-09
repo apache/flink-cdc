@@ -54,6 +54,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.toDebeziumConfig;
 import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
@@ -107,12 +108,13 @@ public class MySqlParallelSource<T>
             throws Exception {
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
-        final Configuration readerConfiguration = getReaderConfig(readerContext);
         final MySqlSourceReaderMetrics sourceReaderMetrics =
                 new MySqlSourceReaderMetrics(readerContext.metricGroup());
         sourceReaderMetrics.registerMetrics();
         Supplier<MySqlSplitReader> splitReaderSupplier =
-                () -> new MySqlSplitReader(readerConfiguration, readerContext.getIndexOfSubtask());
+                () ->
+                        new MySqlSplitReader(
+                                getReaderConfig(readerContext), readerContext.getIndexOfSubtask());
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
@@ -120,7 +122,7 @@ public class MySqlParallelSource<T>
                 readerContext);
     }
 
-    private Configuration getReaderConfig(SourceReaderContext readerContext) {
+    private io.debezium.config.Configuration getReaderConfig(SourceReaderContext readerContext) {
         // set the server id for each reader, will used by debezium reader
         Configuration readerConfiguration = dbzConf.clone();
         final Optional<String> serverId =
@@ -130,7 +132,8 @@ public class MySqlParallelSource<T>
         readerConfiguration.setString(
                 DATABASE_HISTORY_INSTANCE_NAME,
                 historyInstanceName + "_" + readerContext.getIndexOfSubtask());
-        return readerConfiguration;
+
+        return toDebeziumConfig(readerConfiguration);
     }
 
     @Override
@@ -142,10 +145,10 @@ public class MySqlParallelSource<T>
         final MySqlSplitAssigner splitAssigner =
                 startupMode.equals("initial")
                         ? new MySqlHybridSplitAssigner(
-                                dbzConf,
+                                toDebeziumConfig(dbzConf),
                                 currentParallelism,
                                 flinkConf.getInteger(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE))
-                        : new MySqlBinlogSplitAssigner(dbzConf);
+                        : new MySqlBinlogSplitAssigner(toDebeziumConfig(dbzConf));
 
         return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
     }
@@ -153,19 +156,21 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
+
         MySqlValidator validator = new MySqlValidator(dbzConf);
         final MySqlSplitAssigner splitAssigner;
         final int currentParallelism = enumContext.currentParallelism();
         if (checkpoint instanceof HybridPendingSplitsState) {
             splitAssigner =
                     new MySqlHybridSplitAssigner(
-                            dbzConf,
+                            toDebeziumConfig(dbzConf),
                             currentParallelism,
                             flinkConf.getInteger(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE),
                             (HybridPendingSplitsState) checkpoint);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
-                    new MySqlBinlogSplitAssigner(dbzConf, (BinlogPendingSplitsState) checkpoint);
+                    new MySqlBinlogSplitAssigner(
+                            toDebeziumConfig(dbzConf), (BinlogPendingSplitsState) checkpoint);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);

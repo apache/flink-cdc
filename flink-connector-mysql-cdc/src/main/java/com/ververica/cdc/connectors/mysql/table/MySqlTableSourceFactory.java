@@ -85,8 +85,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
             validateStartupOptionIfEnableParallel(startupOptions);
+            validateSplitSize(splitSize);
         }
-        validateSplitSize(splitSize);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
         return new MySqlTableSource(

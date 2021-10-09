@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
@@ -27,6 +26,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPending
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -48,7 +48,6 @@ import java.util.Optional;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMySqlConnection;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createTableFilters;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
-import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
 /**
@@ -274,16 +273,16 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (capturedTableIds.isEmpty()) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
-                            configuration.get(MySqlSourceOptions.DATABASE_NAME),
-                            configuration.get(MySqlSourceOptions.TABLE_NAME)));
+                            "Can't find any matched tables %s in database %s, please check your configured database-name and table-name",
+                            configuration.getString(MySqlSourceOptions.TABLE_WHITE_LIST),
+                            configuration.getString(MySqlSourceOptions.DATABASE_WHITE_LIST)));
         }
         return capturedTableIds;
     }
 
     private static ChunkSplitter createChunkSplitter(
             Configuration configuration, MySqlConnection jdbc, int chunkSize) {
-        MySqlSchema mySqlSchema = new MySqlSchema(toDebeziumConfig(configuration), jdbc);
+        MySqlSchema mySqlSchema = new MySqlSchema(configuration, jdbc);
         return new ChunkSplitter(jdbc, mySqlSchema, chunkSize);
     }
 }

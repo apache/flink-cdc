@@ -18,13 +18,12 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.task.context;
 
-import org.apache.flink.configuration.Configuration;
-
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.config.Configuration;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlChangeEventSourceMetricsFactory;
@@ -93,7 +92,7 @@ public class StatefulTaskContext {
             Configuration configuration,
             BinaryLogClient binaryLogClient,
             MySqlConnection connection) {
-        this.dezConf = toDebeziumConfig(configuration);
+        this.dezConf = configuration;
         this.connectorConfig = new MySqlConnectorConfig(dezConf);
         this.schemaNameAdjuster = SchemaNameAdjuster.create();
         this.metadataProvider = new MySqlEventMetadataProvider();
@@ -354,8 +353,7 @@ public class StatefulTaskContext {
 
     // ------------ utils ---------
     public static BinaryLogClient getBinaryClient(Configuration configuration) {
-        final MySqlConnectorConfig connectorConfig =
-                new MySqlConnectorConfig(toDebeziumConfig(configuration));
+        final MySqlConnectorConfig connectorConfig = new MySqlConnectorConfig(configuration);
         return new BinaryLogClient(
                 connectorConfig.hostname(),
                 connectorConfig.port(),
@@ -364,27 +362,6 @@ public class StatefulTaskContext {
     }
 
     public static MySqlConnection getConnection(Configuration configuration) {
-        return new MySqlConnection(
-                new MySqlConnection.MySqlConnectionConfiguration(toDebeziumConfig(configuration)));
-    }
-
-    public static MySqlDatabaseSchema getMySqlDatabaseSchema(
-            Configuration configuration, MySqlConnection connection) {
-        io.debezium.config.Configuration dezConf = toDebeziumConfig(configuration);
-        MySqlConnectorConfig connectorConfig = new MySqlConnectorConfig(dezConf);
-        boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
-        TopicSelector<TableId> topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
-        SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
-        MySqlValueConverters valueConverters = getValueConverters(connectorConfig);
-        return new MySqlDatabaseSchema(
-                connectorConfig,
-                valueConverters,
-                topicSelector,
-                schemaNameAdjuster,
-                tableIdCaseInsensitive);
-    }
-
-    public static io.debezium.config.Configuration toDebeziumConfig(Configuration configuration) {
-        return io.debezium.config.Configuration.from(configuration.toMap());
+        return new MySqlConnection(new MySqlConnection.MySqlConnectionConfiguration(configuration));
     }
 }

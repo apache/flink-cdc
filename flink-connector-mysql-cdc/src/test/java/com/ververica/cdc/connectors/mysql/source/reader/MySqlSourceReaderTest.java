@@ -23,7 +23,6 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
@@ -40,6 +39,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import io.debezium.config.Configuration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -179,7 +179,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
         properties.put("database.history.prefer.ddl", String.valueOf(true));
         properties.put("tombstones.on.delete", String.valueOf(false));
         properties.put("database.fetchSize", "2");
-        return Configuration.fromMap(properties);
+        return Configuration.from(properties);
     }
 
     private List<String> consumeRecords(
