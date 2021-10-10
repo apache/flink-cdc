@@ -61,9 +61,9 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestB
 
 /** Integration tests to check mysql-cdc works well under different MySQL server timezone. */
 @RunWith(Parameterized.class)
-public class MysqlTimezoneITCase {
+public class MySqlTimezoneITCase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MysqlTimezoneITCase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlTimezoneITCase.class);
     private static TemporaryFolder tempFolder;
     private static File resourceFolder;
     private final StreamExecutionEnvironment env =
@@ -101,12 +101,12 @@ public class MysqlTimezoneITCase {
     }
 
     @Test
-    public void testMysqlServerInBerlin() throws Exception {
+    public void testMySqlServerInBerlin() throws Exception {
         testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai");
     }
 
     @Test
-    public void testMysqlServerInShanghai() throws Exception {
+    public void testMySqlServerInShanghai() throws Exception {
         testTemporalTypesWithMySqlServerTimezone("Europe/Berlin");
     }
 
