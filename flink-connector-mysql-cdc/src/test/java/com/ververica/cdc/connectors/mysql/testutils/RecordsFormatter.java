@@ -62,6 +62,7 @@ public class RecordsFormatter {
         this.deserializationSchema =
                 new RowDataDebeziumDeserializeSchema(
                         (RowType) dataType.getLogicalType(),
+                        new RowDataDebeziumDeserializeSchema.MetadataConverter[0],
                         typeInfo,
                         ((rowData, rowKind) -> {}),
                         ZoneId.of("UTC"));

@@ -126,7 +126,11 @@ public class MySqlTableSource implements ScanTableSource {
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
         DebeziumDeserializationSchema<RowData> deserializer =
                 new RowDataDebeziumDeserializeSchema(
-                        rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
+                        rowType,
+                        new RowDataDebeziumDeserializeSchema.MetadataConverter[0],
+                        typeInfo,
+                        ((rowData, rowKind) -> {}),
+                        serverTimeZone);
         if (enableParallelRead) {
             Configuration configuration = getParallelSourceConf();
             MySqlParallelSource<RowData> parallelSource =

@@ -100,6 +100,7 @@ public class PostgreSQLTableSource implements ScanTableSource {
         DebeziumDeserializationSchema<RowData> deserializer =
                 new RowDataDebeziumDeserializeSchema(
                         rowType,
+                        new RowDataDebeziumDeserializeSchema.MetadataConverter[0],
                         typeInfo,
                         new PostgresValueValidator(schemaName, tableName),
                         ZoneId.of("UTC"));

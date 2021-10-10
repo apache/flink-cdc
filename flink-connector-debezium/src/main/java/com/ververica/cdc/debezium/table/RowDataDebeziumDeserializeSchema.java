@@ -19,11 +19,13 @@
 package com.ververica.cdc.debezium.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
@@ -34,6 +36,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.utils.TemporalConversions;
+import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
@@ -60,7 +63,7 @@ import java.time.ZoneId;
  */
 public final class RowDataDebeziumDeserializeSchema
         implements DebeziumDeserializationSchema<RowData> {
-    private static final long serialVersionUID = -4852684966051743776L;
+    private static final long serialVersionUID = -897499476343410567L;
 
     /** Custom validator to validate the row value. */
     public interface ValueValidator extends Serializable {
@@ -71,10 +74,19 @@ public final class RowDataDebeziumDeserializeSchema
     private final TypeInformation<RowData> resultTypeInfo;
 
     /**
-     * Runtime converter that converts {@link JsonNode}s into objects of Flink SQL internal data
-     * structures. *
+     * Runtime converter that converts {@link JsonNode}s into objects of Flink SQL internal the
+     * physical column data structures. *
      */
-    private final DeserializationRuntimeConverter runtimeConverter;
+    private final DeserializationRuntimeConverter[] physicalConverters;
+
+    /**
+     * Runtime converter that converts {@link JsonNode}s into objects of Flink SQL internal the
+     * metadata column data structures. *
+     */
+    private final MetadataConverter[] metadataConverters;
+
+    /** physical column names. */
+    private final String[] physicalNames;
 
     /** Time zone of the database server. */
     private final ZoneId serverTimeZone;
@@ -83,11 +95,18 @@ public final class RowDataDebeziumDeserializeSchema
     private final ValueValidator validator;
 
     public RowDataDebeziumDeserializeSchema(
-            RowType rowType,
+            RowType physicalDataType,
+            MetadataConverter[] metadataConverters,
             TypeInformation<RowData> resultTypeInfo,
             ValueValidator validator,
             ZoneId serverTimeZone) {
-        this.runtimeConverter = createConverter(rowType);
+        this.metadataConverters = metadataConverters;
+        this.physicalConverters =
+                physicalDataType.getFields().stream()
+                        .map(RowType.RowField::getType)
+                        .map(this::createConverter)
+                        .toArray(DeserializationRuntimeConverter[]::new);
+        this.physicalNames = physicalDataType.getFieldNames().toArray(new String[0]);
         this.resultTypeInfo = resultTypeInfo;
         this.validator = validator;
         this.serverTimeZone = serverTimeZone;
@@ -96,46 +115,148 @@ public final class RowDataDebeziumDeserializeSchema
     @Override
     public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
         Envelope.Operation op = Envelope.operationFor(record);
-        Struct value = (Struct) record.value();
-        Schema valueSchema = record.valueSchema();
         if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
-            GenericRowData insert = extractAfterRow(value, valueSchema);
+            GenericRowData insert = extractAfterRow(record);
             validator.validate(insert, RowKind.INSERT);
             insert.setRowKind(RowKind.INSERT);
             out.collect(insert);
         } else if (op == Envelope.Operation.DELETE) {
-            GenericRowData delete = extractBeforeRow(value, valueSchema);
+            GenericRowData delete = extractBeforeRow(record);
             validator.validate(delete, RowKind.DELETE);
             delete.setRowKind(RowKind.DELETE);
             out.collect(delete);
         } else {
-            GenericRowData before = extractBeforeRow(value, valueSchema);
+            GenericRowData before = extractBeforeRow(record);
             validator.validate(before, RowKind.UPDATE_BEFORE);
             before.setRowKind(RowKind.UPDATE_BEFORE);
             out.collect(before);
 
-            GenericRowData after = extractAfterRow(value, valueSchema);
+            GenericRowData after = extractAfterRow(record);
             validator.validate(after, RowKind.UPDATE_AFTER);
             after.setRowKind(RowKind.UPDATE_AFTER);
             out.collect(after);
         }
     }
 
-    private GenericRowData extractAfterRow(Struct value, Schema valueSchema) throws Exception {
-        Schema afterSchema = valueSchema.field(Envelope.FieldName.AFTER).schema();
-        Struct after = value.getStruct(Envelope.FieldName.AFTER);
-        return (GenericRowData) runtimeConverter.convert(after, afterSchema);
+    private GenericRowData extractAfterRow(SourceRecord record) throws Exception {
+        Schema afterSchema = record.valueSchema().field(Envelope.FieldName.AFTER).schema();
+        Struct after = ((Struct) record.value()).getStruct(Envelope.FieldName.AFTER);
+        return convert(after, afterSchema, record);
     }
 
-    private GenericRowData extractBeforeRow(Struct value, Schema valueSchema) throws Exception {
-        Schema beforeSchema = valueSchema.field(Envelope.FieldName.BEFORE).schema();
-        Struct before = value.getStruct(Envelope.FieldName.BEFORE);
-        return (GenericRowData) runtimeConverter.convert(before, beforeSchema);
+    private GenericRowData extractBeforeRow(SourceRecord record) throws Exception {
+        Schema beforeSchema = record.valueSchema().field(Envelope.FieldName.BEFORE).schema();
+        Struct before = ((Struct) record.value()).getStruct(Envelope.FieldName.BEFORE);
+        return convert(before, beforeSchema, record);
+    }
+
+    private GenericRowData convert(Struct dbzObj, Schema schema, SourceRecord record)
+            throws Exception {
+        GenericRowData row =
+                new GenericRowData(physicalConverters.length + metadataConverters.length);
+
+        if (dbzObj != null) {
+            for (int i = 0; i < physicalConverters.length; i++) {
+                String fieldName = physicalNames[i];
+                Object fieldValue = dbzObj.get(fieldName);
+                Schema fieldSchema = schema.field(fieldName).schema();
+                Object convertedField =
+                        convertField(physicalConverters[i], fieldValue, fieldSchema);
+                row.setField(i, convertedField);
+            }
+        }
+
+        for (int i = 0; i < metadataConverters.length; i++) {
+            row.setField(i + physicalConverters.length, metadataConverters[i].read(record));
+        }
+        return row;
     }
 
     @Override
     public TypeInformation<RowData> getProducedType() {
         return resultTypeInfo;
+    }
+
+    // -------------------------------------------------------------------------------------
+    // Metadata Converters
+    // -------------------------------------------------------------------------------------
+
+    /** {@link SourceRecord} metadata info converter. */
+    @FunctionalInterface
+    public interface MetadataConverter extends Serializable {
+        Object read(SourceRecord record);
+    }
+
+    /** Metadata handling. */
+    public enum ReadableMetadata {
+        TABLE(
+                "source.table",
+                DataTypes.STRING().notNull(),
+                new MetadataConverter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object read(SourceRecord record) {
+                        Struct messageStruct = (Struct) record.value();
+                        Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                        return StringData.fromString(
+                                sourceStruct.getString(AbstractSourceInfo.TABLE_NAME_KEY));
+                    }
+                }),
+
+        DATABASE(
+                "source.database",
+                DataTypes.STRING().notNull(),
+                new MetadataConverter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object read(SourceRecord record) {
+                        Struct messageStruct = (Struct) record.value();
+                        Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                        return StringData.fromString(
+                                sourceStruct.getString(AbstractSourceInfo.DATABASE_NAME_KEY));
+                    }
+                }),
+
+        TIMESTAMP(
+                "source.timestamp",
+                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3).notNull(),
+                new MetadataConverter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object read(SourceRecord record) {
+                        Struct messageStruct = (Struct) record.value();
+                        Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                        return TimestampData.fromEpochMillis(
+                                (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
+                    }
+                });
+
+        private final String key;
+
+        private final DataType dataType;
+
+        private final MetadataConverter converter;
+
+        ReadableMetadata(String key, DataType dataType, MetadataConverter converter) {
+            this.key = key;
+            this.dataType = dataType;
+            this.converter = converter;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public DataType getDataType() {
+            return dataType;
+        }
+
+        public MetadataConverter getConverter() {
+            return converter;
+        }
     }
 
     // -------------------------------------------------------------------------------------
@@ -223,8 +344,6 @@ public final class RowDataDebeziumDeserializeSchema
                 return convertToBinary();
             case DECIMAL:
                 return createDecimalConverter((DecimalType) type);
-            case ROW:
-                return createRowConverter((RowType) type);
             case ARRAY:
             case MAP:
             case MULTISET:
@@ -476,36 +595,6 @@ public final class RowDataDebeziumDeserializeSchema
                     }
                 }
                 return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
-            }
-        };
-    }
-
-    private DeserializationRuntimeConverter createRowConverter(RowType rowType) {
-        final DeserializationRuntimeConverter[] fieldConverters =
-                rowType.getFields().stream()
-                        .map(RowType.RowField::getType)
-                        .map(this::createConverter)
-                        .toArray(DeserializationRuntimeConverter[]::new);
-        final String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
-
-        return new DeserializationRuntimeConverter() {
-
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public Object convert(Object dbzObj, Schema schema) throws Exception {
-                Struct struct = (Struct) dbzObj;
-                int arity = fieldNames.length;
-                GenericRowData row = new GenericRowData(arity);
-                for (int i = 0; i < arity; i++) {
-                    String fieldName = fieldNames[i];
-                    Object fieldValue = struct.get(fieldName);
-                    Schema fieldSchema = schema.field(fieldName).schema();
-                    Object convertedField =
-                            convertField(fieldConverters[i], fieldValue, fieldSchema);
-                    row.setField(i, convertedField);
-                }
-                return row;
             }
         };
     }
