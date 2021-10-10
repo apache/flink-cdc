@@ -62,6 +62,9 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
 
+    private final UniqueDatabase userDatabase1 = new UniqueDatabase(MYSQL_CONTAINER, "user_1", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase userDatabase2 = new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
+
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
@@ -614,6 +617,85 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         assertEqualsInAnyOrder(
                 Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testInconsistentSchema() throws Exception {
+        userDatabase1.createAndInitialize();
+        userDatabase2.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE `user` ("
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " email STRING,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        userDatabase1.getUsername(),
+                        userDatabase1.getPassword(),
+                        "user_.*",
+                        "user_table_.*",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM `user`");
+
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        try (Connection connection = userDatabase1.getJdbcConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE user_table_1_1 SET email = 'user_111@bar.org' WHERE id=111;");
+        }
+
+        try (Connection connection = userDatabase2.getJdbcConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE user_table_2_1 SET address = 'HangZhou' WHERE id=211;");
+        }
+
+        String[] expected =
+                new String[] {
+                    "+I[111, user_111, Shanghai, 123567891234, user_111@foo.com]",
+                    "+I[121, user_121, Shanghai, 123567891234, null]",
+                    "+I[211, user_211, Shanghai, 123567891234, null]",
+                    "+I[221, user_221, Shanghai, 123567891234, user_221@foo.com]",
+                    "-U[111, user_111, Shanghai, 123567891234, user_111@foo.com]",
+                    "+U[111, user_111, Shanghai, 123567891234, user_111@bar.org]",
+                    "-U[211, user_211, Shanghai, 123567891234, null]",
+                    "+U[211, user_211, HangZhou, 123567891234, null]",
+                };
+
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        result.getJobClient().get().cancel().get();
+
+        // should drop the userDatabase1 and userDatabase2
+        for (UniqueDatabase database : new UniqueDatabase[]{userDatabase1, userDatabase2}) {
+            try (Connection connection = database.getJdbcConnection();
+                 Statement statement = connection.createStatement()) {
+                statement.execute("drop database " + database.getDatabaseName());
+            }
+        }
     }
 
     @Ignore
