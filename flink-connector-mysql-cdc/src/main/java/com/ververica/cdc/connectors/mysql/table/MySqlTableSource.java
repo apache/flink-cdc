@@ -26,7 +26,9 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.SourceProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
@@ -37,16 +39,22 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema.MetadataConverter;
+import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema.ReadableMetadata;
 
 import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
@@ -58,7 +66,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A {@link DynamicTableSource} that describes how to create a MySQL binlog source from a logical
  * description.
  */
-public class MySqlTableSource implements ScanTableSource {
+public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final TableSchema physicalSchema;
     private final int port;
@@ -75,6 +83,16 @@ public class MySqlTableSource implements ScanTableSource {
     private final int fetchSize;
     private final Duration connectTimeout;
     private final StartupOptions startupOptions;
+
+    // --------------------------------------------------------------------------------------------
+    // Mutable attributes
+    // --------------------------------------------------------------------------------------------
+
+    /** Data type that describes the final output of the source. */
+    protected DataType producedDataType;
+
+    /** Metadata that is appended at the end of a physical source row. */
+    protected List<String> metadataKeys;
 
     public MySqlTableSource(
             TableSchema physicalSchema,
@@ -107,6 +125,9 @@ public class MySqlTableSource implements ScanTableSource {
         this.fetchSize = fetchSize;
         this.connectTimeout = connectTimeout;
         this.startupOptions = startupOptions;
+        // Mutable attributes
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
     }
 
     @Override
@@ -121,13 +142,16 @@ public class MySqlTableSource implements ScanTableSource {
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
-        TypeInformation<RowData> typeInfo =
-                scanContext.createTypeInformation(physicalSchema.toRowDataType());
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        MetadataConverter[] metadataConverters = getMetadataConverters();
+        final TypeInformation<RowData> typeInfo =
+                scanContext.createTypeInformation(producedDataType);
+
         DebeziumDeserializationSchema<RowData> deserializer =
                 new RowDataDebeziumDeserializeSchema(
-                        rowType,
-                        new RowDataDebeziumDeserializeSchema.MetadataConverter[0],
+                        physicalDataType,
+                        metadataConverters,
                         typeInfo,
                         ((rowData, rowKind) -> {}),
                         serverTimeZone);
@@ -155,6 +179,22 @@ public class MySqlTableSource implements ScanTableSource {
             DebeziumSourceFunction<RowData> sourceFunction = builder.build();
             return SourceFunctionProvider.of(sourceFunction, false);
         }
+    }
+
+    protected MetadataConverter[] getMetadataConverters() {
+        if (metadataKeys == null || metadataKeys.size() == 0) {
+            return new MetadataConverter[] {};
+        }
+
+        return metadataKeys.stream()
+                .map(
+                        key ->
+                                Stream.of(ReadableMetadata.values())
+                                        .filter(m -> m.getKey().equals(key))
+                                        .findFirst()
+                                        .orElseThrow(IllegalStateException::new))
+                .map(ReadableMetadata::getConverter)
+                .toArray(MetadataConverter[]::new);
     }
 
     private Configuration getParallelSourceConf() {
@@ -206,6 +246,18 @@ public class MySqlTableSource implements ScanTableSource {
         }
 
         return Configuration.fromMap(properties);
+    }
+
+    @Override
+    public Map<String, DataType> listReadableMetadata() {
+        return Stream.of(ReadableMetadata.values())
+                .collect(Collectors.toMap(ReadableMetadata::getKey, ReadableMetadata::getDataType));
+    }
+
+    @Override
+    public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+        this.metadataKeys = metadataKeys;
+        this.producedDataType = producedDataType;
     }
 
     @Override
