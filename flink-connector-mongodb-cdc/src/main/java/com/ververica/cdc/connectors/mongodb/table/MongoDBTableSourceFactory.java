@@ -110,6 +110,13 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                                     + "When set to true, both errors that are tolerated (determined by the errors.tolerance setting) "
                                     + "and not tolerated are written. When set to false, errors that are tolerated are omitted.");
 
+    private static final ConfigOption<String> PIPELINE =
+            ConfigOptions.key("pipeline")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "An array of objects describing the pipeline operations to run.");
+
     private static final ConfigOption<Boolean> COPY_EXISTING =
             ConfigOptions.key("copy.existing")
                     .booleanType()
@@ -206,6 +213,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         Integer heartbeatIntervalMillis =
                 config.getOptional(HEARTBEAT_INTERVAL_MILLIS).orElse(null);
 
+        String pipeline = config.getOptional(PIPELINE).orElse(null);
         Boolean copyExisting = config.get(COPY_EXISTING);
         String copyExistingPipeline = config.getOptional(COPY_EXISTING_PIPELINE).orElse(null);
         Integer copyExistingMaxThreads = config.getOptional(COPY_EXISTING_MAX_THREADS).orElse(null);
@@ -234,6 +242,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 connectionOptions,
                 errorsTolerance,
                 errorsLogEnable,
+                pipeline,
                 copyExisting,
                 copyExistingPipeline,
                 copyExistingMaxThreads,
@@ -273,6 +282,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CONNECTION_OPTIONS);
         options.add(ERRORS_TOLERANCE);
         options.add(ERRORS_LOG_ENABLE);
+        options.add(PIPELINE);
         options.add(COPY_EXISTING);
         options.add(COPY_EXISTING_PIPELINE);
         options.add(COPY_EXISTING_MAX_THREADS);

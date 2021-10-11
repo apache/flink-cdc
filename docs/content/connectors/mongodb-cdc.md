@@ -152,14 +152,14 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the database to watch for changes. If set to empty string, then all databases will be captured (databases can be filtered using the copy.existing.namespace.regex setting).</td>
+      <td>Name of the database to watch for changes. If set to empty string, then all databases will be captured (databases can be filtered using the pipeline setting).</td>
     </tr>
     <tr>
       <td>collection</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the collection in the database to watch for changes. If set to empty string, then all collections will be caputred (collections can be filtered using the copy.existing.namespace.regex setting)</td>
+      <td>Name of the collection in the database to watch for changes. If set to empty string, then all collections will be captured (collections can be filtered using the pipeline setting)</td>
     </tr>
     <tr>
       <td>connection.options</td>
@@ -189,6 +189,13 @@ Connector Options
       <td>Whether details of failed operations should be written to the log file.</td>
     </tr>
     <tr>
+      <td>pipeline</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>An array of JSON objects describing the pipeline operations to run. Example: [{"$match": {"operationType": "insert"}}, {"$addFields": {"Kafka": "Rules!"}}]</td>
+    </tr>
+    <tr>
       <td>copy.existing</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
@@ -209,7 +216,7 @@ Connector Options
     <tr>
       <td>copy.existing.namespace.regex</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">16000</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Regular expression that matches the namespaces from which to copy data. A namespace describes the database name and collection separated by a period, e.g. databaseName.collectionName.</td>
     </tr>

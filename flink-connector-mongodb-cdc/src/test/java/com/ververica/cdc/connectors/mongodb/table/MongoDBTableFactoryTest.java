@@ -87,6 +87,7 @@ public class MongoDBTableFactoryTest {
                         null,
                         ERROR_TOLERANCE,
                         ERROR_LOGS_ENABLE,
+                        null,
                         COPY_EXISTING,
                         null,
                         null,
@@ -105,6 +106,9 @@ public class MongoDBTableFactoryTest {
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
         options.put("errors.tolerance", "all");
         options.put("errors.log.enable", "false");
+        options.put(
+                "pipeline",
+                "[{\"$match\": {\"ns.coll\": {\"$regex\": /^(collection1|collection2)$/}}}]");
         options.put("copy.existing", "false");
         options.put("copy.existing.pipeline", "[ { \"$match\": { \"closed\": \"false\" } } ]");
         options.put("copy.existing.max.threads", "1");
@@ -126,6 +130,7 @@ public class MongoDBTableFactoryTest {
                         "replicaSet=test&connectTimeoutMS=300000",
                         ERROR_TOLERANCE_ALL,
                         false,
+                        "[{\"$match\": {\"ns.coll\": {\"$regex\": /^(collection1|collection2)$/}}}]",
                         false,
                         "[ { \"$match\": { \"closed\": \"false\" } } ]",
                         1,

@@ -55,6 +55,7 @@ public class MongoDBTableSource implements ScanTableSource {
     private final String collection;
     private final Boolean errorsLogEnable;
     private final String errorsTolerance;
+    private final String pipeline;
     private final Boolean copyExisting;
     private final String copyExistingPipeline;
     private final Integer copyExistingMaxThreads;
@@ -75,6 +76,7 @@ public class MongoDBTableSource implements ScanTableSource {
             @Nullable String connectionOptions,
             @Nullable String errorsTolerance,
             @Nullable Boolean errorsLogEnable,
+            @Nullable String pipeline,
             @Nullable Boolean copyExisting,
             @Nullable String copyExistingPipeline,
             @Nullable Integer copyExistingMaxThreads,
@@ -93,6 +95,7 @@ public class MongoDBTableSource implements ScanTableSource {
         this.connectionOptions = connectionOptions;
         this.errorsTolerance = errorsTolerance;
         this.errorsLogEnable = errorsLogEnable;
+        this.pipeline = pipeline;
         this.copyExisting = copyExisting;
         this.copyExistingPipeline = copyExistingPipeline;
         this.copyExistingMaxThreads = copyExistingMaxThreads;
@@ -134,6 +137,7 @@ public class MongoDBTableSource implements ScanTableSource {
         Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
         Optional.ofNullable(errorsLogEnable).ifPresent(builder::errorsLogEnable);
         Optional.ofNullable(errorsTolerance).ifPresent(builder::errorsTolerance);
+        Optional.ofNullable(pipeline).ifPresent(builder::pipeline);
         Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
         Optional.ofNullable(copyExistingPipeline).ifPresent(builder::copyExistingPipeline);
         Optional.ofNullable(copyExistingMaxThreads).ifPresent(builder::copyExistingMaxThreads);
@@ -161,6 +165,7 @@ public class MongoDBTableSource implements ScanTableSource {
                 connectionOptions,
                 errorsTolerance,
                 errorsLogEnable,
+                pipeline,
                 copyExisting,
                 copyExistingPipeline,
                 copyExistingMaxThreads,
