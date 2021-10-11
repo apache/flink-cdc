@@ -34,6 +34,7 @@ import com.ververica.cdc.connectors.mongodb.MongoDBSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.MetadataConverter;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nullable;
 
@@ -46,6 +47,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.mongodb.MongoNamespace.checkCollectionNameValidity;
+import static com.mongodb.MongoNamespace.checkDatabaseNameValidity;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.containsRegexMetaCharacters;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -64,7 +68,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final Boolean errorsLogEnable;
     private final String errorsTolerance;
     private final Boolean copyExisting;
-    private final String copyExistingNamespaceRegex;
     private final String copyExistingPipeline;
     private final Integer copyExistingMaxThreads;
     private final Integer copyExistingQueueSize;
@@ -88,13 +91,12 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             String hosts,
             @Nullable String username,
             @Nullable String password,
-            String database,
-            String collection,
+            @Nullable String database,
+            @Nullable String collection,
             @Nullable String connectionOptions,
             @Nullable String errorsTolerance,
             @Nullable Boolean errorsLogEnable,
             @Nullable Boolean copyExisting,
-            @Nullable String copyExistingNamespaceRegex,
             @Nullable String copyExistingPipeline,
             @Nullable Integer copyExistingMaxThreads,
             @Nullable Integer copyExistingQueueSize,
@@ -106,13 +108,12 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.hosts = checkNotNull(hosts);
         this.username = username;
         this.password = password;
-        this.database = checkNotNull(database);
-        this.collection = checkNotNull(collection);
+        this.database = database;
+        this.collection = collection;
         this.connectionOptions = connectionOptions;
         this.errorsTolerance = errorsTolerance;
         this.errorsLogEnable = errorsLogEnable;
         this.copyExisting = copyExisting;
-        this.copyExistingNamespaceRegex = copyExistingNamespaceRegex;
         this.copyExistingPipeline = copyExistingPipeline;
         this.copyExistingMaxThreads = copyExistingMaxThreads;
         this.copyExistingQueueSize = copyExistingQueueSize;
@@ -145,11 +146,27 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         physicalDataType, metadataConverters, typeInfo, localTimeZone);
 
         MongoDBSource.Builder<RowData> builder =
-                MongoDBSource.<RowData>builder()
-                        .hosts(hosts)
-                        .database(database)
-                        .collection(collection)
-                        .deserializer(deserializer);
+                MongoDBSource.<RowData>builder().hosts(hosts).deserializer(deserializer);
+
+        if (StringUtils.isNotEmpty(database) && StringUtils.isNotEmpty(collection)) {
+            // explicitly specified database and collection.
+            if (!containsRegexMetaCharacters(database)
+                    && !containsRegexMetaCharacters(collection)) {
+                checkDatabaseNameValidity(database);
+                checkCollectionNameValidity(collection);
+                builder.databaseList(database);
+                builder.collectionList(database + "." + collection);
+            } else {
+                builder.databaseList(database);
+                builder.collectionList(collection);
+            }
+        } else if (StringUtils.isNotEmpty(database)) {
+            builder.databaseList(database);
+        } else if (StringUtils.isNotEmpty(collection)) {
+            builder.collectionList(collection);
+        } else {
+            // Watching all changes on the cluster by default, we do nothing here
+        }
 
         Optional.ofNullable(username).ifPresent(builder::username);
         Optional.ofNullable(password).ifPresent(builder::password);
@@ -157,8 +174,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         Optional.ofNullable(errorsLogEnable).ifPresent(builder::errorsLogEnable);
         Optional.ofNullable(errorsTolerance).ifPresent(builder::errorsTolerance);
         Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
-        Optional.ofNullable(copyExistingNamespaceRegex)
-                .ifPresent(builder::copyExistingNamespaceRegex);
         Optional.ofNullable(copyExistingPipeline).ifPresent(builder::copyExistingPipeline);
         Optional.ofNullable(copyExistingMaxThreads).ifPresent(builder::copyExistingMaxThreads);
         Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
@@ -216,7 +231,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         errorsTolerance,
                         errorsLogEnable,
                         copyExisting,
-                        copyExistingNamespaceRegex,
                         copyExistingPipeline,
                         copyExistingMaxThreads,
                         copyExistingQueueSize,
@@ -248,7 +262,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(errorsTolerance, that.errorsTolerance)
                 && Objects.equals(errorsLogEnable, that.errorsLogEnable)
                 && Objects.equals(copyExisting, that.copyExisting)
-                && Objects.equals(copyExistingNamespaceRegex, that.copyExistingNamespaceRegex)
                 && Objects.equals(copyExistingPipeline, that.copyExistingPipeline)
                 && Objects.equals(copyExistingMaxThreads, that.copyExistingMaxThreads)
                 && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
@@ -273,7 +286,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,
-                copyExistingNamespaceRegex,
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,

@@ -72,14 +72,21 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
             ConfigOptions.key("database")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Name of the database to watch for changes.");
+                    .withDescription(
+                            "Name of the database to watch for changes."
+                                    + "The database also supports regular expression "
+                                    + "to monitor multiple databases matches the regular expression."
+                                    + "e.g. db[0-9] .");
 
     private static final ConfigOption<String> COLLECTION =
             ConfigOptions.key("collection")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "Name of the collection in the database to watch for changes.");
+                            "Name of the collection in the database to watch for changes."
+                                    + "The collection also supports regular expression "
+                                    + "to monitor multiple collections matches fully-qualified collection identifiers."
+                                    + "e.g. db0\\.coll[0-9] .");
 
     private static final ConfigOption<String> CONNECTION_OPTIONS =
             ConfigOptions.key("connection.options")
@@ -142,15 +149,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The max size of the queue to use when copying data. Defaults to 16000.");
 
-    private static final ConfigOption<String> COPY_EXISTING_NAMESPACE_REGEX =
-            ConfigOptions.key("copy.existing.namespace.regex")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Regular expression that matches the namespaces from which to copy data. "
-                                    + "A namespace describes the database name and collection separated by a period, "
-                                    + "e.g. databaseName.collectionName.");
-
     private static final ConfigOption<Integer> POLL_MAX_BATCH_SIZE =
             ConfigOptions.key("poll.max.batch.size")
                     .intType()
@@ -193,8 +191,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         String username = config.getOptional(USERNAME).orElse(null);
         String password = config.getOptional(PASSWORD).orElse(null);
 
-        String database = config.get(DATABASE);
-        String collection = config.get(COLLECTION);
+        String database = config.getOptional(DATABASE).orElse(null);
+        String collection = config.getOptional(COLLECTION).orElse(null);
 
         String errorsTolerance = config.get(ERRORS_TOLERANCE);
         Boolean errorsLogEnable = config.get(ERRORS_LOG_ENABLE);
@@ -209,8 +207,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         String copyExistingPipeline = config.getOptional(COPY_EXISTING_PIPELINE).orElse(null);
         Integer copyExistingMaxThreads = config.getOptional(COPY_EXISTING_MAX_THREADS).orElse(null);
         Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
-        String copyExistingNamespaceRegex =
-                config.getOptional(COPY_EXISTING_NAMESPACE_REGEX).orElse(null);
 
         String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
         ZoneId localTimeZone =
@@ -236,7 +232,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,
-                copyExistingNamespaceRegex,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,
@@ -258,8 +253,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(HOSTS);
-        options.add(DATABASE);
-        options.add(COLLECTION);
         return options;
     }
 
@@ -269,13 +262,14 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(CONNECTION_OPTIONS);
+        options.add(DATABASE);
+        options.add(COLLECTION);
         options.add(ERRORS_TOLERANCE);
         options.add(ERRORS_LOG_ENABLE);
         options.add(COPY_EXISTING);
         options.add(COPY_EXISTING_PIPELINE);
         options.add(COPY_EXISTING_MAX_THREADS);
         options.add(COPY_EXISTING_QUEUE_SIZE);
-        options.add(COPY_EXISTING_NAMESPACE_REGEX);
         options.add(POLL_MAX_BATCH_SIZE);
         options.add(POLL_AWAIT_TIME_MILLIS);
         options.add(HEARTBEAT_INTERVAL_MILLIS);

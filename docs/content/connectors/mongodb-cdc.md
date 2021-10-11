@@ -151,17 +151,19 @@ Connector Options
     </tr>
     <tr>
       <td>database</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the database to watch for changes. If set to empty string, then all databases will be captured (databases can be filtered using the copy.existing.namespace.regex setting).</td>
+      <td>Name of the database to watch for changes. If not set then all databases will be captured. <br>
+          The database also supports regular expressions to monitor multiple databases matching the regular expression.</td>
     </tr>
     <tr>
       <td>collection</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the collection in the database to watch for changes. If set to empty string, then all collections will be caputred (collections can be filtered using the copy.existing.namespace.regex setting)</td>
+      <td>Name of the collection in the database to watch for changes. If not set then all collections will be captured.<br>
+          The collection also supports regular expressions to monitor multiple collections matching fully-qualified collection identifiers.</td>
     </tr>
     <tr>
       <td>connection.options</td>
@@ -207,13 +209,6 @@ Connector Options
            eg. <code>[{"$match": {"closed": "false"}}]</code> ensures that 
            only documents in which the closed field is set to false are copied.
       </td>
-    </tr>
-    <tr>
-      <td>copy.existing.namespace.regex</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">16000</td>
-      <td>String</td>
-      <td>Regular expression that matches the namespaces from which to copy data. A namespace describes the database name and collection separated by a period, e.g. databaseName.collectionName.</td>
     </tr>
     <tr>
       <td>copy.existing.max.threads</td>
@@ -323,6 +318,24 @@ The MongoDB CDC connector is a Flink Source connector which will read database s
 
 The config option `copy.existing` specifies whether do snapshot when MongoDB CDC consumer startup. <br>Defaults to `true`.
 
+### MongoDB Namespaces Filters
+
+The config option `copy.existing.namespace.regex` is a regular expression that matches the namespaces from which to copy data.<br>
+
+In the following example, matches namespaces `db0.coll0` and `db1.coll1` to snapshot.
+
+```
+'copy.existing.namespace.regex' = '^(db0\\.coll0|db1\\.coll1)$'
+```
+
+The config option `namespace.regex` is a regular expression that matches the namespaces from which to watch for changes.<br>
+
+In the following example, matches namespaces `db0.coll0` and `db1.coll1` to watch.
+
+```
+'namespace.regex' = '^(db0\\.coll0|db1\\.coll1)$'
+```
+
 ### Snapshot Data Filters
 
 The config option `copy.existing.pipeline` describing the filters when copying existing data.<br>
@@ -331,7 +344,7 @@ This can filter only required data and improve the use of indexes by the copying
 In the following example, the `$match` aggregation operator ensures that only documents in which the closed field is set to false are copied.
 
 ```
-copy.existing.pipeline=[ { "$match": { "closed": "false" } } ]
+'copy.existing.pipeline' = '[ { "$match": { "closed": "false" } } ]'
 ```
 
 ### Change Streams

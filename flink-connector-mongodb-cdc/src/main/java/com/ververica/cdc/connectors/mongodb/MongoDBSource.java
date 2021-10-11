@@ -36,9 +36,13 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.COLLECTION_INCLUDE_LIST;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.DATABASE_INCLUDE_LIST;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -123,10 +127,9 @@ public class MongoDBSource {
         private String hosts;
         private String username;
         private String password;
-        private String database;
-        private String collection;
+        private List<String> databaseList;
+        private List<String> collectionList;
         private String connectionOptions;
-        private String pipeline;
         private Integer batchSize;
         private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS_DEFAULT;
         private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE_DEFAULT;
@@ -134,7 +137,6 @@ public class MongoDBSource {
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
         private String copyExistingPipeline;
-        private String copyExistingNamespaceRegex;
         private Boolean errorsLogEnable;
         private String errorsTolerance;
         private Integer heartbeatIntervalMillis;
@@ -168,24 +170,18 @@ public class MongoDBSource {
             return this;
         }
 
-        /** Name of the database to watch for changes. */
-        public Builder<T> database(String database) {
-            this.database = database;
-            return this;
-        }
-
-        /** Name of the collection in the database to watch for changes. */
-        public Builder<T> collection(String collection) {
-            this.collection = collection;
+        /** Regular expressions list that match database names to be monitored. */
+        public Builder<T> databaseList(String... databaseList) {
+            this.databaseList = Arrays.asList(databaseList);
             return this;
         }
 
         /**
-         * An array of objects describing the pipeline operations to run. eg. [{"$match":
-         * {"operationType": "insert"}}, {"$addFields": {"Kafka": "Rules!"}}]
+         * Regular expressions that match fully-qualified collection identifiers for collections to
+         * be monitored. Each identifier is of the form {@code <databaseName>.<collectionName>}.
          */
-        public Builder<T> pipeline(String pipeline) {
-            this.pipeline = pipeline;
+        public Builder<T> collectionList(String... collectionList) {
+            this.collectionList = Arrays.asList(collectionList);
             return this;
         }
 
@@ -322,18 +318,6 @@ public class MongoDBSource {
             return this;
         }
 
-        /**
-         * copy.existing.namespace.regex
-         *
-         * <p>Regular expression that matches the namespaces from which to copy data. A namespace
-         * describes the database name and collection separated by a period, e.g.
-         * databaseName.collectionName.
-         */
-        public Builder<T> copyExistingNamespaceRegex(String copyExistingNamespaceRegex) {
-            this.copyExistingNamespaceRegex = copyExistingNamespaceRegex;
-            return this;
-        }
-
         /** Build connection uri. */
         @VisibleForTesting
         public ConnectionString buildConnectionUri() {
@@ -366,11 +350,17 @@ public class MongoDBSource {
                     "connector.class", MongoDBConnectorSourceConnector.class.getCanonicalName());
             props.setProperty("name", "mongodb_binlog_source");
 
+            ConnectionString connectionString = buildConnectionUri();
             props.setProperty(
-                    MongoSourceConfig.CONNECTION_URI_CONFIG, String.valueOf(buildConnectionUri()));
+                    MongoSourceConfig.CONNECTION_URI_CONFIG, String.valueOf(connectionString));
 
-            props.setProperty(MongoSourceConfig.DATABASE_CONFIG, checkNotNull(database));
-            props.setProperty(MongoSourceConfig.COLLECTION_CONFIG, checkNotNull(collection));
+            if (databaseList != null) {
+                props.setProperty(DATABASE_INCLUDE_LIST, String.join(",", databaseList));
+            }
+
+            if (collectionList != null) {
+                props.setProperty(COLLECTION_INCLUDE_LIST, String.join(",", collectionList));
+            }
 
             props.setProperty(MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
             props.setProperty(
@@ -384,10 +374,6 @@ public class MongoDBSource {
                     String.valueOf(Boolean.FALSE));
             props.setProperty(
                     MongoSourceConfig.OUTPUT_SCHEMA_VALUE_CONFIG, OUTPUT_SCHEMA_VALUE_DEFAULT);
-
-            if (pipeline != null) {
-                props.setProperty(MongoSourceConfig.PIPELINE_CONFIG, pipeline);
-            }
 
             if (batchSize != null) {
                 props.setProperty(MongoSourceConfig.BATCH_SIZE_CONFIG, String.valueOf(batchSize));
@@ -435,12 +421,6 @@ public class MongoDBSource {
             if (copyExistingPipeline != null) {
                 props.setProperty(
                         MongoSourceConfig.COPY_EXISTING_PIPELINE_CONFIG, copyExistingPipeline);
-            }
-
-            if (copyExistingNamespaceRegex != null) {
-                props.setProperty(
-                        MongoSourceConfig.COPY_EXISTING_NAMESPACE_REGEX_CONFIG,
-                        copyExistingNamespaceRegex);
             }
 
             if (heartbeatIntervalMillis != null) {

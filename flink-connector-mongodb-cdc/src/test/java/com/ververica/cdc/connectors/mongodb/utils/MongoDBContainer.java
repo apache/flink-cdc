@@ -22,12 +22,11 @@ import com.github.dockerjava.api.command.InspectContainerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.Enumeration;
 
 /** Mongodb test replica container. */
 public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
@@ -38,55 +37,61 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
 
     private static final String DOCKER_IMAGE_NAME = "mongo:5.0.2";
 
+    public static final String MONGODB_HOST = "mongo0";
+
     public static final int MONGODB_PORT = 27017;
 
-    public MongoDBContainer() {
-        super(DOCKER_IMAGE_NAME);
+    public static final String MONGO_SUPER_USER = "superuser";
+
+    public static final String MONGO_SUPER_PASSWORD = "superpw";
+
+    public MongoDBContainer(Network network) {
+        super(
+                new ImageFromDockerfile()
+                        .withFileFromClasspath("random.key", "docker/random.key")
+                        .withFileFromClasspath("setup.js", "docker/setup.js")
+                        .withDockerfileFromBuilder(
+                                builder ->
+                                        builder.from(DOCKER_IMAGE_NAME)
+                                                .copy(
+                                                        "setup.js",
+                                                        "/docker-entrypoint-initdb.d/setup.js")
+                                                .copy("random.key", "/data/keyfile/random.key")
+                                                .run("chown mongodb /data/keyfile/random.key")
+                                                .run("chmod 400 /data/keyfile/random.key")
+                                                .build()));
+        withNetwork(network);
+        withNetworkAliases(MONGODB_HOST);
         withExposedPorts(MONGODB_PORT);
-        withCommand("--replSet", REPLICA_SET_NAME);
-        waitingFor(Wait.forLogMessage(".*[Ww]aiting for connections.*", 1));
-    }
-
-    public String getLocalHost() {
-        try {
-            Enumeration<NetworkInterface> networkInterfaces =
-                    NetworkInterface.getNetworkInterfaces();
-            while (networkInterfaces.hasMoreElements()) {
-                NetworkInterface ni = networkInterfaces.nextElement();
-
-                if (ni.isLoopback() || ni.isVirtual() || ni.isPointToPoint() || !ni.isUp()) {
-                    continue;
-                }
-
-                Enumeration<InetAddress> addresses = ni.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address.isSiteLocalAddress()) {
-                        return address.getHostAddress();
-                    }
-                }
-            }
-
-            return InetAddress.getLocalHost().getHostAddress();
-        } catch (Exception e) {
-            throw new IllegalStateException("Cannot get local ip address", e);
-        }
+        withEnv("MONGO_INITDB_ROOT_USERNAME", MONGO_SUPER_USER);
+        withEnv("MONGO_INITDB_ROOT_PASSWORD", MONGO_SUPER_PASSWORD);
+        withEnv("MONGO_INITDB_DATABASE", "admin");
+        withCommand("--replSet", REPLICA_SET_NAME, "--keyFile", "/data/keyfile/random.key");
+        waitingFor(Wait.forLogMessage(".*Replication has not yet been configured.*", 1));
     }
 
     public String getConnectionString(String username, String password) {
         return String.format(
                 "mongodb://%s:%s@%s:%d",
-                username, password, getLocalHost(), getMappedPort(MONGODB_PORT));
+                username, password, getContainerIpAddress(), getMappedPort(MONGODB_PORT));
     }
 
     public String getHostAndPort() {
-        return String.format("%s:%s", getLocalHost(), getMappedPort(MONGODB_PORT));
+        return String.format("%s:%s", getContainerIpAddress(), getMappedPort(MONGODB_PORT));
     }
 
     public void executeCommand(String command) {
         try {
             LOG.info("Executing mongo command: {}", command);
-            ExecResult execResult = execInContainer("mongo", "--eval", command);
+            ExecResult execResult =
+                    execInContainer(
+                            "mongo",
+                            "-u",
+                            MONGO_SUPER_USER,
+                            "-p",
+                            MONGO_SUPER_PASSWORD,
+                            "--eval",
+                            command);
             LOG.info(execResult.getStdout());
             if (execResult.getExitCode() != 0) {
                 throw new IllegalStateException(
@@ -107,7 +112,7 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
         executeCommand(
                 String.format(
                         "rs.initiate({ _id : '%s', members: [{ _id: 0, host: '%s:%d'}]})",
-                        REPLICA_SET_NAME, getLocalHost(), getMappedPort(MONGODB_PORT)));
+                        REPLICA_SET_NAME, MONGODB_HOST, MONGODB_PORT));
 
         LOG.info("Waiting for single node node replica set initialized...");
         executeCommand(
