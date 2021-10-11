@@ -81,6 +81,15 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Name of the collection in the database to watch for changes.");
 
+    private static final ConfigOption<String> NAMESPACE_REGEX =
+            ConfigOptions.key("namespace.regex")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Regular expression that matches the namespaces from which to watch for changes. "
+                                    + "A namespace describes the database name and collection separated by a period, "
+                                    + "e.g. ^(db0\\.coll0|db1\\.coll1)$ .");
+
     private static final ConfigOption<String> CONNECTION_OPTIONS =
             ConfigOptions.key("connection.options")
                     .stringType()
@@ -118,6 +127,15 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                                     + "to Change Stream events on their respective topics. Any changes to the data "
                                     + "that occur during the copy process are applied once the copy is completed.");
 
+    private static final ConfigOption<String> COPY_EXISTING_NAMESPACE_REGEX =
+            ConfigOptions.key("copy.existing.namespace.regex")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Regular expression that matches the namespaces from which to copy data. "
+                                    + "A namespace describes the database name and collection separated by a period, "
+                                    + "e.g. ^(db0\\.coll0|db1\\.coll1)$ .");
+
     private static final ConfigOption<String> COPY_EXISTING_PIPELINE =
             ConfigOptions.key("copy.existing.pipeline")
                     .stringType()
@@ -141,15 +159,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription(
                             "The max size of the queue to use when copying data. Defaults to 16000.");
-
-    private static final ConfigOption<String> COPY_EXISTING_NAMESPACE_REGEX =
-            ConfigOptions.key("copy.existing.namespace.regex")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Regular expression that matches the namespaces from which to copy data. "
-                                    + "A namespace describes the database name and collection separated by a period, "
-                                    + "e.g. databaseName.collectionName.");
 
     private static final ConfigOption<Integer> POLL_MAX_BATCH_SIZE =
             ConfigOptions.key("poll.max.batch.size")
@@ -193,8 +202,9 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         String username = config.getOptional(USERNAME).orElse(null);
         String password = config.getOptional(PASSWORD).orElse(null);
 
-        String database = config.get(DATABASE);
-        String collection = config.get(COLLECTION);
+        String database = config.getOptional(DATABASE).orElse(null);
+        String collection = config.getOptional(COLLECTION).orElse(null);
+        String namespaceRegex = config.getOptional(NAMESPACE_REGEX).orElse(null);
 
         String errorsTolerance = config.get(ERRORS_TOLERANCE);
         Boolean errorsLogEnable = config.get(ERRORS_LOG_ENABLE);
@@ -229,14 +239,15 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 password,
                 database,
                 collection,
+                namespaceRegex,
                 connectionOptions,
                 errorsTolerance,
                 errorsLogEnable,
                 copyExisting,
+                copyExistingNamespaceRegex,
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,
-                copyExistingNamespaceRegex,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,
@@ -258,8 +269,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(HOSTS);
-        options.add(DATABASE);
-        options.add(COLLECTION);
         return options;
     }
 
@@ -269,6 +278,9 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(CONNECTION_OPTIONS);
+        options.add(DATABASE);
+        options.add(COLLECTION);
+        options.add(NAMESPACE_REGEX);
         options.add(ERRORS_TOLERANCE);
         options.add(ERRORS_LOG_ENABLE);
         options.add(COPY_EXISTING);

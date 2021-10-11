@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mongodb;
 
+import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.mongodb.ConnectionString;
@@ -125,6 +126,30 @@ public class MongoDBTestBase extends AbstractTestBase {
             return dbName;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
+        while (sinkSize(sinkName) == 0) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected static void waitForSinkSize(String sinkName, int expectedSize)
+            throws InterruptedException {
+        while (sinkSize(sinkName) < expectedSize) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected static int sinkSize(String sinkName) {
+        synchronized (TestValuesTableFactory.class) {
+            try {
+                return TestValuesTableFactory.getRawResults(sinkName).size();
+            } catch (IllegalArgumentException e) {
+                // job is not started yet
+                return 0;
+            }
         }
     }
 }

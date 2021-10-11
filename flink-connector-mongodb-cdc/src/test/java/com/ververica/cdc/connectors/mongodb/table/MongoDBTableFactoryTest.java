@@ -99,6 +99,7 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         null,
+                        null,
                         ERROR_TOLERANCE,
                         ERROR_LOGS_ENABLE,
                         COPY_EXISTING,
@@ -117,13 +118,14 @@ public class MongoDBTableFactoryTest {
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
+        options.put("namespace.regex", "^db\\.coll_.*$");
         options.put("errors.tolerance", "all");
         options.put("errors.log.enable", "false");
         options.put("copy.existing", "false");
         options.put("copy.existing.pipeline", "[ { \"$match\": { \"closed\": \"false\" } } ]");
         options.put("copy.existing.max.threads", "1");
         options.put("copy.existing.queue.size", "101");
-        options.put("copy.existing.namespace.regex", ".*");
+        options.put("copy.existing.namespace.regex", "^db\\.coll_1.*$");
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
         options.put("heartbeat.interval.ms", "104");
@@ -137,11 +139,12 @@ public class MongoDBTableFactoryTest {
                         PASSWORD,
                         MY_DATABASE,
                         MY_TABLE,
+                        "^db\\.coll_.*$",
                         "replicaSet=test&connectTimeoutMS=300000",
                         ERROR_TOLERANCE_ALL,
                         false,
                         false,
-                        ".*",
+                        "^db\\.coll_1.*$",
                         "[ { \"$match\": { \"closed\": \"false\" } } ]",
                         1,
                         101,
@@ -172,6 +175,7 @@ public class MongoDBTableFactoryTest {
                         PASSWORD,
                         MY_DATABASE,
                         MY_TABLE,
+                        null,
                         null,
                         ERROR_TOLERANCE,
                         ERROR_LOGS_ENABLE,

@@ -61,6 +61,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String password;
     private final String database;
     private final String collection;
+    private final String namespaceRegex;
     private final Boolean errorsLogEnable;
     private final String errorsTolerance;
     private final Boolean copyExisting;
@@ -88,8 +89,9 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             String hosts,
             @Nullable String username,
             @Nullable String password,
-            String database,
-            String collection,
+            @Nullable String database,
+            @Nullable String collection,
+            @Nullable String namespaceRegex,
             @Nullable String connectionOptions,
             @Nullable String errorsTolerance,
             @Nullable Boolean errorsLogEnable,
@@ -106,8 +108,9 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.hosts = checkNotNull(hosts);
         this.username = username;
         this.password = password;
-        this.database = checkNotNull(database);
-        this.collection = checkNotNull(collection);
+        this.database = database;
+        this.collection = collection;
+        this.namespaceRegex = namespaceRegex;
         this.connectionOptions = connectionOptions;
         this.errorsTolerance = errorsTolerance;
         this.errorsLogEnable = errorsLogEnable;
@@ -146,14 +149,13 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         physicalDataType, metadataConverters, typeInfo, localTimeZone);
 
         MongoDBSource.Builder<RowData> builder =
-                MongoDBSource.<RowData>builder()
-                        .hosts(hosts)
-                        .database(database)
-                        .collection(collection)
-                        .deserializer(deserializer);
+                MongoDBSource.<RowData>builder().hosts(hosts).deserializer(deserializer);
 
         Optional.ofNullable(username).ifPresent(builder::username);
         Optional.ofNullable(password).ifPresent(builder::password);
+        Optional.ofNullable(database).ifPresent(builder::database);
+        Optional.ofNullable(collection).ifPresent(builder::collection);
+        Optional.ofNullable(namespaceRegex).ifPresent(builder::namespaceRegex);
         Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
         Optional.ofNullable(errorsLogEnable).ifPresent(builder::errorsLogEnable);
         Optional.ofNullable(errorsTolerance).ifPresent(builder::errorsTolerance);
@@ -213,6 +215,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         password,
                         database,
                         collection,
+                        namespaceRegex,
                         connectionOptions,
                         errorsTolerance,
                         errorsLogEnable,
@@ -245,6 +248,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(password, that.password)
                 && Objects.equals(database, that.database)
                 && Objects.equals(collection, that.collection)
+                && Objects.equals(namespaceRegex, that.namespaceRegex)
                 && Objects.equals(connectionOptions, that.connectionOptions)
                 && Objects.equals(errorsTolerance, that.errorsTolerance)
                 && Objects.equals(errorsLogEnable, that.errorsLogEnable)
@@ -270,6 +274,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 password,
                 database,
                 collection,
+                namespaceRegex,
                 connectionOptions,
                 errorsTolerance,
                 errorsLogEnable,

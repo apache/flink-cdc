@@ -38,6 +38,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -125,8 +126,8 @@ public class MongoDBSource {
         private String password;
         private String database;
         private String collection;
+        private Pattern namespaceRegex;
         private String connectionOptions;
-        private String pipeline;
         private Integer batchSize;
         private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS_DEFAULT;
         private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE_DEFAULT;
@@ -134,7 +135,7 @@ public class MongoDBSource {
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
         private String copyExistingPipeline;
-        private String copyExistingNamespaceRegex;
+        private Pattern copyExistingNamespaceRegex;
         private Boolean errorsLogEnable;
         private String errorsTolerance;
         private Integer heartbeatIntervalMillis;
@@ -181,11 +182,14 @@ public class MongoDBSource {
         }
 
         /**
-         * An array of objects describing the pipeline operations to run. eg. [{"$match":
-         * {"operationType": "insert"}}, {"$addFields": {"Kafka": "Rules!"}}]
+         * namespace.regex
+         *
+         * <p>Regular expression that matches the namespaces from which to watch. A namespace
+         * describes the database name and collection separated by a period, e.g. <code>
+         * ^(db0\\.coll0|db1\\.coll1)$</code>.
          */
-        public Builder<T> pipeline(String pipeline) {
-            this.pipeline = pipeline;
+        public Builder<T> namespaceRegex(String namespaceRegex) {
+            this.namespaceRegex = Pattern.compile(namespaceRegex);
             return this;
         }
 
@@ -234,6 +238,18 @@ public class MongoDBSource {
          */
         public Builder<T> copyExisting(boolean copyExisting) {
             this.copyExisting = copyExisting;
+            return this;
+        }
+
+        /**
+         * copy.existing.namespace.regex
+         *
+         * <p>Regular expression that matches the namespaces from which to copy data. A namespace
+         * describes the database name and collection separated by a period, e.g. <code>
+         * ^(db0\\.coll0|db1\\.coll1)$</code>.
+         */
+        public Builder<T> copyExistingNamespaceRegex(String copyExistingNamespaceRegex) {
+            this.copyExistingNamespaceRegex = Pattern.compile(copyExistingNamespaceRegex);
             return this;
         }
 
@@ -322,18 +338,6 @@ public class MongoDBSource {
             return this;
         }
 
-        /**
-         * copy.existing.namespace.regex
-         *
-         * <p>Regular expression that matches the namespaces from which to copy data. A namespace
-         * describes the database name and collection separated by a period, e.g.
-         * databaseName.collectionName.
-         */
-        public Builder<T> copyExistingNamespaceRegex(String copyExistingNamespaceRegex) {
-            this.copyExistingNamespaceRegex = copyExistingNamespaceRegex;
-            return this;
-        }
-
         /** Build connection uri. */
         @VisibleForTesting
         public ConnectionString buildConnectionUri() {
@@ -369,9 +373,6 @@ public class MongoDBSource {
             props.setProperty(
                     MongoSourceConfig.CONNECTION_URI_CONFIG, String.valueOf(buildConnectionUri()));
 
-            props.setProperty(MongoSourceConfig.DATABASE_CONFIG, checkNotNull(database));
-            props.setProperty(MongoSourceConfig.COLLECTION_CONFIG, checkNotNull(collection));
-
             props.setProperty(MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
             props.setProperty(
                     MongoSourceConfig.PUBLISH_FULL_DOCUMENT_ONLY_CONFIG,
@@ -385,8 +386,27 @@ public class MongoDBSource {
             props.setProperty(
                     MongoSourceConfig.OUTPUT_SCHEMA_VALUE_CONFIG, OUTPUT_SCHEMA_VALUE_DEFAULT);
 
-            if (pipeline != null) {
-                props.setProperty(MongoSourceConfig.PIPELINE_CONFIG, pipeline);
+            if (database != null) {
+                props.setProperty(MongoSourceConfig.DATABASE_CONFIG, database);
+            }
+
+            if (collection != null) {
+                props.setProperty(MongoSourceConfig.COLLECTION_CONFIG, collection);
+            }
+
+            if (namespaceRegex != null) {
+                props.setProperty(
+                        MongoSourceConfig.PIPELINE_CONFIG,
+                        String.format(
+                                "[{'$addFields': {'full_namespace': {'$concat': ['$ns.db', '.', '$ns.coll']}}},"
+                                        + "{'$match': {'full_namespace': {'$regex': /%s/} }}]",
+                                namespaceRegex.pattern()));
+
+                // If not explicitly set copyExistingNamespaceRegex, we keep it the same as
+                // namespaceRegex.
+                if (copyExistingNamespaceRegex == null) {
+                    copyExistingNamespaceRegex = namespaceRegex;
+                }
             }
 
             if (batchSize != null) {
@@ -440,7 +460,7 @@ public class MongoDBSource {
             if (copyExistingNamespaceRegex != null) {
                 props.setProperty(
                         MongoSourceConfig.COPY_EXISTING_NAMESPACE_REGEX_CONFIG,
-                        copyExistingNamespaceRegex);
+                        copyExistingNamespaceRegex.pattern());
             }
 
             if (heartbeatIntervalMillis != null) {
