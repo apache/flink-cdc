@@ -28,13 +28,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
 import static com.ververica.cdc.debezium.DebeziumSourceFunction.LEGACY_IMPLEMENTATION_KEY;
 import static com.ververica.cdc.debezium.DebeziumSourceFunction.LEGACY_IMPLEMENTATION_VALUE;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A builder to build a SourceFunction which can read snapshot and continue to consume binlog. */
 public class MySqlSource {
+
+    private static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
 
     public static <T> Builder<T> builder() {
         return new Builder<>();

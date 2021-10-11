@@ -59,12 +59,15 @@ public final class MySqlRecordEmitter<T>
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
+    private final boolean includeSchemaChanges;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
-            MySqlSourceReaderMetrics sourceReaderMetrics) {
+            MySqlSourceReaderMetrics sourceReaderMetrics,
+            boolean includeSchemaChanges) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
+        this.includeSchemaChanges = includeSchemaChanges;
     }
 
     @Override
@@ -83,29 +86,36 @@ public final class MySqlRecordEmitter<T>
             for (TableChanges.TableChange tableChange : changes) {
                 splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
             }
+            if (includeSchemaChanges) {
+                emitElement(element, output);
+            }
         } else if (isDataChangeRecord(element)) {
             if (splitState.isBinlogSplitState()) {
                 BinlogOffset position = getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
             }
             reportMetrics(element);
-            debeziumDeserializationSchema.deserialize(
-                    element,
-                    new Collector<T>() {
-                        @Override
-                        public void collect(final T t) {
-                            output.collect(t);
-                        }
-
-                        @Override
-                        public void close() {
-                            // do nothing
-                        }
-                    });
+            emitElement(element, output);
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
         }
+    }
+
+    private void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
+        debeziumDeserializationSchema.deserialize(
+                element,
+                new Collector<T>() {
+                    @Override
+                    public void collect(final T t) {
+                        output.collect(t);
+                    }
+
+                    @Override
+                    public void close() {
+                        // do nothing
+                    }
+                });
     }
 
     private void reportMetrics(SourceRecord element) {

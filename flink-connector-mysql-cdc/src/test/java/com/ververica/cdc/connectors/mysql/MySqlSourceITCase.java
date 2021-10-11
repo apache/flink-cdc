@@ -84,7 +84,7 @@ public class MySqlSourceITCase extends MySqlTestBase {
     }
 
     @Test
-    public void testConsumingAllTypesWithJsonFormatExcludeSchema() throws Exception {
+    public void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
         testConsumingAllEventsWithJsonFormat(false);
     }
 

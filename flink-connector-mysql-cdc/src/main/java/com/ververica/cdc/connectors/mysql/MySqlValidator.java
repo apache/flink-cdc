@@ -55,7 +55,9 @@ public class MySqlValidator implements Validator {
 
     @Override
     public void validate() {
-        try (MySqlConnection connection = DebeziumUtils.openMySqlConnection(configuration)) {
+        try (MySqlConnection connection =
+                DebeziumUtils.openMySqlConnection(
+                        io.debezium.config.Configuration.from(configuration.toMap()))) {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);

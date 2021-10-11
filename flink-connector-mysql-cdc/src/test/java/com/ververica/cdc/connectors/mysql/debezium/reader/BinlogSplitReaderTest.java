@@ -18,15 +18,14 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
-import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
@@ -46,7 +45,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
 import java.sql.SQLException;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,10 +52,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
@@ -74,16 +70,16 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
         customerDatabase.createAndInitialize();
-        Configuration configuration = getConfig(new String[] {"customers"});
-        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        mySqlConnection = StatefulTaskContext.getConnection(configuration);
+        MySqlParallelSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
+        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(configuration);
+        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
         String[] expected =
                 new String[] {
                     "+I[101, user_1, Shanghai, 123567891234]",
@@ -109,7 +105,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits,
                         dataType,
                         pkType,
-                        configuration,
+                        sourceConfig,
                         1,
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
@@ -119,16 +115,16 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadAllBinlogSplitsForOneTable() throws Exception {
         customerDatabase.createAndInitialize();
-        Configuration configuration = getConfig(new String[] {"customers"});
-        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        mySqlConnection = StatefulTaskContext.getConnection(configuration);
+        MySqlParallelSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
+        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(configuration);
+        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
 
         String[] expected =
                 new String[] {
@@ -172,7 +168,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits,
                         dataType,
                         pkType,
-                        configuration,
+                        sourceConfig,
                         splits.size(),
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
@@ -182,16 +178,18 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadAllBinlogForTableWithSingleLine() throws Exception {
         customerDatabase.createAndInitialize();
-        Configuration configuration = getConfig(new String[] {"customer_card_single_line"});
-        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        mySqlConnection = StatefulTaskContext.getConnection(configuration);
+        MySqlParallelSourceConfig sourceConfig =
+                getConfig(new String[] {"customer_card_single_line"});
+        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
+        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(configuration);
+        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
 
         String[] expected =
                 new String[] {
@@ -212,7 +210,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits,
                         dataType,
                         pkType,
-                        configuration,
+                        sourceConfig,
                         splits.size(),
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
@@ -222,10 +220,10 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadAllBinlogSplitsForTables() throws Exception {
         customerDatabase.createAndInitialize();
-        Configuration configuration =
+        MySqlParallelSourceConfig sourceConfig =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
-        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        mySqlConnection = StatefulTaskContext.getConnection(configuration);
+        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
+        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -238,7 +236,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
                                         DataTypes.FIELD("level", DataTypes.STRING()))
                                 .getLogicalType();
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(configuration);
+        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
         String[] expected =
                 new String[] {
                     "+I[20000, LEVEL_1, user_1, user with level 1]",
@@ -270,7 +268,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                         splits,
                         dataType,
                         pkType,
-                        configuration,
+                        sourceConfig,
                         splits.size(),
                         expected.length,
                         // make the result deterministic
@@ -284,10 +282,11 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadBinlogFromLatestOffset() throws Exception {
         customerDatabase.createAndInitialize();
-        Configuration configuration = getConfig(new String[] {"customers"});
-        configuration.set(SCAN_STARTUP_MODE, "latest-offset");
-        binaryLogClient = StatefulTaskContext.getBinaryClient(configuration);
-        mySqlConnection = StatefulTaskContext.getConnection(configuration);
+        MySqlParallelSourceConfig sourceConfig =
+                getConfig("latest-offset", new String[] {"customers"});
+        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
+        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -309,17 +308,18 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual =
-                readBinlogSplitsFromLatestOffset(dataType, configuration, expected.length);
+                readBinlogSplitsFromLatestOffset(dataType, sourceConfig, expected.length);
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
     private List<String> readBinlogSplitsFromLatestOffset(
-            DataType dataType, Configuration configuration, int expectedSize) throws Exception {
+            DataType dataType, MySqlParallelSourceConfig sourceConfig, int expectedSize)
+            throws Exception {
         final StatefulTaskContext statefulTaskContext =
-                new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
 
         // step-1: create binlog split
-        MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(configuration);
+        MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
         binlogSplitAssigner.open();
         MySqlSplit binlogSplit = binlogSplitAssigner.getNext().get();
 
@@ -358,13 +358,13 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
             List<MySqlSnapshotSplit> sqlSplits,
             DataType dataType,
             RowType pkType,
-            Configuration configuration,
+            MySqlParallelSourceConfig sourceConfig,
             int scanSplitsNum,
             int expectedSize,
             TableId binlogChangeTableId)
             throws Exception {
         final StatefulTaskContext statefulTaskContext =
-                new StatefulTaskContext(configuration, binaryLogClient, mySqlConnection);
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
         final SnapshotSplitReader snapshotSplitReader =
                 new SnapshotSplitReader(statefulTaskContext, 0);
 
@@ -552,9 +552,9 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
         return formatter.format(records);
     }
 
-    private List<MySqlSnapshotSplit> getMySqlSplits(Configuration configuration) {
+    private List<MySqlSnapshotSplit> getMySqlSplits(MySqlParallelSourceConfig sourceConfig) {
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {
@@ -569,27 +569,40 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
         return mySqlSplits;
     }
 
-    private Configuration getConfig(String[] captureTables) {
-        Map<String, String> properties = new HashMap<>();
-        properties.put("database.server.name", "embedded-test");
-        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        properties.put("database.user", customerDatabase.getUsername());
-        properties.put("database.password", customerDatabase.getPassword());
-        properties.put("database.whitelist", customerDatabase.getDatabaseName());
-        properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
-        properties.put("snapshot.mode", "initial");
-        properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", UUID.randomUUID().toString());
+    private MySqlParallelSourceConfig getConfig(String startupMode, String[] captureTables) {
         List<String> captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
                         .collect(Collectors.toList());
-        properties.put("table.whitelist", String.join(",", captureTableIds));
-        properties.put("scan.incremental.snapshot.chunk.size", "10");
-        properties.put("scan.snapshot.fetch.size", "2");
 
-        return Configuration.fromMap(properties);
+        return new MySqlParallelSourceConfig.Builder()
+                .startupMode(startupMode)
+                .capturedDatabases(customerDatabase.getDatabaseName())
+                .capturedTables(String.join(",", captureTableIds))
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .username(customerDatabase.getUsername())
+                .splitSize(10)
+                .fetchSize(2)
+                .password(customerDatabase.getPassword())
+                .build();
+    }
+
+    private MySqlParallelSourceConfig getConfig(String[] captureTables) {
+        List<String> captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .collect(Collectors.toList());
+
+        return new MySqlParallelSourceConfig.Builder()
+                .capturedDatabases(customerDatabase.getDatabaseName())
+                .capturedTables(String.join(",", captureTableIds))
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .username(customerDatabase.getUsername())
+                .splitSize(10)
+                .fetchSize(2)
+                .password(customerDatabase.getPassword())
+                .build();
     }
 }

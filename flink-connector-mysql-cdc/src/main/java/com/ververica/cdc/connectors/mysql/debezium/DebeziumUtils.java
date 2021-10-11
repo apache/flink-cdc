@@ -18,41 +18,26 @@
 
 package com.ververica.cdc.connectors.mysql.debezium;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.MySqlConnectorConfig;
-import io.debezium.relational.RelationalTableFilters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-
-import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext.toDebeziumConfig;
 
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
-    /**
-     * Creates {@link RelationalTableFilters} from configuration. The {@link RelationalTableFilters}
-     * can be used to filter tables according to "table.whitelist" and "database.whitelist" options.
-     */
-    public static RelationalTableFilters createTableFilters(Configuration configuration) {
-        io.debezium.config.Configuration debeziumConfig = toDebeziumConfig(configuration);
-        final MySqlConnectorConfig mySqlConnectorConfig = new MySqlConnectorConfig(debeziumConfig);
-        return mySqlConnectorConfig.getTableFilters();
-    }
-
     /** Creates and opens a new {@link MySqlConnection}. */
     public static MySqlConnection openMySqlConnection(Configuration configuration) {
         MySqlConnection jdbc =
                 new MySqlConnection(
-                        new MySqlConnection.MySqlConnectionConfiguration(
-                                toDebeziumConfig(configuration)));
+                        new MySqlConnection.MySqlConnectionConfiguration(configuration));
         try {
             jdbc.connect();
         } catch (SQLException e) {

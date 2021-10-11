@@ -28,6 +28,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.Preconditions;
 
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.Duration;
@@ -51,8 +52,8 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVE
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.USERNAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.validateAndGetServerId;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
 public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
@@ -84,6 +85,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
             validateStartupOptionIfEnableParallel(startupOptions);
+            validateFetchSize(fetchSize);
+            validateSplitSize(splitSize);
         }
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
@@ -194,5 +197,54 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
                                 + " but actual is %s",
                         startupOptions.startupMode));
+    }
+
+    private void validateSplitSize(Integer splitSize) {
+        checkState(
+                splitSize > 1,
+                String.format(
+                        "The value of option '%s' must larger than 1, but is %d",
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), splitSize));
+    }
+
+    private void validateFetchSize(Integer fetchSize) {
+        checkState(
+                fetchSize > 1,
+                String.format(
+                        "The value of option '%s' must larger than 1, but is %d",
+                        SCAN_SNAPSHOT_FETCH_SIZE.key(), fetchSize));
+    }
+
+    private String validateAndGetServerId(ReadableConfig configuration) {
+        final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
+
+        if (serverIdValue != null) {
+            if (serverIdValue.contains("-")) {
+                String[] idArray = serverIdValue.split("-");
+                if (idArray.length != 2) {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "The range '%s' should be syntax like '5400-5500', but got: %s",
+                                    SERVER_ID.key(), serverIdValue));
+                }
+                validateServerId(idArray[0].trim());
+                validateServerId(idArray[1].trim());
+            } else {
+                validateServerId(serverIdValue);
+            }
+        }
+        return serverIdValue;
+    }
+
+    private void validateServerId(String serverIdValue) {
+        try {
+            Integer.parseInt(serverIdValue);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    String.format(
+                            "The 'server-id' should contains single numeric ID like '5400' or numeric ID range '5400-5404', but actual is %s",
+                            serverIdValue),
+                    e);
+        }
     }
 }

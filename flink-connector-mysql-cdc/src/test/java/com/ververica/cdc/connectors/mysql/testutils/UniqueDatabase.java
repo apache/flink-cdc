@@ -26,17 +26,13 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_NAME;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -101,16 +97,6 @@ public class UniqueDatabase {
 
     public String getPassword() {
         return password;
-    }
-
-    public Map<String, String> getConfigMap() {
-        Map<String, String> config = new HashMap<>();
-        config.put("database.server.name", DATABASE_SERVER_NAME);
-        config.put("database.hostname", checkNotNull(getHost()));
-        config.put("database.user", checkNotNull(getUsername()));
-        config.put("database.password", checkNotNull(getPassword()));
-        config.put("database.port", String.valueOf(getDatabasePort()));
-        return config;
     }
 
     /** @return Fully qualified table name <code>&lt;databaseName&gt;.&lt;tableName&gt;</code> */
