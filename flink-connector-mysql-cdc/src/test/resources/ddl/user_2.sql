@@ -31,11 +31,11 @@ CREATE TABLE user_table_2_2 (
     name VARCHAR(255) NOT NULL DEFAULT 'flink',
     address VARCHAR(1024),
     phone_number VARCHAR(512),
-    email VARCHAR(255)
+    age INTEGER
 );
 
 INSERT INTO user_table_2_1
 VALUES (211,"user_211","Shanghai","123567891234");
 
 INSERT INTO user_table_2_2
-VALUES (221,"user_221","Shanghai","123567891234","user_221@foo.com");
+VALUES (221,"user_221","Shanghai","123567891234", 18);

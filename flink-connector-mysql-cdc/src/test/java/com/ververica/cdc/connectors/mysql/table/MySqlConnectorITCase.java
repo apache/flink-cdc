@@ -62,8 +62,10 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
 
-    private final UniqueDatabase userDatabase1 = new UniqueDatabase(MYSQL_CONTAINER, "user_1", TEST_USER, TEST_PASSWORD);
-    private final UniqueDatabase userDatabase2 = new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase userDatabase1 =
+            new UniqueDatabase(MYSQL_CONTAINER, "user_1", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase userDatabase2 =
+            new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -631,6 +633,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                                 + " address STRING,"
                                 + " phone_number STRING,"
                                 + " email STRING,"
+                                + " age INT,"
                                 + " primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -664,37 +667,42 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         waitForSnapshotStarted(iterator);
 
         try (Connection connection = userDatabase1.getJdbcConnection();
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
             statement.execute("UPDATE user_table_1_1 SET email = 'user_111@bar.org' WHERE id=111;");
         }
 
         try (Connection connection = userDatabase2.getJdbcConnection();
-             Statement statement = connection.createStatement()) {
-            statement.execute("UPDATE user_table_2_1 SET address = 'HangZhou' WHERE id=211;");
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE user_table_2_2 SET age = 20 WHERE id=221;");
         }
 
         String[] expected =
                 new String[] {
-                    "+I[111, user_111, Shanghai, 123567891234, user_111@foo.com]",
-                    "+I[121, user_121, Shanghai, 123567891234, null]",
-                    "+I[211, user_211, Shanghai, 123567891234, null]",
-                    "+I[221, user_221, Shanghai, 123567891234, user_221@foo.com]",
-                    "-U[111, user_111, Shanghai, 123567891234, user_111@foo.com]",
-                    "+U[111, user_111, Shanghai, 123567891234, user_111@bar.org]",
-                    "-U[211, user_211, Shanghai, 123567891234, null]",
-                    "+U[211, user_211, HangZhou, 123567891234, null]",
+                    "+I[111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                    "-U[111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                    "+U[111, user_111, Shanghai, 123567891234, user_111@bar.org, null]",
+                    "+I[121, user_121, Shanghai, 123567891234, null, null]",
+                    "+I[211, user_211, Shanghai, 123567891234, null, null]",
+                    "+I[221, user_221, Shanghai, 123567891234, null, 18]",
+                    "-U[221, user_221, Shanghai, 123567891234, null, 18]",
+                    "+U[221, user_221, Shanghai, 123567891234, null, 20]",
                 };
 
         assertEqualsInAnyOrder(
                 Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
 
-        // should drop the userDatabase1 and userDatabase2
-        for (UniqueDatabase database : new UniqueDatabase[]{userDatabase1, userDatabase2}) {
-            try (Connection connection = database.getJdbcConnection();
-                 Statement statement = connection.createStatement()) {
-                statement.execute("drop database " + database.getDatabaseName());
-            }
+        // should drop the userDatabase1 and userDatabase2 for the test will run
+        // three times and create multiply databases with name like user_xxx.
+        // otherwise it'll read the database created by previous tests for we use `user_.*` to match
+        // database
+        try (Connection connection = userDatabase1.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("drop database " + userDatabase1.getDatabaseName());
+        }
+        try (Connection connection = userDatabase2.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("drop database " + userDatabase2.getDatabaseName());
         }
     }
 
