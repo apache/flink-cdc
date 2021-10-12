@@ -485,16 +485,18 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
 
     @Test
     public void testMetadataColumns() throws Exception {
-        customerDatabase.createAndInitialize();
+        userDatabase1.createAndInitialize();
         String sourceDDL =
                 String.format(
-                        "CREATE TABLE customer_source ("
+                        "CREATE TABLE mysql_users ("
                                 + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
                                 + " table_name STRING METADATA VIRTUAL,"
-                                + " `id` INT NOT NULL,"
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
                                 + " name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
+                                + " email STRING,"
+                                + " age INT,"
                                 + " primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -511,22 +513,25 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
-                        customerDatabase.getDatabaseName(),
-                        "customers.*",
+                        userDatabase1.getUsername(),
+                        userDatabase1.getPassword(),
+                        userDatabase1.getDatabaseName(),
+                        "user_table_.*",
                         getDezImplementation(),
                         incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
+
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " database_name STRING,"
                         + " table_name STRING,"
-                        + " `id` INT NOT NULL,"
+                        + " `id` DECIMAL(20, 0) NOT NULL,"
                         + " name STRING,"
                         + " address STRING,"
                         + " phone_number STRING,"
+                        + " email STRING,"
+                        + " age INT,"
                         + " primary key (database_name, table_name, id) not enforced"
                         + ") WITH ("
                         + " 'connector' = 'values',"
@@ -536,80 +541,36 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         tEnv.executeSql(sinkDDL);
 
         // async submit job
-        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM customer_source");
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM mysql_users");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 42);
+        waitForSinkSize("sink", 2);
 
-        try (Connection connection = customerDatabase.getJdbcConnection();
+        try (Connection connection = userDatabase1.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
 
-            // TODO: we execute an additional DELETE statement to make incremental-snapshot
-            //  mode pass, in that mode, the first statement will be ignored which should be a bug!
-            statement.execute("DELETE FROM shopping_cart WHERE product_no=101;");
-
-            statement.execute("UPDATE customers SET address='Beijing' WHERE id=110;");
             statement.execute(
-                    "INSERT INTO customers_1 VALUES (4000,'user_44','Wuhan',123567891234);");
+                    "INSERT INTO user_table_1_2 VALUES (200,'user_200','Wuhan',123567891234);");
             statement.execute(
-                    "INSERT INTO customers VALUES (3000,'user_33','Hangzhou',123567891234);"); // 110
-            statement.execute("UPDATE customers_1 SET phone_number=88888888 WHERE id=4000;");
-            statement.execute("DELETE FROM customers_1 WHERE id=2000;");
+                    "INSERT INTO user_table_1_1 VALUES (300,'user_300','Hangzhou',123567891234, 'user_300@foo.com');");
+            statement.execute("UPDATE user_table_1_1 SET address='Beijing' WHERE id=300;");
+            statement.execute("UPDATE user_table_1_2 SET phone_number=88888888 WHERE id=121;");
+            statement.execute("DELETE FROM user_table_1_1 WHERE id=111;");
         }
 
         // waiting for binlog finished (5 more events)
-        waitForSinkSize("sink", 47);
+        waitForSinkSize("sink", 7);
 
         List<String> expected =
                 Stream.of(
-                                "+I[%s, customers, 101, user_1, Shanghai, 123567891234]",
-                                "+I[%s, customers, 102, user_2, Shanghai, 123567891234]",
-                                "+I[%s, customers, 103, user_3, Shanghai, 123567891234]",
-                                "+I[%s, customers, 109, user_4, Shanghai, 123567891234]",
-                                "+I[%s, customers, 110, user_5, Shanghai, 123567891234]",
-                                "+I[%s, customers, 111, user_6, Shanghai, 123567891234]",
-                                "+I[%s, customers, 118, user_7, Shanghai, 123567891234]",
-                                "+I[%s, customers, 121, user_8, Shanghai, 123567891234]",
-                                "+I[%s, customers, 123, user_9, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1009, user_10, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1010, user_11, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1011, user_12, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1012, user_13, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1013, user_14, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1014, user_15, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1015, user_16, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1016, user_17, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1017, user_18, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1018, user_19, Shanghai, 123567891234]",
-                                "+I[%s, customers, 1019, user_20, Shanghai, 123567891234]",
-                                "+I[%s, customers, 2000, user_21, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 101, user_1, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 102, user_2, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 103, user_3, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 109, user_4, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 110, user_5, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 111, user_6, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 118, user_7, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 121, user_8, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 123, user_9, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1009, user_10, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1010, user_11, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1011, user_12, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1012, user_13, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1013, user_14, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1014, user_15, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1015, user_16, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1016, user_17, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1017, user_18, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1018, user_19, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 1019, user_20, Shanghai, 123567891234]",
-                                "+I[%s, customers_1, 2000, user_21, Shanghai, 123567891234]",
-                                "+U[%s, customers, 110, user_5, Beijing, 123567891234]",
-                                "+I[%s, customers_1, 4000, user_44, Wuhan, 123567891234]",
-                                "+I[%s, customers, 3000, user_33, Hangzhou, 123567891234]",
-                                "+U[%s, customers_1, 4000, user_44, Wuhan, 88888888]",
-                                "-D[%s, customers_1, 2000, user_21, Shanghai, 123567891234]")
-                        .map(s -> String.format(s, customerDatabase.getDatabaseName()))
+                                "+I[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "+I[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null, null]",
+                                "+I[%s, user_table_1_2, 200, user_200, Wuhan, 123567891234, null, null]",
+                                "+I[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "+U[%s, user_table_1_1, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
+                                "+U[%s, user_table_1_2, 121, user_121, Shanghai, 88888888, null, null]",
+                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]")
+                        .map(s -> String.format(s, userDatabase1.getDatabaseName()))
                         .sorted()
                         .collect(Collectors.toList());
 
@@ -765,7 +726,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
     }
 
     @Test
-    public void testInconsistentSchema() throws Exception {
+    public void testShadingTablesWithInconsistentSchema() throws Exception {
         userDatabase1.createAndInitialize();
         userDatabase2.createAndInitialize();
         String sourceDDL =
