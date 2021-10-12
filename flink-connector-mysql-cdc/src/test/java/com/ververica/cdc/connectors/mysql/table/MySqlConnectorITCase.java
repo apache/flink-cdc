@@ -756,7 +756,9 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                         MYSQL_CONTAINER.getDatabasePort(),
                         userDatabase1.getUsername(),
                         userDatabase1.getPassword(),
-                        "user_.*",
+                        String.format(
+                                "(%s|%s)",
+                                userDatabase1.getDatabaseName(), userDatabase2.getDatabaseName()),
                         "user_table_.*",
                         getDezImplementation(),
                         incrementalSnapshot,
@@ -795,19 +797,6 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         assertEqualsInAnyOrder(
                 Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
-
-        // should drop the userDatabase1 and userDatabase2 for the test will run
-        // three times and create multiply databases with name like user_xxx.
-        // otherwise it'll read the database created by previous tests for we use `user_.*` to match
-        // database
-        try (Connection connection = userDatabase1.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute("drop database " + userDatabase1.getDatabaseName());
-        }
-        try (Connection connection = userDatabase2.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute("drop database " + userDatabase2.getDatabaseName());
-        }
     }
 
     @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")
