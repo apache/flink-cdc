@@ -31,7 +31,8 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 /** Defines the supported metadata columns for {@link MySqlTableSource}. */
 public enum MySqlReadableMetadata {
-    TABLE(
+    /** Name of the table that contain the row. . */
+    TABLE_NAME(
             "table_name",
             DataTypes.STRING().notNull(),
             new MetadataConverter() {
@@ -46,7 +47,8 @@ public enum MySqlReadableMetadata {
                 }
             }),
 
-    DATABASE(
+    /** Name of the database that contain the row. */
+    DATABASE_NAME(
             "database_name",
             DataTypes.STRING().notNull(),
             new MetadataConverter() {
@@ -61,7 +63,11 @@ public enum MySqlReadableMetadata {
                 }
             }),
 
-    TIMESTAMP(
+    /**
+     * It indicates the time that the change was made in the database. If the record is read from
+     * snapshot of the table instead of the binlog, the value is always 0.
+     */
+    OP_TS(
             "op_ts",
             DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3).notNull(),
             new MetadataConverter() {

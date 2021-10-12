@@ -726,7 +726,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
     }
 
     @Test
-    public void testShadingTablesWithInconsistentSchema() throws Exception {
+    public void testShardingTablesWithInconsistentSchema() throws Exception {
         userDatabase1.createAndInitialize();
         userDatabase2.createAndInitialize();
         String sourceDDL =
