@@ -102,12 +102,12 @@ public class MySqlTimezoneITCase {
 
     @Test
     public void testMySqlServerInBerlin() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai");
+        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin");
     }
 
     @Test
     public void testMySqlServerInShanghai() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin");
+        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai");
     }
 
     private void testTemporalTypesWithMySqlServerTimezone(String timezone) throws Exception {
