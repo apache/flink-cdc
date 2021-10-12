@@ -52,7 +52,15 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>*:*</include>
+                                    <include>io.debezium:debezium-api</include>
+                                    <include>io.debezium:debezium-embedded</include>
+                                    <include>io.debezium:debezium-core</include>
+                                    <include>io.debezium:debezium-connector-postgres</include>
+                                    <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-connector-postgres-cdc</include>
+                                    <include>org.apache.kafka:*</include>
+                                    <include>org.postgresql:postgresql</include>
+                                    <include>com.google.protobuf:protobuf-java</include>
                                 </includes>
                             </artifactSet>
                             <filters>

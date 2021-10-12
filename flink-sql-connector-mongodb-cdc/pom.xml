@@ -52,7 +52,17 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>*:*</include>
+                                    <include>io.debezium:debezium-api</include>
+                                    <include>io.debezium:debezium-embedded</include>
+                                    <include>io.debezium:debezium-core</include>
+                                    <include>org.mongodb.kafka:mongo-kafka-connect</include>
+                                    <include>org.mongodb:mongodb-driver-sync</include>
+                                    <include>org.mongodb:mongodb-driver-core</include>
+                                    <include>org.mongodb:bson</include>
+                                    <include>org.apache.avro:avro</include>
+                                    <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-connector-mongodb-cdc</include>
+                                    <include>org.apache.kafka:*</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -69,6 +79,14 @@ under the License.
                                     </excludes>
                                 </filter>
                             </filters>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.kafka</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
+                                    </shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
