@@ -43,6 +43,7 @@ import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
 import org.apache.kafka.connect.data.Decimal;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -499,11 +500,16 @@ public final class RowDataDebeziumDeserializeSchema
                 GenericRowData row = new GenericRowData(arity);
                 for (int i = 0; i < arity; i++) {
                     String fieldName = fieldNames[i];
-                    Object fieldValue = struct.get(fieldName);
-                    Schema fieldSchema = schema.field(fieldName).schema();
-                    Object convertedField =
-                            convertField(fieldConverters[i], fieldValue, fieldSchema);
-                    row.setField(i, convertedField);
+                    Field field = schema.field(fieldName);
+                    if (field == null) {
+                        row.setField(i, null);
+                    } else {
+                        Object fieldValue = struct.get(field);
+                        Schema fieldSchema = schema.field(fieldName).schema();
+                        Object convertedField =
+                                convertField(fieldConverters[i], fieldValue, fieldSchema);
+                        row.setField(i, convertedField);
+                    }
                 }
                 return row;
             }
