@@ -159,7 +159,9 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     private void markRecordTimestamp(SourceRecord record) {
         final Struct value = (Struct) record.value();
         final Struct source = new Struct(value.schema().field(Envelope.FieldName.SOURCE).schema());
-        long timestamp = System.currentTimeMillis();
+        // It indicates the time that the change was made in the database. If the record is read
+        // from snapshot of the table instead of the change stream, the value is always 0.
+        long timestamp = 0L;
         if (value.schema().field(CLUSTER_TIME_FIELD) != null) {
             String clusterTime = value.getString(CLUSTER_TIME_FIELD);
             if (clusterTime != null) {

@@ -24,19 +24,27 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.mongodb.MongoDBSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.MetadataConverter;
 
 import javax.annotation.Nullable;
 
 import java.time.ZoneId;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -44,7 +52,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A {@link DynamicTableSource} that describes how to create a MongoDB change stream events source
  * from a logical description.
  */
-public class MongoDBTableSource implements ScanTableSource {
+public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final TableSchema physicalSchema;
     private final String hosts;
@@ -63,6 +71,16 @@ public class MongoDBTableSource implements ScanTableSource {
     private final Integer pollAwaitTimeMillis;
     private final Integer heartbeatIntervalMillis;
     private final ZoneId localTimeZone;
+
+    // --------------------------------------------------------------------------------------------
+    // Mutable attributes
+    // --------------------------------------------------------------------------------------------
+
+    /** Data type that describes the final output of the source. */
+    protected DataType producedDataType;
+
+    /** Metadata that is appended at the end of a physical source row. */
+    protected List<String> metadataKeys;
 
     public MongoDBTableSource(
             TableSchema physicalSchema,
@@ -99,6 +117,9 @@ public class MongoDBTableSource implements ScanTableSource {
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.localTimeZone = localTimeZone;
+        // Mutable attributes
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
     }
 
     @Override
@@ -112,12 +133,15 @@ public class MongoDBTableSource implements ScanTableSource {
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        MetadataConverter[] metadataConverters = getMetadataConverters();
         TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
 
         DebeziumDeserializationSchema<RowData> deserializer =
-                new MongoDBConnectorDeserializationSchema(rowType, typeInfo, localTimeZone);
+                new MongoDBConnectorDeserializationSchema(
+                        physicalDataType, metadataConverters, typeInfo, localTimeZone);
 
         MongoDBSource.Builder<RowData> builder =
                 MongoDBSource.<RowData>builder()
@@ -144,26 +168,61 @@ public class MongoDBTableSource implements ScanTableSource {
         return SourceFunctionProvider.of(sourceFunction, false);
     }
 
+    protected MetadataConverter[] getMetadataConverters() {
+        if (metadataKeys.isEmpty()) {
+            return new MetadataConverter[0];
+        }
+
+        return metadataKeys.stream()
+                .map(
+                        key ->
+                                Stream.of(MongoDBReadableMetadata.values())
+                                        .filter(m -> m.getKey().equals(key))
+                                        .findFirst()
+                                        .orElseThrow(IllegalStateException::new))
+                .map(MongoDBReadableMetadata::getConverter)
+                .toArray(MetadataConverter[]::new);
+    }
+
+    @Override
+    public Map<String, DataType> listReadableMetadata() {
+        return Stream.of(MongoDBReadableMetadata.values())
+                .collect(
+                        Collectors.toMap(
+                                MongoDBReadableMetadata::getKey,
+                                MongoDBReadableMetadata::getDataType));
+    }
+
+    @Override
+    public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+        this.metadataKeys = metadataKeys;
+        this.producedDataType = producedDataType;
+    }
+
     @Override
     public DynamicTableSource copy() {
-        return new MongoDBTableSource(
-                physicalSchema,
-                hosts,
-                username,
-                password,
-                database,
-                collection,
-                connectionOptions,
-                errorsTolerance,
-                errorsLogEnable,
-                copyExisting,
-                copyExistingPipeline,
-                copyExistingMaxThreads,
-                copyExistingQueueSize,
-                pollMaxBatchSize,
-                pollAwaitTimeMillis,
-                heartbeatIntervalMillis,
-                localTimeZone);
+        MongoDBTableSource source =
+                new MongoDBTableSource(
+                        physicalSchema,
+                        hosts,
+                        username,
+                        password,
+                        database,
+                        collection,
+                        connectionOptions,
+                        errorsTolerance,
+                        errorsLogEnable,
+                        copyExisting,
+                        copyExistingPipeline,
+                        copyExistingMaxThreads,
+                        copyExistingQueueSize,
+                        pollMaxBatchSize,
+                        pollAwaitTimeMillis,
+                        heartbeatIntervalMillis,
+                        localTimeZone);
+        source.metadataKeys = metadataKeys;
+        source.producedDataType = producedDataType;
+        return source;
     }
 
     @Override
@@ -191,7 +250,9 @@ public class MongoDBTableSource implements ScanTableSource {
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
                 && Objects.equals(heartbeatIntervalMillis, that.heartbeatIntervalMillis)
-                && Objects.equals(localTimeZone, that.localTimeZone);
+                && Objects.equals(localTimeZone, that.localTimeZone)
+                && Objects.equals(producedDataType, that.producedDataType)
+                && Objects.equals(metadataKeys, that.metadataKeys);
     }
 
     @Override
@@ -213,7 +274,9 @@ public class MongoDBTableSource implements ScanTableSource {
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,
-                localTimeZone);
+                localTimeZone,
+                producedDataType,
+                metadataKeys);
     }
 
     @Override
