@@ -39,6 +39,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -65,6 +66,18 @@ public class MySqlTableSourceFactoryTest {
                             Column.physical("eee", DataTypes.TIMESTAMP(3))),
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
+
+    private static final ResolvedSchema SCHEMA_WITH_METADATA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("id", DataTypes.BIGINT().notNull()),
+                            Column.physical("name", DataTypes.STRING()),
+                            Column.physical("count", DataTypes.DECIMAL(38, 18)),
+                            Column.metadata("time", DataTypes.TIMESTAMP(3), "op_ts", true),
+                            Column.metadata(
+                                    "_database_name", DataTypes.STRING(), "database_name", true)),
+                    Collections.emptyList(),
+                    UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
@@ -333,6 +346,42 @@ public class MySqlTableSourceFactoryTest {
     }
 
     @Test
+    public void testMetadataColumns() {
+        Map<String, String> properties = getAllOptions();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        MySqlTableSource mySqlSource = (MySqlTableSource) actualSource;
+        mySqlSource.applyReadableMetadata(
+                Arrays.asList("op_ts", "database_name"),
+                SCHEMA_WITH_METADATA.toSourceRowDataType());
+        actualSource = mySqlSource.copy();
+
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
+                        TableSchemaUtils.getPhysicalSchema(
+                                fromResolvedSchema(SCHEMA_WITH_METADATA)),
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.of("UTC"),
+                        PROPERTIES,
+                        null,
+                        false,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        StartupOptions.initial());
+        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
+
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
     public void testValidation() {
         // validate illegal port
         try {
@@ -422,19 +471,24 @@ public class MySqlTableSourceFactoryTest {
         return options;
     }
 
-    private static DynamicTableSource createTableSource(Map<String, String> options) {
+    private static DynamicTableSource createTableSource(
+            ResolvedSchema schema, Map<String, String> options) {
         return FactoryUtil.createTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(SCHEMA).toSchema(),
+                                fromResolvedSchema(schema).toSchema(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),
-                        SCHEMA),
+                        schema),
                 new Configuration(),
                 MySqlTableSourceFactoryTest.class.getClassLoader(),
                 false);
+    }
+
+    private static DynamicTableSource createTableSource(Map<String, String> options) {
+        return createTableSource(SCHEMA, options);
     }
 }

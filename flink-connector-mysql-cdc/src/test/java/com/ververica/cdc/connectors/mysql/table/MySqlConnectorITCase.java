@@ -39,12 +39,16 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.MySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.junit.Assert.assertEquals;
 
 /** Integration tests for MySQL binlog SQL source. */
 @RunWith(Parameterized.class)
@@ -480,6 +484,106 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
     }
 
     @Test
+    public void testMetadataColumns() throws Exception {
+        userDatabase1.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE mysql_users ("
+                                + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " table_name STRING METADATA VIRTUAL,"
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " email STRING,"
+                                + " age INT,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        userDatabase1.getUsername(),
+                        userDatabase1.getPassword(),
+                        userDatabase1.getDatabaseName(),
+                        "user_table_.*",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " database_name STRING,"
+                        + " table_name STRING,"
+                        + " `id` DECIMAL(20, 0) NOT NULL,"
+                        + " name STRING,"
+                        + " address STRING,"
+                        + " phone_number STRING,"
+                        + " email STRING,"
+                        + " age INT,"
+                        + " primary key (database_name, table_name, id) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM mysql_users");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", 2);
+
+        try (Connection connection = userDatabase1.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "INSERT INTO user_table_1_2 VALUES (200,'user_200','Wuhan',123567891234);");
+            statement.execute(
+                    "INSERT INTO user_table_1_1 VALUES (300,'user_300','Hangzhou',123567891234, 'user_300@foo.com');");
+            statement.execute("UPDATE user_table_1_1 SET address='Beijing' WHERE id=300;");
+            statement.execute("UPDATE user_table_1_2 SET phone_number=88888888 WHERE id=121;");
+            statement.execute("DELETE FROM user_table_1_1 WHERE id=111;");
+        }
+
+        // waiting for binlog finished (5 more events)
+        waitForSinkSize("sink", 7);
+
+        List<String> expected =
+                Stream.of(
+                                "+I[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "+I[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null, null]",
+                                "+I[%s, user_table_1_2, 200, user_200, Wuhan, 123567891234, null, null]",
+                                "+I[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "+U[%s, user_table_1_1, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
+                                "+U[%s, user_table_1_2, 121, user_121, Shanghai, 88888888, null, null]",
+                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]")
+                        .map(s -> String.format(s, userDatabase1.getDatabaseName()))
+                        .sorted()
+                        .collect(Collectors.toList());
+
+        // TODO: we can't assert merged result for incremental-snapshot, because we can't add a
+        //  keyby shuffle before "values" upsert sink. We should assert merged result once
+        //  https://issues.apache.org/jira/browse/FLINK-24511 is fixed.
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
     public void testStartupFromLatestOffset() throws Exception {
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
@@ -622,7 +726,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
     }
 
     @Test
-    public void testInconsistentSchema() throws Exception {
+    public void testShardingTablesWithInconsistentSchema() throws Exception {
         userDatabase1.createAndInitialize();
         userDatabase2.createAndInitialize();
         String sourceDDL =
@@ -652,7 +756,9 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
                         MYSQL_CONTAINER.getDatabasePort(),
                         userDatabase1.getUsername(),
                         userDatabase1.getPassword(),
-                        "user_.*",
+                        String.format(
+                                "(%s|%s)",
+                                userDatabase1.getDatabaseName(), userDatabase2.getDatabaseName()),
                         "user_table_.*",
                         getDezImplementation(),
                         incrementalSnapshot,
@@ -691,22 +797,9 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         assertEqualsInAnyOrder(
                 Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
-
-        // should drop the userDatabase1 and userDatabase2 for the test will run
-        // three times and create multiply databases with name like user_xxx.
-        // otherwise it'll read the database created by previous tests for we use `user_.*` to match
-        // database
-        try (Connection connection = userDatabase1.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute("drop database " + userDatabase1.getDatabaseName());
-        }
-        try (Connection connection = userDatabase2.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute("drop database " + userDatabase2.getDatabaseName());
-        }
     }
 
-    @Ignore
+    @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")
     @Test
     public void testStartupFromSpecificOffset() throws Exception {
         if (incrementalSnapshot) {
@@ -796,7 +889,7 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Ignore
+    @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")
     @Test
     public void testStartupFromEarliestOffset() throws Exception {
         if (incrementalSnapshot) {
@@ -881,8 +974,8 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")
     @Test
-    @Ignore
     public void testStartupFromTimestamp() throws Exception {
         if (incrementalSnapshot) {
             // not support yet

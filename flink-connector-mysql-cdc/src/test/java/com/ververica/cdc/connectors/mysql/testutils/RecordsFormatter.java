@@ -60,11 +60,10 @@ public class RecordsFormatter {
         this.typeInfo =
                 (TypeInformation<RowData>) TypeConversions.fromDataTypeToLegacyInfo(dataType);
         this.deserializationSchema =
-                new RowDataDebeziumDeserializeSchema(
-                        (RowType) dataType.getLogicalType(),
-                        typeInfo,
-                        ((rowData, rowKind) -> {}),
-                        ZoneId.of("UTC"));
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType((RowType) dataType.getLogicalType())
+                        .setResultTypeInfo(typeInfo)
+                        .build();
         this.collector = new SimpleCollector();
         this.rowRowConverter = RowRowConverter.create(dataType);
         rowRowConverter.open(Thread.currentThread().getContextClassLoader());
