@@ -38,8 +38,8 @@ import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
-import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema.MetadataConverter;
 
 import javax.annotation.Nullable;
 

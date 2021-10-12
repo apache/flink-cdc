@@ -24,7 +24,6 @@ import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
-import org.apache.flink.table.data.utils.JoinedRowData;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
@@ -84,7 +83,7 @@ public final class RowDataDebeziumDeserializeSchema
     /**
      * A wrapped output collector which is used to append metadata columns after physical columns.
      */
-    private final OutputProjectionCollector outputCollector;
+    private final AppendMetadataCollector appendMetadataCollector;
 
     /** Time zone of the database server. */
     private final ZoneId serverTimeZone;
@@ -104,7 +103,7 @@ public final class RowDataDebeziumDeserializeSchema
             ValueValidator validator,
             ZoneId serverTimeZone) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
-        this.outputCollector = new OutputProjectionCollector(metadataConverters);
+        this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
         this.physicalConverter = createConverter(checkNotNull(physicalDataType));
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
@@ -157,9 +156,9 @@ public final class RowDataDebeziumDeserializeSchema
             return;
         }
 
-        outputCollector.inputRecord = inRecord;
-        outputCollector.outputCollector = collector;
-        outputCollector.collect(physicalRow);
+        appendMetadataCollector.inputRecord = inRecord;
+        appendMetadataCollector.outputCollector = collector;
+        appendMetadataCollector.collect(physicalRow);
     }
 
     @Override
@@ -207,47 +206,6 @@ public final class RowDataDebeziumDeserializeSchema
         public RowDataDebeziumDeserializeSchema build() {
             return new RowDataDebeziumDeserializeSchema(
                     physicalRowType, metadataConverters, resultTypeInfo, validator, serverTimeZone);
-        }
-    }
-
-    // -------------------------------------------------------------------------------------
-    // Metadata Handling
-    // -------------------------------------------------------------------------------------
-
-    /** {@link SourceRecord} metadata info converter. */
-    @FunctionalInterface
-    public interface MetadataConverter extends Serializable {
-        Object read(SourceRecord record);
-    }
-
-    /** Emits a row with physical fields and metadata fields. */
-    private static final class OutputProjectionCollector
-            implements Collector<RowData>, Serializable {
-        private static final long serialVersionUID = 1L;
-
-        private final MetadataConverter[] metadataConverters;
-
-        private transient SourceRecord inputRecord;
-        private transient Collector<RowData> outputCollector;
-
-        private OutputProjectionCollector(MetadataConverter[] metadataConverters) {
-            this.metadataConverters = metadataConverters;
-        }
-
-        @Override
-        public void collect(RowData physicalRow) {
-            GenericRowData metaRow = new GenericRowData(metadataConverters.length);
-            for (int i = 0; i < metadataConverters.length; i++) {
-                Object meta = metadataConverters[i].read(inputRecord);
-                metaRow.setField(i, meta);
-            }
-            RowData outRow = new JoinedRowData(physicalRow.getRowKind(), physicalRow, metaRow);
-            outputCollector.collect(outRow);
-        }
-
-        @Override
-        public void close() {
-            // nothing to do
         }
     }
 

@@ -23,7 +23,7 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 
-import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema.MetadataConverter;
+import com.ververica.cdc.debezium.table.MetadataConverter;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
