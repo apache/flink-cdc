@@ -77,7 +77,7 @@ public class OracleSource {
         /**
          * An optional list of regular expressions that match fully-qualified table identifiers for
          * tables to be monitored; any table not included in the list will be excluded from
-         * monitoring. Each identifier is of the form databaseName.tableName. By default the
+         * monitoring. Each identifier is of the form schemaName.tableName. By default the
          * connector will monitor every non-system table in each monitored database.
          */
         public Builder<T> tableList(String... tableList) {
