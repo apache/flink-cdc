@@ -47,7 +47,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  *     .build();
  * }</pre>
  *
- * <p>Check the Java docs of each individual methods to learn more about the settings to build a
+ * <p>Check the Java docs of each individual method to learn more about the settings to build a
  * {@link MySqlSource}.
  */
 @PublicEvolving
