@@ -1,0 +1,243 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.ververica.cdc.connectors.mysql.source;
+
+import org.apache.flink.annotation.Internal;
+
+import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
+
+import java.io.Serializable;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
+
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_TIME_ZONE;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+/** A factory to construct {@link MySqlSourceConfig}. */
+@Internal
+public class MySqlSourceConfigFactory implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private int port = 3306; // default 3306 port
+    private String hostname;
+    private String username;
+    private String password;
+    private ServerIdRange serverIdRange;
+    private List<String> databaseList;
+    private List<String> tableList;
+    private String serverTimeZone = SERVER_TIME_ZONE.defaultValue();
+    private StartupOptions startupOptions = StartupOptions.initial();
+    private int splitSize = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
+    private int fetchSize = SCAN_SNAPSHOT_FETCH_SIZE.defaultValue();
+    private Duration connectTimeout = MySqlSourceOptions.CONNECT_TIMEOUT.defaultValue();
+    private boolean includeSchemaChanges = false;
+    private Properties dbzProperties;
+
+    public MySqlSourceConfigFactory hostname(String hostname) {
+        this.hostname = hostname;
+        return this;
+    }
+
+    /** Integer port number of the MySQL database server. */
+    public MySqlSourceConfigFactory port(int port) {
+        this.port = port;
+        return this;
+    }
+
+    /**
+     * An optional list of regular expressions that match database names to be monitored; any
+     * database name not included in the whitelist will be excluded from monitoring. By default all
+     * databases will be monitored.
+     */
+    public MySqlSourceConfigFactory databaseList(String... databaseList) {
+        this.databaseList = Arrays.asList(databaseList);
+        return this;
+    }
+
+    /**
+     * An optional list of regular expressions that match fully-qualified table identifiers for
+     * tables to be monitored; any table not included in the list will be excluded from monitoring.
+     * Each identifier is of the form databaseName.tableName. By default the connector will monitor
+     * every non-system table in each monitored database.
+     */
+    public MySqlSourceConfigFactory tableList(String... tableList) {
+        this.tableList = Arrays.asList(tableList);
+        return this;
+    }
+
+    /** Name of the MySQL database to use when connecting to the MySQL database server. */
+    public MySqlSourceConfigFactory username(String username) {
+        this.username = username;
+        return this;
+    }
+
+    /** Password to use when connecting to the MySQL database server. */
+    public MySqlSourceConfigFactory password(String password) {
+        this.password = password;
+        return this;
+    }
+
+    /**
+     * A numeric ID or a numeric ID range of this database client, The numeric ID syntax is like
+     * '5400', the numeric ID range syntax is like '5400-5408', The numeric ID range syntax is
+     * required when 'scan.incremental.snapshot.enabled' enabled. Every ID must be unique across all
+     * currently-running database processes in the MySQL cluster. This connector joins the MySQL
+     * cluster as another server (with this unique ID) so it can read the binlog. By default, a
+     * random number is generated between 5400 and 6400, though we recommend setting an explicit
+     * value."
+     */
+    public MySqlSourceConfigFactory serverId(String serverId) {
+        this.serverIdRange = ServerIdRange.from(serverId);
+        return this;
+    }
+
+    /**
+     * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
+     * TIMESTAMP type in MYSQL converted to STRING. See more
+     * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
+     */
+    public MySqlSourceConfigFactory serverTimeZone(String timeZone) {
+        this.serverTimeZone = timeZone;
+        return this;
+    }
+
+    /**
+     * The split size (number of rows) of table snapshot, captured tables are split into multiple
+     * splits when read the snapshot of table.
+     */
+    public MySqlSourceConfigFactory splitSize(int splitSize) {
+        this.splitSize = splitSize;
+        return this;
+    }
+
+    /** The maximum fetch size for per poll when read table snapshot. */
+    public MySqlSourceConfigFactory fetchSize(int fetchSize) {
+        this.fetchSize = fetchSize;
+        return this;
+    }
+
+    /**
+     * The maximum time that the connector should wait after trying to connect to the MySQL database
+     * server before timing out.
+     */
+    public MySqlSourceConfigFactory connectTimeout(Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
+        return this;
+    }
+
+    /** Whether the {@link MySqlParallelSource} should output the schema changes or not. */
+    public MySqlSourceConfigFactory includeSchemaChanges(boolean includeSchemaChanges) {
+        this.includeSchemaChanges = includeSchemaChanges;
+        return this;
+    }
+
+    /** Specifies the startup options. */
+    public MySqlSourceConfigFactory startupOptions(StartupOptions startupOptions) {
+        switch (startupOptions.startupMode) {
+            case INITIAL:
+            case LATEST_OFFSET:
+                break;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported startup mode: " + startupOptions.startupMode);
+        }
+        this.startupOptions = startupOptions;
+        return this;
+    }
+
+    /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
+    public MySqlSourceConfigFactory debeziumProperties(Properties properties) {
+        this.dbzProperties = properties;
+        return this;
+    }
+
+    /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
+    public MySqlSourceConfig createConfig(int subtaskId) {
+        Properties props = new Properties();
+        // hard code server name, because we don't need to distinguish it, docs:
+        // Logical name that identifies and provides a namespace for the particular
+        // MySQL database server/cluster being monitored. The logical name should be
+        // unique across all other connectors, since it is used as a prefix for all
+        // Kafka topic names emanating from this connector.
+        // Only alphanumeric characters and underscores should be used.
+        props.setProperty("database.server.name", "mysql_binlog_source");
+        props.setProperty("database.hostname", checkNotNull(hostname));
+        props.setProperty("database.user", checkNotNull(username));
+        props.setProperty("database.password", checkNotNull(password));
+        props.setProperty("database.port", String.valueOf(port));
+        props.setProperty("database.fetchSize", String.valueOf(fetchSize));
+        props.setProperty("database.responseBuffering", "adaptive");
+        props.setProperty("database.serverTimezone", serverTimeZone);
+        // database history
+        props.setProperty(
+                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        props.setProperty(
+                "database.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
+        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+        props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
+        props.setProperty("include.schema.changes", String.valueOf(includeSchemaChanges));
+        // disable the offset flush totally
+        props.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
+        // disable tombstones
+        props.setProperty("tombstones.on.delete", String.valueOf(false));
+
+        if (serverIdRange != null) {
+            int serverId = serverIdRange.getServerId(subtaskId);
+            props.setProperty("database.server.id", String.valueOf(serverId));
+        }
+        if (databaseList != null) {
+            props.setProperty("database.include.list", String.join(",", databaseList));
+        }
+        if (tableList != null) {
+            props.setProperty("table.include.list", String.join(",", tableList));
+        }
+        if (serverTimeZone != null) {
+            props.setProperty("database.serverTimezone", serverTimeZone);
+        }
+
+        // override the user-defined debezium properties
+        if (dbzProperties != null) {
+            dbzProperties.forEach(props::put);
+        }
+
+        return new MySqlSourceConfig(
+                hostname,
+                port,
+                username,
+                password,
+                databaseList,
+                tableList,
+                serverIdRange,
+                startupOptions,
+                splitSize,
+                fetchSize,
+                serverTimeZone,
+                connectTimeout,
+                includeSchemaChanges,
+                props);
+    }
+}

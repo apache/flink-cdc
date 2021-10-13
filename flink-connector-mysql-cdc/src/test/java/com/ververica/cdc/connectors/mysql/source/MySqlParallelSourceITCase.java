@@ -28,6 +28,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
@@ -322,7 +323,7 @@ public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
-        return MySqlParallelSourceConfig.getConnection(configuration);
+        return DebeziumUtils.createMySqlConnection(configuration);
     }
 
     // ------------------------------------------------------------------------

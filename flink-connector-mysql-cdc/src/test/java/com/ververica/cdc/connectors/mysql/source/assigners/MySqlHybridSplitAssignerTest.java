@@ -23,8 +23,9 @@ import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
 
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -32,6 +33,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -65,7 +67,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlParallelSourceTestBase {
     public void testAssignMySqlBinlogSplitAfterAllSnapshotSplitsFinished() {
 
         final String captureTable = "customers";
-        MySqlParallelSourceConfig configuration = getConfig(new String[] {captureTable});
+        MySqlSourceConfig configuration = getConfig(new String[] {captureTable});
 
         // Step 1. Mock MySqlHybridSplitAssigner Object
         TableId tableId = new TableId(null, customerDatabase.getDatabaseName(), captureTable);
@@ -139,21 +141,21 @@ public class MySqlHybridSplitAssignerTest extends MySqlParallelSourceTestBase {
         assertEquals(expected, mySqlBinlogSplit);
     }
 
-    private MySqlParallelSourceConfig getConfig(String[] captureTables) {
-        List<String> captureTableIds =
+    private MySqlSourceConfig getConfig(String[] captureTables) {
+        String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        return new MySqlParallelSourceConfig.Builder()
-                .startupMode("initial")
-                .capturedDatabases(customerDatabase.getDatabaseName())
-                .capturedTables(String.join(",", captureTableIds))
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .username(customerDatabase.getUsername())
                 .password(customerDatabase.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
-                .build();
+                .createConfig(0);
     }
 }

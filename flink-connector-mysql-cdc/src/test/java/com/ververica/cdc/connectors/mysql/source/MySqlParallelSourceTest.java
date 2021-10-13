@@ -22,8 +22,7 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import org.junit.Ignore;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.junit.Test;
 
 /** Tests for {@link MySqlParallelSource}. */
@@ -33,18 +32,19 @@ public class MySqlParallelSourceTest extends MySqlParallelSourceTestBase {
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
+    //    @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingAllEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
         MySqlParallelSource<String> mySqlParallelSource =
-                new MySqlParallelSource.Builder<String>()
+                MySqlParallelSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + ".products")
                         .username(inventoryDatabase.getUsername())
                         .password(inventoryDatabase.getPassword())
                         .serverId("5401-5404")
-                        .deserializer(new StringDebeziumDeserializationSchema())
+                        .deserializer(new JsonDebeziumDeserializationSchema())
                         .includeSchemaChanges(true) // output the schema changes as well
                         .build();
 

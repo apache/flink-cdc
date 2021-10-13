@@ -43,7 +43,6 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -149,7 +148,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .build();
         if (enableParallelRead) {
             MySqlParallelSource<RowData> parallelSource =
-                    new MySqlParallelSource.Builder<RowData>()
+                    MySqlParallelSource.<RowData>builder()
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)

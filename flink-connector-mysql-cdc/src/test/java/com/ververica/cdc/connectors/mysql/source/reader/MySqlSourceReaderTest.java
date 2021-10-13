@@ -31,11 +31,13 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -49,7 +51,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
@@ -62,7 +63,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testBinlogReadFailoverCrossTransaction() throws Exception {
         customerDatabase.createAndInitialize();
-        final MySqlParallelSourceConfig configuration = getConfig(new String[] {"customers"});
+        final MySqlSourceConfig configuration = getConfig(new String[] {"customers"});
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -112,7 +113,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
         restartReader.close();
     }
 
-    private MySqlSourceReader<SourceRecord> createReader(MySqlParallelSourceConfig configuration) {
+    private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration) {
         final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
         final SourceReaderContext readerContext = new TestingReaderContext();
@@ -120,7 +121,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
                 new MySqlRecordEmitter<>(
                         new ForwardDeserializeSchema(),
                         new MySqlSourceReaderMetrics(readerContext.metricGroup()),
-                        configuration.includeSchemaChanges());
+                        configuration.isIncludeSchemaChanges());
         return new MySqlSourceReader<>(
                 elementsQueue,
                 () -> createSplitReader(configuration),
@@ -129,13 +130,14 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
                 readerContext);
     }
 
-    private MySqlSplitReader createSplitReader(MySqlParallelSourceConfig configuration) {
+    private MySqlSplitReader createSplitReader(MySqlSourceConfig configuration) {
         return new MySqlSplitReader(configuration, 0);
     }
 
-    private void makeBinlogEventsInOneTransaction(
-            MySqlParallelSourceConfig sourceConfig, String tableId) throws SQLException {
-        JdbcConnection connection = DebeziumUtils.openMySqlConnection(sourceConfig.getDbzConfig());
+    private void makeBinlogEventsInOneTransaction(MySqlSourceConfig sourceConfig, String tableId)
+            throws SQLException {
+        JdbcConnection connection =
+                DebeziumUtils.openMySqlConnection(sourceConfig.getDbzConfiguration());
         // make 6 binlog events by 4 operations
         connection.setAutoCommit(false);
         connection.execute(
@@ -147,23 +149,23 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
         connection.close();
     }
 
-    private MySqlSplit createBinlogSplit(MySqlParallelSourceConfig sourceConfig) {
+    private MySqlSplit createBinlogSplit(MySqlSourceConfig sourceConfig) {
         MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
         binlogSplitAssigner.open();
         return binlogSplitAssigner.getNext().get();
     }
 
-    private MySqlParallelSourceConfig getConfig(String[] captureTables) {
-        List<String> captureTableIds =
+    private MySqlSourceConfig getConfig(String[] captureTables) {
+        String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        return new MySqlParallelSourceConfig.Builder()
-                .startupMode("initial")
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
                 .includeSchemaChanges(false)
-                .capturedDatabases(customerDatabase.getDatabaseName())
-                .capturedTables(String.join(",", captureTableIds))
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .splitSize(10)
@@ -171,7 +173,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
                 .username(customerDatabase.getUsername())
                 .password(customerDatabase.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
-                .build();
+                .createConfig(0);
     }
 
     private List<String> consumeRecords(

@@ -150,7 +150,7 @@ public class MySqlValidatorTest {
     private void startSource(UniqueDatabase database) throws Exception {
         if (runIncrementalSnapshot) {
             MySqlParallelSource<?> mySqlParallelSource =
-                    new MySqlParallelSource.Builder<SourceRecord>()
+                    MySqlParallelSource.<SourceRecord>builder()
                             .hostname(database.getHost())
                             .username(database.getUsername())
                             .password(database.getPassword())

@@ -60,6 +60,7 @@ public final class MySqlRecordEmitter<T>
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
+    private final OutputCollector<T> outputCollector;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
@@ -68,6 +69,7 @@ public final class MySqlRecordEmitter<T>
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
+        this.outputCollector = new OutputCollector<>();
     }
 
     @Override
@@ -103,19 +105,8 @@ public final class MySqlRecordEmitter<T>
     }
 
     private void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
-        debeziumDeserializationSchema.deserialize(
-                element,
-                new Collector<T>() {
-                    @Override
-                    public void collect(final T t) {
-                        output.collect(t);
-                    }
-
-                    @Override
-                    public void close() {
-                        // do nothing
-                    }
-                });
+        outputCollector.output = output;
+        debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
     private void reportMetrics(SourceRecord element) {
@@ -132,6 +123,20 @@ public final class MySqlRecordEmitter<T>
             }
             // report emit delay
             sourceReaderMetrics.recordEmitDelay(now - messageTimestamp);
+        }
+    }
+
+    private static class OutputCollector<T> implements Collector<T> {
+        private SourceOutput<T> output;
+
+        @Override
+        public void collect(T record) {
+            output.collect(record);
+        }
+
+        @Override
+        public void close() {
+            // do nothing
         }
     }
 }

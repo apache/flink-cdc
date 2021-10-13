@@ -79,7 +79,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
 
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
-        String serverId = validateAndGetServerId(config);
+        String serverId = config.get(MySqlSourceOptions.SERVER_ID);
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         StartupOptions startupOptions = getStartupOptions(config);
         if (enableParallelRead) {
@@ -199,7 +199,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         startupOptions.startupMode));
     }
 
-    private void validateSplitSize(Integer splitSize) {
+    private void validateSplitSize(int splitSize) {
         checkState(
                 splitSize > 1,
                 String.format(
@@ -207,44 +207,11 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), splitSize));
     }
 
-    private void validateFetchSize(Integer fetchSize) {
+    private void validateFetchSize(int fetchSize) {
         checkState(
                 fetchSize > 1,
                 String.format(
                         "The value of option '%s' must larger than 1, but is %d",
                         SCAN_SNAPSHOT_FETCH_SIZE.key(), fetchSize));
-    }
-
-    private String validateAndGetServerId(ReadableConfig configuration) {
-        final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
-
-        if (serverIdValue != null) {
-            if (serverIdValue.contains("-")) {
-                String[] idArray = serverIdValue.split("-");
-                if (idArray.length != 2) {
-                    throw new IllegalArgumentException(
-                            String.format(
-                                    "The range '%s' should be syntax like '5400-5500', but got: %s",
-                                    SERVER_ID.key(), serverIdValue));
-                }
-                validateServerId(idArray[0].trim());
-                validateServerId(idArray[1].trim());
-            } else {
-                validateServerId(serverIdValue);
-            }
-        }
-        return serverIdValue;
-    }
-
-    private void validateServerId(String serverIdValue) {
-        try {
-            Integer.parseInt(serverIdValue);
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    String.format(
-                            "The 'server-id' should contains single numeric ID like '5400' or numeric ID range '5400-5404', but actual is %s",
-                            serverIdValue),
-                    e);
-        }
     }
 }

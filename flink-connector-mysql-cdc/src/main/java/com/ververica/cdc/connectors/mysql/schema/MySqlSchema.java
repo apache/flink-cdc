@@ -20,7 +20,7 @@ package com.ververica.cdc.connectors.mysql.schema;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig.getMySqlDatabaseSchema;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlDatabaseSchema;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
 /** A component used to get schema by table path. */
@@ -45,9 +45,9 @@ public class MySqlSchema {
     private final MySqlConnection jdbc;
     private final Map<TableId, TableChange> schemasByTableId;
 
-    public MySqlSchema(MySqlParallelSourceConfig sourceConfig, MySqlConnection jdbc) {
+    public MySqlSchema(MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
         this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
-        this.databaseSchema = getMySqlDatabaseSchema(connectorConfig, jdbc);
+        this.databaseSchema = createMySqlDatabaseSchema(connectorConfig, jdbc);
         this.jdbc = jdbc;
         this.schemasByTableId = new HashMap<>();
     }

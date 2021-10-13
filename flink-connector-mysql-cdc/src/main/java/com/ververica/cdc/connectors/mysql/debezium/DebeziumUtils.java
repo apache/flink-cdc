@@ -20,9 +20,19 @@ package com.ververica.cdc.connectors.mysql.debezium;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
+import io.debezium.connector.mysql.MySqlDatabaseSchema;
+import io.debezium.connector.mysql.MySqlTopicSelector;
+import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.jdbc.JdbcValueConverters;
+import io.debezium.jdbc.TemporalPrecisionMode;
+import io.debezium.relational.TableId;
+import io.debezium.schema.TopicSelector;
+import io.debezium.util.SchemaNameAdjuster;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,10 +44,10 @@ public class DebeziumUtils {
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
     /** Creates and opens a new {@link MySqlConnection}. */
-    public static MySqlConnection openMySqlConnection(Configuration configuration) {
+    public static MySqlConnection openMySqlConnection(Configuration dbzConfiguration) {
         MySqlConnection jdbc =
                 new MySqlConnection(
-                        new MySqlConnection.MySqlConnectionConfiguration(configuration));
+                        new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration));
         try {
             jdbc.connect();
         } catch (SQLException e) {
@@ -58,6 +68,37 @@ public class DebeziumUtils {
             LOG.error("Failed to close MySQL connection", e);
             throw new FlinkRuntimeException("Failed to close MySQL connection", e);
         }
+    }
+
+    /** Creates a new {@link MySqlConnection}, but not open the connection. */
+    public static MySqlConnection createMySqlConnection(Configuration dbzConfiguration) {
+        return new MySqlConnection(
+                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration));
+    }
+
+    /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */
+    public static BinaryLogClient createBinaryClient(Configuration dbzConfiguration) {
+        final MySqlConnectorConfig connectorConfig = new MySqlConnectorConfig(dbzConfiguration);
+        return new BinaryLogClient(
+                connectorConfig.hostname(),
+                connectorConfig.port(),
+                connectorConfig.username(),
+                connectorConfig.password());
+    }
+
+    /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
+    public static MySqlDatabaseSchema createMySqlDatabaseSchema(
+            MySqlConnectorConfig dbzMySqlConfig, MySqlConnection connection) {
+        boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
+        TopicSelector<TableId> topicSelector = MySqlTopicSelector.defaultSelector(dbzMySqlConfig);
+        SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
+        MySqlValueConverters valueConverters = getValueConverters(dbzMySqlConfig);
+        return new MySqlDatabaseSchema(
+                dbzMySqlConfig,
+                valueConverters,
+                topicSelector,
+                schemaNameAdjuster,
+                tableIdCaseInsensitive);
     }
 
     /** Fetch current binlog offsets in MySql Server. */
@@ -88,5 +129,31 @@ public class DebeziumUtils {
                             + "'. Make sure your server is correctly configured",
                     e);
         }
+    }
+
+    // --------------------------------------------------------------------------------------------
+
+    private static MySqlValueConverters getValueConverters(MySqlConnectorConfig dbzMySqlConfig) {
+        TemporalPrecisionMode timePrecisionMode = dbzMySqlConfig.getTemporalPrecisionMode();
+        JdbcValueConverters.DecimalMode decimalMode = dbzMySqlConfig.getDecimalMode();
+        String bigIntUnsignedHandlingModeStr =
+                dbzMySqlConfig
+                        .getConfig()
+                        .getString(MySqlConnectorConfig.BIGINT_UNSIGNED_HANDLING_MODE);
+        MySqlConnectorConfig.BigIntUnsignedHandlingMode bigIntUnsignedHandlingMode =
+                MySqlConnectorConfig.BigIntUnsignedHandlingMode.parse(
+                        bigIntUnsignedHandlingModeStr);
+        JdbcValueConverters.BigIntUnsignedMode bigIntUnsignedMode =
+                bigIntUnsignedHandlingMode.asBigIntUnsignedMode();
+
+        boolean timeAdjusterEnabled =
+                dbzMySqlConfig.getConfig().getBoolean(MySqlConnectorConfig.ENABLE_TIME_ADJUSTER);
+        return new MySqlValueConverters(
+                decimalMode,
+                timePrecisionMode,
+                bigIntUnsignedMode,
+                dbzMySqlConfig.binaryHandlingMode(),
+                timeAdjusterEnabled ? MySqlValueConverters::adjustTemporal : x -> x,
+                MySqlValueConverters::defaultParsingErrorHandler);
     }
 }

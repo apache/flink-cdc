@@ -23,7 +23,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -58,23 +58,23 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     private static final String BINLOG_SPLIT_ID = "binlog-split";
 
-    private final MySqlParallelSourceConfig sourceConfig;
+    private final MySqlSourceConfig sourceConfig;
     private final RelationalTableFilters tableFilters;
 
     private MySqlConnection jdbc;
     private boolean isBinlogSplitAssigned;
 
-    public MySqlBinlogSplitAssigner(MySqlParallelSourceConfig sourceConfig) {
+    public MySqlBinlogSplitAssigner(MySqlSourceConfig sourceConfig) {
         this(sourceConfig, false);
     }
 
     public MySqlBinlogSplitAssigner(
-            MySqlParallelSourceConfig sourceConfig, BinlogPendingSplitsState checkpoint) {
+            MySqlSourceConfig sourceConfig, BinlogPendingSplitsState checkpoint) {
         this(sourceConfig, checkpoint.isBinlogSplitAssigned());
     }
 
     private MySqlBinlogSplitAssigner(
-            MySqlParallelSourceConfig sourceConfig, boolean isBinlogSplitAssigned) {
+            MySqlSourceConfig sourceConfig, boolean isBinlogSplitAssigned) {
         this.sourceConfig = sourceConfig;
         this.tableFilters = sourceConfig.getTableFilters();
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
@@ -82,7 +82,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void open() {
-        jdbc = openMySqlConnection(sourceConfig.getDbzConfig());
+        jdbc = openMySqlConnection(sourceConfig.getDbzConfiguration());
     }
 
     @Override
@@ -157,8 +157,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
             throw new IllegalArgumentException(
                     String.format(
                             "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
-                            sourceConfig.getDbzConfig().getString("database.whitelist"),
-                            sourceConfig.getDbzConfig().getString("table.whitelist")));
+                            sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
         }
 
         // fetch table schemas

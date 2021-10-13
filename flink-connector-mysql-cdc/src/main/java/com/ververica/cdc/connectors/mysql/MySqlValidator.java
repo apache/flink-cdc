@@ -18,14 +18,12 @@
 
 package com.ververica.cdc.connectors.mysql;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
 
-import org.apache.flink.shaded.guava18.com.google.common.collect.Maps;
-
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.debezium.Validator;
+import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 
 import java.sql.SQLException;
@@ -43,21 +41,16 @@ public class MySqlValidator implements Validator {
     private static final String BINLOG_FORMAT_ROW = "ROW";
     private static final String BINLOG_FORMAT_IMAGE_FULL = "FULL";
 
-    private final Configuration configuration;
+    private final Properties dbzProperties;
 
-    public MySqlValidator(Properties properties) {
-        this(Configuration.fromMap(Maps.fromProperties(properties)));
-    }
-
-    public MySqlValidator(Configuration configuration) {
-        this.configuration = configuration;
+    public MySqlValidator(Properties dbzProperties) {
+        this.dbzProperties = dbzProperties;
     }
 
     @Override
     public void validate() {
         try (MySqlConnection connection =
-                DebeziumUtils.openMySqlConnection(
-                        io.debezium.config.Configuration.from(configuration.toMap()))) {
+                DebeziumUtils.openMySqlConnection(Configuration.from(dbzProperties))) {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);

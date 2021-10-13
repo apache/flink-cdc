@@ -21,7 +21,7 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -64,7 +64,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final Map<String, BinlogOffset> splitFinishedOffsets;
     private boolean assignerFinished;
 
-    private final MySqlParallelSourceConfig sourceConfig;
+    private final MySqlSourceConfig sourceConfig;
     private final int currentParallelism;
     private final LinkedList<TableId> remainingTables;
     private final RelationalTableFilters tableFilters;
@@ -75,8 +75,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Nullable private Long checkpointIdToFinish;
 
-    public MySqlSnapshotSplitAssigner(
-            MySqlParallelSourceConfig sourceConfig, int currentParallelism) {
+    public MySqlSnapshotSplitAssigner(MySqlSourceConfig sourceConfig, int currentParallelism) {
         this(
                 sourceConfig,
                 currentParallelism,
@@ -88,7 +87,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     public MySqlSnapshotSplitAssigner(
-            MySqlParallelSourceConfig sourceConfig,
+            MySqlSourceConfig sourceConfig,
             int currentParallelism,
             SnapshotPendingSplitsState checkpoint) {
         this(
@@ -102,7 +101,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private MySqlSnapshotSplitAssigner(
-            MySqlParallelSourceConfig sourceConfig,
+            MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
             List<MySqlSnapshotSplit> remainingSplits,
@@ -124,7 +123,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void open() {
         // discover captured tables
-        jdbc = openMySqlConnection(sourceConfig.getDbzConfig());
+        jdbc = openMySqlConnection(sourceConfig.getDbzConfiguration());
         chunkSplitter = createChunkSplitter(sourceConfig, jdbc, chunkSize);
         if (!assignerFinished) {
             // TODO The discovery logic should move to {@link MySqlSourceEnumerator}
@@ -269,14 +268,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             throw new IllegalArgumentException(
                     String.format(
                             "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
-                            sourceConfig.getDbzConfig().getString("database.whitelist"),
-                            sourceConfig.getDbzConfig().getString("table.whitelist")));
+                            sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
         }
         return capturedTableIds;
     }
 
     private static ChunkSplitter createChunkSplitter(
-            MySqlParallelSourceConfig sourceConfig, MySqlConnection jdbc, int chunkSize) {
+            MySqlSourceConfig sourceConfig, MySqlConnection jdbc, int chunkSize) {
         MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc);
         return new ChunkSplitter(jdbc, mySqlSchema, chunkSize);
     }

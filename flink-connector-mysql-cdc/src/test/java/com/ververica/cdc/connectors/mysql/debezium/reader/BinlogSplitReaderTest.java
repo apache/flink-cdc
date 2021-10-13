@@ -23,10 +23,12 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -34,6 +36,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -52,7 +55,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
@@ -70,9 +72,9 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlParallelSourceConfig sourceConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
-        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -115,9 +117,9 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadAllBinlogSplitsForOneTable() throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlParallelSourceConfig sourceConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
-        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -178,10 +180,9 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadAllBinlogForTableWithSingleLine() throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlParallelSourceConfig sourceConfig =
-                getConfig(new String[] {"customer_card_single_line"});
-        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
-        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -220,10 +221,10 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadAllBinlogSplitsForTables() throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlParallelSourceConfig sourceConfig =
+        MySqlSourceConfig sourceConfig =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
-        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
-        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -282,10 +283,10 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testReadBinlogFromLatestOffset() throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlParallelSourceConfig sourceConfig =
-                getConfig("latest-offset", new String[] {"customers"});
-        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
-        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+        MySqlSourceConfig sourceConfig =
+                getConfig(StartupOptions.latest(), new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -313,8 +314,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
     }
 
     private List<String> readBinlogSplitsFromLatestOffset(
-            DataType dataType, MySqlParallelSourceConfig sourceConfig, int expectedSize)
-            throws Exception {
+            DataType dataType, MySqlSourceConfig sourceConfig, int expectedSize) throws Exception {
         final StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
 
@@ -358,7 +358,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
             List<MySqlSnapshotSplit> sqlSplits,
             DataType dataType,
             RowType pkType,
-            MySqlParallelSourceConfig sourceConfig,
+            MySqlSourceConfig sourceConfig,
             int scanSplitsNum,
             int expectedSize,
             TableId binlogChangeTableId)
@@ -552,7 +552,7 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
         return formatter.format(records);
     }
 
-    private List<MySqlSnapshotSplit> getMySqlSplits(MySqlParallelSourceConfig sourceConfig) {
+    private List<MySqlSnapshotSplit> getMySqlSplits(MySqlSourceConfig sourceConfig) {
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
         assigner.open();
@@ -569,40 +569,40 @@ public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
         return mySqlSplits;
     }
 
-    private MySqlParallelSourceConfig getConfig(String startupMode, String[] captureTables) {
-        List<String> captureTableIds =
+    private MySqlSourceConfig getConfig(StartupOptions startupOptions, String[] captureTables) {
+        String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        return new MySqlParallelSourceConfig.Builder()
-                .startupMode(startupMode)
-                .capturedDatabases(customerDatabase.getDatabaseName())
-                .capturedTables(String.join(",", captureTableIds))
+        return new MySqlSourceConfigFactory()
+                .startupOptions(startupOptions)
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .username(customerDatabase.getUsername())
                 .splitSize(10)
                 .fetchSize(2)
                 .password(customerDatabase.getPassword())
-                .build();
+                .createConfig(0);
     }
 
-    private MySqlParallelSourceConfig getConfig(String[] captureTables) {
-        List<String> captureTableIds =
+    private MySqlSourceConfig getConfig(String[] captureTables) {
+        String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        return new MySqlParallelSourceConfig.Builder()
-                .capturedDatabases(customerDatabase.getDatabaseName())
-                .capturedTables(String.join(",", captureTableIds))
+        return new MySqlSourceConfigFactory()
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .username(customerDatabase.getUsername())
                 .splitSize(10)
                 .fetchSize(2)
                 .password(customerDatabase.getPassword())
-                .build();
+                .createConfig(0);
     }
 }

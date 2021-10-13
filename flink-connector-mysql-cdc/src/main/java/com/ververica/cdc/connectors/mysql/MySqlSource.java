@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql;
 
+import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -32,7 +33,14 @@ import static com.ververica.cdc.debezium.DebeziumSourceFunction.LEGACY_IMPLEMENT
 import static com.ververica.cdc.debezium.DebeziumSourceFunction.LEGACY_IMPLEMENTATION_VALUE;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/** A builder to build a SourceFunction which can read snapshot and continue to consume binlog. */
+/**
+ * A builder to build a SourceFunction which can read snapshot and continue to consume binlog.
+ *
+ * @deprecated please use {@link MySqlParallelSource#builder()} instead which supports more rich
+ *     features, e.g. parallel reading from historical data. The {@link MySqlSource} will be dropped
+ *     in the future version.
+ */
+@Deprecated
 public class MySqlSource {
 
     private static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
@@ -41,7 +49,14 @@ public class MySqlSource {
         return new Builder<>();
     }
 
-    /** Builder class of {@link MySqlSource}. */
+    /**
+     * Builder class of {@link MySqlSource}.
+     *
+     * @deprecated please use {@link MySqlParallelSource#builder()} instead which supports more rich
+     *     features, e.g. parallel reading from historical data. The {@link MySqlSource.Builder}
+     *     will be dropped in the future version.
+     */
+    @Deprecated
     public static class Builder<T> {
 
         private int port = 3306; // default 3306 port

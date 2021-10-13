@@ -22,9 +22,11 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
@@ -39,7 +41,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /** Tests for {@link SnapshotSplitReader}. */
 public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
@@ -53,14 +54,14 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
     @BeforeClass
     public static void init() {
         customerDatabase.createAndInitialize();
-        MySqlParallelSourceConfig sourceConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = MySqlParallelSourceConfig.getBinaryClient(sourceConfig.getDbzConfig());
-        mySqlConnection = MySqlParallelSourceConfig.getConnection(sourceConfig.getDbzConfig());
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
     }
 
     @Test
     public void testReadSingleSnapshotSplit() throws Exception {
-        MySqlParallelSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -87,7 +88,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
 
     @Test
     public void testReadAllSnapshotSplitsForOneTable() throws Exception {
-        MySqlParallelSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -128,8 +129,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
 
     @Test
     public void testReadAllSplitForTableWithSingleLine() throws Exception {
-        MySqlParallelSourceConfig sourceConfig =
-                getConfig(new String[] {"customer_card_single_line"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"});
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -146,7 +146,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
 
     @Test
     public void testReadAllSnapshotSplitsForTables() throws Exception {
-        MySqlParallelSourceConfig sourceConfig =
+        MySqlSourceConfig sourceConfig =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
 
         DataType dataType =
@@ -187,7 +187,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
 
     private List<String> readTableSnapshotSplits(
             List<MySqlSplit> mySqlSplits,
-            MySqlParallelSourceConfig sourceConfig,
+            MySqlSourceConfig sourceConfig,
             int scanSplitsNum,
             DataType dataType)
             throws Exception {
@@ -225,7 +225,7 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
         return formatter.format(records);
     }
 
-    private List<MySqlSplit> getMySqlSplits(MySqlParallelSourceConfig sourceConfig) {
+    private List<MySqlSplit> getMySqlSplits(MySqlSourceConfig sourceConfig) {
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
         assigner.open();
@@ -242,22 +242,22 @@ public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
         return mySqlSplitList;
     }
 
-    public static MySqlParallelSourceConfig getConfig(String[] captureTables) {
-        List<String> captureTableIds =
+    public static MySqlSourceConfig getConfig(String[] captureTables) {
+        String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        return new MySqlParallelSourceConfig.Builder()
-                .capturedDatabases(customerDatabase.getDatabaseName())
-                .capturedTables(String.join(",", captureTableIds))
-                .serverIdRange("1001-1002")
+        return new MySqlSourceConfigFactory()
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
+                .serverId("1001-1002")
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .username(customerDatabase.getUsername())
                 .splitSize(10)
                 .fetchSize(2)
                 .password(customerDatabase.getPassword())
-                .build();
+                .createConfig(0);
     }
 }

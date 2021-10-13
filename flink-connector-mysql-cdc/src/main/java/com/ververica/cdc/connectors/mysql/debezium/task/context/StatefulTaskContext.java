@@ -19,9 +19,10 @@
 package com.ververica.cdc.connectors.mysql.debezium.task.context;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.AbstractSourceInfo;
@@ -68,12 +69,12 @@ public class StatefulTaskContext {
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
     private static final Clock clock = Clock.SYSTEM;
 
-    private final MySqlParallelSourceConfig sourceConfig;
+    private final MySqlSourceConfig sourceConfig;
     private final MySqlConnectorConfig connectorConfig;
     private final MySqlEventMetadataProvider metadataProvider;
     private final SchemaNameAdjuster schemaNameAdjuster;
-    private MySqlConnection connection;
-    private BinaryLogClient binaryLogClient;
+    private final MySqlConnection connection;
+    private final BinaryLogClient binaryLogClient;
 
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
@@ -86,7 +87,7 @@ public class StatefulTaskContext {
     private ErrorHandler errorHandler;
 
     public StatefulTaskContext(
-            MySqlParallelSourceConfig sourceConfig,
+            MySqlSourceConfig sourceConfig,
             BinaryLogClient binaryLogClient,
             MySqlConnection connection) {
         this.sourceConfig = sourceConfig;
@@ -102,11 +103,10 @@ public class StatefulTaskContext {
         this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
         EmbeddedFlinkDatabaseHistory.registerHistory(
                 sourceConfig
-                        .getDbzConfig()
+                        .getDbzConfiguration()
                         .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 mySqlSplit.getTableSchemas().values());
-        this.databaseSchema =
-                MySqlParallelSourceConfig.getMySqlDatabaseSchema(connectorConfig, connection);
+        this.databaseSchema = DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, connection);
         this.offsetContext =
                 loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
@@ -261,7 +261,7 @@ public class StatefulTaskContext {
         return clock;
     }
 
-    public MySqlParallelSourceConfig getSourceConfig() {
+    public MySqlSourceConfig getSourceConfig() {
         return sourceConfig;
     }
 

@@ -177,7 +177,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         Configuration dezConf =
                 statefulTaskContext
                         .getSourceConfig()
-                        .getDbzConfig()
+                        .getDbzConfiguration()
                         .edit()
                         .with("table.whitelist", currentSnapshotSplit.getTableId())
                         .build();

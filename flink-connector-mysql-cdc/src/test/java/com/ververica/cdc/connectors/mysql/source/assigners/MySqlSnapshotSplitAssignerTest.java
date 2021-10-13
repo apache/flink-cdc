@@ -20,9 +20,11 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 
 import org.apache.flink.util.ExceptionUtils;
 
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -127,7 +129,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
     }
 
     private List<String> getTestAssignSnapshotSplits(int splitSize, String[] captureTables) {
-        MySqlParallelSourceConfig configuration = getConfig(splitSize, captureTables);
+        MySqlSourceConfig configuration = getConfig(splitSize, captureTables);
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
 
@@ -265,16 +267,16 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
         }
     }
 
-    private MySqlParallelSourceConfig getConfig(int splitSize, String[] captureTables) {
-        List<String> captureTableIds =
+    private MySqlSourceConfig getConfig(int splitSize, String[] captureTables) {
+        String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        return new MySqlParallelSourceConfig.Builder()
-                .startupMode("initial")
-                .capturedDatabases(customerDatabase.getDatabaseName())
-                .capturedTables(String.join(",", captureTableIds))
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .splitSize(splitSize)
@@ -282,6 +284,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
                 .username(customerDatabase.getUsername())
                 .password(customerDatabase.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
-                .build();
+                .createConfig(0);
     }
 }

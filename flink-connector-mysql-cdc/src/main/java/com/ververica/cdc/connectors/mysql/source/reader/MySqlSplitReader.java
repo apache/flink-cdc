@@ -29,7 +29,7 @@ import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlRecords;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -44,21 +44,21 @@ import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.Queue;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig.getBinaryClient;
-import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceConfig.getConnection;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
 
 /** The {@link SplitReader} implementation for the {@link MySqlParallelSource}. */
 public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSplitReader.class);
     private final Queue<MySqlSplit> splits;
-    private final MySqlParallelSourceConfig sourceConfig;
+    private final MySqlSourceConfig sourceConfig;
     private final int subtaskId;
 
     @Nullable private DebeziumReader<SourceRecord, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
 
-    public MySqlSplitReader(MySqlParallelSourceConfig sourceConfig, int subtaskId) {
+    public MySqlSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
         this.sourceConfig = sourceConfig;
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
@@ -122,9 +122,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
             if (nextSplit.isSnapshotSplit()) {
                 if (currentReader == null) {
                     final MySqlConnection jdbcConnection =
-                            getConnection(sourceConfig.getDbzConfig());
+                            createMySqlConnection(sourceConfig.getDbzConfiguration());
                     final BinaryLogClient binaryLogClient =
-                            getBinaryClient(sourceConfig.getDbzConfig());
+                            createBinaryClient(sourceConfig.getDbzConfiguration());
                     final StatefulTaskContext statefulTaskContext =
                             new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
                     currentReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
@@ -135,9 +135,10 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                     LOG.info("It's turn to read binlog split, close current snapshot reader");
                     currentReader.close();
                 }
-                final MySqlConnection jdbcConnection = getConnection(sourceConfig.getDbzConfig());
+                final MySqlConnection jdbcConnection =
+                        createMySqlConnection(sourceConfig.getDbzConfiguration());
                 final BinaryLogClient binaryLogClient =
-                        getBinaryClient(sourceConfig.getDbzConfig());
+                        createBinaryClient(sourceConfig.getDbzConfiguration());
                 final StatefulTaskContext statefulTaskContext =
                         new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
                 LOG.info("Create binlog reader");
