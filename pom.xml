@@ -329,13 +329,15 @@ under the License.
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <!-- Shading test jar have bug in some previous version, so close this configuration here,
+                            see https://issues.apache.org/jira/browse/MSHADE-284 -->
                             <shadeTestJar>false</shadeTestJar>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
                             <dependencyReducedPomLocation>
                                 ${project.basedir}/target/dependency-reduced-pom.xml
                             </dependencyReducedPomLocation>
-                            <filters>
+                            <filters combine.children="append">
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
