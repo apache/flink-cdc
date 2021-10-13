@@ -148,7 +148,7 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
-    /** Whether the {@link MySqlParallelSource} should output the schema changes or not. */
+    /** Whether the {@link MySqlSource} should output the schema changes or not. */
     public MySqlSourceConfigFactory includeSchemaChanges(boolean includeSchemaChanges) {
         this.includeSchemaChanges = includeSchemaChanges;
         return this;

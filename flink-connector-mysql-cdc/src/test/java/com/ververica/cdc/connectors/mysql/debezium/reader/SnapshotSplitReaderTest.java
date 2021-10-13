@@ -24,9 +24,9 @@ import org.apache.flink.table.types.DataType;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
@@ -43,7 +43,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** Tests for {@link SnapshotSplitReader}. */
-public class SnapshotSplitReaderTest extends MySqlParallelSourceTestBase {
+public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");

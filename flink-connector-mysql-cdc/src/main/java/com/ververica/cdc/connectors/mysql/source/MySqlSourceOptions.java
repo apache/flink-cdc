@@ -23,7 +23,7 @@ import org.apache.flink.configuration.ConfigOptions;
 
 import java.time.Duration;
 
-/** Configurations for {@link MySqlParallelSource}. */
+/** Configurations for {@link MySqlSource}. */
 public class MySqlSourceOptions {
 
     public static final String DATABASE_SERVER_NAME = "mysql_binlog_source";

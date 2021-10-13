@@ -28,7 +28,7 @@ import com.ververica.cdc.connectors.mysql.debezium.reader.BinlogSplitReader;
 import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlRecords;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -47,7 +47,7 @@ import java.util.Queue;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
 
-/** The {@link SplitReader} implementation for the {@link MySqlParallelSource}. */
+/** The {@link SplitReader} implementation for the {@link MySqlSource}. */
 public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSplitReader.class);

@@ -73,9 +73,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/** Tests for {@link MySqlSource} which also heavily tests {@link DebeziumSourceFunction}. */
+/**
+ * Tests for the legacy {@link MySqlSource} which also heavily tests {@link DebeziumSourceFunction}.
+ */
 @RunWith(Parameterized.class)
-public class MySqlSourceTest extends MySqlTestBase {
+public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
     private final UniqueDatabase database =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");

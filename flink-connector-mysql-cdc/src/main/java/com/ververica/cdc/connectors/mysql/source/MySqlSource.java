@@ -64,7 +64,7 @@ import java.util.function.Supplier;
  * </pre>
  *
  * <pre>{@code
- * MySqlParallelSource
+ * MySqlSource
  *     .<RowData>builder()
  *     .hostname("localhost")
  *     .port(3306)
@@ -77,12 +77,12 @@ import java.util.function.Supplier;
  *     .build();
  * }</pre>
  *
- * <p>See {@link MySqlParallelSourceBuilder} for more details.
+ * <p>See {@link MySqlSourceBuilder} for more details.
  *
  * @param <T> the output type of the source.
  */
 @Internal
-public class MySqlParallelSource<T>
+public class MySqlSource<T>
         implements Source<T, MySqlSplit, PendingSplitsState>, ResultTypeQueryable<T> {
 
     private static final long serialVersionUID = 1L;
@@ -91,16 +91,16 @@ public class MySqlParallelSource<T>
     private final DebeziumDeserializationSchema<T> deserializationSchema;
 
     /**
-     * Get a MySqlParallelSourceBuilder to build a {@link MySqlParallelSource}.
+     * Get a MySqlParallelSourceBuilder to build a {@link MySqlSource}.
      *
      * @return a MySql parallel source builder.
      */
     @PublicEvolving
-    public static <T> MySqlParallelSourceBuilder<T> builder() {
-        return new MySqlParallelSourceBuilder<>();
+    public static <T> MySqlSourceBuilder<T> builder() {
+        return new MySqlSourceBuilder<>();
     }
 
-    MySqlParallelSource(
+    MySqlSource(
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema) {
         this.configFactory = configFactory;

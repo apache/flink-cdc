@@ -26,9 +26,9 @@ import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -61,7 +61,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSta
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 
 /** Tests for {@link BinlogSplitReader}. */
-public class BinlogSplitReaderTest extends MySqlParallelSourceTestBase {
+public class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");

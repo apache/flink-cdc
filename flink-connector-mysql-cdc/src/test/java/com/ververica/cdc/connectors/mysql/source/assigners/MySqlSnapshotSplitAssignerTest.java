@@ -20,9 +20,9 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 
 import org.apache.flink.util.ExceptionUtils;
 
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfigFactory;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -44,7 +44,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
-public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase {
+public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");

@@ -23,20 +23,21 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.junit.Ignore;
 import org.junit.Test;
 
-/** Tests for {@link MySqlParallelSource}. */
-public class MySqlParallelSourceTest extends MySqlParallelSourceTestBase {
+/** Example Tests for {@link MySqlSource}. */
+public class MySqlSourceExampleTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
 
     @Test
-    //    @Ignore("Test ignored because it won't stop and is used for manual test")
+    @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingAllEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
-        MySqlParallelSource<String> mySqlParallelSource =
-                MySqlParallelSource.<String>builder()
+        MySqlSource<String> mySqlSource =
+                MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(inventoryDatabase.getDatabaseName())
@@ -52,7 +53,7 @@ public class MySqlParallelSourceTest extends MySqlParallelSourceTestBase {
         // enable checkpoint
         env.enableCheckpointing(3000);
         // set the source parallelism to 4
-        env.fromSource(mySqlParallelSource, WatermarkStrategy.noWatermarks(), "MySqlParallelSource")
+        env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySqlParallelSource")
                 .setParallelism(4)
                 .print()
                 .setParallelism(1);

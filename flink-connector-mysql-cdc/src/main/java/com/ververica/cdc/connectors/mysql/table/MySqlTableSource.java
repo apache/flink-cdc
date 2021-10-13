@@ -31,8 +31,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.ververica.cdc.connectors.mysql.MySqlSource;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.MetadataConverter;
@@ -147,8 +146,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setServerTimeZone(serverTimeZone)
                         .build();
         if (enableParallelRead) {
-            MySqlParallelSource<RowData> parallelSource =
-                    MySqlParallelSource.<RowData>builder()
+            MySqlSource<RowData> parallelSource =
+                    MySqlSource.<RowData>builder()
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)
@@ -166,8 +165,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
-            MySqlSource.Builder<RowData> builder =
-                    MySqlSource.<RowData>builder()
+            com.ververica.cdc.connectors.mysql.MySqlSource.Builder<RowData> builder =
+                    com.ververica.cdc.connectors.mysql.MySqlSource.<RowData>builder()
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)

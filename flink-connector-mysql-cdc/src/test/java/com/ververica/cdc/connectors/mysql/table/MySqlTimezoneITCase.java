@@ -56,8 +56,8 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase.assertEqualsInAnyOrder;
-import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase.assertEqualsInOrder;
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
 /** Integration tests to check mysql-cdc works well under different MySQL server timezone. */
 @RunWith(Parameterized.class)

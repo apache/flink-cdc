@@ -44,8 +44,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-/** IT tests for {@link MySqlParallelSource}. */
-public class MySqlParallelSourceITCase extends MySqlParallelSourceTestBase {
+/** IT tests for {@link MySqlSource}. */
+public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");

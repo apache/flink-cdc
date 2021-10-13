@@ -29,11 +29,11 @@ import java.util.Properties;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * The builder class for {@link MySqlParallelSource} to make it easier for the users to construct a
- * {@link MySqlParallelSource}.
+ * The builder class for {@link MySqlSource} to make it easier for the users to construct a {@link
+ * MySqlSource}.
  *
  * <pre>{@code
- * MySqlParallelSource
+ * MySqlSource
  *     .<RowData>builder()
  *     .hostname("localhost")
  *     .port(3306)
@@ -46,21 +46,21 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  *     .build();
  * }</pre>
  *
- * <p>Check the Java docs of each individual methods to learn more about the settings to build a *
- * KafkaSource.
+ * <p>Check the Java docs of each individual methods to learn more about the settings to build a
+ * {@link MySqlSource}.
  */
 @PublicEvolving
-public class MySqlParallelSourceBuilder<T> {
+public class MySqlSourceBuilder<T> {
     private final MySqlSourceConfigFactory configFactory = new MySqlSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
 
-    public MySqlParallelSourceBuilder<T> hostname(String hostname) {
+    public MySqlSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);
         return this;
     }
 
     /** Integer port number of the MySQL database server. */
-    public MySqlParallelSourceBuilder<T> port(int port) {
+    public MySqlSourceBuilder<T> port(int port) {
         this.configFactory.port(port);
         return this;
     }
@@ -69,7 +69,7 @@ public class MySqlParallelSourceBuilder<T> {
      * An required list of regular expressions that match database names to be monitored; any
      * database name not included in the whitelist will be excluded from monitoring.
      */
-    public MySqlParallelSourceBuilder<T> databaseList(String... databaseList) {
+    public MySqlSourceBuilder<T> databaseList(String... databaseList) {
         this.configFactory.databaseList(databaseList);
         return this;
     }
@@ -79,19 +79,19 @@ public class MySqlParallelSourceBuilder<T> {
      * tables to be monitored; any table not included in the list will be excluded from monitoring.
      * Each identifier is of the form {@code <databaseName>.<tableName>}.
      */
-    public MySqlParallelSourceBuilder<T> tableList(String... tableList) {
+    public MySqlSourceBuilder<T> tableList(String... tableList) {
         this.configFactory.tableList(tableList);
         return this;
     }
 
     /** Name of the MySQL database to use when connecting to the MySQL database server. */
-    public MySqlParallelSourceBuilder<T> username(String username) {
+    public MySqlSourceBuilder<T> username(String username) {
         this.configFactory.username(username);
         return this;
     }
 
     /** Password to use when connecting to the MySQL database server. */
-    public MySqlParallelSourceBuilder<T> password(String password) {
+    public MySqlSourceBuilder<T> password(String password) {
         this.configFactory.password(password);
         return this;
     }
@@ -105,7 +105,7 @@ public class MySqlParallelSourceBuilder<T> {
      * random number is generated between 5400 and 6400, though we recommend setting an explicit
      * value."
      */
-    public MySqlParallelSourceBuilder<T> serverId(String serverId) {
+    public MySqlSourceBuilder<T> serverId(String serverId) {
         this.configFactory.serverId(serverId);
         return this;
     }
@@ -115,7 +115,7 @@ public class MySqlParallelSourceBuilder<T> {
      * TIMESTAMP type in MYSQL converted to STRING. See more
      * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
      */
-    public MySqlParallelSourceBuilder<T> serverTimeZone(String timeZone) {
+    public MySqlSourceBuilder<T> serverTimeZone(String timeZone) {
         this.configFactory.serverTimeZone(timeZone);
         return this;
     }
@@ -124,13 +124,13 @@ public class MySqlParallelSourceBuilder<T> {
      * The split size (number of rows) of table snapshot, captured tables are split into multiple
      * splits when read the snapshot of table.
      */
-    public MySqlParallelSourceBuilder<T> splitSize(int splitSize) {
+    public MySqlSourceBuilder<T> splitSize(int splitSize) {
         this.configFactory.splitSize(splitSize);
         return this;
     }
 
     /** The maximum fetch size for per poll when read table snapshot. */
-    public MySqlParallelSourceBuilder<T> fetchSize(int fetchSize) {
+    public MySqlSourceBuilder<T> fetchSize(int fetchSize) {
         this.configFactory.fetchSize(fetchSize);
         return this;
     }
@@ -139,25 +139,25 @@ public class MySqlParallelSourceBuilder<T> {
      * The maximum time that the connector should wait after trying to connect to the MySQL database
      * server before timing out.
      */
-    public MySqlParallelSourceBuilder<T> connectTimeout(Duration connectTimeout) {
+    public MySqlSourceBuilder<T> connectTimeout(Duration connectTimeout) {
         this.configFactory.connectTimeout(connectTimeout);
         return this;
     }
 
-    /** Whether the {@link MySqlParallelSource} should output the schema changes or not. */
-    public MySqlParallelSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
+    /** Whether the {@link MySqlSource} should output the schema changes or not. */
+    public MySqlSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
         this.configFactory.includeSchemaChanges(includeSchemaChanges);
         return this;
     }
 
     /** Specifies the startup options. */
-    public MySqlParallelSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
+    public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);
         return this;
     }
 
     /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
-    public MySqlParallelSourceBuilder<T> debeziumProperties(Properties properties) {
+    public MySqlSourceBuilder<T> debeziumProperties(Properties properties) {
         this.configFactory.debeziumProperties(properties);
         return this;
     }
@@ -166,18 +166,17 @@ public class MySqlParallelSourceBuilder<T> {
      * The deserializer used to convert from consumed {@link
      * org.apache.kafka.connect.source.SourceRecord}.
      */
-    public MySqlParallelSourceBuilder<T> deserializer(
-            DebeziumDeserializationSchema<T> deserializer) {
+    public MySqlSourceBuilder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
         this.deserializer = deserializer;
         return this;
     }
 
     /**
-     * Build the {@link MySqlParallelSource}.
+     * Build the {@link MySqlSource}.
      *
      * @return a MySqlParallelSource with the settings made for this builder.
      */
-    public MySqlParallelSource<T> build() {
-        return new MySqlParallelSource<>(configFactory, checkNotNull(deserializer));
+    public MySqlSource<T> build() {
+        return new MySqlSource<>(configFactory, checkNotNull(deserializer));
     }
 }
