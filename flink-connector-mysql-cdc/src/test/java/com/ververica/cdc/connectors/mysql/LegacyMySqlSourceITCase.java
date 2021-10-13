@@ -30,8 +30,6 @@ import org.apache.flink.util.CloseableIterator;
 import com.alibaba.fastjson.JSONObject;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.StringDebeziumDeserializationSchema;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -48,35 +46,11 @@ import java.util.Objects;
 
 import static org.junit.Assert.assertTrue;
 
-/** Integration tests for {@link MySqlSource}. */
-public class MySqlSourceITCase extends MySqlTestBase {
-
-    private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+/** Integration tests for the legacy {@link MySqlSource}. */
+public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
 
     private final UniqueDatabase fullTypesDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
-
-    @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testConsumingAllEvents() throws Exception {
-        inventoryDatabase.createAndInitialize();
-        SourceFunction<String> sourceFunction =
-                MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        // monitor all tables under inventory database
-                        .databaseList(inventoryDatabase.getDatabaseName())
-                        .username(inventoryDatabase.getUsername())
-                        .password(inventoryDatabase.getPassword())
-                        .deserializer(new StringDebeziumDeserializationSchema())
-                        .build();
-
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.addSource(sourceFunction).print().setParallelism(1);
-
-        env.execute("Print MySQL Snapshot + Binlog");
-    }
 
     @Test
     public void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
@@ -84,7 +58,7 @@ public class MySqlSourceITCase extends MySqlTestBase {
     }
 
     @Test
-    public void testConsumingAllTypesWithJsonFormatExcludeSchema() throws Exception {
+    public void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
         testConsumingAllEventsWithJsonFormat(false);
     }
 
@@ -163,7 +137,7 @@ public class MySqlSourceITCase extends MySqlTestBase {
         Path path =
                 Paths.get(
                         Objects.requireNonNull(
-                                        MySqlSourceITCase.class
+                                        LegacyMySqlSourceITCase.class
                                                 .getClassLoader()
                                                 .getResource(resource))
                                 .toURI());

@@ -27,7 +27,7 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -46,13 +46,13 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.mysql.MySqlSourceTest.currentMySqlLatestOffset;
+import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for MySQL binlog SQL source. */
 @RunWith(Parameterized.class)
-public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
+public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";

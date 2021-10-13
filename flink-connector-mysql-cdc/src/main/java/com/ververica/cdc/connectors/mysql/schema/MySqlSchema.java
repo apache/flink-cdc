@@ -20,20 +20,14 @@ package com.ververica.cdc.connectors.mysql.schema;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.debezium.config.Configuration;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
-import io.debezium.connector.mysql.MySqlTopicSelector;
-import io.debezium.connector.mysql.MySqlValueConverters;
-import io.debezium.jdbc.JdbcValueConverters;
-import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.SchemaChangeEvent;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
 
 import java.sql.SQLException;
 import java.time.Instant;
@@ -41,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlDatabaseSchema;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
 /** A component used to get schema by table path. */
@@ -50,18 +45,9 @@ public class MySqlSchema {
     private final MySqlConnection jdbc;
     private final Map<TableId, TableChange> schemasByTableId;
 
-    public MySqlSchema(Configuration dbzConf, MySqlConnection jdbc) {
-        this.connectorConfig = new MySqlConnectorConfig(dbzConf);
-        TopicSelector<TableId> topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
-        SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
-        MySqlValueConverters valueConverters = getValueConverters(connectorConfig);
-        this.databaseSchema =
-                new MySqlDatabaseSchema(
-                        connectorConfig,
-                        valueConverters,
-                        topicSelector,
-                        schemaNameAdjuster,
-                        jdbc.isTableIdCaseSensitive());
+    public MySqlSchema(MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
+        this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
+        this.databaseSchema = createMySqlDatabaseSchema(connectorConfig, jdbc);
         this.jdbc = jdbc;
         this.schemasByTableId = new HashMap<>();
     }
@@ -117,29 +103,5 @@ public class MySqlSchema {
         }
 
         return tableChangeMap.get(tableId);
-    }
-
-    private static MySqlValueConverters getValueConverters(MySqlConnectorConfig connectorConfig) {
-        TemporalPrecisionMode timePrecisionMode = connectorConfig.getTemporalPrecisionMode();
-        JdbcValueConverters.DecimalMode decimalMode = connectorConfig.getDecimalMode();
-        String bigIntUnsignedHandlingModeStr =
-                connectorConfig
-                        .getConfig()
-                        .getString(MySqlConnectorConfig.BIGINT_UNSIGNED_HANDLING_MODE);
-        MySqlConnectorConfig.BigIntUnsignedHandlingMode bigIntUnsignedHandlingMode =
-                MySqlConnectorConfig.BigIntUnsignedHandlingMode.parse(
-                        bigIntUnsignedHandlingModeStr);
-        JdbcValueConverters.BigIntUnsignedMode bigIntUnsignedMode =
-                bigIntUnsignedHandlingMode.asBigIntUnsignedMode();
-
-        final boolean timeAdjusterEnabled =
-                connectorConfig.getConfig().getBoolean(MySqlConnectorConfig.ENABLE_TIME_ADJUSTER);
-        return new MySqlValueConverters(
-                decimalMode,
-                timePrecisionMode,
-                bigIntUnsignedMode,
-                connectorConfig.binaryHandlingMode(),
-                timeAdjusterEnabled ? MySqlValueConverters::adjustTemporal : x -> x,
-                MySqlValueConverters::defaultParsingErrorHandler);
     }
 }

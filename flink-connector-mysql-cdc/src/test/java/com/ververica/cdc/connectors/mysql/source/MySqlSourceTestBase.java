@@ -39,10 +39,10 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/** Basic class for testing {@link MySqlParallelSource}. */
-public abstract class MySqlParallelSourceTestBase extends TestLogger {
+/** Basic class for testing {@link MySqlSource}. */
+public abstract class MySqlSourceTestBase extends TestLogger {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlParallelSourceTestBase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
     protected static final MySqlContainer MYSQL_CONTAINER =

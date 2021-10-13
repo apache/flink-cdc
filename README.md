@@ -65,16 +65,14 @@ Include following Maven dependency (available through Maven Central):
 ```
 
 ```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.mysql.MySqlSource;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
-public class MySqlBinlogSourceExample {
+public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
-    Properties debeziumProperties = new Properties();
-    debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
-    SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
+    MySqlSource<String> source = MySqlSource.<String>builder()
             .hostname("yourHostname")
             .port(yourPort)
             .databaseList("yourDatabaseName") // set captured database
@@ -82,16 +80,20 @@ public class MySqlBinlogSourceExample {
             .username("yourUsername")
             .password("yourPassword")
             .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
-            .debeziumProperties(debeziumProperties)
             .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
+    // enable checkpoint
+    env.enableCheckpointing(3000);
+
     env
-      .addSource(sourceFunction)
+      .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
+      // set 4 parallel source tasks
+      .setParallelism(4)
       .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
 
-    env.execute();
+    env.execute("Print MySQL Snapshot + Binlog");
   }
 }
 ```

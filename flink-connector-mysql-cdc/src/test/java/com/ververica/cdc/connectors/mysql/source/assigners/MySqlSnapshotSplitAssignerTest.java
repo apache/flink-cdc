@@ -18,12 +18,13 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.ExceptionUtils;
 
-import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -32,20 +33,15 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
-public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase {
+public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
@@ -130,14 +126,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
     }
 
     private List<String> getTestAssignSnapshotSplits(int splitSize, String[] captureTables) {
-        Configuration configuration = getConfig();
-        configuration.setString("scan.incremental.snapshot.chunk.size", String.valueOf(splitSize));
-        List<String> captureTableIds =
-                Arrays.stream(captureTables)
-                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
-        configuration.setString("table.whitelist", String.join(",", captureTableIds));
-
+        MySqlSourceConfig configuration = getConfig(splitSize, captureTables);
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
 
@@ -250,19 +239,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
     }
 
     @Test
-    public void testInvalidSplitSize() {
-        try {
-            getTestAssignSnapshotSplits(1, new String[] {"customers"});
-            fail("should fail.");
-        } catch (IllegalStateException e) {
-            assertThat(
-                    e,
-                    containsMessage(
-                            "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
-        }
-    }
-
-    @Test
     public void testUnMatchedPrimaryKey() {
         try {
             getTestAssignSnapshotSplits(4, new String[] {"customer_card"});
@@ -275,19 +251,23 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlParallelSourceTestBase 
         }
     }
 
-    private Configuration getConfig() {
-        Map<String, String> properties = new HashMap<>();
-        properties.put("database.server.name", "embedded-test");
-        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.whitelist", customerDatabase.getDatabaseName());
-        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        properties.put("database.user", customerDatabase.getUsername());
-        properties.put("database.password", customerDatabase.getPassword());
-        properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("scan.snapshot.fetch.size", "2");
-        properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
-        properties.put("snapshot.mode", "initial");
-        properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        return Configuration.fromMap(properties);
+    private MySqlSourceConfig getConfig(int splitSize, String[] captureTables) {
+        String[] captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .toArray(String[]::new);
+
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .splitSize(splitSize)
+                .fetchSize(2)
+                .username(customerDatabase.getUsername())
+                .password(customerDatabase.getPassword())
+                .serverTimeZone(ZoneId.of("UTC").toString())
+                .createConfig(0);
     }
 }

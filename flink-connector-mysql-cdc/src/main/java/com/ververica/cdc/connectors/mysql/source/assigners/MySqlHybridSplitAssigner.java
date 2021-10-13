@@ -18,10 +18,9 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import org.apache.flink.configuration.Configuration;
-
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -50,17 +49,17 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
-    public MySqlHybridSplitAssigner(Configuration configuration, int currentParallelism) {
-        this(new MySqlSnapshotSplitAssigner(configuration, currentParallelism), false);
+    public MySqlHybridSplitAssigner(MySqlSourceConfig sourceConfig, int currentParallelism) {
+        this(new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism), false);
     }
 
     public MySqlHybridSplitAssigner(
-            Configuration configuration,
+            MySqlSourceConfig sourceConfig,
             int currentParallelism,
             HybridPendingSplitsState checkpoint) {
         this(
                 new MySqlSnapshotSplitAssigner(
-                        configuration, currentParallelism, checkpoint.getSnapshotPendingSplits()),
+                        sourceConfig, currentParallelism, checkpoint.getSnapshotPendingSplits()),
                 checkpoint.isBinlogSplitAssigned());
     }
 
