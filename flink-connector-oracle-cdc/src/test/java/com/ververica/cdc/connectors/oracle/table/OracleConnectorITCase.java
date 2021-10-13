@@ -25,16 +25,15 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
+import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.BindMode;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -52,9 +51,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleConnectorITCase.class);
 
-    private OracleContainer oracleContainer;
-    private static final DockerImageName OC_IMAGE =
-            DockerImageName.parse("thake/oracle-xe-11g").asCompatibleSubstituteFor("oracle");
+    private OracleContainer oracleContainer =
+            OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -65,28 +63,18 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     @Before
     public void before() throws Exception {
-        oracleContainer =
-                new OracleContainer(OC_IMAGE)
-                        .withClasspathResourceMapping(
-                                "docker/setup.sh", "/etc/logminer_conf.sh", BindMode.READ_WRITE)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
-
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(oracleContainer)).join();
         LOG.info("Containers are started.");
 
         TestValuesTableFactory.clearAllData();
-        Container.ExecResult execResult1 =
-                oracleContainer.execInContainer("chmod", "+x", "/etc/logminer_conf.sh");
 
-        execResult1.getStdout();
-        execResult1.getStderr();
-
-        Container.ExecResult execResult =
-                oracleContainer.execInContainer("/bin/sh", "-c", "/etc/logminer_conf.sh");
-        execResult.getStdout();
-        execResult.getStderr();
         env.setParallelism(1);
+    }
+
+    @After
+    public void teardown() {
+        oracleContainer.stop();
     }
 
     @Test
@@ -262,6 +250,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
     }
 
     public Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(oracleContainer.getJdbcUrl(), "system", "oracle");
+        return DriverManager.getConnection(oracleContainer.getJdbcUrl(), "dbzuser", "dbz");
     }
 }

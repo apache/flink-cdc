@@ -41,16 +41,14 @@ import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.BindMode;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.DockerImageName;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -80,33 +78,20 @@ public class OracleSourceTest extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSourceTest.class);
 
-    private OracleContainer oracleContainer;
-
-    private static final DockerImageName OC_IMAGE =
-            DockerImageName.parse("thake/oracle-xe-11g").asCompatibleSubstituteFor("oracle");
+    private OracleContainer oracleContainer =
+            OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Before
     public void before() throws Exception {
-        oracleContainer =
-                new OracleContainer(OC_IMAGE)
-                        .withClasspathResourceMapping(
-                                "docker/setup.sh", "/etc/logminer_conf.sh", BindMode.READ_WRITE)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
 
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(oracleContainer)).join();
         LOG.info("Containers are started.");
+    }
 
-        Container.ExecResult execResult1 =
-                oracleContainer.execInContainer("chmod", "+x", "/etc/logminer_conf.sh");
-
-        execResult1.getStdout();
-        execResult1.getStderr();
-
-        Container.ExecResult execResult =
-                oracleContainer.execInContainer("/bin/sh", "-c", "/etc/logminer_conf.sh");
-        execResult.getStdout();
-        execResult.getStderr();
+    @After
+    public void teardown() {
+        oracleContainer.stop();
     }
 
     @Test
