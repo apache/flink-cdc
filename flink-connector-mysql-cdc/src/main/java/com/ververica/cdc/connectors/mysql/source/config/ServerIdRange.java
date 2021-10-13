@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source;
+package com.ververica.cdc.connectors.mysql.source.config;
 
 import javax.annotation.Nullable;
 

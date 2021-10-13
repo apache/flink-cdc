@@ -20,7 +20,7 @@ package com.ververica.cdc.connectors.mysql.schema;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.mysql.source.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;

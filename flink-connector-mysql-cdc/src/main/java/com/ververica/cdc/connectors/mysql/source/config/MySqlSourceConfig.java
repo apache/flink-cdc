@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source;
+package com.ververica.cdc.connectors.mysql.source.config;
 
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;

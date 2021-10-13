@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source;
+package com.ververica.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 import java.time.Duration;
 
