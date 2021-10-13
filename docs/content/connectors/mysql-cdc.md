@@ -384,8 +384,6 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 
 ### DataStream Source
 
-The Incremental Snapshot Reading feature of MySQL CDC Source only exposes in SQL currently, if you're using DataStream, please use legacy MySQL Source:
-
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

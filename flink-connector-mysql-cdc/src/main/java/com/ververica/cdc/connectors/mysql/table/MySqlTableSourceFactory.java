@@ -29,6 +29,7 @@ import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions;
+import com.ververica.cdc.connectors.mysql.source.ServerIdRange;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.Duration;
@@ -79,7 +80,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
 
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
-        String serverId = config.get(MySqlSourceOptions.SERVER_ID);
+        String serverId = validateAndGetServerId(config);
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         StartupOptions startupOptions = getStartupOptions(config);
         if (enableParallelRead) {
@@ -197,6 +198,22 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
                                 + " but actual is %s",
                         startupOptions.startupMode));
+    }
+
+    private String validateAndGetServerId(ReadableConfig configuration) {
+        final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
+        if (serverIdValue != null) {
+            // validation
+            try {
+                ServerIdRange.from(serverIdValue);
+            } catch (Exception e) {
+                throw new ValidationException(
+                        String.format(
+                                "The value of option 'server-id' is invalid: '%s'", serverIdValue),
+                        e);
+            }
+        }
+        return serverIdValue;
     }
 
     private void validateSplitSize(int splitSize) {

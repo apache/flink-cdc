@@ -48,8 +48,10 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.CONNE
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -407,9 +409,27 @@ public class MySqlTableSourceFactoryTest {
         } catch (Throwable t) {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The 'server-id' should contains single numeric ID like '5400' or numeric ID range '5400-5404', but actual is 123b")
+                                    t, "The value of option 'server-id' is invalid: '123b'")
                             .isPresent());
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "The server id 123b is not a valid numeric.")
+                            .isPresent());
+        }
+
+        // validate illegal split size
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("scan.incremental.snapshot.chunk.size", "1");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertThat(
+                    t,
+                    containsMessage(
+                            "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
         }
 
         // validate missing required

@@ -155,6 +155,8 @@ public class MySqlValidatorTest {
                             .username(database.getUsername())
                             .password(database.getPassword())
                             .port(database.getDatabasePort())
+                            .databaseList(database.getDatabaseName())
+                            .tableList(database.getDatabaseName() + ".products")
                             .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
                             .build();
 

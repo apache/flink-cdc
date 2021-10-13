@@ -18,6 +18,8 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -80,7 +82,10 @@ public class ServerIdRange implements Serializable {
      * Returns a {@link ServerIdRange} from a server id range string which likes '5400-5408' or a
      * single server id likes '5400'.
      */
-    public static ServerIdRange from(String range) {
+    public static @Nullable ServerIdRange from(@Nullable String range) {
+        if (range == null) {
+            return null;
+        }
         if (range.contains("-")) {
             String[] idArray = range.split("-");
             if (idArray.length != 2) {

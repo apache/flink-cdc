@@ -37,11 +37,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
 public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
@@ -239,19 +236,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         List<String> expected = Collections.singletonList("customers null null");
         List<String> splits = getTestAssignSnapshotSplits(2000, new String[] {"customers"});
         assertEquals(expected, splits);
-    }
-
-    @Test
-    public void testInvalidSplitSize() {
-        try {
-            getTestAssignSnapshotSplits(1, new String[] {"customers"});
-            fail("should fail.");
-        } catch (IllegalStateException e) {
-            assertThat(
-                    e,
-                    containsMessage(
-                            "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
-        }
     }
 
     @Test

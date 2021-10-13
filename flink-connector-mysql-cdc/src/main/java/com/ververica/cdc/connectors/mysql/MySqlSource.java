@@ -35,9 +35,9 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /**
  * A builder to build a SourceFunction which can read snapshot and continue to consume binlog.
  *
- * @deprecated please use {@link com.ververica.cdc.connectors.mysql.source.MySqlSource#builder()}
- *     instead which supports more rich features, e.g. parallel reading from historical data. The
- *     {@link MySqlSource} will be dropped in the future version.
+ * @deprecated please use {@link com.ververica.cdc.connectors.mysql.source.MySqlSource} instead
+ *     which supports more rich features, e.g. parallel reading from historical data. The {@link
+ *     MySqlSource} will be dropped in the future version.
  */
 @Deprecated
 public class MySqlSource {
