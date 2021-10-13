@@ -208,6 +208,10 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
         props.setProperty("tombstones.on.delete", String.valueOf(false));
+        // debezium use "long" mode to handle unsigned bigint by default,
+        // but it'll cause lose of precise when the value is larger than 2^63,
+        // so use "precise" mode to avoid it.
+        props.put("bigint.unsigned.handling.mode", "precise");
 
         if (serverIdRange != null) {
             int serverId = serverIdRange.getServerId(subtaskId);

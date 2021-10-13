@@ -26,9 +26,9 @@ import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetric
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.history.JsonTableChangeSerializer;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
-import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;

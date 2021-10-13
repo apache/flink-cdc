@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.debezium.internal;
 
+import com.ververica.cdc.debezium.history.JsonTableChangeSerializer;
 import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -27,7 +28,6 @@ import io.debezium.relational.history.DatabaseHistoryException;
 import io.debezium.relational.history.DatabaseHistoryListener;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
-import io.debezium.relational.history.JsonTableChangeSerializer;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.schema.DatabaseSchema;
 

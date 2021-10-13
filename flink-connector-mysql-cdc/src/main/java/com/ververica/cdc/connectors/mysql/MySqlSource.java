@@ -173,7 +173,10 @@ public class MySqlSource {
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("database.port", String.valueOf(port));
             props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-            props.setProperty("bigint.unsigned.handling.mode", "precise");
+            // debezium use "long" mode to handle unsigned bigint by default,
+            // but it'll cause lose of precise when the value is larger than 2^63,
+            // so use "precise" mode to avoid it.
+            props.put("bigint.unsigned.handling.mode", "precise");
 
             if (serverId != null) {
                 props.setProperty("database.server.id", String.valueOf(serverId));
