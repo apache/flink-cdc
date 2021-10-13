@@ -136,9 +136,12 @@ VALUES (default,10001,'Beijing','Shanghai',false),
 
 
 4. 下载以下 jar 包到 `<FLINK_HOME>/lib/`:
+
+```下载链接只在已发布的版本上可用```
+
 - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
-- [flink-sql-connector-mysql-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1.0/flink-sql-connector-mysql-cdc-2.1.0.jar)
-- [flink-sql-connector-postgres-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.1.0/flink-sql-connector-postgres-cdc-2.1.0.jar)
+- [flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1-SNAPSHOT/flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar)
+- [flink-sql-connector-postgres-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.1-SNAPSHOT/flink-sql-connector-postgres-cdc-2.1-SNAPSHOT.jar)
 
 5. 然后启动 Flink 集群，再启动 SQL CLI.
 

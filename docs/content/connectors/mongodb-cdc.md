@@ -13,14 +13,16 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mongodb-cdc</artifactId>
-  <version>2.1.0</version>
+  <!-- the dependency is available only for stable releases. -->
+  <version>2.1-SNAPSHOT</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-<!-- fixme: correct the version -->
-Download [flink-sql-connector-mongodb-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.1.0/flink-sql-connector-mongodb-cdc-2.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+```Download link is available only for stable releases.```
+
+Download [flink-sql-connector-mongodb-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.1-SNAPSHOT/flink-sql-connector-mongodb-cdc-2.1-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
 Setup MongoDB
 ----------------
