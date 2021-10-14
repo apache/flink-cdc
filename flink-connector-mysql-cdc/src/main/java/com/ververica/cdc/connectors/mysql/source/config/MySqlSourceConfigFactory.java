@@ -200,7 +200,10 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
-        props.setProperty("include.schema.changes", String.valueOf(includeSchemaChanges));
+        // the underlying debezium reader should always capture the schema changes and forward them.
+        // Note: the includeSchemaChanges parameter is used to controll emitting the schema record,
+        // only DataStream API program need to emit the schema record, the Table API need not
+        props.setProperty("include.schema.changes", String.valueOf(true));
         // disable the offset flush totally
         props.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
