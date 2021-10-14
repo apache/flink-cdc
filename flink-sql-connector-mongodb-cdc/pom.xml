@@ -55,13 +55,13 @@ under the License.
                                     <include>io.debezium:debezium-api</include>
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
+                                    <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-connector-mongodb-cdc</include>
                                     <include>org.mongodb.kafka:mongo-kafka-connect</include>
                                     <include>org.mongodb:mongodb-driver-sync</include>
                                     <include>org.mongodb:mongodb-driver-core</include>
                                     <include>org.mongodb:bson</include>
                                     <include>org.apache.avro:avro</include>
-                                    <include>com.ververica:flink-connector-debezium</include>
-                                    <include>com.ververica:flink-connector-mongodb-cdc</include>
                                     <include>org.apache.kafka:*</include>
                                 </includes>
                             </artifactSet>

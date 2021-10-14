@@ -86,6 +86,12 @@ under the License.
                                         com.ververica.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>org.antlr</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.org.antlr
+                                    </shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
