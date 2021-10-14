@@ -329,13 +329,15 @@ under the License.
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <shadeTestJar>true</shadeTestJar>
+                            <!-- Shading test jar have bug in some previous version, so close this configuration here,
+                            see https://issues.apache.org/jira/browse/MSHADE-284 -->
+                            <shadeTestJar>false</shadeTestJar>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
                             <dependencyReducedPomLocation>
                                 ${project.basedir}/target/dependency-reduced-pom.xml
                             </dependencyReducedPomLocation>
-                            <filters>
+                            <filters combine.children="append">
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
@@ -345,28 +347,11 @@ under the License.
                                     </excludes>
                                 </filter>
                             </filters>
-                            <artifactSet combine.self="override">
-                                <excludes>
-                                    <!-- log4j -->
-                                    <exclude>org.slf4j:slf4j-log4j12</exclude>
-                                    <exclude>log4j:log4j</exclude>
-                                    <!-- jars imported by parent -->
-                                    <exclude>org.slf4j:slf4j-api</exclude>
-                                    <exclude>com.google.code.findbugs:jsr305</exclude>
-                                    <!-- flink shaded jars -->
-                                    <exclude>org.apache.flink:flink-shaded-*</exclude>
-                                    <exclude>com.google.guava:guava</exclude>
-                                    <exclude>tv.cntt:*</exclude>
-                                    <exclude>io.netty:*</exclude>
-                                    <exclude>org.ow2.asm:*</exclude>
-                                    <!-- other third-party jars we must use -->
-                                    <exclude>commons-logging:commons-logging</exclude>
-                                    <exclude>commons-codec:commons-codec</exclude>
-                                    <exclude>commons-collections:commons-collections</exclude>
-                                    <exclude>org.apache.commons:commons-lang3</exclude>
-                                    <!-- flink dependencies are provided -->
-                                    <exclude>org.apache.flink:*</exclude>
-                                </excludes>
+                            <artifactSet>
+                                <includes>
+                                    <!-- include nothing -->
+                                    <include></include>
+                                </includes>
                             </artifactSet>
                         </configuration>
                     </execution>
