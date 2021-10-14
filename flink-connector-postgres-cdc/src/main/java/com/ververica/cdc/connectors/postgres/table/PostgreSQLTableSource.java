@@ -24,17 +24,25 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -42,7 +50,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A {@link DynamicTableSource} that describes how to create a PostgreSQL source from a logical
  * description.
  */
-public class PostgreSQLTableSource implements ScanTableSource {
+public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final TableSchema physicalSchema;
     private final int port;
@@ -55,6 +63,16 @@ public class PostgreSQLTableSource implements ScanTableSource {
     private final String pluginName;
     private final String slotName;
     private final Properties dbzProperties;
+
+    // --------------------------------------------------------------------------------------------
+    // Mutable attributes
+    // --------------------------------------------------------------------------------------------
+
+    /** Data type that describes the final output of the source. */
+    protected DataType producedDataType;
+
+    /** Metadata that is appended at the end of a physical source row. */
+    protected List<String> metadataKeys;
 
     public PostgreSQLTableSource(
             TableSchema physicalSchema,
@@ -79,6 +97,8 @@ public class PostgreSQLTableSource implements ScanTableSource {
         this.pluginName = checkNotNull(pluginName);
         this.slotName = slotName;
         this.dbzProperties = dbzProperties;
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
     }
 
     @Override
@@ -93,13 +113,16 @@ public class PostgreSQLTableSource implements ScanTableSource {
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        MetadataConverter[] metadataConverters = getMetadataConverters();
         TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType(rowType)
+                        .setPhysicalRowType(physicalDataType)
+                        .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
                         .setValueValidator(new PostgresValueValidator(schemaName, tableName))
                         .build();
@@ -120,20 +143,40 @@ public class PostgreSQLTableSource implements ScanTableSource {
         return SourceFunctionProvider.of(sourceFunction, false);
     }
 
+    private MetadataConverter[] getMetadataConverters() {
+        if (metadataKeys.isEmpty()) {
+            return new MetadataConverter[0];
+        }
+
+        return metadataKeys.stream()
+                .map(
+                        key ->
+                                Stream.of(PostgreSQLReadableMetadata.values())
+                                        .filter(m -> m.getKey().equals(key))
+                                        .findFirst()
+                                        .orElseThrow(IllegalStateException::new))
+                .map(PostgreSQLReadableMetadata::getConverter)
+                .toArray(MetadataConverter[]::new);
+    }
+
     @Override
     public DynamicTableSource copy() {
-        return new PostgreSQLTableSource(
-                physicalSchema,
-                port,
-                hostname,
-                database,
-                schemaName,
-                tableName,
-                username,
-                password,
-                pluginName,
-                slotName,
-                dbzProperties);
+        PostgreSQLTableSource source =
+                new PostgreSQLTableSource(
+                        physicalSchema,
+                        port,
+                        hostname,
+                        database,
+                        schemaName,
+                        tableName,
+                        username,
+                        password,
+                        pluginName,
+                        slotName,
+                        dbzProperties);
+        source.metadataKeys = metadataKeys;
+        source.producedDataType = producedDataType;
+        return source;
     }
 
     @Override
@@ -155,7 +198,9 @@ public class PostgreSQLTableSource implements ScanTableSource {
                 && Objects.equals(password, that.password)
                 && Objects.equals(pluginName, that.pluginName)
                 && Objects.equals(slotName, that.slotName)
-                && Objects.equals(dbzProperties, that.dbzProperties);
+                && Objects.equals(dbzProperties, that.dbzProperties)
+                && Objects.equals(producedDataType, that.producedDataType)
+                && Objects.equals(metadataKeys, that.metadataKeys);
     }
 
     @Override
@@ -171,11 +216,28 @@ public class PostgreSQLTableSource implements ScanTableSource {
                 password,
                 pluginName,
                 slotName,
-                dbzProperties);
+                dbzProperties,
+                producedDataType,
+                metadataKeys);
     }
 
     @Override
     public String asSummaryString() {
         return "PostgreSQL-CDC";
+    }
+
+    @Override
+    public Map<String, DataType> listReadableMetadata() {
+        return Stream.of(PostgreSQLReadableMetadata.values())
+                .collect(
+                        Collectors.toMap(
+                                PostgreSQLReadableMetadata::getKey,
+                                PostgreSQLReadableMetadata::getDataType));
+    }
+
+    @Override
+    public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+        this.metadataKeys = metadataKeys;
+        this.producedDataType = producedDataType;
     }
 }
