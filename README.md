@@ -72,7 +72,7 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
-    SourceFunction<String> mySqlSource = MySqlSource.<String>builder()
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
             .hostname("yourHostname")
             .port(yourPort)
             .databaseList("yourDatabaseName") // set captured database
