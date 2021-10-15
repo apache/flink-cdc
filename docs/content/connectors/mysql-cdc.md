@@ -392,9 +392,7 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
-    Properties debeziumProperties = new Properties();
-    debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
-    SourceFunction<String> sourceFunction = MySqlSource.<String>builder()
+    SourceFunction<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
         .databaseList("yourDatabaseName") // set captured database
@@ -402,7 +400,6 @@ public class MySqlSourceExample {
         .username("yourUsername")
         .password("yourPassword")
         .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
-        .debeziumProperties(debeziumProperties)
         .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
