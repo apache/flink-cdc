@@ -13,13 +13,16 @@ In order to setup the Postgres CDC connector, the following table provides depen
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
-  <version>2.1.0</version>
+  <!-- the dependency is available only for stable releases. -->
+  <version>2.1-SNAPSHOT</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-postgres-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.1.0/flink-sql-connector-postgres-cdc-2.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+```Download link is available only for stable releases.```
+
+Download [flink-sql-connector-postgres-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.1-SNAPSHOT/flink-sql-connector-postgres-cdc-2.1-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
 How to create a Postgres CDC table
 ----------------

@@ -56,14 +56,14 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase.assertEqualsInAnyOrder;
-import static com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase.assertEqualsInOrder;
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
+import static com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
 /** Integration tests to check mysql-cdc works well under different MySQL server timezone. */
 @RunWith(Parameterized.class)
-public class MysqlTimezoneITCase {
+public class MySqlTimezoneITCase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MysqlTimezoneITCase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlTimezoneITCase.class);
     private static TemporaryFolder tempFolder;
     private static File resourceFolder;
     private final StreamExecutionEnvironment env =
@@ -101,13 +101,13 @@ public class MysqlTimezoneITCase {
     }
 
     @Test
-    public void testMysqlServerInBerlin() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai");
+    public void testMySqlServerInBerlin() throws Exception {
+        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin");
     }
 
     @Test
-    public void testMysqlServerInShanghai() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin");
+    public void testMySqlServerInShanghai() throws Exception {
+        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai");
     }
 
     private void testTemporalTypesWithMySqlServerTimezone(String timezone) throws Exception {

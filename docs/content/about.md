@@ -76,7 +76,8 @@ Include following Maven dependency (available through Maven Central):
   <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>2.1.0</version>
+  <!-- the dependency is available only for stable releases. -->
+  <version>2.1-SNAPSHOT</version>
 </dependency>
 ```
 

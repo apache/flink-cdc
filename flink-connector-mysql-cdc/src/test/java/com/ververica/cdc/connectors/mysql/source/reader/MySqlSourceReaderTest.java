@@ -23,7 +23,6 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
@@ -31,12 +30,14 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.Collector;
 
-import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
-import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSourceTestBase;
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
+import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -49,16 +50,12 @@ import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link MySqlSourceReader}. */
-public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
+public class MySqlSourceReaderTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
@@ -66,7 +63,7 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
     @Test
     public void testBinlogReadFailoverCrossTransaction() throws Exception {
         customerDatabase.createAndInitialize();
-        final Configuration configuration = getConfig(new String[] {"customers"});
+        final MySqlSourceConfig configuration = getConfig(new String[] {"customers"});
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -116,29 +113,31 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
         restartReader.close();
     }
 
-    private MySqlSourceReader<SourceRecord> createReader(Configuration configuration) {
+    private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration) {
         final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
         final SourceReaderContext readerContext = new TestingReaderContext();
         final MySqlRecordEmitter<SourceRecord> recordEmitter =
                 new MySqlRecordEmitter<>(
                         new ForwardDeserializeSchema(),
-                        new MySqlSourceReaderMetrics(readerContext.metricGroup()));
+                        new MySqlSourceReaderMetrics(readerContext.metricGroup()),
+                        configuration.isIncludeSchemaChanges());
         return new MySqlSourceReader<>(
                 elementsQueue,
                 () -> createSplitReader(configuration),
                 recordEmitter,
-                configuration,
+                readerContext.getConfiguration(),
                 readerContext);
     }
 
-    private MySqlSplitReader createSplitReader(Configuration configuration) {
+    private MySqlSplitReader createSplitReader(MySqlSourceConfig configuration) {
         return new MySqlSplitReader(configuration, 0);
     }
 
-    private void makeBinlogEventsInOneTransaction(Configuration configuration, String tableId)
+    private void makeBinlogEventsInOneTransaction(MySqlSourceConfig sourceConfig, String tableId)
             throws SQLException {
-        JdbcConnection connection = StatefulTaskContext.getConnection(configuration);
+        JdbcConnection connection =
+                DebeziumUtils.openMySqlConnection(sourceConfig.getDbzConfiguration());
         // make 6 binlog events by 4 operations
         connection.setAutoCommit(false);
         connection.execute(
@@ -150,35 +149,31 @@ public class MySqlSourceReaderTest extends MySqlParallelSourceTestBase {
         connection.close();
     }
 
-    private MySqlSplit createBinlogSplit(Configuration configuration) {
-        MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(configuration);
+    private MySqlSplit createBinlogSplit(MySqlSourceConfig sourceConfig) {
+        MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
         binlogSplitAssigner.open();
         return binlogSplitAssigner.getNext().get();
     }
 
-    private Configuration getConfig(String[] captureTables) {
-        Map<String, String> properties = new HashMap<>();
-        properties.put("database.server.name", "embedded-test");
-        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        properties.put("database.user", customerDatabase.getUsername());
-        properties.put("database.password", customerDatabase.getPassword());
-        properties.put("database.whitelist", customerDatabase.getDatabaseName());
-        properties.put("database.history.skip.unparseable.ddl", "true");
-        properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
-        properties.put("snapshot.mode", "initial");
-        properties.put("database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        properties.put("database.history.instance.name", UUID.randomUUID().toString());
-        List<String> captureTableIds =
+    private MySqlSourceConfig getConfig(String[] captureTables) {
+        String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .collect(Collectors.toList());
-        properties.put("table.whitelist", String.join(",", captureTableIds));
-        properties.put("scan.incremental.snapshot.chunk.size", "10");
-        properties.put("scan.snapshot.fetch.size", "2");
-        properties.put("scan.startup.mode", "latest-offset");
+                        .toArray(String[]::new);
 
-        return Configuration.fromMap(properties);
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
+                .includeSchemaChanges(false)
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .splitSize(10)
+                .fetchSize(2)
+                .username(customerDatabase.getUsername())
+                .password(customerDatabase.getPassword())
+                .serverTimeZone(ZoneId.of("UTC").toString())
+                .createConfig(0);
     }
 
     private List<String> consumeRecords(

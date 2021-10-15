@@ -28,6 +28,8 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.Preconditions;
 
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
+import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.Duration;
@@ -35,24 +37,24 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.CONNECT_TIMEOUT;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_NAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.HOSTNAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PASSWORD;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.PORT;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_ID;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SERVER_TIME_ZONE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.TABLE_NAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.USERNAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.validateAndGetServerId;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_MODE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_ID;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_NAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
 public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
@@ -84,6 +86,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
             validateStartupOptionIfEnableParallel(startupOptions);
+            validateFetchSize(fetchSize);
+            validateSplitSize(splitSize);
         }
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
@@ -194,5 +198,37 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
                                 + " but actual is %s",
                         startupOptions.startupMode));
+    }
+
+    private String validateAndGetServerId(ReadableConfig configuration) {
+        final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
+        if (serverIdValue != null) {
+            // validation
+            try {
+                ServerIdRange.from(serverIdValue);
+            } catch (Exception e) {
+                throw new ValidationException(
+                        String.format(
+                                "The value of option 'server-id' is invalid: '%s'", serverIdValue),
+                        e);
+            }
+        }
+        return serverIdValue;
+    }
+
+    private void validateSplitSize(int splitSize) {
+        checkState(
+                splitSize > 1,
+                String.format(
+                        "The value of option '%s' must larger than 1, but is %d",
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), splitSize));
+    }
+
+    private void validateFetchSize(int fetchSize) {
+        checkState(
+                fetchSize > 1,
+                String.format(
+                        "The value of option '%s' must larger than 1, but is %d",
+                        SCAN_SNAPSHOT_FETCH_SIZE.key(), fetchSize));
     }
 }

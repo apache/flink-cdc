@@ -14,7 +14,7 @@ This README is meant as a brief walkthrough on the core features with Flink CDC 
 | MongoDB | Database: 4.0, 4.2, 5.0 <br/> MongoDB Driver: 4.3.1 |
 ## Features
 
-1. Supports reading database snapshot and continues to read binlogs with **exactly-once processing** even failures happen.
+1. Supports reading database snapshot and continues to read transaction logs with **exactly-once processing** even failures happen.
 2. CDC connectors for DataStream API, users can consume changes on multiple databases and tables in a single job without Debezium and Kafka deployed.
 3. CDC connectors for Table/SQL API, users can use SQL DDL to create a CDC source to monitor changes on a single table.
 
@@ -59,17 +59,18 @@ Include following Maven dependency (available through Maven Central):
   <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>2.1.0</version>
+  <!-- the dependency is available only for stable releases. -->
+  <version>2.1-SNAPSHOT</version>
 </dependency>
 ```
 
 ```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.mysql.MySqlSource;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
-public class MySqlBinlogSourceExample {
+public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
     Properties debeziumProperties = new Properties();
     debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
@@ -81,16 +82,20 @@ public class MySqlBinlogSourceExample {
             .username("yourUsername")
             .password("yourPassword")
             .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
-            .debeziumProperties(debeziumProperties)
             .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
+    // enable checkpoint
+    env.enableCheckpointing(3000);
+
     env
-      .addSource(sourceFunction)
+      .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
+      // set 4 parallel source tasks
+      .setParallelism(4)
       .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
 
-    env.execute();
+    env.execute("Print MySQL Snapshot + Binlog");
   }
 }
 ```

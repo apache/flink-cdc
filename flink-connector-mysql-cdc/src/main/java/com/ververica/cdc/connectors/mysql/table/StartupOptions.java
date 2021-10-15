@@ -18,12 +18,15 @@
 
 package com.ververica.cdc.connectors.mysql.table;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** Debezium startup options. */
-public final class StartupOptions {
+public final class StartupOptions implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     public final StartupMode startupMode;
     public final String specificOffsetFile;
     public final Integer specificOffsetPos;

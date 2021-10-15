@@ -19,6 +19,7 @@
 package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.Source;
@@ -27,7 +28,6 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -40,6 +40,8 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSp
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
@@ -47,17 +49,11 @@ import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Supplier;
-
-import static com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.DATABASE_SERVER_ID;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.SCAN_STARTUP_MODE;
-import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.getServerIdForSubTask;
 
 /**
  * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithm which supports parallel
@@ -69,27 +65,48 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlSourceOptions.getSe
  *     3. The source does need apply any lock of MySQL.
  * </pre>
  *
- * @param <T> The record type.
+ * <pre>{@code
+ * MySqlSource
+ *     .<RowData>builder()
+ *     .hostname("localhost")
+ *     .port(3306)
+ *     .databaseList("mydb")
+ *     .tableList("mydb.users")
+ *     .username(username)
+ *     .password(password)
+ *     .serverId(5400)
+ *     .deserializer(new JsonDebeziumDeserializationSchema())
+ *     .build();
+ * }</pre>
+ *
+ * <p>See {@link MySqlSourceBuilder} for more details.
+ *
+ * @param <T> the output type of the source.
  */
 @Internal
-public class MySqlParallelSource<T>
+public class MySqlSource<T>
         implements Source<T, MySqlSplit, PendingSplitsState>, ResultTypeQueryable<T> {
 
     private static final long serialVersionUID = 1L;
 
+    private final MySqlSourceConfigFactory configFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
-    private final Configuration config;
-    private final String startupMode;
-    private final String historyInstanceName;
 
-    public MySqlParallelSource(
-            DebeziumDeserializationSchema<T> deserializationSchema, Configuration config) {
+    /**
+     * Get a MySqlParallelSourceBuilder to build a {@link MySqlSource}.
+     *
+     * @return a MySql parallel source builder.
+     */
+    @PublicEvolving
+    public static <T> MySqlSourceBuilder<T> builder() {
+        return new MySqlSourceBuilder<>();
+    }
+
+    MySqlSource(
+            MySqlSourceConfigFactory configFactory,
+            DebeziumDeserializationSchema<T> deserializationSchema) {
+        this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
-        this.config = config;
-        this.startupMode = config.get(SCAN_STARTUP_MODE);
-        this.historyInstanceName =
-                config.toMap()
-                        .getOrDefault(DATABASE_HISTORY_INSTANCE_NAME, UUID.randomUUID().toString());
     }
 
     @Override
@@ -100,46 +117,48 @@ public class MySqlParallelSource<T>
     @Override
     public SourceReader<T, MySqlSplit> createReader(SourceReaderContext readerContext)
             throws Exception {
+        // create source config for the given subtask (e.g. unique server id)
+        MySqlSourceConfig sourceConfig =
+                configFactory.createConfig(readerContext.getIndexOfSubtask());
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
-        final Configuration readerConfiguration = getReaderConfig(readerContext);
         final MySqlSourceReaderMetrics sourceReaderMetrics =
                 new MySqlSourceReaderMetrics(readerContext.metricGroup());
         sourceReaderMetrics.registerMetrics();
         Supplier<MySqlSplitReader> splitReaderSupplier =
-                () -> new MySqlSplitReader(readerConfiguration, readerContext.getIndexOfSubtask());
+                () -> new MySqlSplitReader(sourceConfig, readerContext.getIndexOfSubtask());
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
-                new MySqlRecordEmitter<>(deserializationSchema, sourceReaderMetrics),
-                readerConfiguration,
+                new MySqlRecordEmitter<>(
+                        deserializationSchema,
+                        sourceReaderMetrics,
+                        sourceConfig.isIncludeSchemaChanges()),
+                readerContext.getConfiguration(),
                 readerContext);
-    }
-
-    private Configuration getReaderConfig(SourceReaderContext readerContext) {
-        // set the server id for each reader, will used by debezium reader
-        Configuration readerConfiguration = config.clone();
-        readerConfiguration.removeConfig(MySqlSourceOptions.SERVER_ID);
-        final Optional<String> serverId =
-                getServerIdForSubTask(config, readerContext.getIndexOfSubtask());
-        serverId.ifPresent(s -> readerConfiguration.setString(DATABASE_SERVER_ID, s));
-        // set the DatabaseHistory name for each reader, will used by debezium reader
-        readerConfiguration.setString(
-                DATABASE_HISTORY_INSTANCE_NAME,
-                historyInstanceName + "_" + readerContext.getIndexOfSubtask());
-        return readerConfiguration;
     }
 
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) {
-        MySqlValidator validator = new MySqlValidator(config);
         final int currentParallelism = enumContext.currentParallelism();
+        MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+        // check the valid for server id range and parallelism.
+        if (sourceConfig.getServerIdRange() != null
+                && sourceConfig.getServerIdRange().getNumberOfServerIds() < currentParallelism) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "The server id range [%s] is not enough for current source parallelism %s, "
+                                    + "please adjust the server id range to make the number of server id is "
+                                    + "larger than the source parallelism.",
+                            sourceConfig.getServerIdRange(), currentParallelism));
+        }
 
+        MySqlValidator validator = new MySqlValidator(sourceConfig.getDbzProperties());
         final MySqlSplitAssigner splitAssigner =
-                startupMode.equals("initial")
-                        ? new MySqlHybridSplitAssigner(config, currentParallelism)
-                        : new MySqlBinlogSplitAssigner(config);
+                StartupMode.INITIAL == sourceConfig.getStartupOptions().startupMode
+                        ? new MySqlHybridSplitAssigner(sourceConfig, currentParallelism)
+                        : new MySqlBinlogSplitAssigner(sourceConfig);
 
         return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
     }
@@ -147,16 +166,20 @@ public class MySqlParallelSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
-        MySqlValidator validator = new MySqlValidator(config);
+        MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+        MySqlValidator validator = new MySqlValidator(sourceConfig.getDbzProperties());
         final MySqlSplitAssigner splitAssigner;
         final int currentParallelism = enumContext.currentParallelism();
         if (checkpoint instanceof HybridPendingSplitsState) {
             splitAssigner =
                     new MySqlHybridSplitAssigner(
-                            config, currentParallelism, (HybridPendingSplitsState) checkpoint);
+                            sourceConfig,
+                            currentParallelism,
+                            (HybridPendingSplitsState) checkpoint);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
-                    new MySqlBinlogSplitAssigner(config, (BinlogPendingSplitsState) checkpoint);
+                    new MySqlBinlogSplitAssigner(
+                            sourceConfig, (BinlogPendingSplitsState) checkpoint);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);

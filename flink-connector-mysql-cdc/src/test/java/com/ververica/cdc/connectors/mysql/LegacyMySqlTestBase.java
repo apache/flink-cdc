@@ -33,9 +33,9 @@ import java.util.stream.Stream;
  * Basic class for testing MySQL binlog source, this contains a MySQL container which enables
  * binlog.
  */
-public abstract class MySqlTestBase extends AbstractTestBase {
+public abstract class LegacyMySqlTestBase extends AbstractTestBase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlTestBase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LegacyMySqlTestBase.class);
 
     protected static final MySqlContainer MYSQL_CONTAINER =
             (MySqlContainer)

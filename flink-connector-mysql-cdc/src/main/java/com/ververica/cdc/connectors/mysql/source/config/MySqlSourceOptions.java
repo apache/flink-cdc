@@ -16,22 +16,19 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source;
+package com.ververica.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.util.Preconditions;
+
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 import java.time.Duration;
-import java.util.Optional;
 
-/** Configurations for {@link MySqlParallelSource}. */
+/** Configurations for {@link MySqlSource}. */
 public class MySqlSourceOptions {
 
     public static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
-    public static final String DATABASE_SERVER_ID = "database.server.id";
 
     public static final ConfigOption<String> HOSTNAME =
             ConfigOptions.key("hostname")
@@ -154,71 +151,4 @@ public class MySqlSourceOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Optional timestamp used in case of \"timestamp\" startup mode");
-
-    // utils
-    public static String validateAndGetServerId(ReadableConfig configuration) {
-        final String serverIdValue = configuration.get(MySqlSourceOptions.SERVER_ID);
-
-        if (serverIdValue != null) {
-            if (serverIdValue.contains("-")) {
-                String[] idArray = serverIdValue.split("-");
-                if (idArray.length != 2) {
-                    throw new IllegalArgumentException(
-                            String.format(
-                                    "The range '%s' should be syntax like '5400-5500', but got: %s",
-                                    SERVER_ID.key(), serverIdValue));
-                }
-                checkServerId(idArray[0].trim());
-                checkServerId(idArray[1].trim());
-            } else {
-                checkServerId(serverIdValue);
-            }
-        }
-        return serverIdValue;
-    }
-
-    private static void checkServerId(String serverIdValue) {
-        try {
-            Integer.parseInt(serverIdValue);
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException(
-                    String.format(
-                            "The 'server-id' should contains single numeric ID like '5400' or numeric ID range '5400-5404', but actual is %s",
-                            serverIdValue),
-                    e);
-        }
-    }
-
-    public static int getServerId(String serverIdValue) {
-        return Integer.parseInt(serverIdValue);
-    }
-
-    public static Optional<String> getServerIdForSubTask(
-            Configuration configuration, int subtaskId) {
-        String serverIdRange = configuration.getString(MySqlSourceOptions.SERVER_ID);
-        if (serverIdRange == null) {
-            return Optional.empty();
-        }
-        if (serverIdRange.contains("-")) {
-            int serverIdStart = Integer.parseInt(serverIdRange.split("-")[0].trim());
-            int serverIdEnd = Integer.parseInt(serverIdRange.split("-")[1].trim());
-            int serverId = serverIdStart + subtaskId;
-            Preconditions.checkState(
-                    serverIdStart <= serverId && serverId <= serverIdEnd,
-                    String.format(
-                            "The server id %s in task %d is out of server id range %s, please keep the job parallelism same with server id num of server id range.",
-                            serverId, subtaskId, serverIdRange));
-            return Optional.of(String.valueOf(serverId));
-        } else {
-            int serverIdStart = Integer.parseInt(serverIdRange);
-            if (subtaskId > 0) {
-                throw new IllegalStateException(
-                        String.format(
-                                "The server id should a range like '5400-5404' when %s enabled , but actual is %s",
-                                SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(), serverIdRange));
-            } else {
-                return Optional.of(String.valueOf(serverIdStart));
-            }
-        }
-    }
 }

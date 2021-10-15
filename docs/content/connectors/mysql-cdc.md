@@ -13,13 +13,16 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <version>2.1.0</version>
+  <!-- the dependency is available only for stable releases. -->
+  <version>2.1-SNAPSHOT</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-mysql-cdc-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1.0/flink-sql-connector-mysql-cdc-2.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+```Download link is available only for stable releases.```
+
+Download [flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1-SNAPSHOT/flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
 Setup MySQL server
 ----------------
@@ -381,15 +384,13 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 
 ### DataStream Source
 
-The Incremental Snapshot Reading feature of MySQL CDC Source only exposes in SQL currently, if you're using DataStream, please use legacy MySQL Source:
-
 ```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.mysql.MySqlSource;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
-public class MySqlBinlogSourceExample {
+public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
     Properties debeziumProperties = new Properties();
     debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
@@ -406,11 +407,16 @@ public class MySqlBinlogSourceExample {
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
+    // enable checkpoint
+    env.enableCheckpointing(3000);
+
     env
-      .addSource(sourceFunction)
+      .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
+      // set 4 parallel source tasks
+      .setParallelism(4)
       .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
 
-    env.execute();
+    env.execute("Print MySQL Snapshot + Binlog");
   }
 }
 ```

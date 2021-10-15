@@ -19,10 +19,9 @@
 package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.ValidationException;
 
-import com.ververica.cdc.connectors.mysql.source.MySqlParallelSource;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -150,11 +149,18 @@ public class MySqlValidatorTest {
 
     private void startSource(UniqueDatabase database) throws Exception {
         if (runIncrementalSnapshot) {
-            MySqlParallelSource<?> mySqlParallelSource =
-                    new MySqlParallelSource<>(
-                            new MySqlTestUtils.ForwardDeserializeSchema(),
-                            Configuration.fromMap(database.getConfigMap()));
-            mySqlParallelSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
+            MySqlSource<?> mySqlSource =
+                    MySqlSource.<SourceRecord>builder()
+                            .hostname(database.getHost())
+                            .username(database.getUsername())
+                            .password(database.getPassword())
+                            .port(database.getDatabasePort())
+                            .databaseList(database.getDatabaseName())
+                            .tableList(database.getDatabaseName() + ".products")
+                            .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
+                            .build();
+
+            mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
         } else {
             DebeziumSourceFunction<SourceRecord> source =
                     basicSourceBuilder(database, false).build();
