@@ -89,8 +89,6 @@ import com.ververica.cdc.connectors.mysql.MySqlSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
-    Properties debeziumProperties = new Properties();
-    debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
     SourceFunction<String> sourceFunction = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
@@ -99,7 +97,6 @@ public class MySqlBinlogSourceExample {
         .username("yourUsername")
         .password("yourPassword")
         .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
-        .debeziumProperties(debeziumProperties)
         .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
