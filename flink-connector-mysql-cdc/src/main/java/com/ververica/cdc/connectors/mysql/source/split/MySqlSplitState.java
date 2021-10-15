@@ -47,6 +47,6 @@ public abstract class MySqlSplitState {
         return (MySqlBinlogSplitState) this;
     }
 
-    /** Use the current split state to create a new MySQLSplit. */
+    /** Use the current split state to create a new MySqlSplit. */
     public abstract MySqlSplit toMySqlSplit();
 }

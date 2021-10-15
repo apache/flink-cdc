@@ -73,7 +73,7 @@ public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {
     Properties debeziumProperties = new Properties();
     debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
-    SourceFunction<String> sourceFunction = MySQLSource.<String>builder()
+    SourceFunction<String> sourceFunction = MySqlSource.<String>builder()
             .hostname("yourHostname")
             .port(yourPort)
             .databaseList("yourDatabaseName") // set captured database
