@@ -392,15 +392,15 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
-    MySqlSource<String> source = MySqlSource.<String>builder()
-            .hostname("yourHostname")
-            .port(yourPort)
-            .databaseList("yourDatabaseName") // set captured database
-            .tableList("yourDatabaseName.yourTableName") // set captured table
-            .username("yourUsername")
-            .password("yourPassword")
-            .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
-            .build();
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .databaseList("yourDatabaseName") // set captured database
+        .tableList("yourDatabaseName.yourTableName") // set captured table
+        .username("yourUsername")
+        .password("yourPassword")
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 

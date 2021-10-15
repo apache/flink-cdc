@@ -61,7 +61,7 @@ import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINL
 /**
  * A stateful task context that contains entries the debezium mysql connector task required.
  *
- * <p>The offset change and schema change should record to MySQLSplitState when emit the record,
+ * <p>The offset change and schema change should record to MySqlSplitState when emit the record,
  * thus the Flink's state mechanism can help to store/restore when failover happens.
  */
 public class StatefulTaskContext {
