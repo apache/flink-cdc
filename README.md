@@ -72,8 +72,6 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
-    Properties debeziumProperties = new Properties();
-    debeziumProperties.put("snapshot.locking.mode", "none");// do not use lock
     SourceFunction<String> sourceFunction = MySqlSource.<String>builder()
             .hostname("yourHostname")
             .port(yourPort)
