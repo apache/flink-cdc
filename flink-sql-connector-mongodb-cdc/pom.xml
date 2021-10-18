@@ -63,6 +63,7 @@ under the License.
                                     <include>org.mongodb:bson</include>
                                     <include>org.apache.avro:avro</include>
                                     <include>org.apache.kafka:*</include>
+                                    <include>com.fasterxml.jackson.core:*</include>
                                 </includes>
                             </artifactSet>
                             <filters>
