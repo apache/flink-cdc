@@ -6,4 +6,5 @@
 mysql-cdc
 postgres-cdc
 mongodb-cdc
+oracle-cdc
 ```
