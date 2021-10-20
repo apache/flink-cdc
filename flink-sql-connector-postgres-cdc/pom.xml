@@ -59,8 +59,10 @@ under the License.
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-postgres-cdc</include>
                                     <include>com.google.protobuf:protobuf-java</include>
+                                    <include>com.google.guava:*</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>org.postgresql:postgresql</include>
+                                    <include>com.fasterxml.*:*</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -85,9 +87,15 @@ under the License.
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>com.google.protobuf</pattern>
+                                    <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.google.protobuf
+                                        com.ververica.cdc.connectors.shaded.com.google
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.com.fasterxml
                                     </shadedPattern>
                                 </relocation>
                             </relocations>
