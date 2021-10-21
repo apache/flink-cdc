@@ -24,7 +24,7 @@ trigger:
     - '*'  # must quote since "*" is a YAML reserved character; we want a string
 
 pool:
-  vmImage: 'ubuntu-16.04'
+  vmImage: 'ubuntu-18.04'
 
 steps:
 - task: Maven@3
