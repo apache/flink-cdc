@@ -1,13 +1,13 @@
 # Building a Streaming Application with Flink Mysql/Postgres CDC
 
-This tutorial is to show how to quickly build streaming applications with  Flink Mysql/Postgres CDC.
+This tutorial is to show how to quickly build streaming applications with Flink Mysql/Postgres CDC.
 
 Assuming we are running an e-commerce business. The product and order data stored in MySQL, the shipment data related to the order is stored in Postgres.
 We need to build a streaming application to meet the following requirements:
 1. Enrich the orders using the product and shipment table and write enriched orders to ElasticSearch in real time
 2. Calculate the GMV(Gross Merchandise Volume) by daily and write to Kafka in real time
 
-In the following sections, we will describe how to use Flink Mysql/Postgres CDC to meet the requirements.
+In the following sections, we will describe how to use Flink Mysql/Postgres CDC to meet all the requirements.
 All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
@@ -80,9 +80,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 ```
 The Docker Compose environment consists of the following containers:
-- MySQL:  the `products`,`orders` tables will be store in the database. They will be joined with data in Postgres to enrich the orders.
+- MySQL: the `products`,`orders` tables will be store in the database. They will be joined with data in Postgres to enrich the orders.
 - Postgres: the `shipments` table will be store in the database.
-- Elasticsearch: mainly used as a data sink to store detailed orders.
+- Elasticsearch: mainly used as a data sink to store enriched orders.
 - Kibana: used to visualize the data in Elasticsearch.
 - Zookeeper: this component is required by Kafka.
 - Kafka: mainly used as a data sink to store GMV
@@ -91,11 +91,11 @@ To start all containers, run the following command in the directory that contain
 ```shell
 docker-compose up -d
 ```
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether the 7 containers are running properly.
+This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly.
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
 Don’t forget to run the following command to stop all containers after finishing the tutorial:
-```shell![img.png](img.png)
+```shell
 docker-compose down
 ```
 
@@ -302,7 +302,7 @@ Flink SQL> CREATE TABLE kafka_gmv (
 ```
 
 ### Enriching the orders using the products and shipments tables and write to ElasticSearch
-Use Flink SQL to join the order table with the products and shipments table to enrich orders and write to the Elasticsearch.
+Use Flink SQL to join the `order` table with the `products` and `shipments` table to enrich orders and write to the Elasticsearch.
 ```sql
 -- Flink SQL
 Flink SQL> INSERT INTO enriched_orders
