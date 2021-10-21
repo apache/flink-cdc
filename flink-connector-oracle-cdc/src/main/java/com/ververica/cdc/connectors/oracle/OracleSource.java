@@ -42,7 +42,7 @@ public class OracleSource {
     /** Builder class of {@link OracleSource}. */
     public static class Builder<T> {
 
-        private int port = 1521; // default 3306 port
+        private int port = 1521; // default 1521 port
         private String hostname;
         private String database;
         private String username;
@@ -77,8 +77,8 @@ public class OracleSource {
         /**
          * An optional list of regular expressions that match fully-qualified table identifiers for
          * tables to be monitored; any table not included in the list will be excluded from
-         * monitoring. Each identifier is of the form schemaName.tableName. By default the
-         * connector will monitor every non-system table in each monitored database.
+         * monitoring. Each identifier is of the form schemaName.tableName. By default the connector
+         * will monitor every non-system table in each monitored database.
          */
         public Builder<T> tableList(String... tableList) {
             this.tableList = tableList;
