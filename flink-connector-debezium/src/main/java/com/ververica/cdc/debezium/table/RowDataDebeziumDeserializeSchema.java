@@ -20,31 +20,22 @@ package com.ververica.cdc.debezium.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.DecimalData;
-import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
-import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
 
-import com.esri.core.geometry.ogc.OGCGeometry;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.utils.TemporalConversions;
-import io.debezium.data.EnumSet;
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
-import io.debezium.data.geometry.Geometry;
-import io.debezium.data.geometry.Point;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
@@ -57,16 +48,13 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.Serializable;
-import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -106,6 +94,10 @@ public final class RowDataDebeziumDeserializeSchema
     /** Validator to validate the row value. */
     private final ValueValidator validator;
 
+    /** Factories to create customized converter for {@link LogicalTypeRoot}. */
+    private final Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
+            customizedConverterFactories;
+
     /** Returns a builder to build {@link RowDataDebeziumDeserializeSchema}. */
     public static Builder newBuilder() {
         return new Builder();
@@ -116,9 +108,12 @@ public final class RowDataDebeziumDeserializeSchema
             MetadataConverter[] metadataConverters,
             TypeInformation<RowData> resultTypeInfo,
             ValueValidator validator,
-            ZoneId serverTimeZone) {
+            ZoneId serverTimeZone,
+            Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
+                    customizedConverterFactories) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
+        this.customizedConverterFactories = checkNotNull(customizedConverterFactories);
         this.physicalConverter = createConverter(checkNotNull(physicalDataType));
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
@@ -192,6 +187,8 @@ public final class RowDataDebeziumDeserializeSchema
         private MetadataConverter[] metadataConverters = new MetadataConverter[0];
         private ValueValidator validator = (rowData, rowKind) -> {};
         private ZoneId serverTimeZone = ZoneId.of("UTC");
+        private Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
+                customizedConverterFactories = new HashMap<>();
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -218,9 +215,21 @@ public final class RowDataDebeziumDeserializeSchema
             return this;
         }
 
+        public Builder setCustomizedConverterFactories(
+                Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
+                        customizedConverterFactories) {
+            this.customizedConverterFactories = customizedConverterFactories;
+            return this;
+        }
+
         public RowDataDebeziumDeserializeSchema build() {
             return new RowDataDebeziumDeserializeSchema(
-                    physicalRowType, metadataConverters, resultTypeInfo, validator, serverTimeZone);
+                    physicalRowType,
+                    metadataConverters,
+                    resultTypeInfo,
+                    validator,
+                    serverTimeZone,
+                    customizedConverterFactories);
         }
     }
 
@@ -228,18 +237,24 @@ public final class RowDataDebeziumDeserializeSchema
     // Runtime Converters
     // -------------------------------------------------------------------------------------
 
-    /**
-     * Runtime converter that converts objects of Debezium into objects of Flink Table & SQL
-     * internal data structures.
-     */
-    @FunctionalInterface
-    private interface DeserializationRuntimeConverter extends Serializable {
-        Object convert(Object dbzObj, Schema schema) throws Exception;
-    }
-
     /** Creates a runtime converter which is null safe. */
     private DeserializationRuntimeConverter createConverter(LogicalType type) {
-        return wrapIntoNullableConverter(createNotNullConverter(type));
+        return wrapIntoNullableConverter(
+                replaceWithCustomizeConverter(createNotNullConverter(type), type));
+    }
+
+    /** Replace the converter with customized converter if needed. */
+    private DeserializationRuntimeConverter replaceWithCustomizeConverter(
+            DeserializationRuntimeConverter converter, LogicalType type) {
+        // if the type root of the LogicalType is in customizedConverterFactories,
+        // replace it with the corresponding customized converter
+        if (customizedConverterFactories.containsKey(type.getTypeRoot())) {
+            return customizedConverterFactories
+                    .get(type.getTypeRoot())
+                    .create(type, this::createConverter);
+        } else {
+            return converter;
+        }
     }
 
     // --------------------------------------------------------------------------------
@@ -312,12 +327,23 @@ public final class RowDataDebeziumDeserializeSchema
             case ROW:
                 return createRowConverter((RowType) type);
             case ARRAY:
-                return createArrayConverter((ArrayType) type);
             case MAP:
             case MULTISET:
             case RAW:
             default:
-                throw new UnsupportedOperationException("Unsupported type: " + type);
+                // if the type is contained in customizedConverterFactories,
+                // not to throw UnsupportedOperationException directly for
+                // the customized converter may support it.
+                if (customizedConverterFactories.containsKey(type.getTypeRoot())) {
+                    return new DeserializationRuntimeConverter() {
+                        @Override
+                        public Object convert(Object dbzObj, Schema schema) throws Exception {
+                            throw new UnsupportedOperationException("Unsupported type: " + type);
+                        }
+                    };
+                } else {
+                    throw new UnsupportedOperationException("Unsupported type: " + type);
+                }
         }
     }
 
@@ -500,39 +526,13 @@ public final class RowDataDebeziumDeserializeSchema
     }
 
     private DeserializationRuntimeConverter convertToString() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        ObjectWriter objectWriter = objectMapper.writer();
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
             @Override
             public Object convert(Object dbzObj, Schema schema) {
-                if (Point.LOGICAL_NAME.equals(schema.name())
-                        || Geometry.LOGICAL_NAME.equals(schema.name())) {
-                    try {
-                        Struct geometryStruct = (Struct) dbzObj;
-                        byte[] wkb = geometryStruct.getBytes("wkb");
-                        String geoJson = OGCGeometry.fromBinary(ByteBuffer.wrap(wkb)).asGeoJson();
-                        JsonNode originGeoNode = objectMapper.readTree(geoJson);
-                        Optional<Integer> srid =
-                                Optional.ofNullable(geometryStruct.getInt32("srid"));
-                        Map<String, Object> geometryInfo =
-                                new HashMap<String, Object>() {
-                                    {
-                                        put("type", originGeoNode.get("type"));
-                                        put("coordinates", originGeoNode.get("coordinates"));
-                                        put("srid", srid.orElse(0));
-                                    }
-                                };
-                        return StringData.fromString(objectWriter.writeValueAsString(geometryInfo));
-                    } catch (Exception e) {
-                        throw new IllegalArgumentException(
-                                String.format("Failed to convert %s to geometry JSON.", dbzObj), e);
-                    }
-                } else {
-                    return StringData.fromString(dbzObj.toString());
-                }
+                return StringData.fromString(dbzObj.toString());
             }
         };
     }
@@ -589,39 +589,6 @@ public final class RowDataDebeziumDeserializeSchema
                     }
                 }
                 return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
-            }
-        };
-    }
-
-    private DeserializationRuntimeConverter createArrayConverter(ArrayType arrayType) {
-        final Class<?> elementClass =
-                LogicalTypeUtils.toInternalConversionClass(arrayType.getElementType());
-        final DeserializationRuntimeConverter elementConverter =
-                createConverter(arrayType.getElementType());
-        return (dbzObj, schema) -> {
-            if (dbzObj instanceof List) {
-                List<?> elements = (List<?>) dbzObj;
-                final Object[] elementArray =
-                        (Object[]) Array.newInstance(elementClass, elements.size());
-                for (int i = 0; i < elements.size(); i++) {
-                    elementArray[i] = elementConverter.convert(elements.get(i), schema);
-                }
-                return new GenericArrayData(elementArray);
-            } else if (EnumSet.LOGICAL_NAME.equals(schema.name()) && dbzObj instanceof String) {
-                // for SET datatype in mysql, debezium will always return a string split by comma
-                // like "a,b,c"
-                String[] elements = ((String) dbzObj).split(",");
-                final Object[] elementArray =
-                        (Object[]) Array.newInstance(elementClass, elements.length);
-                for (int i = 0; i < elements.length; i++) {
-                    elementArray[i] = elementConverter.convert(elements[i], schema);
-                }
-                return new GenericArrayData(elementArray);
-            } else {
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Unable convert to Flink ARRAY type from unexpected value '%s', only LIST and SET type could convert to ARRAY type",
-                                dbzObj));
             }
         };
     }
