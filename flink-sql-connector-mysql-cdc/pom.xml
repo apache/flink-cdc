@@ -63,6 +63,8 @@ under the License.
                                     <include>org.apache.kafka:*</include>
                                     <include>mysql:mysql-connector-java</include>
                                     <include>com.zendesk:mysql-binlog-connector-java</include>
+                                    <include>com.fasterxml.*:*</include>
+                                    <include>com.google.guava:*</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -90,6 +92,18 @@ under the License.
                                     <pattern>org.antlr</pattern>
                                     <shadedPattern>
                                         com.ververica.cdc.connectors.shaded.org.antlr
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.com.fasterxml
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                             </relocations>
