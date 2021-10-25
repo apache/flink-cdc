@@ -574,7 +574,10 @@ public final class RowDataDebeziumDeserializeSchema
                     if (field == null) {
                         row.setField(i, null);
                     } else {
-                        Object fieldValue = struct.get(field);
+                        Object fieldValue =
+                                field.schema().isOptional()
+                                        ? struct.getWithoutDefault(fieldName)
+                                        : struct.get(field);
                         Schema fieldSchema = schema.field(fieldName).schema();
                         Object convertedField =
                                 convertField(fieldConverters[i], fieldValue, fieldSchema);
