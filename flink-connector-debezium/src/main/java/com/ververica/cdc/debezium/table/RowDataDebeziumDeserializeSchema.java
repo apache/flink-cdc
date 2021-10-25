@@ -26,7 +26,6 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
-import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
@@ -47,14 +46,14 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.Map;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -88,15 +87,8 @@ public final class RowDataDebeziumDeserializeSchema
      */
     private final AppendMetadataCollector appendMetadataCollector;
 
-    /** Time zone of the database server. */
-    private final ZoneId serverTimeZone;
-
     /** Validator to validate the row value. */
     private final ValueValidator validator;
-
-    /** Factories to create customized converter for {@link LogicalTypeRoot}. */
-    private final Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
-            customizedConverterFactories;
 
     /** Returns a builder to build {@link RowDataDebeziumDeserializeSchema}. */
     public static Builder newBuilder() {
@@ -109,15 +101,14 @@ public final class RowDataDebeziumDeserializeSchema
             TypeInformation<RowData> resultTypeInfo,
             ValueValidator validator,
             ZoneId serverTimeZone,
-            Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
-                    customizedConverterFactories) {
+            @Nullable DeserializationRuntimeConverterFactory customConverterFactory) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
-        this.customizedConverterFactories = checkNotNull(customizedConverterFactories);
-        this.physicalConverter = createConverter(checkNotNull(physicalDataType));
+        this.physicalConverter =
+                createConverter(
+                        checkNotNull(physicalDataType), serverTimeZone, customConverterFactory);
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
-        this.serverTimeZone = checkNotNull(serverTimeZone);
     }
 
     @Override
@@ -187,8 +178,7 @@ public final class RowDataDebeziumDeserializeSchema
         private MetadataConverter[] metadataConverters = new MetadataConverter[0];
         private ValueValidator validator = (rowData, rowKind) -> {};
         private ZoneId serverTimeZone = ZoneId.of("UTC");
-        private Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
-                customizedConverterFactories = new HashMap<>();
+        private DeserializationRuntimeConverterFactory customConverterFactory;
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -215,10 +205,9 @@ public final class RowDataDebeziumDeserializeSchema
             return this;
         }
 
-        public Builder setCustomizedConverterFactories(
-                Map<LogicalTypeRoot, DeserializationRuntimeConverterFactory>
-                        customizedConverterFactories) {
-            this.customizedConverterFactories = customizedConverterFactories;
+        public Builder setCustomConverterFactory(
+                DeserializationRuntimeConverterFactory customConverterFactory) {
+            this.customConverterFactory = customConverterFactory;
             return this;
         }
 
@@ -229,7 +218,7 @@ public final class RowDataDebeziumDeserializeSchema
                     resultTypeInfo,
                     validator,
                     serverTimeZone,
-                    customizedConverterFactories);
+                    customConverterFactory);
         }
     }
 
@@ -238,23 +227,18 @@ public final class RowDataDebeziumDeserializeSchema
     // -------------------------------------------------------------------------------------
 
     /** Creates a runtime converter which is null safe. */
-    private DeserializationRuntimeConverter createConverter(LogicalType type) {
-        return wrapIntoNullableConverter(
-                replaceWithCustomizeConverter(createNotNullConverter(type), type));
-    }
-
-    /** Replace the converter with customized converter if needed. */
-    private DeserializationRuntimeConverter replaceWithCustomizeConverter(
-            DeserializationRuntimeConverter converter, LogicalType type) {
-        // if the type root of the LogicalType is in customizedConverterFactories,
-        // replace it with the corresponding customized converter
-        if (customizedConverterFactories.containsKey(type.getTypeRoot())) {
-            return customizedConverterFactories
-                    .get(type.getTypeRoot())
-                    .create(type, this::createConverter);
+    private static DeserializationRuntimeConverter createConverter(
+            LogicalType type,
+            ZoneId serverTimeZone,
+            @Nullable DeserializationRuntimeConverterFactory customConverterFactory) {
+        DeserializationRuntimeConverter notNullConverter;
+        if (customConverterFactory != null) {
+            notNullConverter =
+                    customConverterFactory.create(type, serverTimeZone, customConverterFactory);
         } else {
-            return converter;
+            notNullConverter = createNotNullConverter(type, serverTimeZone, customConverterFactory);
         }
+        return wrapIntoNullableConverter(notNullConverter);
     }
 
     // --------------------------------------------------------------------------------
@@ -264,7 +248,10 @@ public final class RowDataDebeziumDeserializeSchema
     // --------------------------------------------------------------------------------
 
     /** Creates a runtime converter which assuming input object is not null. */
-    private DeserializationRuntimeConverter createNotNullConverter(LogicalType type) {
+    public static DeserializationRuntimeConverter createNotNullConverter(
+            LogicalType type,
+            ZoneId serverTimeZone,
+            @Nullable DeserializationRuntimeConverterFactory customConverterFactory) {
         switch (type.getTypeRoot()) {
             case NULL:
                 return new DeserializationRuntimeConverter() {
@@ -309,9 +296,9 @@ public final class RowDataDebeziumDeserializeSchema
             case TIME_WITHOUT_TIME_ZONE:
                 return convertToTime();
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return convertToTimestamp();
+                return convertToTimestamp(serverTimeZone);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return convertToLocalTimeZoneTimestamp();
+                return convertToLocalTimeZoneTimestamp(serverTimeZone);
             case FLOAT:
                 return convertToFloat();
             case DOUBLE:
@@ -325,29 +312,17 @@ public final class RowDataDebeziumDeserializeSchema
             case DECIMAL:
                 return createDecimalConverter((DecimalType) type);
             case ROW:
-                return createRowConverter((RowType) type);
+                return createRowConverter((RowType) type, serverTimeZone, customConverterFactory);
             case ARRAY:
             case MAP:
             case MULTISET:
             case RAW:
             default:
-                // if the type is contained in customizedConverterFactories,
-                // not to throw UnsupportedOperationException directly for
-                // the customized converter may support it.
-                if (customizedConverterFactories.containsKey(type.getTypeRoot())) {
-                    return new DeserializationRuntimeConverter() {
-                        @Override
-                        public Object convert(Object dbzObj, Schema schema) throws Exception {
-                            throw new UnsupportedOperationException("Unsupported type: " + type);
-                        }
-                    };
-                } else {
-                    throw new UnsupportedOperationException("Unsupported type: " + type);
-                }
+                throw new UnsupportedOperationException("Unsupported type: " + type);
         }
     }
 
-    private DeserializationRuntimeConverter convertToBoolean() {
+    private static DeserializationRuntimeConverter convertToBoolean() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -367,7 +342,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToInt() {
+    private static DeserializationRuntimeConverter convertToInt() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -385,7 +360,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToLong() {
+    private static DeserializationRuntimeConverter convertToLong() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -403,7 +378,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToDouble() {
+    private static DeserializationRuntimeConverter convertToDouble() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -421,7 +396,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToFloat() {
+    private static DeserializationRuntimeConverter convertToFloat() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -439,7 +414,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToDate() {
+    private static DeserializationRuntimeConverter convertToDate() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -451,7 +426,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToTime() {
+    private static DeserializationRuntimeConverter convertToTime() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -474,7 +449,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToTimestamp() {
+    private static DeserializationRuntimeConverter convertToTimestamp(ZoneId serverTimeZone) {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -502,7 +477,8 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToLocalTimeZoneTimestamp() {
+    private static DeserializationRuntimeConverter convertToLocalTimeZoneTimestamp(
+            ZoneId serverTimeZone) {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -525,7 +501,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToString() {
+    private static DeserializationRuntimeConverter convertToString() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -537,7 +513,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter convertToBinary() {
+    private static DeserializationRuntimeConverter convertToBinary() {
         return new DeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
@@ -559,7 +535,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter createDecimalConverter(DecimalType decimalType) {
+    private static DeserializationRuntimeConverter createDecimalConverter(DecimalType decimalType) {
         final int precision = decimalType.getPrecision();
         final int scale = decimalType.getScale();
         return new DeserializationRuntimeConverter() {
@@ -593,11 +569,17 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private DeserializationRuntimeConverter createRowConverter(RowType rowType) {
+    private static DeserializationRuntimeConverter createRowConverter(
+            RowType rowType,
+            ZoneId serverTimeZone,
+            DeserializationRuntimeConverterFactory customConverterFactory) {
         final DeserializationRuntimeConverter[] fieldConverters =
                 rowType.getFields().stream()
                         .map(RowType.RowField::getType)
-                        .map(this::createConverter)
+                        .map(
+                                logicType ->
+                                        createConverter(
+                                                logicType, serverTimeZone, customConverterFactory))
                         .toArray(DeserializationRuntimeConverter[]::new);
         final String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
 
@@ -628,7 +610,7 @@ public final class RowDataDebeziumDeserializeSchema
         };
     }
 
-    private Object convertField(
+    private static Object convertField(
             DeserializationRuntimeConverter fieldConverter, Object fieldValue, Schema fieldSchema)
             throws Exception {
         if (fieldValue == null) {
@@ -638,7 +620,7 @@ public final class RowDataDebeziumDeserializeSchema
         }
     }
 
-    private DeserializationRuntimeConverter wrapIntoNullableConverter(
+    private static DeserializationRuntimeConverter wrapIntoNullableConverter(
             DeserializationRuntimeConverter converter) {
         return new DeserializationRuntimeConverter() {
 

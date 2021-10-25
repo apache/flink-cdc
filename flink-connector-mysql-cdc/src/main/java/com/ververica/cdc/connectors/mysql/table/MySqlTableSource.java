@@ -144,9 +144,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
                         .setServerTimeZone(serverTimeZone)
-                        .setCustomizedConverterFactories(
-                                MySqlCustomizeConverterFactory.createCustomizeConverterFactories(
-                                        physicalDataType))
+                        .setCustomConverterFactory(MySqlCustomConverterFactoryProvider.provide())
                         .build();
         if (enableParallelRead) {
             MySqlSource<RowData> parallelSource =

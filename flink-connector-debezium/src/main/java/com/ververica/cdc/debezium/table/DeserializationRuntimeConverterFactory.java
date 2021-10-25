@@ -20,8 +20,10 @@ package com.ververica.cdc.debezium.table;
 
 import org.apache.flink.table.types.logical.LogicalType;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
-import java.util.function.Function;
+import java.time.ZoneId;
 
 /**
  * Factory to create {@link DeserializationRuntimeConverter} according to {@link LogicalType}. It's
@@ -35,12 +37,12 @@ public interface DeserializationRuntimeConverterFactory extends Serializable {
      *
      * @param logicalType the Flink Table & SQL internal datatype to be converted from objects of
      *     Debezium
-     * @param createConvertFunc the function called to create {@link
-     *     DeserializationRuntimeConverter}, useful when need to get the underlying converter of
-     *     nested data in a nest datatype such as {@link
-     *     org.apache.flink.table.types.logical.ArrayType}
+     * @param serverTimeZone TimeZone used to convert data with timestamp type
+     * @param converterFactory {@link DeserializationRuntimeConverterFactory} to be used when create
+     *     {@link DeserializationRuntimeConverter}
      */
     DeserializationRuntimeConverter create(
             LogicalType logicalType,
-            Function<LogicalType, DeserializationRuntimeConverter> createConvertFunc);
+            ZoneId serverTimeZone,
+            @Nullable DeserializationRuntimeConverterFactory converterFactory);
 }
