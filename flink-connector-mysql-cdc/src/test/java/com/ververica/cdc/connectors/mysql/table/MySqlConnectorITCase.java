@@ -71,6 +71,9 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
     private final UniqueDatabase userDatabase2 =
             new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
 
+    private final UniqueDatabase columnDefaultValue =
+            new UniqueDatabase(MYSQL_CONTAINER, "column_default_value", TEST_USER, TEST_PASSWORD);
+
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
@@ -1049,6 +1052,74 @@ public class MySqlConnectorITCase extends MySqlParallelSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testConsumingTableWithDefaultValueColumn() throws Exception {
+        columnDefaultValue.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " `id` INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        columnDefaultValue.getDatabaseName(),
+                        "products",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " description STRING"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql("INSERT INTO sink SELECT name,description FROM debezium_source");
+
+        waitForSnapshotStarted("sink");
+
+        String[] expected =
+                new String[] {
+                    "+I[null, Small 2-wheel scooter]",
+                    "+I[car battery, 12V car battery]",
+                    "+I[12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3]",
+                    "+I[hammer, 12oz carpenter's hammer]",
+                    "+I[hammer, 14oz carpenter's hammer]",
+                    "+I[hammer, 16oz carpenter's hammer]",
+                    "+I[rocks, box of assorted rocks]",
+                    "+I[jacket, water resistent black wind breaker]",
+                    "+I[spare tire, 24 inch spare tire]"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+        result.getJobClient().get().cancel().get();
+    }
     // ------------------------------------------------------------------------------------
 
     private String getDezImplementation() {
