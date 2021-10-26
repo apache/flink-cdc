@@ -31,6 +31,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -162,6 +163,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .debeziumProperties(dbzProperties)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
+                            .mySqlValidator(new MySqlValidator(physicalDataType.getFieldNames()))
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

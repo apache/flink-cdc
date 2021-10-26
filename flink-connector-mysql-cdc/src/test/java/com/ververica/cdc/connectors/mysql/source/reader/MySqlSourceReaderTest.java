@@ -30,6 +30,7 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.Collector;
 
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
@@ -150,7 +151,9 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
     }
 
     private MySqlSplit createBinlogSplit(MySqlSourceConfig sourceConfig) {
-        MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
+        MySqlBinlogSplitAssigner binlogSplitAssigner =
+                new MySqlBinlogSplitAssigner(
+                        sourceConfig, new MySqlValidator(sourceConfig.getDbzProperties()));
         binlogSplitAssigner.open();
         return binlogSplitAssigner.getNext().get();
     }

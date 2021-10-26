@@ -22,6 +22,7 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
@@ -227,7 +228,10 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     private List<MySqlSplit> getMySqlSplits(MySqlSourceConfig sourceConfig) {
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        new MySqlValidator(sourceConfig.getDbzProperties()));
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {

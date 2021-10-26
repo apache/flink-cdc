@@ -91,6 +91,7 @@ public class MySqlSource<T>
 
     private final MySqlSourceConfigFactory configFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
+    private final MySqlValidator mySqlValidator;
 
     /**
      * Get a MySqlParallelSourceBuilder to build a {@link MySqlSource}.
@@ -104,9 +105,11 @@ public class MySqlSource<T>
 
     MySqlSource(
             MySqlSourceConfigFactory configFactory,
-            DebeziumDeserializationSchema<T> deserializationSchema) {
+            DebeziumDeserializationSchema<T> deserializationSchema,
+            MySqlValidator mySqlValidator) {
         this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
+        this.mySqlValidator = mySqlValidator;
     }
 
     @Override
@@ -154,20 +157,19 @@ public class MySqlSource<T>
                             sourceConfig.getServerIdRange(), currentParallelism));
         }
 
-        MySqlValidator validator = new MySqlValidator(sourceConfig.getDbzProperties());
         final MySqlSplitAssigner splitAssigner =
                 StartupMode.INITIAL == sourceConfig.getStartupOptions().startupMode
-                        ? new MySqlHybridSplitAssigner(sourceConfig, currentParallelism)
-                        : new MySqlBinlogSplitAssigner(sourceConfig);
+                        ? new MySqlHybridSplitAssigner(
+                                sourceConfig, currentParallelism, mySqlValidator)
+                        : new MySqlBinlogSplitAssigner(sourceConfig, mySqlValidator);
 
-        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
+        return new MySqlSourceEnumerator(enumContext, splitAssigner, mySqlValidator);
     }
 
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
         MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
-        MySqlValidator validator = new MySqlValidator(sourceConfig.getDbzProperties());
         final MySqlSplitAssigner splitAssigner;
         final int currentParallelism = enumContext.currentParallelism();
         if (checkpoint instanceof HybridPendingSplitsState) {
@@ -175,17 +177,18 @@ public class MySqlSource<T>
                     new MySqlHybridSplitAssigner(
                             sourceConfig,
                             currentParallelism,
-                            (HybridPendingSplitsState) checkpoint);
+                            (HybridPendingSplitsState) checkpoint,
+                            mySqlValidator);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(
-                            sourceConfig, (BinlogPendingSplitsState) checkpoint);
+                            sourceConfig, (BinlogPendingSplitsState) checkpoint, mySqlValidator);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
 
-        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
+        return new MySqlSourceEnumerator(enumContext, splitAssigner, mySqlValidator);
     }
 
     @Override

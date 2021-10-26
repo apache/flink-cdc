@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.table;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -26,9 +27,11 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -49,6 +52,8 @@ import java.util.stream.Stream;
 import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /** Integration tests for MySQL binlog SQL source. */
 @RunWith(Parameterized.class)
@@ -102,6 +107,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
+        env.setRestartStrategy(RestartStrategies.noRestart());
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
             env.enableCheckpointing(200);
@@ -797,6 +803,117 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(
                 Arrays.asList(expected), fetchRows(result.collect(), expected.length));
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testSchemaValidation() {
+        // only run schema validation test when enable incremental snapshot
+        Assume.assumeTrue(incrementalSnapshot);
+        // test inconsistent schema for a single table
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE address ("
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " country STRING,"
+                                + " city STRING,"
+                                + " detail_address1 STRING,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "address",
+                        getDezImplementation(),
+                        true,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        try {
+            // async submit job
+            TableResult result =
+                    tEnv.executeSql(
+                            "SELECT id,\n"
+                                    + "country,\n"
+                                    + "city,\n"
+                                    + "detail_address1 FROM address");
+
+            CloseableIterator<Row> iterator = result.collect();
+            waitForSnapshotStarted(iterator);
+            fail("Should fail.");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "tables captured don't contains all columns")
+                            .isPresent());
+        }
+        // test inconsistent schema for sharding tables
+        userDatabase1.createAndInitialize();
+        userDatabase2.createAndInitialize();
+
+        sourceDDL =
+                String.format(
+                        "CREATE TABLE `user` ("
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " email STRING,"
+                                + " mis_age INT,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        userDatabase1.getUsername(),
+                        userDatabase1.getPassword(),
+                        String.format(
+                                "(%s|%s)",
+                                userDatabase1.getDatabaseName(), userDatabase2.getDatabaseName()),
+                        "user_table_.*",
+                        getDezImplementation(),
+                        true,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        try {
+            // async submit job
+            TableResult result = tEnv.executeSql("SELECT * FROM `user`");
+            CloseableIterator<Row> iterator = result.collect();
+            waitForSnapshotStarted(iterator);
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "tables captured don't contains all columns")
+                            .isPresent());
+        }
     }
 
     @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")

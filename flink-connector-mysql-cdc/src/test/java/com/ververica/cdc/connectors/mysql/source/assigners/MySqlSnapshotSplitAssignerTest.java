@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
@@ -128,7 +129,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     private List<String> getTestAssignSnapshotSplits(int splitSize, String[] captureTables) {
         MySqlSourceConfig configuration = getConfig(splitSize, captureTables);
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        configuration,
+                        DEFAULT_PARALLELISM,
+                        new MySqlValidator(configuration.getDbzProperties()));
 
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();

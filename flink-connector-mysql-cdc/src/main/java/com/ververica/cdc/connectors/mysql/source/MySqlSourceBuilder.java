@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.annotation.PublicEvolving;
 
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -54,6 +55,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class MySqlSourceBuilder<T> {
     private final MySqlSourceConfigFactory configFactory = new MySqlSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
+    private MySqlValidator mySqlValidator;
 
     public MySqlSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);
@@ -172,12 +174,23 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** The mysql validator. It's optional, default not to validate schema. */
+    public MySqlSourceBuilder<T> mySqlValidator(MySqlValidator mySqlValidator) {
+        this.mySqlValidator = mySqlValidator;
+        return this;
+    }
+
     /**
      * Build the {@link MySqlSource}.
      *
      * @return a MySqlParallelSource with the settings made for this builder.
      */
     public MySqlSource<T> build() {
-        return new MySqlSource<>(configFactory, checkNotNull(deserializer));
+        Properties dbzProperties = configFactory.createConfig(0).getDbzProperties();
+        if (mySqlValidator == null) {
+            mySqlValidator = new MySqlValidator();
+        }
+        mySqlValidator.initDbzProperties(dbzProperties);
+        return new MySqlSource<>(configFactory, checkNotNull(deserializer), mySqlValidator);
     }
 }

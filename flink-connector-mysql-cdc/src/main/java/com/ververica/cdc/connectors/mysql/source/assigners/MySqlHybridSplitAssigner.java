@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -48,25 +49,38 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     private boolean isBinlogSplitAssigned;
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
+    private final MySqlValidator validator;
 
-    public MySqlHybridSplitAssigner(MySqlSourceConfig sourceConfig, int currentParallelism) {
-        this(new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism), false);
+    public MySqlHybridSplitAssigner(
+            MySqlSourceConfig sourceConfig, int currentParallelism, MySqlValidator validator) {
+        this(
+                new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism, validator),
+                false,
+                validator);
     }
 
     public MySqlHybridSplitAssigner(
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
-            HybridPendingSplitsState checkpoint) {
+            HybridPendingSplitsState checkpoint,
+            MySqlValidator validator) {
         this(
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, currentParallelism, checkpoint.getSnapshotPendingSplits()),
-                checkpoint.isBinlogSplitAssigned());
+                        sourceConfig,
+                        currentParallelism,
+                        checkpoint.getSnapshotPendingSplits(),
+                        validator),
+                checkpoint.isBinlogSplitAssigned(),
+                validator);
     }
 
     private MySqlHybridSplitAssigner(
-            MySqlSnapshotSplitAssigner snapshotSplitAssigner, boolean isBinlogSplitAssigned) {
+            MySqlSnapshotSplitAssigner snapshotSplitAssigner,
+            boolean isBinlogSplitAssigned,
+            MySqlValidator validator) {
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
+        this.validator = validator;
     }
 
     @Override

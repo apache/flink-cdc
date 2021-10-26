@@ -23,6 +23,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
@@ -319,7 +320,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
 
         // step-1: create binlog split
-        MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
+        MySqlBinlogSplitAssigner binlogSplitAssigner =
+                new MySqlBinlogSplitAssigner(
+                        sourceConfig, new MySqlValidator(sourceConfig.getDbzProperties()));
         binlogSplitAssigner.open();
         MySqlSplit binlogSplit = binlogSplitAssigner.getNext().get();
 
@@ -554,7 +557,10 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
     private List<MySqlSnapshotSplit> getMySqlSplits(MySqlSourceConfig sourceConfig) {
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        new MySqlValidator(sourceConfig.getDbzProperties()));
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {

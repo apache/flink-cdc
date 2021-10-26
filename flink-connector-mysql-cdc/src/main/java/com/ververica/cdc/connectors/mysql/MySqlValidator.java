@@ -20,15 +20,26 @@ package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.util.CollectionUtil;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.relational.Column;
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
+
+import javax.annotation.Nullable;
 
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The validator for MySql: it only cares about the version of the database is larger than or equal
@@ -41,9 +52,21 @@ public class MySqlValidator implements Validator {
     private static final String BINLOG_FORMAT_ROW = "ROW";
     private static final String BINLOG_FORMAT_IMAGE_FULL = "FULL";
 
-    private final Properties dbzProperties;
+    private Properties dbzProperties;
+    // columns specified in Flink, used to do schema validation
+    @Nullable private List<String> columns;
+
+    public MySqlValidator() {}
 
     public MySqlValidator(Properties dbzProperties) {
+        this.dbzProperties = dbzProperties;
+    }
+
+    public MySqlValidator(List<String> columns) {
+        this.columns = columns;
+    }
+
+    public void initDbzProperties(Properties dbzProperties) {
         this.dbzProperties = dbzProperties;
     }
 
@@ -128,6 +151,28 @@ public class MySqlValidator implements Validator {
                                     + "required for this connector to work properly. Change the MySQL configuration to use a "
                                     + "binlog_row_image=FULL and restart the connector.",
                             rowImage, BINLOG_FORMAT_IMAGE_FULL));
+        }
+    }
+
+    /** Validate the schemas from MySQL source contains all columns specified in Flink. */
+    public void validateSchema(Map<TableId, TableChanges.TableChange> schemas) {
+        // skip validation when columns is null or empty
+        if (CollectionUtil.isNullOrEmpty(columns)) {
+            return;
+        }
+        Set<String> allTableColumns = new HashSet<>();
+        schemas.values()
+                .forEach(
+                        tableChange ->
+                                allTableColumns.addAll(
+                                        tableChange.getTable().columns().stream()
+                                                .map(Column::name)
+                                                .collect(Collectors.toList())));
+        if (!allTableColumns.containsAll(new HashSet<>(columns))) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "The columns %s in tables captured don't contains all columns %s specified in Flink DDL. ",
+                            allTableColumns, columns));
         }
     }
 }

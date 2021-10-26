@@ -18,15 +18,22 @@
 
 package com.ververica.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.util.FlinkRuntimeException;
+
+import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
@@ -34,7 +41,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quo
 public class TableDiscoveryUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
-    public static List<TableId> listTables(
+    private static List<TableId> listTables(
             MySqlConnection jdbc, RelationalTableFilters tableFilters) throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
         // -------------------
@@ -85,5 +92,44 @@ public class TableDiscoveryUtils {
             }
         }
         return capturedTableIds;
+    }
+
+    public static List<TableId> discoverCapturedTables(
+            MySqlConnection jdbc,
+            RelationalTableFilters tableFilters,
+            MySqlSourceConfig sourceConfig) {
+        final List<TableId> capturedTableIds;
+        try {
+            capturedTableIds = listTables(jdbc, tableFilters);
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException("Failed to discover captured tables", e);
+        }
+        if (capturedTableIds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
+                            sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
+        }
+        return capturedTableIds;
+    }
+
+    public static Map<TableId, TableChange> getTableSchemas(
+            MySqlSchema mySqlSchema, List<TableId> tableIds) {
+        Map<TableId, TableChange> tableSchemas = new HashMap<>();
+        for (TableId tableId : tableIds) {
+            TableChange tableSchema = mySqlSchema.getTableSchema(tableId);
+            tableSchemas.put(tableId, tableSchema);
+        }
+        return tableSchemas;
+    }
+
+    public static Map<TableId, TableChange> discoverCapturedTableSchemas(
+            MySqlConnection jdbc,
+            RelationalTableFilters tableFilters,
+            MySqlSourceConfig sourceConfig) {
+        final List<TableId> capturedTableIds =
+                discoverCapturedTables(jdbc, tableFilters, sourceConfig);
+        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc);
+        return getTableSchemas(mySqlSchema, capturedTableIds);
     }
 }
