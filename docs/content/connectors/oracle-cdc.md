@@ -5,11 +5,11 @@ The Oracle CDC connector allows for reading snapshot data and incremental data f
 Dependencies
 ------------
 
-In order to setup the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQl Client with SQL JAR bundles.
+In order to setup the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-```
+```xml
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-oracle-cdc</artifactId>
@@ -20,7 +20,7 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
+**Download link is available only for stable releases.**
 
 Download [flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.1-SNAPSHOT/flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
@@ -29,13 +29,13 @@ Setup Oracle
 You have to enable log archiving for Oracle database and define an Oracle user with appropriate permissions on all databases that the Debezium Oracle connector monitors.
 
 1. Enable log archiving 
-   
-    a. Connect to the database as DBA
+
+   (1.1). Connect to the database as DBA
     ```shells
     sqlplus sys/password@host:port/SID AS SYSDBA
     ```
-   
-    b. Enable log archiving
+
+   (1.2). Enable log archiving
     ```sql
     alter system set db_recovery_file_dest_size = 10G;
     alter system set db_recovery_file_dest = '/opt/oracle/oradata/recovery_area' scope=spfile;
@@ -68,15 +68,15 @@ You have to enable log archiving for Oracle database and define an Oracle user w
    ```
 
 2. Create an Oracle user with permissions
-   
-   a. Create Tablespace
+
+   (2.1). Create Tablespace
    ```sql
    sqlplus sys/password@host:port/SID AS SYSDBA;
      CREATE TABLESPACE logminer_tbs DATAFILE '/opt/oracle/oradata/SID/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
      exit;
    ```
-   
-   b. Create a user and grant permissions
+
+   (2.2). Create a user and grant permissions
    ```sql
    sqlplus sys/password@host:port/SID AS SYSDBA;
      CREATE USER flinkuser IDENTIFIED BY flinkpw DEFAULT TABLESPACE LOGMINER_TBS QUOTA UNLIMITED ON LOGMINER_TBS;
@@ -118,13 +118,13 @@ How to create an Oracle CDC table
 The Oracle CDC table can be defined as following:
 
 ```sql 
--- register an Oracle table 'orders' in Flink SQL
+-- register an Oracle table 'products' in Flink SQL
 Flink SQL> CREATE TABLE products (
      id INT NOT NULL,
      name STRING,
      description STRING,
      weight DECIMAL(10, 3),
-     PRIMARY KEY(order_id) NOT ENFORCED
+     PRIMARY KEY(id) NOT ENFORCED
      ) WITH (
      'connector' = 'oracle-cdc',
      'hostname' = 'localhost',
@@ -135,7 +135,7 @@ Flink SQL> CREATE TABLE products (
      'schema-name' = 'inventory',
      'table-name' = 'products');
   
--- read snapshot and binlogs from orders table
+-- read snapshot and binlogs from products table
 Flink SQL> SELECT * FROM products;
 ```
 
