@@ -244,7 +244,10 @@ public class MySqlSource {
             }
 
             return new DebeziumSourceFunction<>(
-                    deserializer, props, specificOffset, new MySqlValidator(props));
+                    deserializer,
+                    props,
+                    specificOffset,
+                    MySqlValidator.builder().dbzProperties(props).build());
         }
     }
 }

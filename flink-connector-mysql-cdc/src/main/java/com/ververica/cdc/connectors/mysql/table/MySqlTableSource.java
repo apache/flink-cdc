@@ -163,7 +163,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .debeziumProperties(dbzProperties)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
-                            .mySqlValidator(new MySqlValidator(physicalDataType.getFieldNames()))
+                            .mySqlValidatorBuilder(
+                                    MySqlValidator.builder()
+                                            .columns(physicalDataType.getFieldNames()))
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

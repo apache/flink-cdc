@@ -322,7 +322,10 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // step-1: create binlog split
         MySqlBinlogSplitAssigner binlogSplitAssigner =
                 new MySqlBinlogSplitAssigner(
-                        sourceConfig, new MySqlValidator(sourceConfig.getDbzProperties()));
+                        sourceConfig,
+                        MySqlValidator.builder()
+                                .dbzProperties(sourceConfig.getDbzProperties())
+                                .build());
         binlogSplitAssigner.open();
         MySqlSplit binlogSplit = binlogSplitAssigner.getNext().get();
 
@@ -560,7 +563,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 new MySqlSnapshotSplitAssigner(
                         sourceConfig,
                         DEFAULT_PARALLELISM,
-                        new MySqlValidator(sourceConfig.getDbzProperties()));
+                        MySqlValidator.builder()
+                                .dbzProperties(sourceConfig.getDbzProperties())
+                                .build());
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {

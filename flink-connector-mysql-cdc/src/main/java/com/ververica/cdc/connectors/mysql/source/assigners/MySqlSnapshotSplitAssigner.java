@@ -29,7 +29,6 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +46,6 @@ import java.util.Optional;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMySqlConnection;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.discoverCapturedTables;
-import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.getTableSchemas;
 
 /**
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
@@ -129,17 +127,16 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void open() {
-        // discover captured tables
-        jdbc = openMySqlConnection(sourceConfig.getDbzConfiguration());
-        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc);
-        chunkSplitter = createChunkSplitter(mySqlSchema, jdbc, chunkSize);
         if (!assignerFinished) {
+            // discover captured tables
+            jdbc = openMySqlConnection(sourceConfig.getDbzConfiguration());
             // TODO The discovery logic should move to {@link MySqlSourceEnumerator}
             // and pass the remainingTables as one construct parameter
+            MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc);
             final List<TableId> discoverTables =
                     discoverCapturedTables(jdbc, tableFilters, sourceConfig);
-            Map<TableId, TableChange> tableSchemas = getTableSchemas(mySqlSchema, discoverTables);
-            validator.validateSchema(tableSchemas);
+            mySqlSchema = validator.getResolvedMysqlSchema(mySqlSchema, discoverTables);
+            chunkSplitter = createChunkSplitter(mySqlSchema, jdbc, chunkSize);
             discoverTables.removeAll(alreadyProcessedTables);
             remainingTables.addAll(discoverTables);
         }

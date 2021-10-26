@@ -170,6 +170,11 @@ public class MySqlSource<T>
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
         MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+        MySqlValidator validator =
+                MySqlValidator.builder()
+                        .dbzProperties(sourceConfig.getDbzProperties())
+                        .isRestored(true)
+                        .build();
         final MySqlSplitAssigner splitAssigner;
         final int currentParallelism = enumContext.currentParallelism();
         if (checkpoint instanceof HybridPendingSplitsState) {
@@ -178,17 +183,17 @@ public class MySqlSource<T>
                             sourceConfig,
                             currentParallelism,
                             (HybridPendingSplitsState) checkpoint,
-                            mySqlValidator);
+                            validator);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(
-                            sourceConfig, (BinlogPendingSplitsState) checkpoint, mySqlValidator);
+                            sourceConfig, (BinlogPendingSplitsState) checkpoint, validator);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
 
-        return new MySqlSourceEnumerator(enumContext, splitAssigner, mySqlValidator);
+        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
     }
 
     @Override

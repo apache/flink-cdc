@@ -22,6 +22,7 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.MySqlValidator;
+import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -31,17 +32,17 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMySqlConnection;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
-import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.discoverCapturedTableSchemas;
+import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.discoverCapturedTables;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
@@ -133,9 +134,10 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     // ------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {
-        Map<TableId, TableChange> tableSchemas =
-                discoverCapturedTableSchemas(jdbc, tableFilters, sourceConfig);
-        validator.validateSchema(tableSchemas);
+        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc);
+        final List<TableId> capturedTableIds =
+                discoverCapturedTables(jdbc, tableFilters, sourceConfig);
+        mySqlSchema = validator.getResolvedMysqlSchema(mySqlSchema, capturedTableIds);
         // TODO: binlog-only source shouldn't need split key (e.g. no primary key tables),
         //  mock a split key here which should never be used later. We should refactor
         //  MySqlBinlogSplit ASAP.
@@ -147,6 +149,6 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
                 currentBinlogOffset(jdbc),
                 BinlogOffset.NO_STOPPING_OFFSET,
                 Collections.emptyList(),
-                tableSchemas);
+                mySqlSchema.getSchemas());
     }
 }

@@ -231,7 +231,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 new MySqlSnapshotSplitAssigner(
                         sourceConfig,
                         DEFAULT_PARALLELISM,
-                        new MySqlValidator(sourceConfig.getDbzProperties()));
+                        MySqlValidator.builder()
+                                .dbzProperties(sourceConfig.getDbzProperties())
+                                .build());
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {

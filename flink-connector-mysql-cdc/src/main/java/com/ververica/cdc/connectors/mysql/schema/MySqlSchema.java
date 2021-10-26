@@ -66,6 +66,10 @@ public class MySqlSchema {
         return schema;
     }
 
+    public Map<TableId, TableChange> getSchemas() {
+        return schemasByTableId;
+    }
+
     // ------------------------------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------------------------------

@@ -23,6 +23,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.CollectionUtil;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
+import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -41,6 +42,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.getTableSchemas;
+
 /**
  * The validator for MySql: it only cares about the version of the database is larger than or equal
  * to 5.7. It also requires the binlog format in the database is ROW and row image is FULL.
@@ -52,26 +55,52 @@ public class MySqlValidator implements Validator {
     private static final String BINLOG_FORMAT_ROW = "ROW";
     private static final String BINLOG_FORMAT_IMAGE_FULL = "FULL";
 
-    private Properties dbzProperties;
-    // columns specified in Flink, used to do schema validation
-    @Nullable private List<String> columns;
-
-    public MySqlValidator() {}
-
-    public MySqlValidator(Properties dbzProperties) {
-        this.dbzProperties = dbzProperties;
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public MySqlValidator(List<String> columns) {
+    /** Builder class of {@link MySqlValidator}. */
+    public static class Builder {
+        private Properties dbzProperties;
+        private List<String> columns;
+        private boolean isRestored;
+
+        public Builder dbzProperties(Properties dbzProperties) {
+            this.dbzProperties = dbzProperties;
+            return this;
+        }
+
+        public Builder columns(List<String> columns) {
+            this.columns = columns;
+            return this;
+        }
+
+        public Builder isRestored(boolean isRestored) {
+            this.isRestored = isRestored;
+            return this;
+        }
+
+        public MySqlValidator build() {
+            return new MySqlValidator(dbzProperties, columns, isRestored);
+        }
+    }
+
+    private final Properties dbzProperties;
+    private final boolean isRestored;
+    // columns specified in Flink, only used to do schema validation
+    @Nullable private final List<String> columns;
+
+    MySqlValidator(Properties dbzProperties, List<String> columns, boolean isRestored) {
+        this.dbzProperties = dbzProperties;
         this.columns = columns;
-    }
-
-    public void initDbzProperties(Properties dbzProperties) {
-        this.dbzProperties = dbzProperties;
+        this.isRestored = isRestored;
     }
 
     @Override
     public void validate() {
+        if (isRestored) {
+            return;
+        }
         try (MySqlConnection connection =
                 DebeziumUtils.openMySqlConnection(Configuration.from(dbzProperties))) {
             checkVersion(connection);
@@ -155,7 +184,7 @@ public class MySqlValidator implements Validator {
     }
 
     /** Validate the schemas from MySQL source contains all columns specified in Flink. */
-    public void validateSchema(Map<TableId, TableChanges.TableChange> schemas) {
+    private void validateSchema(Map<TableId, TableChanges.TableChange> schemas) {
         // skip validation when columns is null or empty
         if (CollectionUtil.isNullOrEmpty(columns)) {
             return;
@@ -174,5 +203,15 @@ public class MySqlValidator implements Validator {
                             "The columns %s in tables captured don't contains all columns %s specified in Flink DDL. ",
                             allTableColumns, columns));
         }
+    }
+
+    /** Get the resolved and validated MySqlSchema . */
+    public MySqlSchema getResolvedMysqlSchema(MySqlSchema mySqlSchema, List<TableId> tableIds) {
+        Map<TableId, TableChanges.TableChange> tableSchemas =
+                getTableSchemas(mySqlSchema, tableIds);
+        if (!isRestored) {
+            validateSchema(tableSchemas);
+        }
+        return mySqlSchema;
     }
 }

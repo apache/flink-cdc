@@ -49,14 +49,10 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     private boolean isBinlogSplitAssigned;
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
-    private final MySqlValidator validator;
 
     public MySqlHybridSplitAssigner(
             MySqlSourceConfig sourceConfig, int currentParallelism, MySqlValidator validator) {
-        this(
-                new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism, validator),
-                false,
-                validator);
+        this(new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism, validator), false);
     }
 
     public MySqlHybridSplitAssigner(
@@ -70,17 +66,13 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                         currentParallelism,
                         checkpoint.getSnapshotPendingSplits(),
                         validator),
-                checkpoint.isBinlogSplitAssigned(),
-                validator);
+                checkpoint.isBinlogSplitAssigned());
     }
 
     private MySqlHybridSplitAssigner(
-            MySqlSnapshotSplitAssigner snapshotSplitAssigner,
-            boolean isBinlogSplitAssigned,
-            MySqlValidator validator) {
+            MySqlSnapshotSplitAssigner snapshotSplitAssigner, boolean isBinlogSplitAssigned) {
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
-        this.validator = validator;
     }
 
     @Override

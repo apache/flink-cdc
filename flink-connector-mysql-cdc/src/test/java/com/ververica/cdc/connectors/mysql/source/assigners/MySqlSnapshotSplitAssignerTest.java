@@ -132,7 +132,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 new MySqlSnapshotSplitAssigner(
                         configuration,
                         DEFAULT_PARALLELISM,
-                        new MySqlValidator(configuration.getDbzProperties()));
+                        MySqlValidator.builder()
+                                .dbzProperties(configuration.getDbzProperties())
+                                .build());
 
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();

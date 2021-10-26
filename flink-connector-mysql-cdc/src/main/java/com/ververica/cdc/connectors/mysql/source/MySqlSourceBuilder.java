@@ -55,7 +55,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class MySqlSourceBuilder<T> {
     private final MySqlSourceConfigFactory configFactory = new MySqlSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
-    private MySqlValidator mySqlValidator;
+    private MySqlValidator.Builder mySqlValidatorBuilder = MySqlValidator.builder();
 
     public MySqlSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);
@@ -174,9 +174,10 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
-    /** The mysql validator. It's optional, default not to validate schema. */
-    public MySqlSourceBuilder<T> mySqlValidator(MySqlValidator mySqlValidator) {
-        this.mySqlValidator = mySqlValidator;
+    /** The mysql validator builder. */
+    public MySqlSourceBuilder<T> mySqlValidatorBuilder(
+            MySqlValidator.Builder mySqlValidatorBuilder) {
+        this.mySqlValidatorBuilder = mySqlValidatorBuilder;
         return this;
     }
 
@@ -186,11 +187,11 @@ public class MySqlSourceBuilder<T> {
      * @return a MySqlParallelSource with the settings made for this builder.
      */
     public MySqlSource<T> build() {
-        Properties dbzProperties = configFactory.createConfig(0).getDbzProperties();
-        if (mySqlValidator == null) {
-            mySqlValidator = new MySqlValidator();
-        }
-        mySqlValidator.initDbzProperties(dbzProperties);
-        return new MySqlSource<>(configFactory, checkNotNull(deserializer), mySqlValidator);
+        return new MySqlSource<>(
+                configFactory,
+                checkNotNull(deserializer),
+                mySqlValidatorBuilder
+                        .dbzProperties(configFactory.createConfig(0).getDbzProperties())
+                        .build());
     }
 }

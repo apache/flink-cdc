@@ -107,7 +107,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.setRestartStrategy(RestartStrategies.noRestart());
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
             env.enableCheckpointing(200);
@@ -502,7 +501,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " address STRING,"
                                 + " phone_number STRING,"
                                 + " email STRING,"
-                                + " age INT,"
                                 + " primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -537,7 +535,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         + " address STRING,"
                         + " phone_number STRING,"
                         + " email STRING,"
-                        + " age INT,"
                         + " primary key (database_name, table_name, id) not enforced"
                         + ") WITH ("
                         + " 'connector' = 'values',"
@@ -569,13 +566,13 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
         List<String> expected =
                 Stream.of(
-                                "+I[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
-                                "+I[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null, null]",
-                                "+I[%s, user_table_1_2, 200, user_200, Wuhan, 123567891234, null, null]",
-                                "+I[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
-                                "+U[%s, user_table_1_1, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
-                                "+U[%s, user_table_1_2, 121, user_121, Shanghai, 88888888, null, null]",
-                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]")
+                                "+I[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com]",
+                                "+I[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null]",
+                                "+I[%s, user_table_1_2, 200, user_200, Wuhan, 123567891234, null]",
+                                "+I[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com]",
+                                "+U[%s, user_table_1_1, 300, user_300, Beijing, 123567891234, user_300@foo.com]",
+                                "+U[%s, user_table_1_2, 121, user_121, Shanghai, 88888888, null]",
+                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com]")
                         .map(s -> String.format(s, userDatabase1.getDatabaseName()))
                         .sorted()
                         .collect(Collectors.toList());
@@ -811,6 +808,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         Assume.assumeTrue(incrementalSnapshot);
         // test inconsistent schema for a single table
         customerDatabase.createAndInitialize();
+        StreamExecutionEnvironment noRestartEnv =
+                StreamExecutionEnvironment.getExecutionEnvironment();
+        noRestartEnv.setRestartStrategy(RestartStrategies.noRestart());
+        StreamTableEnvironment tNoRestartEnv = StreamTableEnvironment.create(noRestartEnv);
         String sourceDDL =
                 String.format(
                         "CREATE TABLE address ("
@@ -842,12 +843,12 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         true,
                         getServerId(),
                         getSplitSize());
-        tEnv.executeSql(sourceDDL);
+        tNoRestartEnv.executeSql(sourceDDL);
 
         try {
             // async submit job
             TableResult result =
-                    tEnv.executeSql(
+                    tNoRestartEnv.executeSql(
                             "SELECT id,\n"
                                     + "country,\n"
                                     + "city,\n"
@@ -901,11 +902,11 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         true,
                         getServerId(),
                         getSplitSize());
-        tEnv.executeSql(sourceDDL);
+        tNoRestartEnv.executeSql(sourceDDL);
 
         try {
             // async submit job
-            TableResult result = tEnv.executeSql("SELECT * FROM `user`");
+            TableResult result = tNoRestartEnv.executeSql("SELECT * FROM `user`");
             CloseableIterator<Row> iterator = result.collect();
             waitForSnapshotStarted(iterator);
         } catch (Throwable t) {
