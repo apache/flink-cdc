@@ -49,7 +49,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
     - Enable log archiving requires database restart, pay attention when try to do it
     - The archived logs will occupy a large amount of disk space, so consider clean the expired logs the periodically
    
-    c. Check whether log archiving is enabled
+    (1.3). Check whether log archiving is enabled
     ```sql
     -- Should now "Database log mode: Archive Mode"
     archive log list;
