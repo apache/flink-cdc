@@ -152,8 +152,8 @@ docker-compose down
            (default,10002,'Hangzhou','Shanghai',false),
            (default,10003,'Shanghai','Hangzhou',false);
     ```
-## Launching the Streaming ETL
-### Starting Flink cluster and Flink SQL CLI
+   
+## Starting Flink cluster and Flink SQL CLI
 
 1. Use the following command to change to the Flink directory:
     ```
@@ -182,7 +182,7 @@ docker-compose down
 
    ![Flink SQL Client](/_static/fig/mysql-postgress-tutorial/flink-sql-client.png "Flink SQL Client")
 
-### Creating tables using Flink DDL in Flink SQL CLI
+## Creating tables using Flink DDL in Flink SQL CLI
 First, enable checkpoints every 3000 milliseconds
 ```sql
 -- Flink SQL                   
@@ -268,7 +268,7 @@ Flink SQL> CREATE TABLE enriched_orders (
  );
 ```
 
-### Enriching orders and load to ElasticSearch
+## Enriching orders and load to ElasticSearch
 Use Flink SQL to join the `order` table with the `products` and `shipments` table to enrich orders and write to the Elasticsearch.
 ```sql
 -- Flink SQL
