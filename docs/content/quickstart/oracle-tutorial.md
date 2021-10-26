@@ -1,6 +1,6 @@
-# Streaming ETL from Oracle to Elasticsearch
+# Demo: Oracle CDC to Elasticsearch
 
-1. Create `docker-compose.yml` file using following contents:
+**1. Create `docker-compose.yml` file using following contents:**
 
 ```
 version: '2.1'
@@ -49,13 +49,18 @@ Don’t forget to run the following command to stop all containers after you fin
 ```shell
 docker-compose down
 ```
-2. Download following JAR package to `<FLINK_HOME>/lib`:
-   ```Download links are available only for stable releases.```
+
+**2. Download following JAR package to `<FLINK_HOME>/lib`**
+
+*Download links are available only for stable releases.*
 
 - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
 - [flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.1-SNAPSHOT/flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar)
 
-3. Launch a Flink cluster, then start a Flink SQL CLI and execute following SQL statements inside: 
+**3. Launch a Flink cluster and start a Flink SQL CLI**
+
+Execute following SQL statements in the Flink SQL CLI:
+
 ```sql
 -- Flink SQL
 -- checkpoint every 3000 milliseconds                       
@@ -117,9 +122,14 @@ Flink SQL> INSERT INTO enriched_orders
  LEFT JOIN products AS p ON o.PRODUCT_ID = p.ID;
 ```
 
-4. Check the data has been written to Elasticsearch successfully, you can visit [Kibana](http://localhost:8081/#/overview) to see the data.
+**4. Check result in Elasticsearch**
 
-5. Enter Oracle's container to make some changes in Oracle, then you can see the result in Elasticsearch will change after executing every SQL statement:
+Check the data has been written to Elasticsearch successfully, you can visit [Kibana](http://localhost:8081/#/overview) to see the data.
+
+**5. Make changes in Oracle and watch result in Elasticsearch**
+
+Enter Oracle's container to make some changes in Oracle, then you can see the result in Elasticsearch will change after executing every SQL statement:
+
 ```shell
 docker-compose exec sqlplus flinkuser/flinkpw
 ```

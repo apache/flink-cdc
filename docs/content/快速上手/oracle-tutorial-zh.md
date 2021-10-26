@@ -1,6 +1,7 @@
-# Streaming ETL from Oracle to Elasticsearch（中文）
+# 演示: Oracle CDC 导入 Elasticsearch
 
-1. 创建`docker-compose.yml`文件，内容如下所示：
+**1. 创建`docker-compose.yml`文件，内容如下所示:**
+
 ```
 version: '2.1'
 services:
@@ -44,17 +45,20 @@ docker-compose up -d
 该命令会以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。
 你可以通过 docker ps 来观察上述的容器是否正常启动了。 也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
 另外可以通过如下命令停止所有的容器：
+
 ```shell
 docker-compose down
 ````
 
-2. 下载以下 jar 包到 `<FLINK_HOME>/lib/`:
-   ```下载链接只在已发布的版本上可用```
+**2. 下载以下 jar 包到 `<FLINK_HOME>/lib/`:**
+
+*下载链接只在已发布的版本上可用*
 
 - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
 - [flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.1-SNAPSHOT/flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar)
 
-3. 然后启动 Flink 集群，再启动 SQL CLI:
+**3. 然后启动 Flink 集群，再启动 SQL CLI:**
+
 ```sql
 -- Flink SQL
 -- checkpoint every 3000 milliseconds                       
@@ -115,9 +119,15 @@ Flink SQL> INSERT INTO enriched_orders
  FROM orders AS o
  LEFT JOIN products AS p ON o.PRODUCT_ID = p.ID;
 ```
-4. 检查最终的结果是否写入ElasticSearch中, 可以在[Kibana](http://localhost:8081/#/overview)看到ElasticSearch中的数据
 
-5. 进入Oracle容器中并通过如下的SQL语句对Oracle数据库进行一些修改, 然后就可以看到每执行一条SQL语句，Elasticsearch中的数据都会实时更新
+**4. 检查 ElasticSearch 中的结果**
+
+检查最终的结果是否写入ElasticSearch中, 可以在[Kibana](http://localhost:8081/#/overview)看到ElasticSearch中的数据
+
+**5. 在 Oracle 制造一些变更，观察 ElasticSearch 中的结果**
+
+进入Oracle容器中并通过如下的SQL语句对Oracle数据库进行一些修改, 然后就可以看到每执行一条SQL语句，Elasticsearch中的数据都会实时更新。
+
 ```shell
 docker-compose exec sqlplus flinkuser/flinkpw
 ```
