@@ -300,27 +300,27 @@ Data Type Mapping
     </thead>
     <tbody>
     <tr>
-      <td>NUMBER(p, s<=0), p - s < 3
+      <td>NUMBER(p, s <= 0), p - s < 3
       </td>
       <td>TINYINT</td>
     </tr>
     <tr>
-      <td>NUMBER(p, s<=0), p - s < 5
+      <td>NUMBER(p, s <= 0), p - s < 5
       </td>
       <td>SMALLINT</td>
     </tr>
     <tr>
-      <td>NUMBER(p, s<=0), p - s < 10
+      <td>NUMBER(p, s <= 0), p - s < 10
       </td>
       <td>INT</td>
     </tr>
     <tr>
-      <td>NUMBER(p, s<=0), p - s < 19
+      <td>NUMBER(p, s <= 0), p - s < 19
       </td>
       <td>BIGINT</td>
     </tr>
-   <tr>
-      <td>NUMBER(p, s<=0), p - s >= 19<br>
+    <tr>
+      <td>NUMBER(p, s <= 0), 19 <= p - s <= 38 <br>
       </td>
       <td>DECIMAL(p - s, 0)</td>
     </tr>
@@ -328,6 +328,11 @@ Data Type Mapping
       <td>NUMBER(p, s > 0)
       </td>
       <td>DECIMAL(p, s)</td>
+    </tr>
+    <tr>
+      <td>NUMBER(p, s <= 0), p - s > 38
+      </td>
+      <td>STRING</td>
     </tr>
     <tr>
       <td> 
