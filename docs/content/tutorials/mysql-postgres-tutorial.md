@@ -1,20 +1,21 @@
-# Building a Streaming Application with Flink Mysql/Postgres CDC
+# Streaming ETL for MySQL and Postgres with Flink CDC
 
-This tutorial is to show how to quickly build streaming applications with Flink Mysql/Postgres CDC.
+This tutorial is to show how to quickly build streaming ETL for MySQL and Postgres with Flink CDC.
 
 Assuming we are running an e-commerce business. The product and order data stored in MySQL, the shipment data related to the order is stored in Postgres.
-We need to build a streaming application to meet the following requirements:
-1. Enrich the orders using the product and shipment table and write enriched orders to ElasticSearch in real time
-2. Calculate the GMV(Gross Merchandise Volume) by daily and write to Kafka in real time
+We want to enrich the orders using the product and shipment table, and then load the enriched orders to ElasticSearch in real time.
 
-In the following sections, we will describe how to use Flink Mysql/Postgres CDC to meet all the requirements.
+In the following sections, we will describe how to use Flink Mysql/Postgres CDC to implement it.
 All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
+
+The overview of the architecture is as follows:
+![Flink CDC Streaming ETL](/_static/fig/mysql-postgress-tutorial/flink-cdc-streaming-etl.png "Flink CDC Streaming ETL")
 
 ## Preparation
 Prepare a Linux or MacOS computer with Docker installed.
 
 ### Starting components required
-The components required in this demo are all managed in containers, so we will use docker-compose to start them.
+The components required in this demo are all managed in containers, so we will use `docker-compose` to start them.
 
 Create `docker-compose.yml` file using following contents:
 ```
@@ -58,34 +59,12 @@ services:
     image: elastic/kibana:7.6.0
     ports:
       - "5601:5601"
-  zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
-    ports:
-      - "2181:2181"
-  kafka:
-    image: wurstmeister/kafka:2.12-2.2.1
-    ports:
-      - "9092:9092"
-      - "9094:9094"
-    depends_on:
-      - zookeeper
-    environment:
-      - KAFKA_ADVERTISED_LISTENERS=INSIDE://:9094,OUTSIDE://localhost:9092
-      - KAFKA_LISTENERS=INSIDE://:9094,OUTSIDE://:9092
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
-      - KAFKA_INTER_BROKER_LISTENER_NAME=INSIDE
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CREATE_TOPICS="user_behavior:1:1"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
 ```
 The Docker Compose environment consists of the following containers:
 - MySQL: the `products`,`orders` tables will be store in the database. They will be joined with data in Postgres to enrich the orders.
 - Postgres: the `shipments` table will be store in the database.
 - Elasticsearch: mainly used as a data sink to store enriched orders.
 - Kibana: used to visualize the data in Elasticsearch.
-- Zookeeper: this component is required by Kafka.
-- Kafka: mainly used as a data sink to store GMV
 
 To start all containers, run the following command in the directory that contains the `docker-compose.yml` file.
 ```shell
@@ -103,8 +82,7 @@ docker-compose down
 1. Download [Flink 1.13.2](https://downloads.apache.org/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) and unzip it to the directory `flink-1.13.2`
 2. Download following JAR package required and put them under `flink-1.13.2/lib/`:
 
-   ```Download links are available only for stable releases.```
-    - [flink-sql-connector-kafka_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-kafka_2.11/1.13.2/flink-sql-connector-kafka_2.11-1.13.2.jar)
+   **Download links are available only for stable releases.**
     - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
     - [flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1-SNAPSHOT/flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar)
     - [flink-sql-connector-postgres-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.1-SNAPSHOT/flink-sql-connector-postgres-cdc-2.1-SNAPSHOT.jar)
@@ -174,7 +152,7 @@ docker-compose down
            (default,10002,'Hangzhou','Shanghai',false),
            (default,10003,'Shanghai','Hangzhou',false);
     ```
-## Launching the Streaming Application
+## Launching the Streaming ETL
 ### Starting Flink cluster and Flink SQL CLI
 
 1. Use the following command to change to the Flink directory:
@@ -266,7 +244,7 @@ Flink SQL> CREATE TABLE shipments (
  );
 ```
 
-Finally, create `enriched_orders` and `kafka_gmv` tables used to write data to the Elasticsearch and Kafka respectively.
+Finally, create `enriched_orders` table that is used to load data to the Elasticsearch.
 ```sql
 -- Flink SQL
 Flink SQL> CREATE TABLE enriched_orders (
@@ -288,20 +266,9 @@ Flink SQL> CREATE TABLE enriched_orders (
      'hosts' = 'http://localhost:9200',
      'index' = 'enriched_orders'
  );
- 
-Flink SQL> CREATE TABLE kafka_gmv (
-   day_str STRING,
-   gmv DECIMAL(10, 5)
-) WITH (
-     'connector' = 'kafka',
-     'topic' = 'kafka_gmv',
-     'scan.startup.mode' = 'earliest-offset',
-     'properties.bootstrap.servers' = 'localhost:9092',
-     'format' = 'debezium-json'
- );
 ```
 
-### Enriching the orders using the products and shipments tables and write to ElasticSearch
+### Enriching orders and load to ElasticSearch
 Use Flink SQL to join the `order` table with the `products` and `shipments` table to enrich orders and write to the Elasticsearch.
 ```sql
 -- Flink SQL
@@ -320,7 +287,7 @@ Visit [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kib
 
 ![Find enriched Orders](/_static/fig/mysql-postgress-tutorial/kibana-detailed-orders.png "Find enriched Orders")
 
-Next, do some change in the databases, and then the enriched orders shown in Kibana will be updated after each step in reel time.
+Next, do some change in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
 1. Insert a new order in MySQL
    ```sql
    --MySQL
@@ -350,47 +317,3 @@ Next, do some change in the databases, and then the enriched orders shown in Kib
    ```
    The changes of enriched orders in Kibana are as follows:
    ![Enriched Orders Changes](/_static/fig/mysql-postgress-tutorial/kibana-detailed-orders-changes.gif "Enriched Orders Changes")
-
-### Calculating GMV by daily and write to Kafka
-
-Execute the following SQL to calculate GMV and write to Kafka in Flink SQL CLI:
-```sql
-Flink SQL> INSERT INTO kafka_gmv
-SELECT DATE_FORMAT(order_date, 'yyyy-MM-dd') as day_str, SUM(price) as gmv
-FROM orders
-WHERE order_status = true
-GROUP BY DATE_FORMAT(order_date, 'yyyy-MM-dd');
-```
-Use the `kafka-console-consumer` to consumer records:
-```
-docker-compose exec kafka bash -c 'kafka-console-consumer.sh --topic kafka_gmv --bootstrap-server kafka:9094 --from-beginning'
-```
-Then do some changes in the database, the output of `kafka-console-consumer` will also change in real time.
-```sql
--- MySQL
-UPDATE orders SET order_status = true WHERE order_id = 10001;
-UPDATE orders SET order_status = true WHERE order_id = 10002;
-UPDATE orders SET order_status = true WHERE order_id = 10003;
-
-INSERT INTO orders
-VALUES (default, '2020-07-30 17:33:00', 'Timo', 50.00, 104, true);
-
-UPDATE orders SET price = 40.00 WHERE order_id = 10005;
-
-DELETE FROM orders WHERE order_id = 10005;
-```
-The changes of GMV in `kafka-console-consumer` are as follows:
-![GMV Changes](/_static/fig/mysql-postgress-tutorial/kafka-gmv-changes.gif "GMV Changes")
-
-
-
-
-
-
-
-
-
-
-
-
-
