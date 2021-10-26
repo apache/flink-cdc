@@ -49,13 +49,22 @@ CREATE TABLE full_types (
     file_uuid BINARY(16),
     bit_c BIT(64),
     text_c TEXT,
+    tiny_blob_c TINYBLOB,
     blob_c BLOB,
+    medium_blob_c MEDIUMBLOB,
+    long_blob_c LONGBLOB,
     year_c YEAR,
     enum_c enum('red', 'white') default 'red',
     set_c SET('a', 'b'),
     json_c JSON,
     point_c POINT,
     geometry_c GEOMETRY,
+    linestring_c LINESTRING,
+    polygon_c POLYGON,
+    multipoint_c MULTIPOINT,
+    multiline_c MULTILINESTRING,
+    multipolygon_c MULTIPOLYGON,
+    geometrycollection_c GEOMETRYCOLLECTION,
     PRIMARY KEY (id)
 ) DEFAULT CHARSET=utf8;
 
@@ -65,6 +74,14 @@ INSERT INTO full_types VALUES (
     'Hello World', 'abc', 123.102, 123.102, 404.4443, 123.4567, 345.6, 34567892.1, 0, 1, true,
     '2020-07-17', '18:00:22', '2020-07-17 18:00:22.123', '2020-07-17 18:00:22.123456', '2020-07-17 18:00:22',
     unhex(replace('651aed08-390f-4893-b2f1-36923e7b7400','-','')), b'0000010000000100000001000000010000000100000001000000010000000100',
-    'text',UNHEX(HEX(16)), 2021, 'red', 'a,b,a', '{"key1": "value1"}', ST_GeomFromText('POINT(1 1)'),
-    ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0),(5 5,7 5,7 7,5 7, 5 5))')
+    'text',UNHEX(HEX(16)),UNHEX(HEX(16)),UNHEX(HEX(16)),UNHEX(HEX(16)), 2021,
+    'red', 'a,b,a', '{"key1": "value1"}',
+    ST_GeomFromText('POINT(1 1)'),
+    ST_GeomFromText('POLYGON((1 1, 2 1, 2 2,  1 2, 1 1))'),
+    ST_GeomFromText('LINESTRING(3 0, 3 3, 3 5)'),
+    ST_GeomFromText('POLYGON((1 1, 2 1, 2 2,  1 2, 1 1))'),
+    ST_GeomFromText('MULTIPOINT((1 1),(2 2))'),
+    ST_GeomFromText('MultiLineString((1 1,2 2,3 3),(4 4,5 5))'),
+    ST_GeomFromText('MULTIPOLYGON(((0 0, 10 0, 10 10, 0 10, 0 0)), ((5 5, 7 5, 7 7, 5 7, 5 5)))'),
+    ST_GeomFromText('GEOMETRYCOLLECTION(POINT(10 10), POINT(30 30), LINESTRING(15 15, 20 20))')
 );

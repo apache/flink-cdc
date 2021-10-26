@@ -26,7 +26,7 @@ import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetric
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.history.JsonTableChangeSerializer;
+import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
@@ -54,8 +54,8 @@ public final class MySqlRecordEmitter<T>
         implements RecordEmitter<SourceRecord, T, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
-    private static final JsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
-            new JsonTableChangeSerializer();
+    private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
+            new FlinkJsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;

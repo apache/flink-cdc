@@ -20,29 +20,29 @@ package com.ververica.cdc.debezium.table;
 
 import org.apache.flink.table.types.logical.LogicalType;
 
-import javax.annotation.Nullable;
-
 import java.io.Serializable;
 import java.time.ZoneId;
+import java.util.Optional;
 
 /**
  * Factory to create {@link DeserializationRuntimeConverter} according to {@link LogicalType}. It's
- * usually used to create a customized {@link DeserializationRuntimeConverter} to convert the
- * objects of Debezium with a specific logic binding to database.
+ * usually used to create a user-defined {@link DeserializationRuntimeConverter} which has a higher
+ * resolve order than default converter.
  */
 public interface DeserializationRuntimeConverterFactory extends Serializable {
 
+    /** A user-defined converter factory which always fallback to default converters. */
+    DeserializationRuntimeConverterFactory DEFAULT =
+            (logicalType, serverTimeZone) -> Optional.empty();
+
     /**
-     * Create {@link DeserializationRuntimeConverter}.
+     * Returns an optional {@link DeserializationRuntimeConverter}. Returns {@link Optional#empty()}
+     * if fallback to default converter.
      *
      * @param logicalType the Flink Table & SQL internal datatype to be converted from objects of
      *     Debezium
      * @param serverTimeZone TimeZone used to convert data with timestamp type
-     * @param converterFactory {@link DeserializationRuntimeConverterFactory} to be used when create
-     *     {@link DeserializationRuntimeConverter}
      */
-    DeserializationRuntimeConverter create(
-            LogicalType logicalType,
-            ZoneId serverTimeZone,
-            @Nullable DeserializationRuntimeConverterFactory converterFactory);
+    Optional<DeserializationRuntimeConverter> createUserDefinedConverter(
+            LogicalType logicalType, ZoneId serverTimeZone);
 }

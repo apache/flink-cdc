@@ -29,7 +29,7 @@ import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.ververica.cdc.debezium.history.JsonTableChangeSerializer;
+import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentWriter;
 import io.debezium.relational.Column;
@@ -767,7 +767,8 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         DocumentWriter writer = DocumentWriter.defaultWriter();
         if (useLegacyImplementation) {
             // build a non-legacy state
-            JsonTableChangeSerializer tableChangesSerializer = new JsonTableChangeSerializer();
+            FlinkJsonTableChangeSerializer tableChangesSerializer =
+                    new FlinkJsonTableChangeSerializer();
             historyState.add(
                     writer.write(
                             tableChangesSerializer.toDocument(

@@ -193,12 +193,22 @@
                         {
                             "type": "bytes",
                             "optional": true,
+                            "field": "tiny_blob_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
                             "field": "blob_c"
                         },
                         {
-                            "type": "int32",
+                            "type": "bytes",
                             "optional": true,
-                            "field": "year_c"
+                            "field": "medium_blob_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "long_blob_c"
                         },
                         {
                             "type": "int32",
@@ -229,6 +239,36 @@
                             "type": "string",
                             "optional": true,
                             "field": "geometry_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "linestring_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "polygon_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "multipoint_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "multiline_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "multipolygon_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "geometrycollection_c"
                         }
                     ],
                     "optional": true,
@@ -425,12 +465,22 @@
                         {
                             "type": "bytes",
                             "optional": true,
+                            "field": "tiny_blob_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
                             "field": "blob_c"
                         },
                         {
-                            "type": "int32",
+                            "type": "bytes",
                             "optional": true,
-                            "field": "year_c"
+                            "field": "medium_blob_c"
+                        },
+                        {
+                            "type": "bytes",
+                            "optional": true,
+                            "field": "long_blob_c"
                         },
                         {
                             "type": "int32",
@@ -461,6 +511,36 @@
                             "type": "string",
                             "optional": true,
                             "field": "geometry_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "linestring_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "polygon_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "multipoint_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "multiline_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "multipolygon_c"
+                        },
+                        {
+                            "type": "string",
+                            "optional": true,
+                            "field": "geometrycollection_c"
                         }
                     ],
                     "optional": true,
@@ -626,13 +706,22 @@
                 "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
                 "bit_c": "BAQEBAQEBAQ=",
                 "text_c": "text",
+                "tiny_blob_c": "EA==",
                 "blob_c": "EA==",
+                "medium_blob_c": "EA==",
+                "long_blob_c": "EA==",
                 "year_c": 2021,
                 "enum_c": "red",
                 "set_c": "a,b",
                 "json_c": "{\"key1\": \"value1\"}",
                 "point_c": {"x":1.0,"y":1.0,"wkb":"AQEAAAAAAAAAAADwPwAAAAAAAPA/"},
-                "geometry_c":{"wkb":"AQMAAAACAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"}
+                "geometry_c":{"wkb":"AQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAADwPwAAAAAAAPA/"},
+                "linestring_c": {"wkb":"AQIAAAADAAAAAAAAAAAACEAAAAAAAAAAAAAAAAAAAAhAAAAAAAAACEAAAAAAAAAIQAAAAAAAABRA"},
+                "polygon_c": {"wkb":"AQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAADwPwAAAAAAAPA/"},
+                "multipoint_c": {"wkb":"AQQAAAACAAAAAQEAAAAAAAAAAADwPwAAAAAAAPA/AQEAAAAAAAAAAAAAQAAAAAAAAABA"},
+                "multiline_c": {"wkb":"AQUAAAACAAAAAQIAAAADAAAAAAAAAAAA8D8AAAAAAADwPwAAAAAAAABAAAAAAAAAAEAAAAAAAAAIQAAAAAAAAAhAAQIAAAACAAAAAAAAAAAAEEAAAAAAAAAQQAAAAAAAABRAAAAAAAAAFEA="},
+                "multipolygon_c": {"wkb":"AQYAAAACAAAAAQMAAAABAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAAAQMAAAABAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"},
+                "geometrycollection_c": {"wkb":"AQcAAAADAAAAAQEAAAAAAAAAAAAkQAAAAAAAACRAAQEAAAAAAAAAAAA+QAAAAAAAAD5AAQIAAAACAAAAAAAAAAAALkAAAAAAAAAuQAAAAAAAADRAAAAAAAAANEA="}
             },
             "source": {
                 "version": "1.5.2.Final",
@@ -661,589 +750,268 @@
             "type": "struct",
             "fields": [
                 {
-                    "type": "struct",
-                    "fields": [
-                        {
-                            "type": "int32",
-                            "optional": false,
-                            "field": "id"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "tiny_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "tiny_un_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "small_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "small_un_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "medium_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "medium_un_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "int_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "field": "int_un_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "int11_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "field": "big_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "field": "big_un_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "varchar_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "char_c"
-                        },
-                        {
-                            "type": "double",
-                            "optional": true,
-                            "field": "real_c"
-                        },
-                        {
-                            "type": "double",
-                            "optional": true,
-                            "field": "float_c"
-                        },
-                        {
-                            "type": "double",
-                            "optional": true,
-                            "field": "double_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "name": "org.apache.kafka.connect.data.Decimal",
-                            "version": 1,
-                            "parameters": {
-                                "scale": "4",
-                                "connect.decimal.precision": "8"
-                            },
-                            "field": "decimal_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "name": "org.apache.kafka.connect.data.Decimal",
-                            "version": 1,
-                            "parameters": {
-                                "scale": "0",
-                                "connect.decimal.precision": "6"
-                            },
-                            "field": "numeric_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "name": "org.apache.kafka.connect.data.Decimal",
-                            "version": 1,
-                            "parameters": {
-                                "scale": "65",
-                                "connect.decimal.precision": "1"
-                            },
-                            "field": "big_decimal_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "bit1_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "tiny1_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "boolean_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "name": "io.debezium.time.Date",
-                            "version": 1,
-                            "field": "date_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "name": "io.debezium.time.MicroTime",
-                            "version": 1,
-                            "field": "time_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "name": "io.debezium.time.Timestamp",
-                            "version": 1,
-                            "field": "datetime3_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "name": "io.debezium.time.MicroTimestamp",
-                            "version": 1,
-                            "field": "datetime6_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "name": "io.debezium.time.ZonedTimestamp",
-                            "version": 1,
-                            "default": "1970-01-01T00:00:00Z",
-                            "field": "timestamp_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "field": "file_uuid"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "field": "bit_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "text_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "field": "blob_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "year_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "year_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "enum_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "set_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "json_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "point_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "geometry_c"
-                        }
-                    ],
-                    "optional": true,
-                    "name": "mysql_binlog_source.column_type_test_13p6nkc.full_types.Value",
-                    "field": "before"
-                },
-                {
-                    "type": "struct",
-                    "fields": [
-                        {
-                            "type": "int32",
-                            "optional": false,
-                            "field": "id"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "tiny_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "tiny_un_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "small_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "small_un_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "medium_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "medium_un_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "int_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "field": "int_un_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "int11_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "field": "big_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "field": "big_un_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "varchar_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "char_c"
-                        },
-                        {
-                            "type": "double",
-                            "optional": true,
-                            "field": "real_c"
-                        },
-                        {
-                            "type": "double",
-                            "optional": true,
-                            "field": "float_c"
-                        },
-                        {
-                            "type": "double",
-                            "optional": true,
-                            "field": "double_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "name": "org.apache.kafka.connect.data.Decimal",
-                            "version": 1,
-                            "parameters": {
-                                "scale": "4",
-                                "connect.decimal.precision": "8"
-                            },
-                            "field": "decimal_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "name": "org.apache.kafka.connect.data.Decimal",
-                            "version": 1,
-                            "parameters": {
-                                "scale": "0",
-                                "connect.decimal.precision": "6"
-                            },
-                            "field": "numeric_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "name": "org.apache.kafka.connect.data.Decimal",
-                            "version": 1,
-                            "parameters": {
-                                "scale": "65",
-                                "connect.decimal.precision": "1"
-                            },
-                            "field": "big_decimal_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "bit1_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "tiny1_c"
-                        },
-                        {
-                            "type": "int16",
-                            "optional": true,
-                            "field": "boolean_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "name": "io.debezium.time.Date",
-                            "version": 1,
-                            "field": "date_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "name": "io.debezium.time.MicroTime",
-                            "version": 1,
-                            "field": "time_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "name": "io.debezium.time.Timestamp",
-                            "version": 1,
-                            "field": "datetime3_c"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "name": "io.debezium.time.MicroTimestamp",
-                            "version": 1,
-                            "field": "datetime6_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "name": "io.debezium.time.ZonedTimestamp",
-                            "version": 1,
-                            "default": "1970-01-01T00:00:00Z",
-                            "field": "timestamp_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "field": "file_uuid"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "field": "bit_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "text_c"
-                        },
-                        {
-                            "type": "bytes",
-                            "optional": true,
-                            "field": "blob_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "year_c"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": true,
-                            "field": "year_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "enum_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "set_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "json_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "point_c"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "geometry_c"
-                        }
-                    ],
-                    "optional": true,
-                    "name": "mysql_binlog_source.column_type_test_13p6nkc.full_types.Value",
-                    "field": "after"
-                },
-                {
-                    "type": "struct",
-                    "fields": [
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "field": "version"
-                        },
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "field": "connector"
-                        },
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "field": "name"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": false,
-                            "field": "ts_ms"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "name": "io.debezium.data.Enum",
-                            "version": 1,
-                            "parameters": {
-                                "allowed": "true,last,false"
-                            },
-                            "default": "false",
-                            "field": "snapshot"
-                        },
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "field": "db"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "sequence"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "table"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": false,
-                            "field": "server_id"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "gtid"
-                        },
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "field": "file"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": false,
-                            "field": "pos"
-                        },
-                        {
-                            "type": "int32",
-                            "optional": false,
-                            "field": "row"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": true,
-                            "field": "thread"
-                        },
-                        {
-                            "type": "string",
-                            "optional": true,
-                            "field": "query"
-                        }
-                    ],
+                    "type": "int32",
                     "optional": false,
-                    "name": "io.debezium.connector.mysql.Source",
-                    "field": "source"
+                    "field": "id"
                 },
                 {
-                    "type": "string",
-                    "optional": false,
-                    "field": "op"
+                    "type": "int16",
+                    "optional": true,
+                    "field": "tiny_c"
+                },
+                {
+                    "type": "int16",
+                    "optional": true,
+                    "field": "tiny_un_c"
+                },
+                {
+                    "type": "int16",
+                    "optional": true,
+                    "field": "small_c"
+                },
+                {
+                    "type": "int32",
+                    "optional": true,
+                    "field": "small_un_c"
+                },
+                {
+                    "type": "int32",
+                    "optional": true,
+                    "field": "medium_c"
+                },
+                {
+                    "type": "int32",
+                    "optional": true,
+                    "field": "medium_un_c"
+                },
+                {
+                    "type": "int32",
+                    "optional": true,
+                    "field": "int_c"
                 },
                 {
                     "type": "int64",
                     "optional": true,
-                    "field": "ts_ms"
+                    "field": "int_un_c"
                 },
                 {
-                    "type": "struct",
-                    "fields": [
-                        {
-                            "type": "string",
-                            "optional": false,
-                            "field": "id"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": false,
-                            "field": "total_order"
-                        },
-                        {
-                            "type": "int64",
-                            "optional": false,
-                            "field": "data_collection_order"
-                        }
-                    ],
+                    "type": "int32",
                     "optional": true,
-                    "field": "transaction"
+                    "field": "int11_c"
+                },
+                {
+                    "type": "int64",
+                    "optional": true,
+                    "field": "big_c"
+                },
+                {
+                    "type": "int64",
+                    "optional": true,
+                    "field": "big_un_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "varchar_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "char_c"
+                },
+                {
+                    "type": "double",
+                    "optional": true,
+                    "field": "real_c"
+                },
+                {
+                    "type": "double",
+                    "optional": true,
+                    "field": "float_c"
+                },
+                {
+                    "type": "double",
+                    "optional": true,
+                    "field": "double_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "name": "org.apache.kafka.connect.data.Decimal",
+                    "version": 1,
+                    "parameters": {
+                        "scale": "4",
+                        "connect.decimal.precision": "8"
+                    },
+                    "field": "decimal_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "name": "org.apache.kafka.connect.data.Decimal",
+                    "version": 1,
+                    "parameters": {
+                        "scale": "0",
+                        "connect.decimal.precision": "6"
+                    },
+                    "field": "numeric_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "name": "org.apache.kafka.connect.data.Decimal",
+                    "version": 1,
+                    "parameters": {
+                        "scale": "65",
+                        "connect.decimal.precision": "1"
+                    },
+                    "field": "big_decimal_c"
+                },
+                {
+                    "type": "int16",
+                    "optional": true,
+                    "field": "bit1_c"
+                },
+                {
+                    "type": "int16",
+                    "optional": true,
+                    "field": "tiny1_c"
+                },
+                {
+                    "type": "int16",
+                    "optional": true,
+                    "field": "boolean_c"
+                },
+                {
+                    "type": "int32",
+                    "optional": true,
+                    "name": "io.debezium.time.Date",
+                    "version": 1,
+                    "field": "date_c"
+                },
+                {
+                    "type": "int64",
+                    "optional": true,
+                    "name": "io.debezium.time.MicroTime",
+                    "version": 1,
+                    "field": "time_c"
+                },
+                {
+                    "type": "int64",
+                    "optional": true,
+                    "name": "io.debezium.time.Timestamp",
+                    "version": 1,
+                    "field": "datetime3_c"
+                },
+                {
+                    "type": "int64",
+                    "optional": true,
+                    "name": "io.debezium.time.MicroTimestamp",
+                    "version": 1,
+                    "field": "datetime6_c"
+                },
+                {
+                    "type": "string",
+                    "optional": false,
+                    "name": "io.debezium.time.ZonedTimestamp",
+                    "version": 1,
+                    "default": "1970-01-01T00:00:00Z",
+                    "field": "timestamp_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "field": "file_uuid"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "field": "bit_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "text_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "field": "tiny_blob_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "field": "blob_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "field": "medium_blob_c"
+                },
+                {
+                    "type": "bytes",
+                    "optional": true,
+                    "field": "long_blob_c"
+                },
+                {
+                    "type": "int32",
+                    "optional": true,
+                    "field": "year_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "enum_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "set_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "json_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "point_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "geometry_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "linestring_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "polygon_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "multipoint_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "multiline_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "multipolygon_c"
+                },
+                {
+                    "type": "string",
+                    "optional": true,
+                    "field": "geometrycollection_c"
                 }
             ],
             "optional": false,
@@ -1282,13 +1050,22 @@
                 "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
                 "bit_c": "BAQEBAQEBAQ=",
                 "text_c": "text",
+                "tiny_blob_c": "EA==",
                 "blob_c": "EA==",
+                "medium_blob_c": "EA==",
+                "long_blob_c": "EA==",
                 "year_c": 2021,
                 "enum_c": "red",
                 "set_c": "a,b",
                 "json_c": "{\"key1\":\"value1\"}",
                 "point_c": {"x":1.0,"y":1.0,"wkb":"AQEAAAAAAAAAAADwPwAAAAAAAPA/"},
-                "geometry_c":{"wkb":"AQMAAAACAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"}
+                "geometry_c":{"wkb":"AQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAADwPwAAAAAAAPA/"},
+                "linestring_c": {"wkb":"AQIAAAADAAAAAAAAAAAACEAAAAAAAAAAAAAAAAAAAAhAAAAAAAAACEAAAAAAAAAIQAAAAAAAABRA"},
+                "polygon_c": {"wkb":"AQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAADwPwAAAAAAAPA/"},
+                "multipoint_c": {"wkb":"AQQAAAACAAAAAQEAAAAAAAAAAADwPwAAAAAAAPA/AQEAAAAAAAAAAAAAQAAAAAAAAABA"},
+                "multiline_c": {"wkb":"AQUAAAACAAAAAQIAAAADAAAAAAAAAAAA8D8AAAAAAADwPwAAAAAAAABAAAAAAAAAAEAAAAAAAAAIQAAAAAAAAAhAAQIAAAACAAAAAAAAAAAAEEAAAAAAAAAQQAAAAAAAABRAAAAAAAAAFEA="},
+                "multipolygon_c": {"wkb":"AQYAAAACAAAAAQMAAAABAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAAAQMAAAABAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"},
+                "geometrycollection_c": {"wkb":"AQcAAAADAAAAAQEAAAAAAAAAAAAkQAAAAAAAACRAAQEAAAAAAAAAAAA+QAAAAAAAAD5AAQIAAAACAAAAAAAAAAAALkAAAAAAAAAuQAAAAAAAADRAAAAAAAAANEA="}
             },
             "after": {
                 "id": 1,
@@ -1322,13 +1099,22 @@
                 "file_uuid": "ZRrtCDkPSJOy8TaSPnt0AA==",
                 "bit_c": "BAQEBAQEBAQ=",
                 "text_c": "text",
+                "tiny_blob_c": "EA==",
                 "blob_c": "EA==",
+                "medium_blob_c": "EA==",
+                "long_blob_c": "EA==",
                 "year_c": 2021,
                 "enum_c": "red",
                 "set_c": "a,b",
                 "json_c": "{\"key1\":\"value1\"}",
                 "point_c": {"x":1.0,"y":1.0,"wkb":"AQEAAAAAAAAAAADwPwAAAAAAAPA/"},
-                "geometry_c":{"wkb":"AQMAAAACAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"}
+                "geometry_c":{"wkb":"AQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAADwPwAAAAAAAPA/"},
+                "linestring_c": {"wkb":"AQIAAAADAAAAAAAAAAAACEAAAAAAAAAAAAAAAAAAAAhAAAAAAAAACEAAAAAAAAAIQAAAAAAAABRA"},
+                "polygon_c": {"wkb":"AQMAAAABAAAABQAAAAAAAAAAAPA/AAAAAAAA8D8AAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAPA/AAAAAAAAAEAAAAAAAADwPwAAAAAAAPA/"},
+                "multipoint_c": {"wkb":"AQQAAAACAAAAAQEAAAAAAAAAAADwPwAAAAAAAPA/AQEAAAAAAAAAAAAAQAAAAAAAAABA"},
+                "multiline_c": {"wkb":"AQUAAAACAAAAAQIAAAADAAAAAAAAAAAA8D8AAAAAAADwPwAAAAAAAABAAAAAAAAAAEAAAAAAAAAIQAAAAAAAAAhAAQIAAAACAAAAAAAAAAAAEEAAAAAAAAAQQAAAAAAAABRAAAAAAAAAFEA="},
+                "multipolygon_c": {"wkb":"AQYAAAACAAAAAQMAAAABAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAkQAAAAAAAAAAAAAAAAAAAJEAAAAAAAAAAAAAAAAAAAAAAAQMAAAABAAAABQAAAAAAAAAAABRAAAAAAAAAFEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAcQAAAAAAAABRAAAAAAAAAHEAAAAAAAAAUQAAAAAAAABRA"},
+                "geometrycollection_c": {"wkb":"AQcAAAADAAAAAQEAAAAAAAAAAAAkQAAAAAAAACRAAQEAAAAAAAAAAAA+QAAAAAAAAD5AAQIAAAACAAAAAAAAAAAALkAAAAAAAAAuQAAAAAAAADRAAAAAAAAANEA="}
             },
             "source": {
                 "version": "1.5.2.Final",

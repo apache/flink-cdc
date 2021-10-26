@@ -40,7 +40,7 @@ import java.util.stream.StreamSupport;
  * io.debezium.relational.history.JsonTableChangeSerializer, but add serialization/deserialization
  * for column's enumValues
  */
-public class JsonTableChangeSerializer implements TableChanges.TableChangesSerializer<Array> {
+public class FlinkJsonTableChangeSerializer implements TableChanges.TableChangesSerializer<Array> {
 
     @Override
     public Array serialize(TableChanges tableChanges) {
@@ -101,7 +101,9 @@ public class JsonTableChangeSerializer implements TableChanges.TableChangesSeria
         document.setBoolean("autoIncremented", column.isAutoIncremented());
         document.setBoolean("generated", column.isGenerated());
 
+        // BEGIN FLINK MODIFICATION
         document.setArray("enumValues", column.enumValues().toArray());
+        // END FLINK MODIFICATION
 
         return document;
     }
@@ -167,6 +169,7 @@ public class JsonTableChangeSerializer implements TableChanges.TableChangesSeria
                                     .autoIncremented(v.getBoolean("autoIncremented"))
                                     .generated(v.getBoolean("generated"));
 
+                            // BEGIN FLINK MODIFICATION
                             Array enumValues = v.getArray("enumValues");
                             if (enumValues != null && !enumValues.isEmpty()) {
                                 columnEditor.enumValues(
@@ -175,6 +178,7 @@ public class JsonTableChangeSerializer implements TableChanges.TableChangesSeria
                                                 .map(Value::asString)
                                                 .collect(Collectors.toList()));
                             }
+                            // END FLINK MODIFICATION
 
                             return columnEditor.create();
                         })

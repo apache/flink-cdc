@@ -46,14 +46,13 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import javax.annotation.Nullable;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -101,12 +100,14 @@ public final class RowDataDebeziumDeserializeSchema
             TypeInformation<RowData> resultTypeInfo,
             ValueValidator validator,
             ZoneId serverTimeZone,
-            @Nullable DeserializationRuntimeConverterFactory customConverterFactory) {
+            DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
         this.physicalConverter =
                 createConverter(
-                        checkNotNull(physicalDataType), serverTimeZone, customConverterFactory);
+                        checkNotNull(physicalDataType),
+                        serverTimeZone,
+                        userDefinedConverterFactory);
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
     }
@@ -178,7 +179,8 @@ public final class RowDataDebeziumDeserializeSchema
         private MetadataConverter[] metadataConverters = new MetadataConverter[0];
         private ValueValidator validator = (rowData, rowKind) -> {};
         private ZoneId serverTimeZone = ZoneId.of("UTC");
-        private DeserializationRuntimeConverterFactory customConverterFactory;
+        private DeserializationRuntimeConverterFactory userDefinedConverterFactory =
+                DeserializationRuntimeConverterFactory.DEFAULT;
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -205,9 +207,9 @@ public final class RowDataDebeziumDeserializeSchema
             return this;
         }
 
-        public Builder setCustomConverterFactory(
-                DeserializationRuntimeConverterFactory customConverterFactory) {
-            this.customConverterFactory = customConverterFactory;
+        public Builder setUserDefinedConverterFactory(
+                DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
+            this.userDefinedConverterFactory = userDefinedConverterFactory;
             return this;
         }
 
@@ -218,7 +220,7 @@ public final class RowDataDebeziumDeserializeSchema
                     resultTypeInfo,
                     validator,
                     serverTimeZone,
-                    customConverterFactory);
+                    userDefinedConverterFactory);
         }
     }
 
@@ -230,15 +232,9 @@ public final class RowDataDebeziumDeserializeSchema
     private static DeserializationRuntimeConverter createConverter(
             LogicalType type,
             ZoneId serverTimeZone,
-            @Nullable DeserializationRuntimeConverterFactory customConverterFactory) {
-        DeserializationRuntimeConverter notNullConverter;
-        if (customConverterFactory != null) {
-            notNullConverter =
-                    customConverterFactory.create(type, serverTimeZone, customConverterFactory);
-        } else {
-            notNullConverter = createNotNullConverter(type, serverTimeZone, customConverterFactory);
-        }
-        return wrapIntoNullableConverter(notNullConverter);
+            DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
+        return wrapIntoNullableConverter(
+                createNotNullConverter(type, serverTimeZone, userDefinedConverterFactory));
     }
 
     // --------------------------------------------------------------------------------
@@ -251,7 +247,15 @@ public final class RowDataDebeziumDeserializeSchema
     public static DeserializationRuntimeConverter createNotNullConverter(
             LogicalType type,
             ZoneId serverTimeZone,
-            @Nullable DeserializationRuntimeConverterFactory customConverterFactory) {
+            DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
+        // user defined converter has a higher resolve order
+        Optional<DeserializationRuntimeConverter> converter =
+                userDefinedConverterFactory.createUserDefinedConverter(type, serverTimeZone);
+        if (converter.isPresent()) {
+            return converter.get();
+        }
+
+        // if no matched user defined converter, fallback to the default converter
         switch (type.getTypeRoot()) {
             case NULL:
                 return new DeserializationRuntimeConverter() {
@@ -312,7 +316,8 @@ public final class RowDataDebeziumDeserializeSchema
             case DECIMAL:
                 return createDecimalConverter((DecimalType) type);
             case ROW:
-                return createRowConverter((RowType) type, serverTimeZone, customConverterFactory);
+                return createRowConverter(
+                        (RowType) type, serverTimeZone, userDefinedConverterFactory);
             case ARRAY:
             case MAP:
             case MULTISET:
@@ -572,14 +577,16 @@ public final class RowDataDebeziumDeserializeSchema
     private static DeserializationRuntimeConverter createRowConverter(
             RowType rowType,
             ZoneId serverTimeZone,
-            DeserializationRuntimeConverterFactory customConverterFactory) {
+            DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
         final DeserializationRuntimeConverter[] fieldConverters =
                 rowType.getFields().stream()
                         .map(RowType.RowField::getType)
                         .map(
                                 logicType ->
                                         createConverter(
-                                                logicType, serverTimeZone, customConverterFactory))
+                                                logicType,
+                                                serverTimeZone,
+                                                userDefinedConverterFactory))
                         .toArray(DeserializationRuntimeConverter[]::new);
         final String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
 

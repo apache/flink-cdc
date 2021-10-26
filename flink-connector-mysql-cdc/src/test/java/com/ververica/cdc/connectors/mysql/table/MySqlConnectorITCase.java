@@ -346,13 +346,22 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "    file_uuid BYTES,\n"
                                 + "    bit_c BINARY(8),\n"
                                 + "    text_c STRING,\n"
+                                + "    tiny_blob_c BYTES,\n"
                                 + "    blob_c BYTES,\n"
+                                + "    medium_blob_c BYTES,\n"
+                                + "    long_blob_c BYTES,\n"
                                 + "    year_c INT,\n"
                                 + "    enum_c STRING,\n"
                                 + "    set_c ARRAY<STRING>,\n"
                                 + "    json_c STRING,\n"
                                 + "    point_c STRING,\n"
                                 + "    geometry_c STRING,\n"
+                                + "    linestring_c STRING,\n"
+                                + "    polygon_c STRING,\n"
+                                + "    multipoint_c STRING,\n"
+                                + "    multiline_c STRING,\n"
+                                + "    multipolygon_c STRING,\n"
+                                + "    geometrycollection_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -413,13 +422,22 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "TO_BASE64(DECODE(file_uuid, 'UTF-8')),\n"
                                 + "bit_c,\n"
                                 + "text_c,\n"
+                                + "tiny_blob_c,\n"
                                 + "blob_c,\n"
+                                + "medium_blob_c,\n"
+                                + "long_blob_c,\n"
                                 + "year_c,\n"
                                 + "enum_c,\n"
                                 + "set_c,\n"
                                 + "json_c, \n"
                                 + "point_c, \n"
-                                + "geometry_c \n"
+                                + "geometry_c, \n"
+                                + "linestring_c, \n"
+                                + "polygon_c, \n"
+                                + "multipoint_c, \n"
+                                + "multiline_c, \n"
+                                + "multipolygon_c, \n"
+                                + "geometrycollection_c \n"
                                 + " FROM full_types");
 
         CloseableIterator<Row> iterator = result.collect();
@@ -427,38 +445,85 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-
             statement.execute(
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
         String expectedPointJsonText = "{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}";
         String expectedGeometryJsonText =
-                "{\"coordinates\":[[[0,0],[10,0],[10,10],[0,10],[0,0]],[[5,5],[5,7],[7,7],[7,5],[5,5]]],\"type\":\"Polygon\",\"srid\":0}";
+                "{\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}";
+        String expectLinestringJsonText =
+                "{\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0}";
+        String expectPolygonJsonText =
+                "{\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}";
+        String expectMultipointJsonText =
+                "{\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0}";
+        String expectMultilineJsonText =
+                "{\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0}";
+        String expectMultipolygonJsonText =
+                "{\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0}";
+        String expectGeometryCollectionJsonText =
+                "{\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0}";
         String[] expected =
                 new String[] {
                     "+I[1, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, Hello World, abc, 123.102, 123.102, 404.4443, 123.4567, 346, 34567892.1, false, true, true,"
                             + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, "
-                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], 2021, red, [a, b], "
+                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
                             + "{\"key1\": \"value1\"}, "
                             + expectedPointJsonText
                             + ", "
                             + expectedGeometryJsonText
+                            + ", "
+                            + expectLinestringJsonText
+                            + ", "
+                            + expectPolygonJsonText
+                            + ", "
+                            + expectMultipointJsonText
+                            + ", "
+                            + expectMultilineJsonText
+                            + ", "
+                            + expectMultipolygonJsonText
+                            + ", "
+                            + expectGeometryCollectionJsonText
                             + "]",
                     "-U[1, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, Hello World, abc, 123.102, 123.102, 404.4443, 123.4567, 346, 34567892.1, false, true, true,"
                             + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, "
-                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], 2021, red, [a, b], "
+                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
                             + "{\"key1\":\"value1\"}, "
                             + expectedPointJsonText
                             + ", "
                             + expectedGeometryJsonText
+                            + ", "
+                            + expectLinestringJsonText
+                            + ", "
+                            + expectPolygonJsonText
+                            + ", "
+                            + expectMultipointJsonText
+                            + ", "
+                            + expectMultilineJsonText
+                            + ", "
+                            + expectMultipolygonJsonText
+                            + ", "
+                            + expectGeometryCollectionJsonText
                             + "]",
                     "+U[1, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, Hello World, abc, 123.102, 123.102, 404.4443, 123.4567, 346, 34567892.1, false, true, true,"
                             + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, "
-                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], 2021, red, [a, b], "
+                            + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
                             + "{\"key1\":\"value1\"}, "
                             + expectedPointJsonText
                             + ", "
                             + expectedGeometryJsonText
+                            + ", "
+                            + expectLinestringJsonText
+                            + ", "
+                            + expectPolygonJsonText
+                            + ", "
+                            + expectMultipointJsonText
+                            + ", "
+                            + expectMultilineJsonText
+                            + ", "
+                            + expectMultipolygonJsonText
+                            + ", "
+                            + expectGeometryCollectionJsonText
                             + "]",
                 };
 

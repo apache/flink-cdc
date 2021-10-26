@@ -18,7 +18,7 @@
 
 package com.ververica.cdc.debezium.internal;
 
-import com.ververica.cdc.debezium.history.JsonTableChangeSerializer;
+import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.config.Configuration;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -55,8 +55,8 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
 
     public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
 
-    private final JsonTableChangeSerializer tableChangesSerializer =
-            new JsonTableChangeSerializer();
+    private final FlinkJsonTableChangeSerializer tableChangesSerializer =
+            new FlinkJsonTableChangeSerializer();
 
     private ConcurrentMap<TableId, SchemaRecord> latestTables;
     private String instanceName;
@@ -82,7 +82,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
         for (SchemaRecord schemaRecord : retrieveHistory(instanceName)) {
             // validate here
             TableChange tableChange =
-                    JsonTableChangeSerializer.fromDocument(
+                    FlinkJsonTableChangeSerializer.fromDocument(
                             schemaRecord.toDocument(), useCatalogBeforeSchema);
             latestTables.put(tableChange.getId(), schemaRecord);
         }
@@ -143,7 +143,7 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
         listener.recoveryStarted();
         for (SchemaRecord record : latestTables.values()) {
             TableChange tableChange =
-                    JsonTableChangeSerializer.fromDocument(
+                    FlinkJsonTableChangeSerializer.fromDocument(
                             record.getTableChangeDoc(), useCatalogBeforeSchema);
             schema.overwriteTable(tableChange.getTable());
         }
