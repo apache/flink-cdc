@@ -18,8 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.split;
 
-import org.apache.flink.table.types.logical.RowType;
-
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -29,28 +27,38 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /** The split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplit extends MySqlSplit {
 
+    /**
+     * The max meta number of a {@link MySqlBinlogSplit} can pass in one transmission, the split
+     * should splits to parts for transmission if the number exceeds the max number.
+     */
+    public static final int MAX_META_NUMBER_IN_TRANSMISSION = 2000;
+
     private final BinlogOffset startingOffset;
     private final BinlogOffset endingOffset;
     private final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos;
+    private final Map<TableId, TableChange> tableSchemas;
+
+    private final boolean isCompletedSplit;
 
     @Nullable transient byte[] serializedFormCache;
 
     public MySqlBinlogSplit(
             String splitId,
-            RowType splitKeyType,
             BinlogOffset startingOffset,
             BinlogOffset endingOffset,
             List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
-            Map<TableId, TableChange> tableSchemas) {
-        super(splitId, splitKeyType, tableSchemas);
+            Map<TableId, TableChange> tableSchemas,
+            boolean isCompletedSplit) {
+        super(splitId);
         this.startingOffset = startingOffset;
         this.endingOffset = endingOffset;
         this.finishedSnapshotSplitInfos = finishedSnapshotSplitInfos;
+        this.tableSchemas = tableSchemas;
+        this.isCompletedSplit = isCompletedSplit;
     }
 
     public BinlogOffset getStartingOffset() {
@@ -63,6 +71,15 @@ public class MySqlBinlogSplit extends MySqlSplit {
 
     public List<FinishedSnapshotSplitInfo> getFinishedSnapshotSplitInfos() {
         return finishedSnapshotSplitInfos;
+    }
+
+    @Override
+    public Map<TableId, TableChange> getTableSchemas() {
+        return tableSchemas;
+    }
+
+    public boolean isCompletedSplit() {
+        return isCompletedSplit;
     }
 
     @Override
@@ -90,20 +107,51 @@ public class MySqlBinlogSplit extends MySqlSplit {
 
     @Override
     public String toString() {
-        String splitKeyTypeSummary =
-                splitKeyType.getFields().stream()
-                        .map(RowType.RowField::asSummaryString)
-                        .collect(Collectors.joining(",", "[", "]"));
         return "MySqlBinlogSplit{"
                 + ", splitId='"
                 + splitId
                 + '\''
-                + ", splitKeyType="
-                + splitKeyTypeSummary
                 + ", offset="
                 + startingOffset
                 + ", endOffset="
                 + endingOffset
                 + '}';
+    }
+
+    // -------------------------------------------------------------------
+    // factory utils to build new MySqlBinlogSplit instance
+    // -------------------------------------------------------------------
+    public static MySqlBinlogSplit toCompletedBinlog(MySqlBinlogSplit binlogSplit) {
+        return new MySqlBinlogSplit(
+                binlogSplit.splitId,
+                binlogSplit.getStartingOffset(),
+                binlogSplit.getEndingOffset(),
+                binlogSplit.getFinishedSnapshotSplitInfos(),
+                binlogSplit.getTableSchemas(),
+                true);
+    }
+
+    public static MySqlBinlogSplit appendFinishedSplitInfos(
+            MySqlBinlogSplit binlogSplit, List<FinishedSnapshotSplitInfo> splitInfos) {
+        splitInfos.addAll(binlogSplit.getFinishedSnapshotSplitInfos());
+        return new MySqlBinlogSplit(
+                binlogSplit.splitId,
+                binlogSplit.getStartingOffset(),
+                binlogSplit.getEndingOffset(),
+                splitInfos,
+                binlogSplit.getTableSchemas(),
+                binlogSplit.isCompletedSplit());
+    }
+
+    public static MySqlBinlogSplit fillTableSchemas(
+            MySqlBinlogSplit binlogSplit, Map<TableId, TableChange> tableSchemas) {
+        tableSchemas.putAll(binlogSplit.getTableSchemas());
+        return new MySqlBinlogSplit(
+                binlogSplit.splitId,
+                binlogSplit.getStartingOffset(),
+                binlogSplit.getEndingOffset(),
+                binlogSplit.getFinishedSnapshotSplitInfos(),
+                tableSchemas,
+                binlogSplit.isCompletedSplit());
     }
 }

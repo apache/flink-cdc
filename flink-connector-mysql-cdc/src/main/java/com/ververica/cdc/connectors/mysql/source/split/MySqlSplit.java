@@ -19,10 +19,9 @@
 package com.ververica.cdc.connectors.mysql.source.split;
 
 import org.apache.flink.api.connector.source.SourceSplit;
-import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.relational.history.TableChanges;
 
 import java.util.Map;
 import java.util.Objects;
@@ -31,14 +30,9 @@ import java.util.Objects;
 public abstract class MySqlSplit implements SourceSplit {
 
     protected final String splitId;
-    protected final RowType splitKeyType;
-    protected final Map<TableId, TableChange> tableSchemas;
 
-    public MySqlSplit(
-            String splitId, RowType splitKeyType, Map<TableId, TableChange> tableSchemas) {
+    public MySqlSplit(String splitId) {
         this.splitId = splitId;
-        this.splitKeyType = splitKeyType;
-        this.tableSchemas = tableSchemas;
     }
 
     /** Checks whether this split is a snapshot split. */
@@ -66,13 +60,7 @@ public abstract class MySqlSplit implements SourceSplit {
         return splitId;
     }
 
-    public RowType getSplitKeyType() {
-        return splitKeyType;
-    }
-
-    public Map<TableId, TableChange> getTableSchemas() {
-        return tableSchemas;
-    }
+    public abstract Map<TableId, TableChanges.TableChange> getTableSchemas();
 
     @Override
     public boolean equals(Object o) {
@@ -83,13 +71,11 @@ public abstract class MySqlSplit implements SourceSplit {
             return false;
         }
         MySqlSplit that = (MySqlSplit) o;
-        return Objects.equals(splitId, that.splitId)
-                && Objects.equals(splitKeyType, that.splitKeyType)
-                && Objects.equals(tableSchemas, that.tableSchemas);
+        return Objects.equals(splitId, that.splitId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(splitId, splitKeyType, tableSchemas);
+        return Objects.hash(splitId);
     }
 }

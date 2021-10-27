@@ -20,7 +20,6 @@ package com.ververica.cdc.connectors.mysql.debezium.reader;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.logical.RowType;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
@@ -36,12 +35,14 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -100,13 +101,11 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[121, user_8, Shanghai, 123567891234]",
                     "+I[123, user_9, Shanghai, 123567891234]"
                 };
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
+
         List<String> actual =
                 readBinlogSplits(
                         splits,
                         dataType,
-                        pkType,
                         sourceConfig,
                         1,
                         expected.length,
@@ -163,13 +162,10 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2002, user_23, Shanghai, 123567891234]",
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
-        final RowType pkType =
-                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         List<String> actual =
                 readBinlogSplits(
                         splits,
                         dataType,
-                        pkType,
                         sourceConfig,
                         splits.size(),
                         expected.length,
@@ -200,17 +196,10 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[20002, LEVEL_3, user_3, user with level 3]"
                 };
 
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
-                                        DataTypes.FIELD("level", DataTypes.STRING()))
-                                .getLogicalType();
         List<String> actual =
                 readBinlogSplits(
                         splits,
                         dataType,
-                        pkType,
                         sourceConfig,
                         splits.size(),
                         expected.length,
@@ -231,12 +220,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        final RowType pkType =
-                (RowType)
-                        DataTypes.ROW(
-                                        DataTypes.FIELD("card_no", DataTypes.BIGINT()),
-                                        DataTypes.FIELD("level", DataTypes.STRING()))
-                                .getLogicalType();
         List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
         String[] expected =
                 new String[] {
@@ -268,7 +251,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 readBinlogSplits(
                         splits,
                         dataType,
-                        pkType,
                         sourceConfig,
                         splits.size(),
                         expected.length,
@@ -321,7 +303,16 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // step-1: create binlog split
         MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
         binlogSplitAssigner.open();
-        MySqlSplit binlogSplit = binlogSplitAssigner.getNext().get();
+
+        MySqlSplit binlogSplit;
+        try (MySqlConnection jdbc =
+                DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
+            binlogSplit =
+                    MySqlBinlogSplit.fillTableSchemas(
+                            binlogSplitAssigner.getNext().get().asBinlogSplit(), tableSchemas);
+        }
 
         // step-2: test read binlog split
         BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
@@ -357,7 +348,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     private List<String> readBinlogSplits(
             List<MySqlSnapshotSplit> sqlSplits,
             DataType dataType,
-            RowType pkType,
             MySqlSourceConfig sourceConfig,
             int scanSplitsNum,
             int expectedSize,
@@ -395,11 +385,11 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         MySqlSplit binlogSplit =
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        pkType,
                         startingOffset,
                         BinlogOffset.NO_STOPPING_OFFSET,
                         finishedSplitsInfo,
-                        tableSchemas);
+                        tableSchemas,
+                        true);
 
         // step-3: test read binlog split
         BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
