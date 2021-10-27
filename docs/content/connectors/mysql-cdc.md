@@ -626,15 +626,76 @@ Data Type Mapping
         STRING
       </td>
       <td>
-      The spatial data types in MySQL will be converted into STRING with a fixed format like:<br>
-      <code>
-      {"srid": 0, "type": "POINT", "coordinates": [1.0,1.0]}
-      </code>
+      The spatial data types in MySQL will be converted into STRING with a fixed Json format.
+      Please see <a href="#mysql-spatial-data-types-mapping ">MySQL Spatial Data Types Mapping</a>section for more detailed information.
       </td>
     </tr>
     </tbody>
 </table>
 </div>
+
+### MySQL Spatial Data Types Mapping
+The spatial data types except for `GEOMETRYCOLLECTION` in MySQL will be converted into Json String with a fixed format like:<br>
+```json
+{"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
+```
+The field `srid` identifies the SRS in which the geometry is defined, SRID 0 is the default for new geometry values if no SRID is specified.
+As only MySQL 8+ support to specific SRID when define spatial data type, the field `srid` will always be 0 in MySQL with a lower version.
+
+The field `type` identifies the spatial data type, such as `POINT`/`LINESTRING`/`POLYGON`.
+
+The field `coordinates` represents the `coordinates` of the spatial data.
+
+For `GEOMETRYCOLLECTION`, it will be converted into Json String with a fixed format like:<br>
+```json
+{"srid": 0 , "type": "GeometryCollection", "geometries": [{"type":"Point","coordinates":[10,10]}]}
+```
+
+The field `geometries` is an array contains all spatial data.
+
+The example for different spatial data types mapping is as follows:
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Spatial data in MySQL</th>
+        <th class="text-left">Json String converted in Flink</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>POINT(1 1)</td>
+        <td>{"coordinates":[1,1],"type":"Point","srid":0}</td>
+      </tr>
+      <tr>
+        <td>LINESTRING(3 0, 3 3, 3 5)</td>
+        <td>{"coordinates":[[3,0],[3,3],[3,5]],"type":"LineString","srid":0}</td>
+      </tr>
+      <tr>
+        <td>POLYGON((1 1, 2 1, 2 2,  1 2, 1 1))</td>
+        <td>{"coordinates":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],"type":"Polygon","srid":0}</td>
+      </tr>
+      <tr>
+        <td>MULTIPOINT((1 1),(2 2))</td>
+        <td>{"coordinates":[[1,1],[2,2]],"type":"MultiPoint","srid":0}</td>
+      </tr>
+      <tr>
+        <td>MultiLineString((1 1,2 2,3 3),(4 4,5 5))</td>
+        <td>{"coordinates":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],"type":"MultiLineString","srid":0}</td>
+      </tr>
+      <tr>
+        <td>MULTIPOLYGON(((0 0, 10 0, 10 10, 0 10, 0 0)), ((5 5, 7 5, 7 7, 5 7, 5 5)))</td>
+        <td>{"coordinates":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],"type":"MultiPolygon","srid":0}</td>
+      </tr>
+      <tr>
+        <td>GEOMETRYCOLLECTION(POINT(10 10), POINT(30 30), LINESTRING(15 15, 20 20))</td>
+        <td>{"geometries":[{"type":"Point","coordinates":[10,10]},{"type":"Point","coordinates":[30,30]},{"type":"LineString","coordinates":[[15,15],[20,20]]}],"type":"GeometryCollection","srid":0}</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+
 
 FAQ
 --------
