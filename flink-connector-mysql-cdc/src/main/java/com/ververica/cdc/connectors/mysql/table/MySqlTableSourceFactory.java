@@ -36,6 +36,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
@@ -72,7 +73,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
+        validateDatabaseName(databaseName);
         String tableName = config.get(TABLE_NAME);
+        validateTableName(tableName);
         int port = config.get(PORT);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -230,5 +233,23 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 String.format(
                         "The value of option '%s' must larger than 1, but is %d",
                         SCAN_SNAPSHOT_FETCH_SIZE.key(), fetchSize));
+    }
+
+    private void validateDatabaseName(String databaseName) {
+        try {
+            Pattern.compile(databaseName);
+        } catch (Exception e) {
+            throw new ValidationException(
+                    String.format("The database-name is invalid: '%s'", databaseName), e);
+        }
+    }
+
+    private void validateTableName(String tableName) {
+        try {
+            Pattern.compile(tableName);
+        } catch (Exception e) {
+            throw new ValidationException(
+                    String.format("The database-name is invalid: '%s'", tableName), e);
+        }
     }
 }

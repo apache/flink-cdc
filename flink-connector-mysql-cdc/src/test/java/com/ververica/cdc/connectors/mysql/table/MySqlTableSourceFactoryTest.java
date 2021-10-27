@@ -477,6 +477,23 @@ public class MySqlTableSourceFactoryTest {
                             + "but was: abc";
             assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
         }
+
+        // validate invalid database-name
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("database-name", "*_invalid_db");
+        } catch (Throwable t) {
+            String msg = String.format("The database-name is invalid: '%s'", "*_invalid_db");
+            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
+        }
+        // validate invalid table-name
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("table-name", "*_invalid_table");
+        } catch (Throwable t) {
+            String msg = String.format("The table-name is invalid: '%s'", "*_invalid_table");
+            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
+        }
     }
 
     private Map<String, String> getAllOptions() {
