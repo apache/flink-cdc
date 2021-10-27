@@ -133,11 +133,11 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         MySqlBinlogSplit expected =
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        splitKeyType,
                         new BinlogOffset("mysql-bin.00001", 1),
                         BinlogOffset.NO_STOPPING_OFFSET,
                         finishedSnapshotSplitInfos,
-                        new HashMap<>());
+                        new HashMap<>(),
+                        true);
         assertEquals(expected, mySqlBinlogSplit);
     }
 

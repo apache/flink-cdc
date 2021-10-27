@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -28,6 +29,7 @@ import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlOffsetContext;
@@ -201,9 +203,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             }
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
+                RowType splitKeyType =
+                        ChunkUtils.getSplitType(
+                                statefulTaskContext.getDatabaseSchema().tableFor(tableId));
                 Object[] key =
                         getSplitKey(
-                                currentBinlogSplit.getSplitKeyType(),
+                                splitKeyType,
                                 sourceRecord,
                                 statefulTaskContext.getSchemaNameAdjuster());
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {

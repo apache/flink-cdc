@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
@@ -27,6 +26,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.schema.MySqlTypeUtils;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.Column;
@@ -52,8 +52,6 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.que
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMinMax;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryNextChunkMax;
 import static java.math.BigDecimal.ROUND_CEILING;
-import static org.apache.flink.table.api.DataTypes.FIELD;
-import static org.apache.flink.table.api.DataTypes.ROW;
 
 /**
  * The {@code ChunkSplitter}'s task is to split table into a set of chunks or called splits (i.e.
@@ -82,18 +80,8 @@ class ChunkSplitter {
     public Collection<MySqlSnapshotSplit> generateSplits(TableId tableId) {
         long start = System.currentTimeMillis();
 
-        Table schema = mySqlSchema.getTableSchema(tableId).getTable();
-        List<Column> primaryKeys = schema.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            tableId));
-        }
-
-        // use first field in primary key as the split key
-        Column splitColumn = primaryKeys.get(0);
+        Table table = mySqlSchema.getTableSchema(tableId).getTable();
+        Column splitColumn = ChunkUtils.getSplitColumn(table);
         final List<ChunkRange> chunks;
         try {
             chunks = splitTableIntoChunks(tableId, splitColumn);
@@ -103,7 +91,7 @@ class ChunkSplitter {
 
         // convert chunks into splits
         List<MySqlSnapshotSplit> splits = new ArrayList<>();
-        RowType splitType = splitType(splitColumn);
+        RowType splitType = ChunkUtils.getSplitType(splitColumn);
         for (int i = 0; i < chunks.size(); i++) {
             ChunkRange chunk = chunks.get(i);
             MySqlSnapshotSplit split =
@@ -294,12 +282,6 @@ class ChunkSplitter {
 
     private static String splitId(TableId tableId, int chunkId) {
         return tableId.toString() + ":" + chunkId;
-    }
-
-    private static RowType splitType(Column splitColumn) {
-        return (RowType)
-                ROW(FIELD(splitColumn.name(), MySqlTypeUtils.fromDbzColumn(splitColumn)))
-                        .getLogicalType();
     }
 
     private static void maySleep(int count) {

@@ -20,7 +20,6 @@ package com.ververica.cdc.connectors.mysql.source.split;
 
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.logical.VarCharType;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.document.Document;
@@ -96,14 +95,22 @@ public class MySqlSplitSerializerTest {
         final MySqlSplit split =
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        new RowType(
-                                Collections.singletonList(
-                                        new RowType.RowField("card_no", new VarCharType()))),
                         new BinlogOffset("mysql-bin.000001", 4L),
                         BinlogOffset.NO_STOPPING_OFFSET,
                         finishedSplitsInfo,
-                        databaseHistory);
+                        databaseHistory,
+                        true);
         assertEquals(split, serializeAndDeserializeSplit(split));
+
+        final MySqlSplit unCompletedBinlogSplit =
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        new BinlogOffset("mysql-bin.000001", 4L),
+                        BinlogOffset.NO_STOPPING_OFFSET,
+                        new ArrayList<>(),
+                        new HashMap<>(),
+                        false);
+        assertEquals(unCompletedBinlogSplit, serializeAndDeserializeSplit(unCompletedBinlogSplit));
     }
 
     @Test

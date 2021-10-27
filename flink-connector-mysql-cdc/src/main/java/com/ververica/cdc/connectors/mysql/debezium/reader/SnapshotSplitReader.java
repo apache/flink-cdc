@@ -158,11 +158,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             SnapshotSplitChangeEventSourceContextImpl sourceContext) {
         return new MySqlBinlogSplit(
                 currentSnapshotSplit.splitId(),
-                currentSnapshotSplit.getSplitKeyType(),
                 sourceContext.getLowWatermark(),
                 sourceContext.getHighWatermark(),
                 new ArrayList<>(),
-                currentSnapshotSplit.getTableSchemas());
+                currentSnapshotSplit.getTableSchemas(),
+                true);
     }
 
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(
