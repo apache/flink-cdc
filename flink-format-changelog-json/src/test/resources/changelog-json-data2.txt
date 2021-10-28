@@ -1,0 +1,5 @@
+{"data":{"id":112,"name":"liaooo","money":10.00},"op":"+I"}
+{"data":{"id":112,"name":"liaooo","money":10.00},"op":"-U"}
+{"data":{"id":112,"name":"liaooo","money":1000000.00},"op":"+U"}
+{"data":{"id":112,"name":"liaooo","money":1000000.00},"op":"-U"}
+{"data":{"id":112,"name":"liaooo","money":9999999.50},"op":"+U"}

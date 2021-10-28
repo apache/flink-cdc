@@ -22,6 +22,7 @@ import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.formats.common.TimestampFormat;
+import org.apache.flink.formats.json.JsonOptions;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
@@ -76,7 +77,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
                 new ChangelogJsonDeserializationSchema(
                         ROW_TYPE, InternalTypeInfo.of(ROW_TYPE), true, TimestampFormat.ISO_8601);
         final ChangelogJsonSerializationSchema expectedSer =
-                new ChangelogJsonSerializationSchema(ROW_TYPE, TimestampFormat.ISO_8601);
+                new ChangelogJsonSerializationSchema(ROW_TYPE, TimestampFormat.ISO_8601, JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.defaultValue());
 
         final Map<String, String> options = getAllOptions();
 
