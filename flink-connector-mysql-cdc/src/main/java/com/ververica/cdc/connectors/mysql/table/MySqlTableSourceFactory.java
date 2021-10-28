@@ -36,6 +36,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
@@ -72,7 +73,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
+        validateRegex(DATABASE_NAME.key(), databaseName);
         String tableName = config.get(TABLE_NAME);
+        validateRegex(TABLE_NAME.key(), tableName);
         int port = config.get(PORT);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -230,5 +233,23 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 String.format(
                         "The value of option '%s' must larger than 1, but is %d",
                         SCAN_SNAPSHOT_FETCH_SIZE.key(), fetchSize));
+    }
+
+    /**
+     * Checks the given regular expression's syntax is valid.
+     *
+     * @param optionName the option name of the regex
+     * @param regex The regular expression to be checked
+     * @throws ValidationException If the expression's syntax is invalid
+     */
+    private void validateRegex(String optionName, String regex) {
+        try {
+            Pattern.compile(regex);
+        } catch (Exception e) {
+            throw new ValidationException(
+                    String.format(
+                            "The %s '%s' is not a valid regular expression", optionName, regex),
+                    e);
+        }
     }
 }
