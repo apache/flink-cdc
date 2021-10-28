@@ -56,7 +56,8 @@ public class ChangelogJsonFormatFactory
 
     public static final ConfigOption<String> TIMESTAMP_FORMAT = JsonOptions.TIMESTAMP_FORMAT;
 
-    public static final ConfigOption<Boolean> ENCODE_DECIMAL_AS_PLAIN_NUMBER = JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER;
+    public static final ConfigOption<Boolean> ENCODE_DECIMAL_AS_PLAIN_NUMBER =
+            JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER;
 
     @Override
     public DecodingFormat<DeserializationSchema<RowData>> createDecodingFormat(
@@ -111,7 +112,8 @@ public class ChangelogJsonFormatFactory
             public SerializationSchema<RowData> createRuntimeEncoder(
                     DynamicTableSink.Context context, DataType consumedDataType) {
                 final RowType rowType = (RowType) consumedDataType.getLogicalType();
-                return new ChangelogJsonSerializationSchema(rowType, timestampFormat, encodeDecimalAsPlainNumber);
+                return new ChangelogJsonSerializationSchema(
+                        rowType, timestampFormat, encodeDecimalAsPlainNumber);
             }
         };
     }

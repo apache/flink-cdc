@@ -23,6 +23,7 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
+
 import org.junit.Test;
 
 import java.io.File;
@@ -38,7 +39,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.table.api.DataTypes.DECIMAL;
 import static org.apache.flink.table.api.DataTypes.FIELD;
-import static org.apache.flink.table.api.DataTypes.FLOAT;
 import static org.apache.flink.table.api.DataTypes.INT;
 import static org.apache.flink.table.api.DataTypes.ROW;
 import static org.apache.flink.table.api.DataTypes.STRING;
@@ -71,13 +71,15 @@ public class ChangelogJsonSerDeDecimalTest {
             deserializationSchema.deserialize(line.getBytes(StandardCharsets.UTF_8), collector);
         }
 
-        List<String> expected = Arrays.asList(
-                "+I(112,liaooo,10.00)",
-                "-U(112,liaooo,10.00)",
-                "+U(112,liaooo,1000000.00)",
-                "-U(112,liaooo,1000000.00)",
-                "+U(112,liaooo,9999999.50)");
-        List<String> actual = collector.list.stream().map(Object::toString).collect(Collectors.toList());
+        List<String> expected =
+                Arrays.asList(
+                        "+I(112,liaooo,10.00)",
+                        "-U(112,liaooo,10.00)",
+                        "+U(112,liaooo,1000000.00)",
+                        "-U(112,liaooo,1000000.00)",
+                        "+U(112,liaooo,9999999.50)");
+        List<String> actual =
+                collector.list.stream().map(Object::toString).collect(Collectors.toList());
         assertEquals(expected, actual);
 
         // decimal字段会启用科学记数法
@@ -103,7 +105,8 @@ public class ChangelogJsonSerDeDecimalTest {
         serializationSchema2.open(null);
         List<String> result2 = new ArrayList<>();
         for (RowData rowData : collector.list) {
-            result2.add(new String(serializationSchema2.serialize(rowData), StandardCharsets.UTF_8));
+            result2.add(
+                    new String(serializationSchema2.serialize(rowData), StandardCharsets.UTF_8));
         }
         List<String> expectedResult2 =
                 Arrays.asList(

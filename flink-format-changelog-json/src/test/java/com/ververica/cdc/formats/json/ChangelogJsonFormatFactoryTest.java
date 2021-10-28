@@ -77,7 +77,10 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
                 new ChangelogJsonDeserializationSchema(
                         ROW_TYPE, InternalTypeInfo.of(ROW_TYPE), true, TimestampFormat.ISO_8601);
         final ChangelogJsonSerializationSchema expectedSer =
-                new ChangelogJsonSerializationSchema(ROW_TYPE, TimestampFormat.ISO_8601, JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.defaultValue());
+                new ChangelogJsonSerializationSchema(
+                        ROW_TYPE,
+                        TimestampFormat.ISO_8601,
+                        JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.defaultValue());
 
         final Map<String, String> options = getAllOptions();
 

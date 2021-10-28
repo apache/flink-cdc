@@ -127,7 +127,10 @@ public class ChangelogJsonSerDeTest {
         assertEquals(expected, actual);
 
         ChangelogJsonSerializationSchema serializationSchema =
-                new ChangelogJsonSerializationSchema(SCHEMA, TimestampFormat.SQL, JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.defaultValue());
+                new ChangelogJsonSerializationSchema(
+                        SCHEMA,
+                        TimestampFormat.SQL,
+                        JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.defaultValue());
         serializationSchema.open(null);
         List<String> result = new ArrayList<>();
         for (RowData rowData : collector.list) {

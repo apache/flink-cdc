@@ -53,7 +53,8 @@ public class ChangelogJsonSerializationSchema implements SerializationSchema<Row
 
     private transient GenericRowData reuse;
 
-    public ChangelogJsonSerializationSchema(RowType rowType, TimestampFormat timestampFormat, boolean encodeDecimalAsPlainNumber) {
+    public ChangelogJsonSerializationSchema(
+            RowType rowType, TimestampFormat timestampFormat, boolean encodeDecimalAsPlainNumber) {
         this.jsonSerializer =
                 new JsonRowDataSerializationSchema(
                         createJsonRowType(fromLogicalToDataType(rowType)),
