@@ -258,11 +258,18 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     @Override
     public void close() {
+        LOG.info("Close reader {}", this.getClass().getCanonicalName());
         try {
             if (statefulTaskContext.getConnection() != null) {
+                LOG.info(
+                        "Closing MySQL Connection {}",
+                        statefulTaskContext.getConnection().toString());
                 statefulTaskContext.getConnection().close();
             }
             if (statefulTaskContext.getBinaryLogClient() != null) {
+                LOG.info(
+                        "Closing MySQL BinaryLogClient {}",
+                        statefulTaskContext.getBinaryLogClient().toString());
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
         } catch (Exception e) {

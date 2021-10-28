@@ -18,7 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.utils;
 
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import org.slf4j.Logger;
@@ -34,8 +34,8 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quo
 public class TableDiscoveryUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
-    public static List<TableId> listTables(
-            MySqlConnection jdbc, RelationalTableFilters tableFilters) throws SQLException {
+    public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)
+            throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
         // -------------------
         // READ DATABASE NAMES

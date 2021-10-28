@@ -21,10 +21,10 @@ package com.ververica.cdc.connectors.mysql.schema;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.SchemaChangeEvent;
@@ -42,13 +42,11 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quo
 public class MySqlSchema {
     private final MySqlConnectorConfig connectorConfig;
     private final MySqlDatabaseSchema databaseSchema;
-    private final MySqlConnection jdbc;
     private final Map<TableId, TableChange> schemasByTableId;
 
-    public MySqlSchema(MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
+    public MySqlSchema(MySqlSourceConfig sourceConfig, boolean isTableIdCaseSensitive) {
         this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
-        this.databaseSchema = createMySqlDatabaseSchema(connectorConfig, jdbc);
-        this.jdbc = jdbc;
+        this.databaseSchema = createMySqlDatabaseSchema(connectorConfig, isTableIdCaseSensitive);
         this.schemasByTableId = new HashMap<>();
     }
 
@@ -56,11 +54,11 @@ public class MySqlSchema {
      * Gets table schema for the given table path. It will request to MySQL server by running `SHOW
      * CREATE TABLE` if cache missed.
      */
-    public TableChange getTableSchema(TableId tableId) {
+    public TableChange getTableSchema(JdbcConnection jdbc, TableId tableId) {
         // read schema from cache first
         TableChange schema = schemasByTableId.get(tableId);
         if (schema == null) {
-            schema = readTableSchema(tableId);
+            schema = readTableSchema(jdbc, tableId);
             schemasByTableId.put(tableId, schema);
         }
         return schema;
@@ -70,7 +68,7 @@ public class MySqlSchema {
     // Helpers
     // ------------------------------------------------------------------------------------------
 
-    private TableChange readTableSchema(TableId tableId) {
+    private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         final String sql = "SHOW CREATE TABLE " + quote(tableId);
         try {

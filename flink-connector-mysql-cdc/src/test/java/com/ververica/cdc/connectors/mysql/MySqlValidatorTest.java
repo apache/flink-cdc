@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
@@ -51,7 +52,6 @@ import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.basicSourceBuilder;
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.setupSource;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -143,7 +143,7 @@ public class MySqlValidatorTest {
             fail("Should fail.");
         } catch (Exception e) {
             assertTrue(e instanceof ValidationException);
-            assertEquals(exceptionMessage, e.getMessage());
+            assertTrue(ExceptionUtils.findThrowableWithMessage(e, exceptionMessage).isPresent());
         }
     }
 

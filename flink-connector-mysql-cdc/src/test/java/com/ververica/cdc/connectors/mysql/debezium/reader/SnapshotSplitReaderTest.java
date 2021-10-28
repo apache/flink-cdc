@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -41,6 +42,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /** Tests for {@link SnapshotSplitReader}. */
 public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
@@ -54,21 +56,23 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @BeforeClass
     public static void init() {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig =
+                getConfig(new String[] {customerDatabase.getDatabaseName() + ".customers"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
     }
 
     @Test
     public void testReadSingleSnapshotSplit() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig =
+                getConfig(new String[] {customerDatabase.getDatabaseName() + ".customers"});
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(new String[] {"customers"}, sourceConfig);
 
         String[] expected =
                 new String[] {
@@ -88,7 +92,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testReadAllSnapshotSplitsForOneTable() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig =
+                getConfig(new String[] {customerDatabase.getDatabaseName() + ".customers"});
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -96,7 +101,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(new String[] {"customers"}, sourceConfig);
 
         String[] expected =
                 new String[] {
@@ -129,7 +134,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testReadAllSplitForTableWithSingleLine() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"});
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customer_card_single_line"
+                        });
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -137,7 +146,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+        List<MySqlSplit> mySqlSplits =
+                getMySqlSplits(new String[] {"customer_card_single_line"}, sourceConfig);
         String[] expected = new String[] {"+I[20001, LEVEL_1, user_1, user with level 1]"};
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, sourceConfig, mySqlSplits.size(), dataType);
@@ -147,7 +157,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testReadAllSnapshotSplitsForTables() throws Exception {
         MySqlSourceConfig sourceConfig =
-                getConfig(new String[] {"customer_card", "customer_card_single_line"});
+                getConfig(
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customer_card",
+                            customerDatabase.getDatabaseName() + ".customer_card_single_line"
+                        });
 
         DataType dataType =
                 DataTypes.ROW(
@@ -155,7 +169,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+        List<MySqlSplit> mySqlSplits =
+                getMySqlSplits(
+                        new String[] {"customer_card", "customer_card_single_line"}, sourceConfig);
 
         String[] expected =
                 new String[] {
@@ -225,9 +241,17 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         return formatter.format(records);
     }
 
-    private List<MySqlSplit> getMySqlSplits(MySqlSourceConfig sourceConfig) {
+    private List<MySqlSplit> getMySqlSplits(
+            String[] captureTables, MySqlSourceConfig sourceConfig) {
+        List<String> captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .collect(Collectors.toList());
+        List<TableId> remainingTables =
+                captureTableIds.stream().map(TableId::parse).collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
@@ -243,14 +267,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     public static MySqlSourceConfig getConfig(String[] captureTables) {
-        String[] captureTableIds =
-                Arrays.stream(captureTables)
-                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .toArray(String[]::new);
-
         return new MySqlSourceConfigFactory()
                 .databaseList(customerDatabase.getDatabaseName())
-                .tableList(captureTableIds)
+                .tableList(captureTables)
                 .serverId("1001-1002")
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())

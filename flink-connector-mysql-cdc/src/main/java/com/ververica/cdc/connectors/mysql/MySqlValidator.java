@@ -25,6 +25,9 @@ import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.jdbc.JdbcConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -36,6 +39,7 @@ import java.util.Properties;
  */
 public class MySqlValidator implements Validator {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlValidator.class);
     private static final long serialVersionUID = 1L;
 
     private static final String BINLOG_FORMAT_ROW = "ROW";
@@ -49,18 +53,21 @@ public class MySqlValidator implements Validator {
 
     @Override
     public void validate() {
+        LOG.info("Starting validation...");
         try (MySqlConnection connection =
                 DebeziumUtils.openMySqlConnection(Configuration.from(dbzProperties))) {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);
         } catch (SQLException ex) {
+            LOG.error("Validate failed");
             throw new TableException(
                     "Unexpected error while connecting to MySQL and validating", ex);
         }
+        LOG.info("Validation passed.");
     }
 
-    private void checkVersion(MySqlConnection connection) throws SQLException {
+    private void checkVersion(JdbcConnection connection) throws SQLException {
         String version =
                 connection.queryAndMap("SELECT VERSION()", rs -> rs.next() ? rs.getString(1) : "");
 
@@ -88,7 +95,7 @@ public class MySqlValidator implements Validator {
     }
 
     /** Check whether the binlog format is ROW. */
-    private void checkBinlogFormat(MySqlConnection connection) throws SQLException {
+    private void checkBinlogFormat(JdbcConnection connection) throws SQLException {
         String mode =
                 connection
                         .queryAndMap(
@@ -106,7 +113,7 @@ public class MySqlValidator implements Validator {
     }
 
     /** Check whether the binlog row image is FULL. */
-    private void checkBinlogRowImage(MySqlConnection connection) throws SQLException {
+    private void checkBinlogRowImage(JdbcConnection connection) throws SQLException {
         String rowImage =
                 connection
                         .queryAndMap(

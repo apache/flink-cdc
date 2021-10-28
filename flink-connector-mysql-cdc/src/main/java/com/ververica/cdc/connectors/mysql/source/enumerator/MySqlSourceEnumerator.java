@@ -18,19 +18,30 @@
 
 package com.ververica.cdc.connectors.mysql.source.enumerator;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.MySqlValidator;
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
+import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
+import com.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
+import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
+import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
+import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,45 +54,93 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
 
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createJdbcConnection;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.discoverCapturedTables;
+
 /**
  * A MySQL CDC source enumerator that enumerates receive the split request and assign the split to
  * source readers.
  */
+@Internal
 public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, PendingSplitsState> {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceEnumerator.class);
     private static final long CHECK_EVENT_INTERVAL = 30_000L;
 
     private final SplitEnumeratorContext<MySqlSplit> context;
-    private final MySqlSplitAssigner splitAssigner;
     private final MySqlValidator validator;
+    private final MySqlSourceConfig sourceConfig;
+    private final int currentParallelism;
+    private final StartupMode startupMode;
+    @Nullable private final PendingSplitsState pendingSplitsState;
 
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
+    private MySqlSplitAssigner splitAssigner;
 
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
-            MySqlSplitAssigner splitAssigner,
-            MySqlValidator validator) {
+            MySqlSourceConfig sourceConfig,
+            StartupMode startupMode,
+            @Nullable PendingSplitsState pendingSplitsState) {
         this.context = context;
-        this.splitAssigner = splitAssigner;
-        this.validator = validator;
+        this.sourceConfig = sourceConfig;
+        this.startupMode = startupMode;
+        this.pendingSplitsState = pendingSplitsState;
+        this.validator = new MySqlValidator(sourceConfig.getDbzProperties());
+        this.currentParallelism = context.currentParallelism();
         this.readersAwaitingSplit = new TreeSet<>();
     }
 
     @Override
     public void start() {
-        validator.validate();
+        // first start
+        if (pendingSplitsState == null) {
+            LOG.info("Starting enumerator...");
+            validator.validate();
+            try (JdbcConnection jdbc = createJdbcConnection(sourceConfig.getDbzConfiguration())) {
+                final List<TableId> remainingTables = discoverCapturedTables(jdbc, sourceConfig);
+                boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                splitAssigner =
+                        startupMode == StartupMode.INITIAL
+                                ? new MySqlHybridSplitAssigner(
+                                        sourceConfig,
+                                        currentParallelism,
+                                        remainingTables,
+                                        isTableIdCaseSensitive)
+                                : new MySqlBinlogSplitAssigner(sourceConfig);
+            } catch (Exception e) {
+                throw new ValidationException("Starting enumerator error", e);
+            }
+        } else {
+            // restore
+            LOG.info("Restoring enumerator...");
+            if (pendingSplitsState instanceof HybridPendingSplitsState) {
+                splitAssigner =
+                        new MySqlHybridSplitAssigner(
+                                sourceConfig,
+                                currentParallelism,
+                                (HybridPendingSplitsState) pendingSplitsState);
+            } else if (pendingSplitsState instanceof BinlogPendingSplitsState) {
+                splitAssigner =
+                        new MySqlBinlogSplitAssigner(
+                                sourceConfig, (BinlogPendingSplitsState) pendingSplitsState);
+            } else {
+                throw new UnsupportedOperationException(
+                        "Unsupported restored PendingSplitsState: " + pendingSplitsState);
+            }
+        }
         splitAssigner.open();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
                 CHECK_EVENT_INTERVAL,
                 CHECK_EVENT_INTERVAL);
+        LOG.info("Start enumerator success");
     }
 
     @Override
     public void handleSplitRequest(int subtaskId, @Nullable String requesterHostname) {
-        if (!context.registeredReaders().containsKey(subtaskId)) {
+        if (!context.registeredReaders().containsKey(subtaskId) || splitAssigner == null) {
             // reader failed between sending the request and now. skip this request.
             return;
         }
@@ -133,7 +192,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void close() {
+        LOG.info("Closing enumerator...");
         splitAssigner.close();
+        LOG.info("Close enumerator success");
     }
 
     // ------------------------------------------------------------------------------------------

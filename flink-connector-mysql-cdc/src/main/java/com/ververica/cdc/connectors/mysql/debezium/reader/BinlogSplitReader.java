@@ -165,11 +165,16 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     @Override
     public void close() {
+        LOG.info("Closing reader");
         try {
             if (statefulTaskContext.getConnection() != null) {
+                LOG.info("Closing MySQL Connection {}", statefulTaskContext.getConnection());
                 statefulTaskContext.getConnection().close();
             }
             if (statefulTaskContext.getBinaryLogClient() != null) {
+                LOG.info(
+                        "Closing MySQL BinaryLogClient {}",
+                        statefulTaskContext.getBinaryLogClient());
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
         } catch (Exception e) {

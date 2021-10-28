@@ -54,6 +54,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private int splitSize = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
     private int fetchSize = SCAN_SNAPSHOT_FETCH_SIZE.defaultValue();
     private Duration connectTimeout = MySqlSourceOptions.CONNECT_TIMEOUT.defaultValue();
+    private int connectMaxRetries = MySqlSourceOptions.CONNECT_MAX_RETRIES.defaultValue();
+    private int connectionPoolSize = MySqlSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     private boolean includeSchemaChanges = false;
     private Properties dbzProperties;
 
@@ -149,6 +151,18 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** The connection pool size. */
+    public MySqlSourceConfigFactory connectionPoolSize(int connectionPoolSize) {
+        this.connectionPoolSize = connectionPoolSize;
+        return this;
+    }
+
+    /** The max retry times to get connection. */
+    public MySqlSourceConfigFactory connectMaxRetries(int connectMaxRetries) {
+        this.connectMaxRetries = connectMaxRetries;
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should output the schema changes or not. */
     public MySqlSourceConfigFactory includeSchemaChanges(boolean includeSchemaChanges) {
         this.includeSchemaChanges = includeSchemaChanges;
@@ -199,6 +213,8 @@ public class MySqlSourceConfigFactory implements Serializable {
                 "database.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
+        props.setProperty("connection.pool.size", String.valueOf(connectionPoolSize));
+        props.setProperty("connect.max-retries", String.valueOf(connectMaxRetries));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // the underlying debezium reader should always capture the schema changes and forward them.
         // Note: the includeSchemaChanges parameter is used to controll emitting the schema record,

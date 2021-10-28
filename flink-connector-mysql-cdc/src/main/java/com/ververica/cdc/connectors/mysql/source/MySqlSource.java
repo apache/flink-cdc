@@ -32,12 +32,6 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
-import com.ververica.cdc.connectors.mysql.MySqlValidator;
-import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
-import com.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
-import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
-import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
-import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -49,7 +43,6 @@ import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
-import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -141,51 +134,21 @@ public class MySqlSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) {
-        final int currentParallelism = enumContext.currentParallelism();
         MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
-        // check the valid for server id range and parallelism.
-        if (sourceConfig.getServerIdRange() != null
-                && sourceConfig.getServerIdRange().getNumberOfServerIds() < currentParallelism) {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "The server id range [%s] is not enough for current source parallelism %s, "
-                                    + "please adjust the server id range to make the number of server id is "
-                                    + "larger than the source parallelism.",
-                            sourceConfig.getServerIdRange(), currentParallelism));
-        }
 
-        MySqlValidator validator = new MySqlValidator(sourceConfig.getDbzProperties());
-        final MySqlSplitAssigner splitAssigner =
-                StartupMode.INITIAL == sourceConfig.getStartupOptions().startupMode
-                        ? new MySqlHybridSplitAssigner(sourceConfig, currentParallelism)
-                        : new MySqlBinlogSplitAssigner(sourceConfig);
-
-        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
+        return new MySqlSourceEnumerator(
+                enumContext, sourceConfig, sourceConfig.getStartupOptions().startupMode, null);
     }
 
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
         MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
-        MySqlValidator validator = new MySqlValidator(sourceConfig.getDbzProperties());
-        final MySqlSplitAssigner splitAssigner;
-        final int currentParallelism = enumContext.currentParallelism();
-        if (checkpoint instanceof HybridPendingSplitsState) {
-            splitAssigner =
-                    new MySqlHybridSplitAssigner(
-                            sourceConfig,
-                            currentParallelism,
-                            (HybridPendingSplitsState) checkpoint);
-        } else if (checkpoint instanceof BinlogPendingSplitsState) {
-            splitAssigner =
-                    new MySqlBinlogSplitAssigner(
-                            sourceConfig, (BinlogPendingSplitsState) checkpoint);
-        } else {
-            throw new UnsupportedOperationException(
-                    "Unsupported restored PendingSplitsState: " + checkpoint);
-        }
-
-        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
+        return new MySqlSourceEnumerator(
+                enumContext,
+                sourceConfig,
+                sourceConfig.getStartupOptions().startupMode,
+                checkpoint);
     }
 
     @Override

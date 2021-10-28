@@ -20,7 +20,6 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 
 import org.apache.flink.table.types.logical.RowType;
 
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
@@ -38,7 +37,7 @@ public class StatementUtils {
 
     private StatementUtils() {}
 
-    public static Object[] queryMinMax(MySqlConnection jdbc, TableId tableId, String columnName)
+    public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
             throws SQLException {
         final String minMaxQuery =
                 String.format(
@@ -58,7 +57,7 @@ public class StatementUtils {
                 });
     }
 
-    public static long queryApproximateRowCnt(MySqlConnection jdbc, TableId tableId)
+    public static long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId)
             throws SQLException {
         // The statement used to get approximate row count which is less
         // accurate than COUNT(*), but is more efficient for large table.
@@ -79,7 +78,7 @@ public class StatementUtils {
     }
 
     public static Object queryMin(
-            MySqlConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
             throws SQLException {
         final String minQuery =
                 String.format(
@@ -100,7 +99,7 @@ public class StatementUtils {
     }
 
     public static Object queryNextChunkMax(
-            MySqlConnection jdbc,
+            JdbcConnection jdbc,
             TableId tableId,
             String splitColumnName,
             int chunkSize,

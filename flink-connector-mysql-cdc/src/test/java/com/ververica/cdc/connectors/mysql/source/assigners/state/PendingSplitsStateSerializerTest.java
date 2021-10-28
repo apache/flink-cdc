@@ -76,20 +76,28 @@ public class PendingSplitsStateSerializerTest {
         final PendingSplitsStateSerializer serializer =
                 new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
         byte[] serialized = serializer.serialize(state);
-        return serializer.deserialize(2, serialized);
+        return serializer.deserialize(serializer.getVersion(), serialized);
     }
 
     private static SnapshotPendingSplitsState getTestSnapshotPendingSplitsState() {
-        // construct the source that captures two tables
-        // the first one has 3 snapshot splits and has been assigned finished
-        // the second one has 4 snapshot splits and has been assigned 2 splits
-        final TableId tableId0 = TableId.parse("test_db.test_table");
+        // construct the source that captures three tables
+        // the first table has 3 snapshot splits and has been assigned finished
+        // the second table has 4 snapshot splits and has been assigned 2 splits
+        // the third table has not assigned yet
         final List<TableId> alreadyProcessedTables = new ArrayList<>();
-        alreadyProcessedTables.add(tableId0);
+        final List<TableId> remainingTables = new ArrayList<>();
 
         final List<MySqlSnapshotSplit> remainingSplits = new ArrayList<>();
+
+        final TableId tableId0 = TableId.parse("test_db.test_table");
         final TableId tableId1 = TableId.parse("test_db.test_table1");
+        final TableId tableId2 = TableId.parse("test_db.test_table2");
+
+        alreadyProcessedTables.add(tableId0);
         alreadyProcessedTables.add(tableId1);
+
+        remainingTables.add(tableId2);
+
         remainingSplits.add(getTestSnapshotSplit(tableId1, 2));
         remainingSplits.add(getTestSnapshotSplit(tableId1, 3));
 
@@ -116,7 +124,10 @@ public class PendingSplitsStateSerializerTest {
                 remainingSplits,
                 assignedSnapshotSplits,
                 finishedOffsets,
-                false);
+                false,
+                remainingTables,
+                false,
+                true);
     }
 
     private static HybridPendingSplitsState getTestHybridPendingSplitsState() {
