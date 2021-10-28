@@ -65,6 +65,7 @@ under the License.
                                     <include>com.zendesk:mysql-binlog-connector-java</include>
                                     <include>com.fasterxml.*:*</include>
                                     <include>com.google.guava:*</include>
+                                    <include>com.zaxxer:HikariCP</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -104,6 +105,12 @@ under the License.
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
                                         com.ververica.cdc.connectors.shaded.com.google
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.zaxxer</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.com.zaxxer
                                     </shadedPattern>
                                 </relocation>
                             </relocations>
