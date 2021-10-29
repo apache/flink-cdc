@@ -31,6 +31,9 @@ import java.util.Objects;
 /** A {@link PendingSplitsState} for pending snapshot splits. */
 public class SnapshotPendingSplitsState extends PendingSplitsState {
 
+    /** The tables in the checkpoint. */
+    private final List<TableId> remainingTables;
+
     /**
      * The paths that are no longer in the enumerator checkpoint, but have been processed before and
      * should this be ignored. Relevant only for sources in continuous monitoring mode.
@@ -58,17 +61,29 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      */
     private final boolean isAssignerFinished;
 
+    /** Whether the table identifier is case sensitive. */
+    private final boolean isTableIdCaseSensitive;
+
+    /** Whether the remaining tables are keep when snapshot state. */
+    private final boolean isRemainingTablesCheckpointed;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<MySqlSnapshotSplit> remainingSplits,
             Map<String, MySqlSnapshotSplit> assignedSplits,
             Map<String, BinlogOffset> splitFinishedOffsets,
-            boolean isAssignerFinished) {
+            boolean isAssignerFinished,
+            List<TableId> remainingTables,
+            boolean isTableIdCaseSensitive,
+            boolean isRemainingTablesCheckpointed) {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.isAssignerFinished = isAssignerFinished;
+        this.remainingTables = remainingTables;
+        this.isTableIdCaseSensitive = isTableIdCaseSensitive;
+        this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
@@ -91,16 +106,31 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return isAssignerFinished;
     }
 
+    public List<TableId> getRemainingTables() {
+        return remainingTables;
+    }
+
+    public boolean isTableIdCaseSensitive() {
+        return isTableIdCaseSensitive;
+    }
+
+    public boolean isRemainingTablesCheckpointed() {
+        return isRemainingTablesCheckpointed;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof SnapshotPendingSplitsState)) {
             return false;
         }
         SnapshotPendingSplitsState that = (SnapshotPendingSplitsState) o;
         return isAssignerFinished == that.isAssignerFinished
+                && isTableIdCaseSensitive == that.isTableIdCaseSensitive
+                && isRemainingTablesCheckpointed == that.isRemainingTablesCheckpointed
+                && Objects.equals(remainingTables, that.remainingTables)
                 && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
@@ -110,17 +140,22 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     @Override
     public int hashCode() {
         return Objects.hash(
+                remainingTables,
                 alreadyProcessedTables,
                 remainingSplits,
                 assignedSplits,
                 splitFinishedOffsets,
-                isAssignerFinished);
+                isAssignerFinished,
+                isTableIdCaseSensitive,
+                isRemainingTablesCheckpointed);
     }
 
     @Override
     public String toString() {
         return "SnapshotPendingSplitsState{"
-                + "alreadyProcessedTables="
+                + "remainingTables="
+                + remainingTables
+                + ", alreadyProcessedTables="
                 + alreadyProcessedTables
                 + ", remainingSplits="
                 + remainingSplits
@@ -130,6 +165,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + splitFinishedOffsets
                 + ", isAssignerFinished="
                 + isAssignerFinished
+                + ", isTableIdCaseSensitive="
+                + isTableIdCaseSensitive
+                + ", isRemainingTablesCheckpointed="
+                + isRemainingTablesCheckpointed
                 + '}';
     }
 }

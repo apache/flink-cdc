@@ -26,6 +26,7 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import io.debezium.relational.TableId;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -62,14 +63,18 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "customers [1012] [1015]",
                         "customers [1015] [1018]",
                         "customers [1018] null");
-        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"customers"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4, new String[] {customerDatabase.getDatabaseName() + ".customers"});
         assertEquals(expected, splits);
     }
 
     @Test
     public void testAssignTableWhoseRowCntLessSplitSize() {
         List<String> expected = Arrays.asList("customers null null");
-        List<String> splits = getTestAssignSnapshotSplits(2000, new String[] {"customers"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2000, new String[] {customerDatabase.getDatabaseName() + ".customers"});
         assertEquals(expected, splits);
     }
 
@@ -92,7 +97,12 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "customers_1 [1015] [1018]",
                         "customers_1 [1018] null");
         List<String> splits =
-                getTestAssignSnapshotSplits(4, new String[] {"customers", "customers_1"});
+                getTestAssignSnapshotSplits(
+                        4,
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customers",
+                            customerDatabase.getDatabaseName() + ".customers_1"
+                        });
         assertEquals(expected, splits);
     }
 
@@ -100,7 +110,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testEnableAutoIncrementedKeyOptimization() {
         List<String> expected =
                 Arrays.asList("shopping_cart_big null [3]", "shopping_cart_big [3] null");
-        List<String> splits = getTestAssignSnapshotSplits(2, new String[] {"shopping_cart_big"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2,
+                        new String[] {customerDatabase.getDatabaseName() + ".shopping_cart_big"});
         assertEquals(expected, splits);
     }
 
@@ -111,7 +124,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "address null [417111867899200427]",
                         "address [417111867899200427] [417420106184475563]",
                         "address [417420106184475563] null");
-        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"address"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4, new String[] {customerDatabase.getDatabaseName() + ".address"});
         assertEquals(expected, splits);
     }
 
@@ -121,14 +136,20 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 Arrays.asList(
                         "shopping_cart_dec null [124456.4560]",
                         "shopping_cart_dec [124456.4560] null");
-        List<String> splits = getTestAssignSnapshotSplits(2, new String[] {"shopping_cart_dec"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2,
+                        new String[] {customerDatabase.getDatabaseName() + ".shopping_cart_dec"});
         assertEquals(expected, splits);
     }
 
     private List<String> getTestAssignSnapshotSplits(int splitSize, String[] captureTables) {
         MySqlSourceConfig configuration = getConfig(splitSize, captureTables);
+        List<TableId> remainingTables =
+                Arrays.stream(captureTables).map(TableId::parse).collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        configuration, DEFAULT_PARALLELISM, remainingTables, false);
 
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();
@@ -167,7 +188,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "customer_card [30009] [40001]",
                         "customer_card [40001] [50001]",
                         "customer_card [50001] null");
-        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"customer_card"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4, new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
         assertEquals(expected, splits);
     }
 
@@ -175,7 +198,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignTableWithSingleLine() {
         List<String> expected = Collections.singletonList("customer_card_single_line null null");
         List<String> splits =
-                getTestAssignSnapshotSplits(4, new String[] {"customer_card_single_line"});
+                getTestAssignSnapshotSplits(
+                        4,
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customer_card_single_line"
+                        });
         assertEquals(expected, splits);
     }
 
@@ -187,7 +214,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "shopping_cart [user_2] [user_4]",
                         "shopping_cart [user_4] [user_5]",
                         "shopping_cart [user_5] null");
-        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"shopping_cart"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4, new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
         assertEquals(expected, splits);
     }
 
@@ -199,7 +228,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "shopping_cart [user_2] [user_4]",
                         "shopping_cart [user_4] [user_5]",
                         "shopping_cart [user_5] null");
-        List<String> splits = getTestAssignSnapshotSplits(4, new String[] {"shopping_cart"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4, new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
         assertEquals(expected, splits);
     }
 
@@ -227,21 +258,26 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "customers [1017] [1018]",
                         "customers [1018] [1019]",
                         "customers [1019] null");
-        List<String> splits = getTestAssignSnapshotSplits(2, new String[] {"customers"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2, new String[] {customerDatabase.getDatabaseName() + ".customers"});
         assertEquals(expected, splits);
     }
 
     @Test
     public void testAssignMaxSplitSize() {
         List<String> expected = Collections.singletonList("customers null null");
-        List<String> splits = getTestAssignSnapshotSplits(2000, new String[] {"customers"});
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2000, new String[] {customerDatabase.getDatabaseName() + ".customers"});
         assertEquals(expected, splits);
     }
 
     @Test
     public void testUnMatchedPrimaryKey() {
         try {
-            getTestAssignSnapshotSplits(4, new String[] {"customer_card"});
+            getTestAssignSnapshotSplits(
+                    4, new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
         } catch (Throwable t) {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
@@ -252,15 +288,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     private MySqlSourceConfig getConfig(int splitSize, String[] captureTables) {
-        String[] captureTableIds =
-                Arrays.stream(captureTables)
-                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .toArray(String[]::new);
-
         return new MySqlSourceConfigFactory()
                 .startupOptions(StartupOptions.initial())
                 .databaseList(customerDatabase.getDatabaseName())
-                .tableList(captureTableIds)
+                .tableList(captureTables)
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .splitSize(splitSize)

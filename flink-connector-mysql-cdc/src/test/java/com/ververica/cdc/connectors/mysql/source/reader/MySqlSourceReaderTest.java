@@ -150,8 +150,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
 
     private void makeBinlogEventsInOneTransaction(MySqlSourceConfig sourceConfig, String tableId)
             throws SQLException {
-        JdbcConnection connection =
-                DebeziumUtils.openMySqlConnection(sourceConfig.getDbzConfiguration());
+        JdbcConnection connection = DebeziumUtils.openJdbcConnection(sourceConfig);
         // make 6 binlog events by 4 operations
         connection.setAutoCommit(false);
         connection.execute(

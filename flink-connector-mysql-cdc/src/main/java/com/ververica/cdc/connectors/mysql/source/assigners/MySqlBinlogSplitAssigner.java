@@ -18,6 +18,9 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
+import org.apache.flink.util.FlinkRuntimeException;
+
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -25,7 +28,9 @@ import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.jdbc.JdbcConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,22 +40,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMySqlConnection;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
-import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
 
-/**
- * A {@link MySqlSplitAssigner} which only read binlog from current binlog position.
- *
- * <p>TODO: the table and schema discovery should happen in split reader instead of here, to reduce
- * the split size.
- */
+/** A {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitAssigner.class);
     private static final String BINLOG_SPLIT_ID = "binlog-split";
 
     private final MySqlSourceConfig sourceConfig;
 
-    private MySqlConnection jdbc;
     private boolean isBinlogSplitAssigned;
 
     public MySqlBinlogSplitAssigner(MySqlSourceConfig sourceConfig) {
@@ -69,9 +68,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public void open() {
-        jdbc = openMySqlConnection(sourceConfig.getDbzConfiguration());
-    }
+    public void open() {}
 
     @Override
     public Optional<MySqlSplit> getNext() {
@@ -115,21 +112,21 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public void close() {
-        if (jdbc != null) {
-            closeMySqlConnection(jdbc);
-        }
-    }
+    public void close() {}
 
     // ------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {
-        return new MySqlBinlogSplit(
-                BINLOG_SPLIT_ID,
-                currentBinlogOffset(jdbc),
-                BinlogOffset.NO_STOPPING_OFFSET,
-                new ArrayList<>(),
-                new HashMap<>(),
-                0);
+        try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            return new MySqlBinlogSplit(
+                    BINLOG_SPLIT_ID,
+                    currentBinlogOffset(jdbc),
+                    BinlogOffset.NO_STOPPING_OFFSET,
+                    new ArrayList<>(),
+                    new HashMap<>(),
+                    0);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Read the binlog offset error", e);
+        }
     }
 }

@@ -154,6 +154,18 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** The max retry times to get connection. */
+    public MySqlSourceBuilder<T> connectMaxRetries(int connectMaxRetries) {
+        this.configFactory.connectMaxRetries(connectMaxRetries);
+        return this;
+    }
+
+    /** The connection pool size. */
+    public MySqlSourceBuilder<T> connectionPoolSize(int connectionPoolSize) {
+        this.configFactory.connectionPoolSize(connectionPoolSize);
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should output the schema changes or not. */
     public MySqlSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
         this.configFactory.includeSchemaChanges(includeSchemaChanges);

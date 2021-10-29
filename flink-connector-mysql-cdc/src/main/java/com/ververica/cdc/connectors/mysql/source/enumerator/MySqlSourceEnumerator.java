@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.enumerator;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
@@ -25,9 +26,9 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
 
-import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
@@ -53,14 +54,14 @@ import java.util.stream.Collectors;
  * A MySQL CDC source enumerator that enumerates receive the split request and assign the split to
  * source readers.
  */
+@Internal
 public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, PendingSplitsState> {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceEnumerator.class);
     private static final long CHECK_EVENT_INTERVAL = 30_000L;
 
     private final SplitEnumeratorContext<MySqlSplit> context;
+    private final MySqlSourceConfig sourceConfig;
     private final MySqlSplitAssigner splitAssigner;
-    private final MySqlValidator validator;
-    private final int metaGroupSize;
 
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
@@ -68,19 +69,16 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
-            MySqlSplitAssigner splitAssigner,
-            MySqlValidator validator,
-            int metaGroupSize) {
+            MySqlSourceConfig sourceConfig,
+            MySqlSplitAssigner splitAssigner) {
         this.context = context;
+        this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
-        this.validator = validator;
-        this.metaGroupSize = metaGroupSize;
         this.readersAwaitingSplit = new TreeSet<>();
     }
 
     @Override
     public void start() {
-        validator.validate();
         splitAssigner.open();
         this.context.callAsync(
                 this::getRegisteredReader,
@@ -148,6 +146,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void close() {
+        LOG.info("Closing enumerator...");
         splitAssigner.close();
     }
 
@@ -210,7 +209,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 throw new FlinkRuntimeException(
                         "The assigner offer empty finished split information, this should not happen");
             }
-            binlogSplitMeta = Lists.partition(finishedSnapshotSplitInfos, metaGroupSize);
+            binlogSplitMeta =
+                    Lists.partition(
+                            finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
 

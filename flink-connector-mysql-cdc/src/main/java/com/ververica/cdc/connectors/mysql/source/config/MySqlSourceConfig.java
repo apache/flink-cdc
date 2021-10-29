@@ -50,6 +50,8 @@ public class MySqlSourceConfig implements Serializable {
     private final int fetchSize;
     private final String serverTimeZone;
     private final Duration connectTimeout;
+    private final int connectMaxRetries;
+    private final int connectionPoolSize;
     private final boolean includeSchemaChanges;
 
     // --------------------------------------------------------------------------------------------
@@ -73,6 +75,8 @@ public class MySqlSourceConfig implements Serializable {
             int fetchSize,
             String serverTimeZone,
             Duration connectTimeout,
+            int connectMaxRetries,
+            int connectionPoolSize,
             boolean includeSchemaChanges,
             Properties dbzProperties) {
         this.hostname = checkNotNull(hostname);
@@ -88,6 +92,8 @@ public class MySqlSourceConfig implements Serializable {
         this.fetchSize = fetchSize;
         this.serverTimeZone = checkNotNull(serverTimeZone);
         this.connectTimeout = checkNotNull(connectTimeout);
+        this.connectMaxRetries = connectMaxRetries;
+        this.connectionPoolSize = connectionPoolSize;
         this.includeSchemaChanges = includeSchemaChanges;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
@@ -145,6 +151,14 @@ public class MySqlSourceConfig implements Serializable {
 
     public Duration getConnectTimeout() {
         return connectTimeout;
+    }
+
+    public int getConnectMaxRetries() {
+        return connectMaxRetries;
+    }
+
+    public int getConnectionPoolSize() {
+        return connectionPoolSize;
     }
 
     public boolean isIncludeSchemaChanges() {
