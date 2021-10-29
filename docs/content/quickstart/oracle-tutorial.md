@@ -124,7 +124,7 @@ Flink SQL> INSERT INTO enriched_orders
 
 **4. Check result in Elasticsearch**
 
-Check the data has been written to Elasticsearch successfully, you can visit [Kibana](http://localhost:8081/#/overview) to see the data.
+Check the data has been written to Elasticsearch successfully, you can visit [Kibana](http://localhost:5601/) to see the data.
 
 **5. Make changes in Oracle and watch result in Elasticsearch**
 
