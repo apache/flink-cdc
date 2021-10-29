@@ -31,24 +31,16 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
-import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import com.jayway.jsonpath.JsonPath;
-import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -63,7 +55,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
@@ -74,25 +65,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link OracleSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class OracleSourceTest extends AbstractTestBase {
-
-    private static final Logger LOG = LoggerFactory.getLogger(OracleSourceTest.class);
-
-    private OracleContainer oracleContainer =
-            OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @Before
-    public void before() throws Exception {
-
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(oracleContainer)).join();
-        LOG.info("Containers are started.");
-    }
-
-    @After
-    public void teardown() {
-        oracleContainer.stop();
-    }
+public class OracleSourceTest extends OracleTestBase {
 
     @Test
     public void testConsumingAllEvents() throws Exception {
@@ -101,7 +74,7 @@ public class OracleSourceTest extends AbstractTestBase {
 
         setupSource(source);
 
-        try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+        try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                 Statement statement = connection.createStatement()) {
 
             // start the source
@@ -253,7 +226,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
@@ -314,7 +287,7 @@ public class OracleSourceTest extends AbstractTestBase {
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
 
             // can continue to receive new events
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                     Statement statement = connection.createStatement()) {
                 statement.execute("DELETE FROM debezium.products WHERE id=1001");
             }
@@ -383,7 +356,7 @@ public class OracleSourceTest extends AbstractTestBase {
         final TestingListState<String> historyState = new TestingListState<>();
 
         {
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                     Statement statement = connection.createStatement()) {
                 // Step-1: start the source from empty state
                 final DebeziumSourceFunction<SourceRecord> source = createOracleLogminerSource();
@@ -457,7 +430,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                     Statement statement = connection.createStatement()) {
                 statement.execute(
                         "INSERT INTO debezium.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT) VALUES (113,'Airplane','Toy airplane',1.304)"); // 113
@@ -482,7 +455,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder(oracleContainer)
+                    basicSourceBuilder(ORACLE_CONTAINER)
                             .tableList("debezium" + "." + "category")
                             .build();
             // we use blocking context to block the source to emit before last snapshot record
@@ -517,7 +490,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext));
 
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute("INSERT INTO debezium.category VALUES (1, 'book')");
@@ -576,7 +549,7 @@ public class OracleSourceTest extends AbstractTestBase {
     // ------------------------------------------------------------------------------------------
 
     private DebeziumSourceFunction<SourceRecord> createOracleLogminerSource() {
-        return basicSourceBuilder(oracleContainer).build();
+        return basicSourceBuilder(ORACLE_CONTAINER).build();
     }
 
     private OracleSource.Builder<SourceRecord> basicSourceBuilder(OracleContainer oracleContainer) {

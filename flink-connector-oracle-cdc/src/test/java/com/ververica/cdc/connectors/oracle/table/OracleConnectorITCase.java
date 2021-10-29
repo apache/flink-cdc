@@ -23,36 +23,22 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
 
-import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
-import org.junit.After;
+import com.ververica.cdc.connectors.oracle.OracleTestBase;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for Oracle binlog SQL source. */
-public class OracleConnectorITCase extends AbstractTestBase {
-
-    private static final Logger LOG = LoggerFactory.getLogger(OracleConnectorITCase.class);
-
-    private OracleContainer oracleContainer =
-            OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
+public class OracleConnectorITCase extends OracleTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -63,18 +49,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     @Before
     public void before() throws Exception {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(oracleContainer)).join();
-        LOG.info("Containers are started.");
-
         TestValuesTableFactory.clearAllData();
-
         env.setParallelism(1);
-    }
-
-    @After
-    public void teardown() {
-        oracleContainer.stop();
     }
 
     @Test
@@ -97,8 +73,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         "debezium",
@@ -123,7 +99,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
         waitForSnapshotStarted("sink");
 
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
@@ -179,8 +155,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'table-name' = '%s' ,"
                                 + " 'scan.startup.mode' = 'latest-offset'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         "debezium",
@@ -199,7 +175,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
         // wait for the source startup, we don't have a better way to wait it, use sleep for now
         Thread.sleep(5000L);
 
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnection(ORACLE_CONTAINER);
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
@@ -247,9 +223,5 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 return 0;
             }
         }
-    }
-
-    public Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(oracleContainer.getJdbcUrl(), "dbzuser", "dbz");
     }
 }

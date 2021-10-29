@@ -54,7 +54,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -593,8 +592,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                     "INSERT INTO products VALUES (default,'robot','Toy robot',1.304)"); // 110
         }
 
-        Tuple2<String, Integer> offset =
-                currentMySqlLatestOffset(database, "products", 10, useLegacyImplementation);
+        Tuple2<String, Integer> offset = currentMySqlLatestOffset(database, "products", 10);
         final String offsetFile = offset.f0;
         final int offsetPos = offset.f1;
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -917,11 +915,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
     /** Gets the latest offset of current MySQL server. */
     public static Tuple2<String, Integer> currentMySqlLatestOffset(
-            UniqueDatabase database,
-            String table,
-            int expectedRecordCount,
-            boolean useLegacyImplementation)
-            throws Exception {
+            UniqueDatabase database, String table, int expectedRecordCount) throws Exception {
         DebeziumSourceFunction<SourceRecord> source =
                 MySqlSource.<SourceRecord>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
@@ -931,7 +925,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                         .username(MYSQL_CONTAINER.getUsername())
                         .password(MYSQL_CONTAINER.getPassword())
                         .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
-                        .debeziumProperties(createDebeziumProperties(useLegacyImplementation))
                         .build();
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
@@ -970,19 +963,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         runThread.sync();
 
         return Tuple2.of(offsetFile, offsetPos);
-    }
-
-    private static Properties createDebeziumProperties(boolean useLegacyImplementation) {
-        Properties debeziumProps = new Properties();
-        if (useLegacyImplementation) {
-            debeziumProps.put("internal.implementation", "legacy");
-            // check legacy mysql record type
-            debeziumProps.put("transforms", "snapshotasinsert");
-            debeziumProps.put(
-                    "transforms.snapshotasinsert.type",
-                    "io.debezium.connector.mysql.transforms.ReadToInsertEvent");
-        }
-        return debeziumProps;
     }
 
     // ------------------------------------------------------------------------------------------
