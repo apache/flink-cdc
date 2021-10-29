@@ -26,6 +26,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.relational.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,9 +54,14 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
-    public MySqlHybridSplitAssigner(MySqlSourceConfig sourceConfig, int currentParallelism) {
+    public MySqlHybridSplitAssigner(
+            MySqlSourceConfig sourceConfig,
+            int currentParallelism,
+            List<TableId> remainingTables,
+            boolean isTableIdCaseSensitive) {
         this(
-                new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism),
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig, currentParallelism, remainingTables, isTableIdCaseSensitive),
                 false,
                 sourceConfig.getSplitMetaGroupSize());
     }
@@ -82,6 +88,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void open() {
+        LOG.info("Open assigner");
         snapshotSplitAssigner.open();
     }
 
@@ -181,8 +188,8 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             binlogOffset));
         }
 
-        // the finishedSnapshotSplitInfos is to large to transmission, divide it to groups and
-        // then transfer it
+        // the finishedSnapshotSplitInfos is to large for transmission, divide it to groups and
+        // then transfer them
 
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new MySqlBinlogSplit(

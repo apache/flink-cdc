@@ -45,6 +45,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -112,6 +114,8 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -145,6 +149,8 @@ public class MySqlTableSourceFactoryTest {
                         3000,
                         100,
                         Duration.ofSeconds(45),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -177,6 +183,8 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         100,
                         Duration.ofSeconds(45),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -207,6 +215,8 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.latest());
         assertEquals(expectedSource, actualSource);
     }
@@ -239,6 +249,8 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -291,6 +303,8 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -352,6 +366,8 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.latest());
         assertEquals(expectedSource, actualSource);
     }
@@ -386,6 +402,8 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
                         StartupOptions.initial());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
@@ -442,6 +460,21 @@ public class MySqlTableSourceFactoryTest {
                             "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
         }
 
+        // validate illegal fetch size
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("scan.snapshot.fetch.size", "1");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertThat(
+                    t,
+                    containsMessage(
+                            "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1"));
+        }
+
         // validate illegal split meta group size
         try {
             Map<String, String> properties = getAllOptions();
@@ -455,6 +488,36 @@ public class MySqlTableSourceFactoryTest {
                     t,
                     containsMessage(
                             "The value of option 'chunk-meta.group.size' must larger than 1, but is 1"));
+        }
+
+        // validate illegal connection pool size
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("connection.pool.size", "1");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertThat(
+                    t,
+                    containsMessage(
+                            "The value of option 'connection.pool.size' must larger than 1, but is 1"));
+        }
+
+        // validate illegal connect max retry times
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("connect.max-retries", "0");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertThat(
+                    t,
+                    containsMessage(
+                            "The value of option 'connect.max-retries' must larger than 0, but is 0"));
         }
 
         // validate missing required

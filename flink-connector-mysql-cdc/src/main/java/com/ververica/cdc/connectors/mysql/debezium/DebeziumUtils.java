@@ -21,13 +21,17 @@ package com.ververica.cdc.connectors.mysql.debezium;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.connection.JdbcConnectionFactory;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
+import io.debezium.connector.mysql.MySqlSystemVariables;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.TableId;
@@ -37,37 +41,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
-    /** Creates and opens a new {@link MySqlConnection}. */
-    public static MySqlConnection openMySqlConnection(Configuration dbzConfiguration) {
-        MySqlConnection jdbc =
-                new MySqlConnection(
-                        new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration));
+    /** Creates and opens a new {@link JdbcConnection} backing connection pool. */
+    public static JdbcConnection openJdbcConnection(MySqlSourceConfig sourceConfig) {
+        JdbcConnection jdbc =
+                new JdbcConnection(
+                        sourceConfig.getDbzConfiguration(),
+                        new JdbcConnectionFactory(sourceConfig));
         try {
             jdbc.connect();
-        } catch (SQLException e) {
+        } catch (Exception e) {
             LOG.error("Failed to open MySQL connection", e);
-            throw new FlinkRuntimeException("Failed to open MySQL connection", e);
+            throw new FlinkRuntimeException(e);
         }
-
         return jdbc;
-    }
-
-    /** Closes the given {@link MySqlConnection}. */
-    public static void closeMySqlConnection(MySqlConnection jdbc) {
-        try {
-            if (jdbc != null) {
-                jdbc.close();
-            }
-        } catch (SQLException e) {
-            LOG.error("Failed to close MySQL connection", e);
-            throw new FlinkRuntimeException("Failed to close MySQL connection", e);
-        }
     }
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
@@ -88,8 +85,7 @@ public class DebeziumUtils {
 
     /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
     public static MySqlDatabaseSchema createMySqlDatabaseSchema(
-            MySqlConnectorConfig dbzMySqlConfig, MySqlConnection connection) {
-        boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
+            MySqlConnectorConfig dbzMySqlConfig, boolean isTableIdCaseSensitive) {
         TopicSelector<TableId> topicSelector = MySqlTopicSelector.defaultSelector(dbzMySqlConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         MySqlValueConverters valueConverters = getValueConverters(dbzMySqlConfig);
@@ -98,11 +94,11 @@ public class DebeziumUtils {
                 valueConverters,
                 topicSelector,
                 schemaNameAdjuster,
-                tableIdCaseInsensitive);
+                isTableIdCaseSensitive);
     }
 
     /** Fetch current binlog offsets in MySql Server. */
-    public static BinlogOffset currentBinlogOffset(MySqlConnection jdbc) {
+    public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
         final String showMasterStmt = "SHOW MASTER STATUS";
         try {
             return jdbc.queryAndMap(
@@ -155,5 +151,57 @@ public class DebeziumUtils {
                 dbzMySqlConfig.binaryHandlingMode(),
                 timeAdjusterEnabled ? MySqlValueConverters::adjustTemporal : x -> x,
                 MySqlValueConverters::defaultParsingErrorHandler);
+    }
+
+    public static List<TableId> discoverCapturedTables(
+            JdbcConnection jdbc, MySqlSourceConfig sourceConfig) {
+
+        final List<TableId> capturedTableIds;
+        try {
+            capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException("Failed to discover captured tables", e);
+        }
+        if (capturedTableIds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
+                            sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
+        }
+        return capturedTableIds;
+    }
+
+    public static boolean isTableIdCaseSensitive(JdbcConnection connection) {
+        return !"0"
+                .equals(
+                        readMySqlSystemVariables(connection)
+                                .get(MySqlSystemVariables.LOWER_CASE_TABLE_NAMES));
+    }
+
+    public static Map<String, String> readMySqlSystemVariables(JdbcConnection connection) {
+        // Read the system variables from the MySQL instance and get the current database name ...
+        return querySystemVariables(connection, "SHOW VARIABLES");
+    }
+
+    private static Map<String, String> querySystemVariables(
+            JdbcConnection connection, String statement) {
+        final Map<String, String> variables = new HashMap<>();
+        try {
+            connection.query(
+                    statement,
+                    rs -> {
+                        while (rs.next()) {
+                            String varName = rs.getString(1);
+                            String value = rs.getString(2);
+                            if (varName != null && value != null) {
+                                variables.put(varName, value);
+                            }
+                        }
+                    });
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException("Error reading MySQL variables: " + e.getMessage(), e);
+        }
+
+        return variables;
     }
 }

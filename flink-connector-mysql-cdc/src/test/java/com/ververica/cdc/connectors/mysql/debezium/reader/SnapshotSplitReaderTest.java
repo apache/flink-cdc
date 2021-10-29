@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -41,6 +42,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /** Tests for {@link SnapshotSplitReader}. */
 public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
@@ -226,8 +228,13 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     private List<MySqlSplit> getMySqlSplits(MySqlSourceConfig sourceConfig) {
+        List<TableId> remainingTables =
+                sourceConfig.getTableList().stream()
+                        .map(TableId::parse)
+                        .collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {

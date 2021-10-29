@@ -105,6 +105,9 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         remainingSplits,
                         assignedSplits,
                         splitFinishedOffsets,
+                        true,
+                        new ArrayList<>(),
+                        false,
                         true);
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);

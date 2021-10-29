@@ -118,7 +118,7 @@ public class MySqlSourceReader<T>
         // add finished snapshot splits that didn't receive ack yet
         stateSplits.addAll(finishedUnackedSplits.values());
 
-        // add big binlog splits who are uncompleted
+        // add binlog splits who are uncompleted
         stateSplits.addAll(uncompletedBinlogSplits.values());
 
         return stateSplits;

@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
@@ -86,16 +88,21 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         TableSchema physicalSchema =
                 TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
         String serverId = validateAndGetServerId(config);
-        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         StartupOptions startupOptions = getStartupOptions(config);
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
+        int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
+        int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
             validateStartupOptionIfEnableParallel(startupOptions);
-            validateSplitSize(splitSize);
-            validateSplitMetaGroupSize(splitMetaGroupSize);
-            validateFetchSize(fetchSize);
+            validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
+            validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
+            validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
+            validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
+            validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
         }
-        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
         return new MySqlTableSource(
                 physicalSchema,
@@ -113,6 +120,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 splitMetaGroupSize,
                 fetchSize,
                 connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
                 startupOptions);
     }
 
@@ -147,6 +156,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
+        options.add(CONNECTION_POOL_SIZE);
+        options.add(CONNECT_MAX_RETRIES);
         return options;
     }
 
@@ -224,28 +235,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         return serverIdValue;
     }
 
-    private void validateSplitSize(int splitSize) {
+    /** Checks the value of given integer option is valid. */
+    private void validateIntegerOption(
+            ConfigOption<Integer> option, int optionValue, int exclusiveMin) {
         checkState(
-                splitSize > 1,
+                optionValue > exclusiveMin,
                 String.format(
-                        "The value of option '%s' must larger than 1, but is %d",
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), splitSize));
-    }
-
-    private void validateSplitMetaGroupSize(int splitMetaGroupSize) {
-        checkState(
-                splitMetaGroupSize > 1,
-                String.format(
-                        "The value of option '%s' must larger than 1, but is %d",
-                        CHUNK_META_GROUP_SIZE.key(), splitMetaGroupSize));
-    }
-
-    private void validateFetchSize(int fetchSize) {
-        checkState(
-                fetchSize > 1,
-                String.format(
-                        "The value of option '%s' must larger than 1, but is %d",
-                        SCAN_SNAPSHOT_FETCH_SIZE.key(), fetchSize));
+                        "The value of option '%s' must larger than %d, but is %d",
+                        option.key(), exclusiveMin, optionValue));
     }
 
     /**

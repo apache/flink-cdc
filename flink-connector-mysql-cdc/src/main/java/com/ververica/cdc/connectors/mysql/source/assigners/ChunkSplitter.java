@@ -25,10 +25,11 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.schema.MySqlTypeUtils;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils;
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryApproximateRowCnt;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMin;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMinMax;
@@ -66,55 +68,65 @@ class ChunkSplitter {
      */
     public static final Double MAX_EVENLY_DISTRIBUTION_FACTOR = 2.0d;
 
-    private final MySqlConnection jdbc;
+    private final MySqlSourceConfig sourceConfig;
     private final MySqlSchema mySqlSchema;
     private final int chunkSize;
 
-    public ChunkSplitter(MySqlConnection jdbc, MySqlSchema mySqlSchema, int chunkSize) {
-        this.jdbc = jdbc;
+    public ChunkSplitter(MySqlSchema mySqlSchema, MySqlSourceConfig sourceConfig, int chunkSize) {
         this.mySqlSchema = mySqlSchema;
         this.chunkSize = chunkSize;
+        this.sourceConfig = sourceConfig;
     }
 
     /** Generates all snapshot splits (chunks) for the give table path. */
     public Collection<MySqlSnapshotSplit> generateSplits(TableId tableId) {
-        long start = System.currentTimeMillis();
+        try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+            long start = System.currentTimeMillis();
 
-        Table table = mySqlSchema.getTableSchema(tableId).getTable();
-        Column splitColumn = ChunkUtils.getSplitColumn(table);
-        final List<ChunkRange> chunks;
-        try {
-            chunks = splitTableIntoChunks(tableId, splitColumn);
-        } catch (SQLException e) {
-            throw new FlinkRuntimeException("Failed to split chunks for table " + tableId, e);
+            Table table = mySqlSchema.getTableSchema(jdbc, tableId).getTable();
+            Column splitColumn = ChunkUtils.getSplitColumn(table);
+            final List<ChunkRange> chunks;
+            try {
+                chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
+            } catch (SQLException e) {
+                throw new FlinkRuntimeException("Failed to split chunks for table " + tableId, e);
+            }
+
+            // convert chunks into splits
+            List<MySqlSnapshotSplit> splits = new ArrayList<>();
+            RowType splitType = ChunkUtils.getSplitType(splitColumn);
+            for (int i = 0; i < chunks.size(); i++) {
+                ChunkRange chunk = chunks.get(i);
+                MySqlSnapshotSplit split =
+                        createSnapshotSplit(
+                                jdbc,
+                                tableId,
+                                i,
+                                splitType,
+                                chunk.getChunkStart(),
+                                chunk.getChunkEnd());
+                splits.add(split);
+            }
+
+            long end = System.currentTimeMillis();
+            LOG.info(
+                    "Split table {} into {} chunks, time cost: {}ms.",
+                    tableId,
+                    splits.size(),
+                    Duration.ofMillis(end - start));
+            return splits;
+        } catch (Exception e) {
+            throw new FlinkRuntimeException(
+                    String.format("Generate Splits for table %s error", tableId), e);
         }
-
-        // convert chunks into splits
-        List<MySqlSnapshotSplit> splits = new ArrayList<>();
-        RowType splitType = ChunkUtils.getSplitType(splitColumn);
-        for (int i = 0; i < chunks.size(); i++) {
-            ChunkRange chunk = chunks.get(i);
-            MySqlSnapshotSplit split =
-                    createSnapshotSplit(
-                            tableId, i, splitType, chunk.getChunkStart(), chunk.getChunkEnd());
-            splits.add(split);
-        }
-
-        long end = System.currentTimeMillis();
-        LOG.info(
-                "Split table {} into {} chunks, time cost: {}ms.",
-                tableId,
-                splits.size(),
-                Duration.ofMillis(end - start));
-        return splits;
     }
 
     // --------------------------------------------------------------------------------------------
     // Utilities
     // --------------------------------------------------------------------------------------------
 
-    private List<ChunkRange> splitTableIntoChunks(TableId tableId, Column splitColumn)
-            throws SQLException {
+    private List<ChunkRange> splitTableIntoChunks(
+            JdbcConnection jdbc, TableId tableId, Column splitColumn) throws SQLException {
         final String splitColumnName = splitColumn.name();
         final Object[] minMaxOfSplitColumn = queryMinMax(jdbc, tableId, splitColumnName);
         final Object min = minMaxOfSplitColumn[0];
@@ -130,7 +142,7 @@ class ChunkSplitter {
             chunks = splitEvenlySizedChunks(min, max);
         } else {
             // use unevenly-sized chunks which will request many queries and is not efficient.
-            chunks = splitUnevenlySizedChunks(tableId, splitColumnName, min, max);
+            chunks = splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max);
         }
 
         return chunks;
@@ -161,10 +173,11 @@ class ChunkSplitter {
 
     /** Split table into unevenly sized chunks by continuously calculating next chunk max value. */
     private List<ChunkRange> splitUnevenlySizedChunks(
-            TableId tableId, String splitColumnName, Object min, Object max) throws SQLException {
+            JdbcConnection jdbc, TableId tableId, String splitColumnName, Object min, Object max)
+            throws SQLException {
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
-        Object chunkEnd = nextChunkEnd(min, tableId, splitColumnName, max);
+        Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumnName, max);
         int count = 0;
         while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
@@ -172,7 +185,7 @@ class ChunkSplitter {
             // may sleep a while to avoid DDOS on MySQL server
             maySleep(count++);
             chunkStart = chunkEnd;
-            chunkEnd = nextChunkEnd(chunkEnd, tableId, splitColumnName, max);
+            chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max);
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
@@ -180,7 +193,11 @@ class ChunkSplitter {
     }
 
     private Object nextChunkEnd(
-            Object previousChunkEnd, TableId tableId, String splitColumnName, Object max)
+            JdbcConnection jdbc,
+            Object previousChunkEnd,
+            TableId tableId,
+            String splitColumnName,
+            Object max)
             throws SQLException {
         // chunk end might be null when max values are removed
         Object chunkEnd =
@@ -198,6 +215,7 @@ class ChunkSplitter {
     }
 
     private MySqlSnapshotSplit createSnapshotSplit(
+            JdbcConnection jdbc,
             TableId tableId,
             int chunkId,
             RowType splitKeyType,
@@ -207,7 +225,7 @@ class ChunkSplitter {
         Object[] splitStart = chunkStart == null ? null : new Object[] {chunkStart};
         Object[] splitEnd = chunkEnd == null ? null : new Object[] {chunkEnd};
         Map<TableId, TableChange> schema = new HashMap<>();
-        schema.put(tableId, mySqlSchema.getTableSchema(tableId));
+        schema.put(tableId, mySqlSchema.getTableSchema(jdbc, tableId));
         return new MySqlSnapshotSplit(
                 tableId,
                 splitId(tableId, chunkId),
@@ -222,7 +240,7 @@ class ChunkSplitter {
 
     /** Checks whether split column is evenly distributed across its range. */
     private static boolean isSplitColumnEvenlyDistributed(
-            MySqlConnection jdbc,
+            JdbcConnection jdbc,
             TableId tableId,
             Column splitColumn,
             Object min,

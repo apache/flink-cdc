@@ -141,8 +141,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                         createBinaryClient(sourceConfig.getDbzConfiguration());
                 final StatefulTaskContext statefulTaskContext =
                         new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
-                LOG.info("Create binlog reader");
                 currentReader = new BinlogSplitReader(statefulTaskContext, subtaskId);
+                LOG.info("BinlogSplitReader is created.");
             }
             currentReader.submitSplit(nextSplit);
         }

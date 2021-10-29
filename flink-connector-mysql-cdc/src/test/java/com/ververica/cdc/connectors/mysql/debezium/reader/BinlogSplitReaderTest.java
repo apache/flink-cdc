@@ -56,6 +56,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
@@ -82,7 +83,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
+        List<MySqlSnapshotSplit> splits = getMySqlSplits(new String[] {"customers"}, sourceConfig);
         String[] expected =
                 new String[] {
                     "+I[101, user_1, Shanghai, 123567891234]",
@@ -125,7 +126,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
+        List<MySqlSnapshotSplit> splits = getMySqlSplits(new String[] {"customers"}, sourceConfig);
 
         String[] expected =
                 new String[] {
@@ -186,7 +187,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
+        List<MySqlSnapshotSplit> splits =
+                getMySqlSplits(new String[] {"customer_card_single_line"}, sourceConfig);
 
         String[] expected =
                 new String[] {
@@ -220,7 +222,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("level", DataTypes.STRING()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("note", DataTypes.STRING()));
-        List<MySqlSnapshotSplit> splits = getMySqlSplits(sourceConfig);
+        List<MySqlSnapshotSplit> splits =
+                getMySqlSplits(
+                        new String[] {"customer_card", "customer_card_single_line"}, sourceConfig);
         String[] expected =
                 new String[] {
                     "+I[20000, LEVEL_1, user_1, user with level 1]",
@@ -542,9 +546,18 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         return formatter.format(records);
     }
 
-    private List<MySqlSnapshotSplit> getMySqlSplits(MySqlSourceConfig sourceConfig) {
+    private List<MySqlSnapshotSplit> getMySqlSplits(
+            String[] captureTables, MySqlSourceConfig sourceConfig) {
+        List<String> captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .collect(Collectors.toList());
+        List<TableId> remainingTables =
+                captureTableIds.stream().map(TableId::parse).collect(Collectors.toList());
+
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(sourceConfig, DEFAULT_PARALLELISM);
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {

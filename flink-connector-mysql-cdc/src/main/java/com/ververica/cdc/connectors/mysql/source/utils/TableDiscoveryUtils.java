@@ -23,6 +23,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -41,8 +42,8 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quo
 public class TableDiscoveryUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
-    public static List<TableId> listTables(
-            MySqlConnection jdbc, RelationalTableFilters tableFilters) throws SQLException {
+    public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)
+            throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
         // -------------------
         // READ DATABASE NAMES
@@ -110,10 +111,10 @@ public class TableDiscoveryUtils {
         }
 
         // fetch table schemas
-        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc);
+        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive());
         Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
         for (TableId tableId : capturedTableIds) {
-            TableChanges.TableChange tableSchema = mySqlSchema.getTableSchema(tableId);
+            TableChanges.TableChange tableSchema = mySqlSchema.getTableSchema(jdbc, tableId);
             tableSchemas.put(tableId, tableSchema);
         }
         return tableSchemas;
