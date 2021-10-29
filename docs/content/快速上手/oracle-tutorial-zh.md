@@ -122,7 +122,7 @@ Flink SQL> INSERT INTO enriched_orders
 
 **4. 检查 ElasticSearch 中的结果**
 
-检查最终的结果是否写入ElasticSearch中, 可以在[Kibana](http://localhost:8081/#/overview)看到ElasticSearch中的数据
+检查最终的结果是否写入ElasticSearch中, 可以在[Kibana](http://localhost:5601/)看到ElasticSearch中的数据
 
 **5. 在 Oracle 制造一些变更，观察 ElasticSearch 中的结果**
 
