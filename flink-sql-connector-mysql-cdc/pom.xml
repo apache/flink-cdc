@@ -66,6 +66,7 @@ under the License.
                                     <include>com.fasterxml.*:*</include>
                                     <include>com.google.guava:*</include>
                                     <include>com.esri.geometry:esri-geometry-api</include>
+                                    <include>com.zaxxer:HikariCP</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -110,6 +111,12 @@ under the License.
                                 <relocation>
                                     <pattern>com.esri.geometry</pattern>
                                     <shadedPattern>com.ververica.cdc.connectors.shaded.com.esri.geometry</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.zaxxer</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.com.zaxxer
+                                    </shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
