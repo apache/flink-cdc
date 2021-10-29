@@ -135,7 +135,8 @@ public class MySqlSource<T>
                         sourceReaderMetrics,
                         sourceConfig.isIncludeSchemaChanges()),
                 readerContext.getConfiguration(),
-                readerContext);
+                readerContext,
+                sourceConfig);
     }
 
     @Override
@@ -160,7 +161,8 @@ public class MySqlSource<T>
                         ? new MySqlHybridSplitAssigner(sourceConfig, currentParallelism)
                         : new MySqlBinlogSplitAssigner(sourceConfig);
 
-        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
+        return new MySqlSourceEnumerator(
+                enumContext, splitAssigner, validator, sourceConfig.getSplitMetaGroupSize());
     }
 
     @Override
@@ -185,7 +187,8 @@ public class MySqlSource<T>
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
 
-        return new MySqlSourceEnumerator(enumContext, splitAssigner, validator);
+        return new MySqlSourceEnumerator(
+                enumContext, splitAssigner, validator, sourceConfig.getSplitMetaGroupSize());
     }
 
     @Override

@@ -99,41 +99,21 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         switch (version) {
             case 1:
             case 2:
-                return deserializeV2(serialized);
+                final DataInputDeserializer in = new DataInputDeserializer(serialized);
+                final int splitVersion = in.readInt();
+                final int stateFlag = in.readInt();
+                if (stateFlag == SNAPSHOT_PENDING_SPLITS_STATE_FLAG) {
+                    return deserializeSnapshotPendingSplitsState(version, splitVersion, in);
+                } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
+                    return deserializeBinlogPendingSplitsState(in);
+                } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
+                    return deserializeHybridPendingSplitsState(version, splitVersion, in);
+                } else {
+                    throw new IOException(
+                            "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
+                }
             default:
                 throw new IOException("Unknown version: " + version);
-        }
-    }
-
-    public PendingSplitsState deserializeV1(byte[] serialized) throws IOException {
-        final DataInputDeserializer in = new DataInputDeserializer(serialized);
-        final int splitVersion = in.readInt();
-        final int stateFlag = in.readInt();
-        if (stateFlag == SNAPSHOT_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeSnapshotPendingSplitsState(1, splitVersion, in);
-        } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeBinlogPendingSplitsState(in);
-        } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeHybridPendingSplitsState(1, splitVersion, in);
-        } else {
-            throw new IOException(
-                    "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
-        }
-    }
-
-    public PendingSplitsState deserializeV2(byte[] serialized) throws IOException {
-        final DataInputDeserializer in = new DataInputDeserializer(serialized);
-        final int splitVersion = in.readInt();
-        final int stateFlag = in.readInt();
-        if (stateFlag == SNAPSHOT_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeSnapshotPendingSplitsState(2, splitVersion, in);
-        } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeBinlogPendingSplitsState(in);
-        } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeHybridPendingSplitsState(2, splitVersion, in);
-        } else {
-            throw new IOException(
-                    "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
         }
     }
 

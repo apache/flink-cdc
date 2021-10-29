@@ -236,7 +236,7 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
 
     @Override
     public String toString() {
-        return "BinlogOffset{" + "offset=" + offset + '}';
+        return offset.toString();
     }
 
     @Override

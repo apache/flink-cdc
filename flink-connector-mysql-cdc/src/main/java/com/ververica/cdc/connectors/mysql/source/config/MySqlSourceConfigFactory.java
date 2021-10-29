@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
@@ -52,6 +53,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private String serverTimeZone = SERVER_TIME_ZONE.defaultValue();
     private StartupOptions startupOptions = StartupOptions.initial();
     private int splitSize = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
+    private int splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private int fetchSize = SCAN_SNAPSHOT_FETCH_SIZE.defaultValue();
     private Duration connectTimeout = MySqlSourceOptions.CONNECT_TIMEOUT.defaultValue();
     private boolean includeSchemaChanges = false;
@@ -134,6 +136,15 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * The group size of split meta, if the meta size exceeds the group size, the meta will be will
+     * be divided into multiple groups.
+     */
+    public MySqlSourceConfigFactory splitMetaGroupSize(int splitMetaGroupSize) {
+        this.splitMetaGroupSize = splitMetaGroupSize;
+        return this;
+    }
+
     /** The maximum fetch size for per poll when read table snapshot. */
     public MySqlSourceConfigFactory fetchSize(int fetchSize) {
         this.fetchSize = fetchSize;
@@ -201,7 +212,7 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // the underlying debezium reader should always capture the schema changes and forward them.
-        // Note: the includeSchemaChanges parameter is used to controll emitting the schema record,
+        // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
         // only DataStream API program need to emit the schema record, the Table API need not
         props.setProperty("include.schema.changes", String.valueOf(true));
         // disable the offset flush totally
@@ -238,6 +249,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 serverIdRange,
                 startupOptions,
                 splitSize,
+                splitMetaGroupSize,
                 fetchSize,
                 serverTimeZone,
                 connectTimeout,

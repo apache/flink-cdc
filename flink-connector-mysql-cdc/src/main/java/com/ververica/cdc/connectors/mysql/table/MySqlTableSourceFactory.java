@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
@@ -78,6 +79,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         validateRegex(TABLE_NAME.key(), tableName);
         int port = config.get(PORT);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 
@@ -89,8 +91,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
             validateStartupOptionIfEnableParallel(startupOptions);
-            validateFetchSize(fetchSize);
             validateSplitSize(splitSize);
+            validateSplitMetaGroupSize(splitMetaGroupSize);
+            validateFetchSize(fetchSize);
         }
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
@@ -107,6 +110,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 serverId,
                 enableParallelRead,
                 splitSize,
+                splitMetaGroupSize,
                 fetchSize,
                 connectTimeout,
                 startupOptions);
@@ -140,6 +144,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(CHUNK_META_GROUP_SIZE);
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
         return options;
@@ -225,6 +230,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 String.format(
                         "The value of option '%s' must larger than 1, but is %d",
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), splitSize));
+    }
+
+    private void validateSplitMetaGroupSize(int splitMetaGroupSize) {
+        checkState(
+                splitMetaGroupSize > 1,
+                String.format(
+                        "The value of option '%s' must larger than 1, but is %d",
+                        CHUNK_META_GROUP_SIZE.key(), splitMetaGroupSize));
     }
 
     private void validateFetchSize(int fetchSize) {

@@ -22,30 +22,44 @@ import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 
 import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * notify the finished snapshot splits has been received, i.e. acknowledge for {@link
- * FinishedSnapshotSplitsReportEvent}.
+ * pass binlog meta data, i.e. {@link FinishedSnapshotSplitInfo}.
  */
-public class FinishedSnapshotSplitsAckEvent implements SourceEvent {
+public class BinlogSplitMetaEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    private final List<String> finishedSplits;
+    private final String splitId;
 
-    public FinishedSnapshotSplitsAckEvent(List<String> finishedSplits) {
-        this.finishedSplits = finishedSplits;
+    /** The meta data of binlog split is divided to multiple groups. */
+    private final int metaGroupId;
+    /**
+     * The serialized meta data of binlog split, it's serialized/deserialize by {@link
+     * FinishedSnapshotSplitInfo#serialize(FinishedSnapshotSplitInfo)} and {@link
+     * FinishedSnapshotSplitInfo#deserialize(byte[])}.
+     */
+    private final List<byte[]> metaGroup;
+
+    public BinlogSplitMetaEvent(String splitId, int metaGroupId, List<byte[]> metaGroup) {
+        this.splitId = splitId;
+        this.metaGroupId = metaGroupId;
+        this.metaGroup = metaGroup;
     }
 
-    public List<String> getFinishedSplits() {
-        return finishedSplits;
+    public String getSplitId() {
+        return splitId;
     }
 
-    @Override
-    public String toString() {
-        return "FinishedSnapshotSplitsAckEvent{" + "finishedSplits=" + finishedSplits + '}';
+    public int getMetaGroupId() {
+        return metaGroupId;
+    }
+
+    public List<byte[]> getMetaGroup() {
+        return metaGroup;
     }
 }

@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -108,6 +109,7 @@ public class MySqlTableSourceFactoryTest {
                         null,
                         false,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -120,6 +122,7 @@ public class MySqlTableSourceFactoryTest {
         properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123-126");
         properties.put("scan.incremental.snapshot.chunk.size", "8000");
+        properties.put("chunk-meta.group.size", "3000");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
 
@@ -139,6 +142,7 @@ public class MySqlTableSourceFactoryTest {
                         "123-126",
                         true,
                         8000,
+                        3000,
                         100,
                         Duration.ofSeconds(45),
                         StartupOptions.initial());
@@ -170,6 +174,7 @@ public class MySqlTableSourceFactoryTest {
                         "123",
                         true,
                         8000,
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
                         100,
                         Duration.ofSeconds(45),
                         StartupOptions.initial());
@@ -199,6 +204,7 @@ public class MySqlTableSourceFactoryTest {
                         "123-126",
                         SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.latest());
@@ -230,6 +236,7 @@ public class MySqlTableSourceFactoryTest {
                         "4321",
                         false,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -281,6 +288,7 @@ public class MySqlTableSourceFactoryTest {
                         null,
                         false,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -341,6 +349,7 @@ public class MySqlTableSourceFactoryTest {
                         null,
                         false,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.latest());
@@ -374,6 +383,7 @@ public class MySqlTableSourceFactoryTest {
                         null,
                         false,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         StartupOptions.initial());
@@ -430,6 +440,21 @@ public class MySqlTableSourceFactoryTest {
                     t,
                     containsMessage(
                             "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
+        }
+
+        // validate illegal split meta group size
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("chunk-meta.group.size", "1");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertThat(
+                    t,
+                    containsMessage(
+                            "The value of option 'chunk-meta.group.size' must larger than 1, but is 1"));
         }
 
         // validate missing required

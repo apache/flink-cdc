@@ -26,8 +26,8 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,14 +43,21 @@ import java.util.stream.Collectors;
  * range and chunk size and also continue with a binlog split.
  */
 public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlHybridSplitAssigner.class);
     private static final String BINLOG_SPLIT_ID = "binlog-split";
+
+    private final int splitMetaGroupSize;
 
     private boolean isBinlogSplitAssigned;
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
     public MySqlHybridSplitAssigner(MySqlSourceConfig sourceConfig, int currentParallelism) {
-        this(new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism), false);
+        this(
+                new MySqlSnapshotSplitAssigner(sourceConfig, currentParallelism),
+                false,
+                sourceConfig.getSplitMetaGroupSize());
     }
 
     public MySqlHybridSplitAssigner(
@@ -60,13 +67,17 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         this(
                 new MySqlSnapshotSplitAssigner(
                         sourceConfig, currentParallelism, checkpoint.getSnapshotPendingSplits()),
-                checkpoint.isBinlogSplitAssigned());
+                checkpoint.isBinlogSplitAssigned(),
+                sourceConfig.getSplitMetaGroupSize());
     }
 
     private MySqlHybridSplitAssigner(
-            MySqlSnapshotSplitAssigner snapshotSplitAssigner, boolean isBinlogSplitAssigned) {
+            MySqlSnapshotSplitAssigner snapshotSplitAssigner,
+            boolean isBinlogSplitAssigned,
+            int splitMetaGroupSize) {
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
+        this.splitMetaGroupSize = splitMetaGroupSize;
     }
 
     @Override
@@ -100,6 +111,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     @Override
     public boolean waitingForFinishedSplits() {
         return snapshotSplitAssigner.waitingForFinishedSplits();
+    }
+
+    @Override
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
+        return snapshotSplitAssigner.getFinishedSplitInfos();
     }
 
     @Override
@@ -148,7 +164,6 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         Map<String, BinlogOffset> splitFinishedOffsets =
                 snapshotSplitAssigner.getSplitFinishedOffsets();
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
 
         BinlogOffset minBinlogOffset = null;
         for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
@@ -164,17 +179,18 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             split.getSplitStart(),
                             split.getSplitEnd(),
                             binlogOffset));
-            tableSchemas.putAll(split.getTableSchemas());
         }
 
-        final MySqlSnapshotSplit lastSnapshotSplit =
-                assignedSnapshotSplit.get(assignedSnapshotSplit.size() - 1).asSnapshotSplit();
+        // the finishedSnapshotSplitInfos is to large to transmission, divide it to groups and
+        // then transfer it
+
+        boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new MySqlBinlogSplit(
                 BINLOG_SPLIT_ID,
-                lastSnapshotSplit.getSplitKeyType(),
                 minBinlogOffset == null ? BinlogOffset.INITIAL_OFFSET : minBinlogOffset,
                 BinlogOffset.NO_STOPPING_OFFSET,
-                finishedSnapshotSplitInfos,
-                tableSchemas);
+                divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
+                new HashMap<>(),
+                finishedSnapshotSplitInfos.size());
     }
 }

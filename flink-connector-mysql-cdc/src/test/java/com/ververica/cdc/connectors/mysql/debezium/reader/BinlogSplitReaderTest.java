@@ -389,7 +389,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         BinlogOffset.NO_STOPPING_OFFSET,
                         finishedSplitsInfo,
                         tableSchemas,
-                        true);
+                        finishedSplitsInfo.size());
 
         // step-3: test read binlog split
         BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);

@@ -35,6 +35,9 @@ import java.util.stream.Collectors;
 public class MySqlSnapshotSplit extends MySqlSplit {
 
     private final TableId tableId;
+    private final RowType splitKeyType;
+    private final Map<TableId, TableChange> tableSchemas;
+
     @Nullable private final Object[] splitStart;
     @Nullable private final Object[] splitEnd;
     /** The high watermark is not bull when the split read finished. */
@@ -50,11 +53,13 @@ public class MySqlSnapshotSplit extends MySqlSplit {
             Object[] splitEnd,
             BinlogOffset highWatermark,
             Map<TableId, TableChange> tableSchemas) {
-        super(splitId, splitKeyType, tableSchemas);
+        super(splitId);
         this.tableId = tableId;
+        this.splitKeyType = splitKeyType;
         this.splitStart = splitStart;
         this.splitEnd = splitEnd;
         this.highWatermark = highWatermark;
+        this.tableSchemas = tableSchemas;
     }
 
     public TableId getTableId() {
@@ -81,6 +86,11 @@ public class MySqlSnapshotSplit extends MySqlSplit {
     }
 
     @Override
+    public Map<TableId, TableChange> getTableSchemas() {
+        return tableSchemas;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -93,16 +103,22 @@ public class MySqlSnapshotSplit extends MySqlSplit {
         }
         MySqlSnapshotSplit that = (MySqlSnapshotSplit) o;
         return Objects.equals(tableId, that.tableId)
+                && Objects.equals(splitKeyType, that.splitKeyType)
                 && Arrays.equals(splitStart, that.splitStart)
                 && Arrays.equals(splitEnd, that.splitEnd)
                 && Objects.equals(highWatermark, that.highWatermark);
     }
 
+    public RowType getSplitKeyType() {
+        return splitKeyType;
+    }
+
     @Override
     public int hashCode() {
-        int result = Objects.hash(super.hashCode(), tableId, highWatermark);
+        int result = Objects.hash(super.hashCode(), tableId, splitKeyType, highWatermark);
         result = 31 * result + Arrays.hashCode(splitStart);
         result = 31 * result + Arrays.hashCode(splitEnd);
+        result = 31 * result + Arrays.hashCode(serializedFormCache);
         return result;
     }
 
