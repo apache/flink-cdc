@@ -25,7 +25,7 @@ import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -41,8 +41,15 @@ public class OracleTestBase extends AbstractTestBase {
     private static final String ORACLE_USER = "dbzuser";
     private static final String ORACLE_PWD = "dbz";
     protected static final OracleContainer ORACLE_CONTAINER =
-            new OracleContainer("jark/oracle-xe-11g-r2-cdc:0.1")
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+            new OracleContainer(
+                    new ImageFromDockerfile("oracle-xe-11g-tmp")
+                            .withFileFromClasspath(".", "docker")
+                            .withFileFromClasspath(
+                                    "assets/activate-archivelog.sh",
+                                    "docker/assets/activate-archivelog.sh")
+                            .withFileFromClasspath(
+                                    "assets/activate-archivelog.sql",
+                                    "docker/assets/activate-archivelog.sql"));
 
     @BeforeClass
     public static void beforeClass() throws Exception {
