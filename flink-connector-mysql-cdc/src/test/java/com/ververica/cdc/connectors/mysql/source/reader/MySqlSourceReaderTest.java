@@ -36,13 +36,17 @@ import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssig
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
@@ -51,6 +55,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 
@@ -63,22 +68,30 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
     @Test
     public void testBinlogReadFailoverCrossTransaction() throws Exception {
         customerDatabase.createAndInitialize();
-        final MySqlSourceConfig configuration = getConfig(new String[] {"customers"});
+        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        MySqlSplit binlogSplit = createBinlogSplit(configuration);
+        MySqlSplit binlogSplit;
+        try (MySqlConnection jdbc =
+                DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
+            binlogSplit =
+                    MySqlBinlogSplit.fillTableSchemas(
+                            createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
+        }
 
-        MySqlSourceReader<SourceRecord> reader = createReader(configuration);
+        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig);
         reader.start();
         reader.addSplits(Arrays.asList(binlogSplit));
 
         // step-1: make 6 change events in one MySQL transaction
         TableId tableId = binlogSplit.getTableSchemas().keySet().iterator().next();
-        makeBinlogEventsInOneTransaction(configuration, tableId.toString());
+        makeBinlogEventsInOneTransaction(sourceConfig, tableId.toString());
 
         // step-2: fetch the first 2 records belong to the MySQL transaction
         String[] expectedRecords =
@@ -95,7 +108,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         reader.close();
 
         // step-3: mock failover from a restored state
-        MySqlSourceReader<SourceRecord> restartReader = createReader(configuration);
+        MySqlSourceReader<SourceRecord> restartReader = createReader(sourceConfig);
         restartReader.start();
         restartReader.addSplits(splitsState);
 
@@ -127,7 +140,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 () -> createSplitReader(configuration),
                 recordEmitter,
                 readerContext.getConfiguration(),
-                readerContext);
+                readerContext,
+                configuration);
     }
 
     private MySqlSplitReader createSplitReader(MySqlSourceConfig configuration) {

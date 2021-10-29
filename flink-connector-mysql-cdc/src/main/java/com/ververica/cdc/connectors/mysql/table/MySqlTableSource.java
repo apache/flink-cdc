@@ -70,6 +70,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final Properties dbzProperties;
     private final boolean enableParallelRead;
     private final int splitSize;
+    private final int splitMetaGroupSize;
     private final int fetchSize;
     private final Duration connectTimeout;
     private final StartupOptions startupOptions;
@@ -97,6 +98,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             @Nullable String serverId,
             boolean enableParallelRead,
             int splitSize,
+            int splitMetaGroupSize,
             int fetchSize,
             Duration connectTimeout,
             StartupOptions startupOptions) {
@@ -112,6 +114,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.dbzProperties = dbzProperties;
         this.enableParallelRead = enableParallelRead;
         this.splitSize = splitSize;
+        this.splitMetaGroupSize = splitMetaGroupSize;
         this.fetchSize = fetchSize;
         this.connectTimeout = connectTimeout;
         this.startupOptions = startupOptions;
@@ -157,6 +160,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .serverTimeZone(serverTimeZone.toString())
                             .serverId(serverId)
                             .splitSize(splitSize)
+                            .splitMetaGroupSize(splitMetaGroupSize)
                             .fetchSize(fetchSize)
                             .connectTimeout(connectTimeout)
                             .debeziumProperties(dbzProperties)
@@ -230,6 +234,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         serverId,
                         enableParallelRead,
                         splitSize,
+                        splitMetaGroupSize,
                         fetchSize,
                         connectTimeout,
                         startupOptions);
@@ -250,6 +255,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         return port == that.port
                 && enableParallelRead == that.enableParallelRead
                 && splitSize == that.splitSize
+                && splitMetaGroupSize == that.splitMetaGroupSize
                 && fetchSize == that.fetchSize
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
@@ -281,6 +287,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 dbzProperties,
                 enableParallelRead,
                 splitSize,
+                splitMetaGroupSize,
                 fetchSize,
                 connectTimeout,
                 startupOptions,

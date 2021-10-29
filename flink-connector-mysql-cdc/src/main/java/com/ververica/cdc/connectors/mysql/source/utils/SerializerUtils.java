@@ -53,17 +53,22 @@ public class SerializerUtils {
             case 1:
                 return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : null;
             case 2:
-                boolean offsetNonNull = in.readBoolean();
-                if (offsetNonNull) {
-                    int binlogOffsetBytesLength = in.readInt();
-                    byte[] binlogOffsetBytes = new byte[binlogOffsetBytesLength];
-                    in.readFully(binlogOffsetBytes);
-                    return BinlogOffsetSerializer.INSTANCE.deserialize(binlogOffsetBytes);
-                } else {
-                    return null;
-                }
+            case 3:
+                return readBinlogPosition(in);
             default:
                 throw new IOException("Unknown version: " + offsetVersion);
+        }
+    }
+
+    public static BinlogOffset readBinlogPosition(DataInputDeserializer in) throws IOException {
+        boolean offsetNonNull = in.readBoolean();
+        if (offsetNonNull) {
+            int binlogOffsetBytesLength = in.readInt();
+            byte[] binlogOffsetBytes = new byte[binlogOffsetBytesLength];
+            in.readFully(binlogOffsetBytes);
+            return BinlogOffsetSerializer.INSTANCE.deserialize(binlogOffsetBytes);
+        } else {
+            return null;
         }
     }
 

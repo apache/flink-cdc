@@ -25,6 +25,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPending
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -38,12 +39,14 @@ import javax.annotation.Nullable;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.closeMySqlConnection;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openMySqlConnection;
@@ -161,6 +164,32 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public boolean waitingForFinishedSplits() {
         return !allSplitsFinished();
+    }
+
+    @Override
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
+        if (waitingForFinishedSplits()) {
+            LOG.error(
+                    "The assigner is not ready to offer finished split information, this should not be called");
+            throw new FlinkRuntimeException(
+                    "The assigner is not ready to offer finished split information, this should not be called");
+        }
+        final List<MySqlSnapshotSplit> assignedSnapshotSplit =
+                assignedSplits.values().stream()
+                        .sorted(Comparator.comparing(MySqlSplit::splitId))
+                        .collect(Collectors.toList());
+        List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
+        for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
+            BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
+            finishedSnapshotSplitInfos.add(
+                    new FinishedSnapshotSplitInfo(
+                            split.getTableId(),
+                            split.splitId(),
+                            split.getSplitStart(),
+                            split.getSplitEnd(),
+                            binlogOffset));
+        }
+        return finishedSnapshotSplitInfos;
     }
 
     @Override

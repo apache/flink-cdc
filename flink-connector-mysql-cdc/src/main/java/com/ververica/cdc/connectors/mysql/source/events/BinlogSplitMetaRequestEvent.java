@@ -23,29 +23,27 @@ import org.apache.flink.api.connector.source.SourceEvent;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
-import java.util.List;
-
 /**
- * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * notify the finished snapshot splits has been received, i.e. acknowledge for {@link
- * FinishedSnapshotSplitsReportEvent}.
+ * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
+ * pull binlog meta data, i.e. sending {@link BinlogSplitMetaEvent}.
  */
-public class FinishedSnapshotSplitsAckEvent implements SourceEvent {
+public class BinlogSplitMetaRequestEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    private final List<String> finishedSplits;
+    private final String splitId;
+    private final int requestMetaGroupId;
 
-    public FinishedSnapshotSplitsAckEvent(List<String> finishedSplits) {
-        this.finishedSplits = finishedSplits;
+    public BinlogSplitMetaRequestEvent(String splitId, int requestMetaGroupId) {
+        this.splitId = splitId;
+        this.requestMetaGroupId = requestMetaGroupId;
     }
 
-    public List<String> getFinishedSplits() {
-        return finishedSplits;
+    public String getSplitId() {
+        return splitId;
     }
 
-    @Override
-    public String toString() {
-        return "FinishedSnapshotSplitsAckEvent{" + "finishedSplits=" + finishedSplits + '}';
+    public int getRequestMetaGroupId() {
+        return requestMetaGroupId;
     }
 }

@@ -102,7 +102,6 @@ public class MySqlSplitStateTest {
             throws Exception {
         final TableId tableId = TableId.parse("test_db.test_table");
         final List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
-        final Map<TableId, RowType> tableSplitKeyTypes = new HashMap<>();
         finishedSplitsInfo.add(
                 new FinishedSnapshotSplitInfo(
                         tableId,
@@ -141,6 +140,6 @@ public class MySqlSplitStateTest {
                 BinlogOffset.NO_STOPPING_OFFSET,
                 finishedSplitsInfo,
                 tableSchemas,
-                true);
+                finishedSplitsInfo.size());
     }
 }

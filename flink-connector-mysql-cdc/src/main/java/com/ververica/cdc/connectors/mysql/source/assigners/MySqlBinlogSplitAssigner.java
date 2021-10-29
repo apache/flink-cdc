@@ -22,13 +22,16 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSp
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.mysql.MySqlConnection;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -86,6 +89,11 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
+        return Collections.EMPTY_LIST;
+    }
+
+    @Override
     public void onFinishedSplits(Map<String, BinlogOffset> splitFinishedOffsets) {
         // do nothing
     }
@@ -122,6 +130,6 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
                 BinlogOffset.NO_STOPPING_OFFSET,
                 new ArrayList<>(),
                 new HashMap<>(),
-                true);
+                0);
     }
 }

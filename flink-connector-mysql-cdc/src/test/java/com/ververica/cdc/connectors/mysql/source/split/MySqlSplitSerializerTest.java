@@ -99,7 +99,7 @@ public class MySqlSplitSerializerTest {
                         BinlogOffset.NO_STOPPING_OFFSET,
                         finishedSplitsInfo,
                         databaseHistory,
-                        true);
+                        finishedSplitsInfo.size());
         assertEquals(split, serializeAndDeserializeSplit(split));
 
         final MySqlSplit unCompletedBinlogSplit =
@@ -109,7 +109,7 @@ public class MySqlSplitSerializerTest {
                         BinlogOffset.NO_STOPPING_OFFSET,
                         new ArrayList<>(),
                         new HashMap<>(),
-                        false);
+                        0);
         assertEquals(unCompletedBinlogSplit, serializeAndDeserializeSplit(unCompletedBinlogSplit));
     }
 

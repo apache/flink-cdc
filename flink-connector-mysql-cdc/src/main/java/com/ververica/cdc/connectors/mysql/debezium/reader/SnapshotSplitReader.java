@@ -162,7 +162,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                 sourceContext.getHighWatermark(),
                 new ArrayList<>(),
                 currentSnapshotSplit.getTableSchemas(),
-                true);
+                0);
     }
 
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(

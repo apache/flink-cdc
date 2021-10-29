@@ -28,8 +28,6 @@ import java.time.Duration;
 /** Configurations for {@link MySqlSource}. */
 public class MySqlSourceOptions {
 
-    public static final String DATABASE_SERVER_NAME = "mysql_binlog_source";
-
     public static final ConfigOption<String> HOSTNAME =
             ConfigOptions.key("hostname")
                     .stringType()
@@ -107,6 +105,13 @@ public class MySqlSourceOptions {
                     .defaultValue(8096)
                     .withDescription(
                             "The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.");
+    // internal option, won't add to documentaion
+    public static final ConfigOption<Integer> CHUNK_META_GROUP_SIZE =
+            ConfigOptions.key("chunk-meta.group.size")
+                    .intType()
+                    .defaultValue(1000)
+                    .withDescription(
+                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be will be divided into multiple groups.");
 
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
             ConfigOptions.key("scan.snapshot.fetch.size")

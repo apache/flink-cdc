@@ -18,14 +18,27 @@
 
 package com.ververica.cdc.connectors.mysql.source.split;
 
+import org.apache.flink.core.memory.DataInputDeserializer;
+import org.apache.flink.core.memory.DataOutputSerializer;
+import org.apache.flink.util.FlinkRuntimeException;
+
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.relational.TableId;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
+
 /** The information used to describe a finished snapshot split. */
 public class FinishedSnapshotSplitInfo {
+
+    private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
+            ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
     private final TableId tableId;
     private final String splitId;
@@ -105,5 +118,41 @@ public class FinishedSnapshotSplitInfo {
                 + ", highWatermark="
                 + highWatermark
                 + '}';
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Utils to serialize/deserialize for transmission between Enumerator and SourceReader
+    // ------------------------------------------------------------------------------------
+    public static byte[] serialize(FinishedSnapshotSplitInfo splitInfo) {
+        try {
+            final DataOutputSerializer out = SERIALIZER_CACHE.get();
+            out.writeUTF(splitInfo.getTableId().toString());
+            out.writeUTF(splitInfo.getSplitId());
+            out.writeUTF(rowToSerializedString(splitInfo.getSplitStart()));
+            out.writeUTF(rowToSerializedString(splitInfo.getSplitEnd()));
+            writeBinlogPosition(splitInfo.getHighWatermark(), out);
+            final byte[] result = out.getCopyOfBuffer();
+            out.clear();
+            return result;
+        } catch (IOException e) {
+            throw new FlinkRuntimeException(e);
+        }
+    }
+
+    public static FinishedSnapshotSplitInfo deserialize(byte[] serialized) {
+        try {
+            final DataInputDeserializer in = new DataInputDeserializer(serialized);
+            TableId tableId = TableId.parse(in.readUTF());
+            String splitId = in.readUTF();
+            Object[] splitStart = serializedStringToRow(in.readUTF());
+            Object[] splitEnd = serializedStringToRow(in.readUTF());
+            BinlogOffset highWatermark = readBinlogPosition(in);
+            in.releaseArrays();
+            return new FinishedSnapshotSplitInfo(
+                    tableId, splitId, splitStart, splitEnd, highWatermark);
+
+        } catch (IOException e) {
+            throw new FlinkRuntimeException(e);
+        }
     }
 }

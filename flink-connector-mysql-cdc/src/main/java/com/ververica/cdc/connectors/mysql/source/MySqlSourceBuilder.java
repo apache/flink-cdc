@@ -130,6 +130,15 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * The group size of split meta, if the meta size exceeds the group size, the meta will be will
+     * be divided into multiple groups.
+     */
+    public MySqlSourceBuilder<T> splitMetaGroupSize(int splitMetaGroupSize) {
+        this.configFactory.splitMetaGroupSize(splitMetaGroupSize);
+        return this;
+    }
+
     /** The maximum fetch size for per poll when read table snapshot. */
     public MySqlSourceBuilder<T> fetchSize(int fetchSize) {
         this.configFactory.fetchSize(fetchSize);

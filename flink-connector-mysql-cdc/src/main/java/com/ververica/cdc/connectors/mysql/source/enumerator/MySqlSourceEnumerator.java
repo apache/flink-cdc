@@ -23,13 +23,18 @@ import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
+
 import com.ververica.cdc.connectors.mysql.MySqlValidator;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * A MySQL CDC source enumerator that enumerates receive the split request and assign the split to
@@ -54,17 +60,21 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     private final SplitEnumeratorContext<MySqlSplit> context;
     private final MySqlSplitAssigner splitAssigner;
     private final MySqlValidator validator;
+    private final int metaGroupSize;
 
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
+    private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
 
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
             MySqlSplitAssigner splitAssigner,
-            MySqlValidator validator) {
+            MySqlValidator validator,
+            int metaGroupSize) {
         this.context = context;
         this.splitAssigner = splitAssigner;
         this.validator = validator;
+        this.metaGroupSize = metaGroupSize;
         this.readersAwaitingSplit = new TreeSet<>();
     }
 
@@ -116,6 +126,11 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             FinishedSnapshotSplitsAckEvent ackEvent =
                     new FinishedSnapshotSplitsAckEvent(new ArrayList<>(finishedOffsets.keySet()));
             context.sendEventToSourceReader(subtaskId, ackEvent);
+        } else if (sourceEvent instanceof BinlogSplitMetaRequestEvent) {
+            LOG.debug(
+                    "The enumerator receives request for binlog split meta from subtask {}.",
+                    subtaskId);
+            sendBinlogMeta(subtaskId, (BinlogSplitMetaRequestEvent) sourceEvent);
         }
     }
 
@@ -181,6 +196,39 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 context.sendEventToSourceReader(
                         subtaskId, new FinishedSnapshotSplitsRequestEvent());
             }
+        }
+    }
+
+    private void sendBinlogMeta(int subTask, BinlogSplitMetaRequestEvent requestEvent) {
+        // initialize once
+        if (binlogSplitMeta == null) {
+            final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
+                    splitAssigner.getFinishedSplitInfos();
+            if (finishedSnapshotSplitInfos.isEmpty()) {
+                LOG.error(
+                        "The assigner offer empty finished split information, this should not happen");
+                throw new FlinkRuntimeException(
+                        "The assigner offer empty finished split information, this should not happen");
+            }
+            binlogSplitMeta = Lists.partition(finishedSnapshotSplitInfos, metaGroupSize);
+        }
+        final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
+
+        if (binlogSplitMeta.size() > requestMetaGroupId) {
+            List<FinishedSnapshotSplitInfo> metaToSend = binlogSplitMeta.get(requestMetaGroupId);
+            BinlogSplitMetaEvent metadataEvent =
+                    new BinlogSplitMetaEvent(
+                            requestEvent.getSplitId(),
+                            requestMetaGroupId,
+                            metaToSend.stream()
+                                    .map(FinishedSnapshotSplitInfo::serialize)
+                                    .collect(Collectors.toList()));
+            context.sendEventToSourceReader(subTask, metadataEvent);
+        } else {
+            LOG.error(
+                    "Received invalid request meta group id {}, the invalid meta group id range is [0, {}]",
+                    requestMetaGroupId,
+                    binlogSplitMeta.size() - 1);
         }
     }
 }

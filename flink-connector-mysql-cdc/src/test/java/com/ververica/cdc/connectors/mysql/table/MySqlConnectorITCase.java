@@ -27,6 +27,8 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
+
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.Before;
@@ -480,6 +482,97 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
         assertEqualsInAnyOrder(
                 Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testBigTableWithHugeSplits() throws Exception {
+        if (!incrementalSnapshot) {
+            // only check when incremental snapshot is enabled
+            return;
+        }
+        final int tableRowNumber = 10;
+        fullTypesDatabase.createAndInitialize();
+        try (Connection connection = fullTypesDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(String.format("USE %s", fullTypesDatabase.getDatabaseName()));
+            statement.execute(
+                    "CREATE TABLE big_table1(id BIGINT, str VARCHAR(100), PRIMARY KEY (id))");
+            statement.execute(
+                    "CREATE TABLE big_table2(id BIGINT, str VARCHAR(100), PRIMARY KEY (id))");
+
+            for (int i = 0; i < tableRowNumber; i++) {
+                statement.execute("INSERT INTO big_table1 values(" + i + "," + (i + 100000) + ")");
+                statement.execute("INSERT INTO big_table2 values(" + i + "," + (i + 200000) + ")");
+            }
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE big_table (\n"
+                                + "    id BIGINT,"
+                                + "    str STRING,"
+                                + "    primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = 'big_table.*',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'chunk-meta.group.size' = '3',"
+                                + " 'server-id' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        fullTypesDatabase.getUsername(),
+                        fullTypesDatabase.getPassword(),
+                        fullTypesDatabase.getDatabaseName(),
+                        getServerId());
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " `id` BIGINT NOT NULL,"
+                        + " str STRING,"
+                        + " primary key (`id`) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM big_table");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", tableRowNumber * 2);
+
+        try (Connection connection = fullTypesDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE big_table1 SET str = '1024' WHERE id=0;");
+            statement.execute("UPDATE big_table1 SET str = '1025' WHERE id=1;");
+            statement.execute("UPDATE big_table2 SET str = '2048' WHERE id=2;");
+            statement.execute("UPDATE big_table2 SET str = '2049' WHERE id=3;");
+        }
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", tableRowNumber * 2 + 4);
+
+        List<String> expected = new ArrayList<>();
+        // snapshot result after upsert into the sink
+        for (int i = 0; i < tableRowNumber; i++) {
+            expected.add("+I[" + i + ", " + (i + 100000) + "]");
+            expected.add("+I[" + i + ", " + (i + 200000) + "]");
+        }
+        // binlog result after upsert into the sink
+        expected.addAll(
+                Lists.newArrayList("+U[0, 1024]", "+U[1, 1025]", "+U[2, 2048]", "+U[3, 2049]"));
+
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(actual);
+        Collections.sort(expected);
+        assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
     }
 

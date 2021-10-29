@@ -46,6 +46,7 @@ public class MySqlSourceConfig implements Serializable {
     @Nullable private final ServerIdRange serverIdRange;
     private final StartupOptions startupOptions;
     private final int splitSize;
+    private final int splitMetaGroupSize;
     private final int fetchSize;
     private final String serverTimeZone;
     private final Duration connectTimeout;
@@ -68,6 +69,7 @@ public class MySqlSourceConfig implements Serializable {
             @Nullable ServerIdRange serverIdRange,
             StartupOptions startupOptions,
             int splitSize,
+            int splitMetaGroupSize,
             int fetchSize,
             String serverTimeZone,
             Duration connectTimeout,
@@ -82,6 +84,7 @@ public class MySqlSourceConfig implements Serializable {
         this.serverIdRange = serverIdRange;
         this.startupOptions = checkNotNull(startupOptions);
         this.splitSize = splitSize;
+        this.splitMetaGroupSize = splitMetaGroupSize;
         this.fetchSize = fetchSize;
         this.serverTimeZone = checkNotNull(serverTimeZone);
         this.connectTimeout = checkNotNull(connectTimeout);
@@ -126,6 +129,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public int getSplitSize() {
         return splitSize;
+    }
+
+    public int getSplitMetaGroupSize() {
+        return splitMetaGroupSize;
     }
 
     public int getFetchSize() {

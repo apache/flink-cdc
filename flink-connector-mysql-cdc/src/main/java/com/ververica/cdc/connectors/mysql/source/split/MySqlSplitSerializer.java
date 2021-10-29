@@ -103,7 +103,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             writeBinlogPosition(binlogSplit.getEndingOffset(), out);
             writeFinishedSplitsInfo(binlogSplit.getFinishedSnapshotSplitInfos(), out);
             writeTableSchemas(binlogSplit.getTableSchemas(), out);
-            out.writeBoolean(binlogSplit.isCompletedSplit());
+            out.writeInt(binlogSplit.getTotalFinishedSplitSize());
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
@@ -148,16 +148,16 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     tableSchemas);
         } else if (splitKind == BINLOG_SPLIT_FLAG) {
             String splitId = in.readUTF();
-            // split Key Type
+            // skip split Key Type
             in.readUTF();
             BinlogOffset startingOffset = readBinlogPosition(version, in);
             BinlogOffset endingOffset = readBinlogPosition(version, in);
             List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
                     readFinishedSplitsInfo(version, in);
             Map<TableId, TableChange> tableChangeMap = readTableSchemas(version, in);
-            boolean isCompletedSplit = true;
+            int totalFinishedSplitSize = finishedSplitsInfo.size();
             if (version == 3) {
-                isCompletedSplit = in.readBoolean();
+                totalFinishedSplitSize = in.readInt();
             }
             in.releaseArrays();
             return new MySqlBinlogSplit(
@@ -166,7 +166,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     endingOffset,
                     finishedSplitsInfo,
                     tableChangeMap,
-                    isCompletedSplit);
+                    totalFinishedSplitSize);
         } else {
             throw new IOException("Unknown split kind: " + splitKind);
         }
