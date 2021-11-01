@@ -188,7 +188,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             binlogOffset));
         }
 
-        // the finishedSnapshotSplitInfos is to large for transmission, divide it to groups and
+        // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
         // then transfer them
 
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;

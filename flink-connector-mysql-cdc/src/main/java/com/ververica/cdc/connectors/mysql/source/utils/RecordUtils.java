@@ -301,7 +301,7 @@ public class RecordUtils {
                         ? BinlogOffset.INITIAL_OFFSET
                         : finishedSnapshotSplits.get(0).getHighWatermark();
         for (FinishedSnapshotSplitInfo finishedSnapshotSplit : finishedSnapshotSplits) {
-            if (!finishedSnapshotSplit.getHighWatermark().isAtOrBefore(startOffset)) {
+            if (!finishedSnapshotSplit.getHighWatermark().isAtOrAfter(startOffset)) {
                 startOffset = finishedSnapshotSplit.getHighWatermark();
             }
         }
