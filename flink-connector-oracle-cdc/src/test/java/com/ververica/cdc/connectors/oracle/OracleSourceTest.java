@@ -569,7 +569,7 @@ public class OracleSourceTest extends OracleTestBase {
         List<T> allRecords = new ArrayList<>();
         LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
         while (allRecords.size() < expectedRecordCount) {
-            StreamRecord<T> record = queue.poll(100, TimeUnit.SECONDS);
+            StreamRecord<T> record = queue.poll(200, TimeUnit.SECONDS);
             if (record != null) {
                 allRecords.add(record.getValue());
             } else {
