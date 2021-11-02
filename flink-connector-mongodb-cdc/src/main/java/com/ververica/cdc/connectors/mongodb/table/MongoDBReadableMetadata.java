@@ -32,7 +32,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 /** Defines the supported metadata columns for {@link MongoDBTableSource}. */
 public enum MongoDBReadableMetadata {
 
-    /** Name of the collection that contain the row. . */
+    /** Name of the collection that contain the row. */
     COLLECTION(
             "collection_name",
             DataTypes.STRING().notNull(),
