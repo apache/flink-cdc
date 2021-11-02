@@ -176,7 +176,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
             // find the min binlog offset
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
-            if (minBinlogOffset == null || binlogOffset.compareTo(minBinlogOffset) < 0) {
+            if (minBinlogOffset == null || binlogOffset.isBefore(minBinlogOffset)) {
                 minBinlogOffset = binlogOffset;
             }
             finishedSnapshotSplitInfos.add(
