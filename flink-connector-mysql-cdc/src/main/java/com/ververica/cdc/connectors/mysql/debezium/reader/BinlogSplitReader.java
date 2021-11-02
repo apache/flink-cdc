@@ -214,7 +214,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
                                     key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
-                            && position.isAtOrAfter(splitInfo.getHighWatermark())) {
+                            && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }
                 }
@@ -264,7 +264,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
                 BinlogOffset highWatermark = finishedSplitInfo.getHighWatermark();
                 BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
-                if (maxHighWatermark == null || highWatermark.isAtOrAfter(maxHighWatermark)) {
+                if (maxHighWatermark == null || highWatermark.isAfter(maxHighWatermark)) {
                     tableIdBinlogPositionMap.put(tableId, highWatermark);
                 }
             }
