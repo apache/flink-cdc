@@ -248,6 +248,41 @@ Connector Options
 Note: `heartbeat.interval.ms` is highly recommended to set a proper value larger than 0 **if the collection changes slowly**.
 The heartbeat event can pushing the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from a checkpoint or savepoint.
 
+Available Metadata
+----------------
+
+The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+
+<div class="highlight">
+<table class="colwidths-auto docutils">
+  <thead>
+     <tr>
+       <th class="text-left" style="width: 15%">Key</th>
+       <th class="text-left" style="width: 30%">DataType</th>
+       <th class="text-left" style="width: 55%">Description</th>
+     </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>database_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the database that contain the row.</td>
+    </tr>
+    <tr>
+      <td>collection_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the collection that contain the row.</td>
+    </tr>
+    <tr>
+      <td>op_ts</td>
+      <td>TIMESTAMP_LTZ(3) NOT NULL</td>
+      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
 Features
 --------
 
