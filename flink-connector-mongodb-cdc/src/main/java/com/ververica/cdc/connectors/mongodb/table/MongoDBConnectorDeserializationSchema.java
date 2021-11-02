@@ -35,6 +35,7 @@ import org.apache.flink.util.Collector;
 
 import com.mongodb.client.model.changestream.OperationType;
 import com.mongodb.internal.HexUtils;
+import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.table.AppendMetadataCollector;
 import com.ververica.cdc.debezium.table.MetadataConverter;
@@ -78,12 +79,6 @@ public class MongoDBConnectorDeserializationSchema
 
     private static final long serialVersionUID = 1750787080613035184L;
 
-    private static final String FULL_DOCUMENT_FIELD = "fullDocument";
-
-    private static final String DOCUMENT_KEY_FIELD = "documentKey";
-
-    private static final String OPERATION_TYPE_FIELD = "operationType";
-
     /** TypeInformation of the produced {@link RowData}. */
     private final TypeInformation<RowData> resultTypeInfo;
 
@@ -124,8 +119,11 @@ public class MongoDBConnectorDeserializationSchema
 
         OperationType op = operationTypeFor(record);
         BsonDocument documentKey =
-                checkNotNull(extractBsonDocument(value, valueSchema, DOCUMENT_KEY_FIELD));
-        BsonDocument fullDocument = extractBsonDocument(value, valueSchema, FULL_DOCUMENT_FIELD);
+                checkNotNull(
+                        extractBsonDocument(
+                                value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD));
+        BsonDocument fullDocument =
+                extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_FIELD);
 
         switch (op) {
             case INSERT:
@@ -185,7 +183,7 @@ public class MongoDBConnectorDeserializationSchema
 
     private OperationType operationTypeFor(SourceRecord record) {
         Struct value = (Struct) record.value();
-        return OperationType.fromString(value.getString(OPERATION_TYPE_FIELD));
+        return OperationType.fromString(value.getString(MongoDBEnvelope.OPERATION_TYPE_FIELD));
     }
 
     private void emit(SourceRecord inRecord, RowData physicalRow, Collector<RowData> collector) {

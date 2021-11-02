@@ -23,6 +23,7 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 
+import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
@@ -42,8 +43,9 @@ public enum MongoDBReadableMetadata {
                 @Override
                 public Object read(SourceRecord record) {
                     Struct value = (Struct) record.value();
-                    Struct to = value.getStruct("ns");
-                    return StringData.fromString(to.getString("coll"));
+                    Struct to = value.getStruct(MongoDBEnvelope.NAMESPACE_FIELD);
+                    return StringData.fromString(
+                            to.getString(MongoDBEnvelope.NAMESPACE_COLLECTION_FIELD));
                 }
             }),
 
@@ -57,8 +59,9 @@ public enum MongoDBReadableMetadata {
                 @Override
                 public Object read(SourceRecord record) {
                     Struct value = (Struct) record.value();
-                    Struct to = value.getStruct("ns");
-                    return StringData.fromString(to.getString("db"));
+                    Struct to = value.getStruct(MongoDBEnvelope.NAMESPACE_FIELD);
+                    return StringData.fromString(
+                            to.getString(MongoDBEnvelope.NAMESPACE_DATABASE_FIELD));
                 }
             }),
 
@@ -66,7 +69,7 @@ public enum MongoDBReadableMetadata {
      * It indicates the time that the change was made in the database. If the record is read from
      * snapshot of the table instead of the change stream, the value is always 0.
      */
-    TIMESTAMP(
+    OP_TS(
             "op_ts",
             DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3).notNull(),
             new MetadataConverter() {

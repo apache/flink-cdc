@@ -117,7 +117,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.localTimeZone = localTimeZone;
-        // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
     }
