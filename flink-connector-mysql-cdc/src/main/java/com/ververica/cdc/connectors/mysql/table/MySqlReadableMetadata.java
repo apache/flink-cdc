@@ -31,7 +31,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 /** Defines the supported metadata columns for {@link MySqlTableSource}. */
 public enum MySqlReadableMetadata {
-    /** Name of the table that contain the row. . */
+    /** Name of the table that contain the row. */
     TABLE_NAME(
             "table_name",
             DataTypes.STRING().notNull(),
