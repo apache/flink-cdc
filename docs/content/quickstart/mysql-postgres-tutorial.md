@@ -159,9 +159,8 @@ docker-compose down
     ```
     cd flink-1.13.2
     ```
-2. Change the value of `taskmanager.numberOfTaskSlots` to 2 in `conf/flink-conf.yaml` for we will run two tasks at the same time.
-
-3. Use the following command to start a Flink cluster:
+   
+2. Use the following command to start a Flink cluster:
     ```shell
     ./bin/start-cluster.sh
     ```
@@ -174,7 +173,7 @@ docker-compose down
     ./bin/stop-cluster.sh
     ```
 
-4. Use the following command to start a Flink SQL CLI:
+3. Use the following command to start a Flink SQL CLI:
     ```shell
     ./bin/sql-client.sh
     ```
@@ -183,7 +182,7 @@ docker-compose down
    ![Flink SQL Client](/_static/fig/mysql-postgress-tutorial/flink-sql-client.png "Flink SQL Client")
 
 ## Creating tables using Flink DDL in Flink SQL CLI
-First, enable checkpoints every 3000 milliseconds
+First, enable checkpoints every 3 seconds
 ```sql
 -- Flink SQL                   
 Flink SQL> SET execution.checkpointing.interval = 3s;
@@ -300,7 +299,7 @@ Next, do some change in the databases, and then the enriched orders shown in Kib
    INSERT INTO shipments
    VALUES (default,10004,'Shanghai','Beijing',false);
    ```   
-3. Update order status in MySQL
+3. Update the order status in MySQL
    ```sql
    --MySQL
    UPDATE orders SET order_status = true WHERE order_id = 10004;
@@ -310,7 +309,7 @@ Next, do some change in the databases, and then the enriched orders shown in Kib
    --PG
    UPDATE shipments SET is_arrived = true WHERE shipment_id = 1004;
    ```
-5. Delete the shipment in Postgres
+5. Delete the order in MySQL
    ```sql
    --MySQL
    DELETE FROM orders WHERE order_id = 10004;
