@@ -179,7 +179,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         .getSourceConfig()
                         .getDbzConfiguration()
                         .edit()
-                        .with("table.whitelist", currentSnapshotSplit.getTableId())
+                        .with("table.include.list", currentSnapshotSplit.getTableId().toString())
                         .build();
         // task to read binlog and backfill for current split
         return new MySqlBinlogSplitReadTask(
