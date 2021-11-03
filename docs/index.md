@@ -9,6 +9,7 @@ content/快速上手/index
 content/connectors/index
 content/formats/index
 content/downloads
+content/githublink
 ```
 
 # Indices and Search

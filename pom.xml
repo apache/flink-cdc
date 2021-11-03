@@ -189,6 +189,7 @@ under the License.
                         <exclude>docs/Dockerfile</exclude>
                         <exclude>docs/make.bat</exclude>
                         <exclude>docs/_templates/version.html</exclude>
+                        <exclude>docs/_static/button.js</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                         <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
