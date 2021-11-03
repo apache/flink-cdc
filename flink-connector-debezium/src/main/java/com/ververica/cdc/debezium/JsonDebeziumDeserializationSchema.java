@@ -27,6 +27,8 @@ import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.storage.ConverterConfig;
 import org.apache.kafka.connect.storage.ConverterType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 
@@ -38,10 +40,14 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
 
     private static final long serialVersionUID = 1L;
 
+    protected static final Logger LOG =
+            LoggerFactory.getLogger(JsonDebeziumDeserializationSchema.class);
+
     private transient JsonConverter jsonConverter;
 
     /**
-     * Configuration whether to enable {@link JsonConverterConfig.SCHEMAS_ENABLE_CONFIG} to include schema in messages.
+     * Configuration whether to enable {@link JsonConverterConfig.SCHEMAS_ENABLE_CONFIG} to include
+     * schema in messages.
      */
     private final Boolean includeSchema;
 
@@ -64,7 +70,7 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
             jsonConverter.configure(configs);
         }
         byte[] bytes =
-            jsonConverter.fromConnectData(record.topic(), record.valueSchema(), record.value());
+                jsonConverter.fromConnectData(record.topic(), record.valueSchema(), record.value());
         out.collect(new String(bytes));
     }
 
