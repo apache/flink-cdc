@@ -9,10 +9,10 @@
 ![Flink CDC Streaming ETL](/_static/fig/mysql-postgress-tutorial/flink-cdc-streaming-etl.png "Flink CDC Streaming ETL")
 
 ## 准备阶段
-准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑
+准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
 
 ### 准备教程所需要的组件
-接下来的教程将以 `Docker Compose` 的方式准备所需要的组件。
+接下来的教程将以 `docker-compose` 的方式准备所需要的组件。
 
 使用下面的内容创建一个 `docker-compose.yml` 文件：
 ```
@@ -68,11 +68,6 @@ services:
 docker-compose up -d
 ```
 该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:5601/](http://localhost:5601/) 来查看 Kibana 是否运行正常。
-
-在本教程结束后，可以通过如下命令停止所有的容器：
-```shell
-docker-compose down
-```
 
 ### 下载 Flink 和所需要的依赖包
 1. 下载 [Flink 1.13.2](https://downloads.apache.org/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) 并将其解压至目录 `flink-1.13.2`
@@ -164,18 +159,13 @@ docker-compose down
 
    ![Flink UI](/_static/fig/mysql-postgress-tutorial/flink-ui.png "Flink UI")
 
-   本教程结束后可以通过下面的命令停止 Flink 集群：
-    ```shell
-    ./bin/stop-cluster.sh
-    ```
-
 3. 使用下面的命令启动 Flink SQL CLI
     ```shell
     ./bin/sql-client.sh
     ```
    启动成功后，可以看到如下的页面：
 
-   ![Flink SQL CLI](/_static/fig/mysql-postgress-tutorial/flink-sql-CLI.png "Flink SQL CLI")
+   ![Flink SQL_Client](/_static/fig/mysql-postgress-tutorial/flink-sql-client.png "Flink SQL Client")
 
 ## 在 Flink SQL CLI 中使用 Flink DDL 创建表
 首先，开启 checkpoint，每隔3秒做一次 checkpoint
@@ -313,3 +303,15 @@ Flink SQL> INSERT INTO enriched_orders
    ```
    每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新，如下所示：
    ![Enriched Orders Changes](/_static/fig/mysql-postgress-tutorial/kibana-detailed-orders-changes.gif "Enriched Orders Changes")
+
+## 环境清理
+本教程结束后，在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：
+```shell
+docker-compose down
+```
+在 Flink 所在目录 `flink-1.13.2` 下执行如下命令停止 Flink 集群：
+```shell
+./bin/stop-cluster.sh
+```
+
+

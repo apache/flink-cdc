@@ -73,11 +73,6 @@ docker-compose up -d
 This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly.
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
-Don’t forget to run the following command to stop all containers after finishing the tutorial:
-```shell
-docker-compose down
-```
-
 ### Preparing Flink and JAR package required
 1. Download [Flink 1.13.2](https://downloads.apache.org/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) and unzip it to the directory `flink-1.13.2`
 2. Download following JAR package required and put them under `flink-1.13.2/lib/`:
@@ -167,11 +162,6 @@ docker-compose down
    Then we can visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally, and the web page looks like:
 
    ![Flink UI](/_static/fig/mysql-postgress-tutorial/flink-ui.png "Flink UI")
-
-   Don’t forget to run the following command to stop the Flink cluster after finishing the tutorial:
-    ```shell
-    ./bin/stop-cluster.sh
-    ```
 
 3. Use the following command to start a Flink SQL CLI:
     ```shell
@@ -316,3 +306,13 @@ Next, do some change in the databases, and then the enriched orders shown in Kib
    ```
    The changes of enriched orders in Kibana are as follows:
    ![Enriched Orders Changes](/_static/fig/mysql-postgress-tutorial/kibana-detailed-orders-changes.gif "Enriched Orders Changes")
+   
+## Clean up
+After finishing the tutorial, run the following command to stop all containers in the directory of `docker-compose.yml`:
+```shell
+docker-compose down
+```
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.13.2`:
+```shell
+./bin/stop-cluster.sh
+```
