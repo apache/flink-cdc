@@ -45,7 +45,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
-/** Integration tests for PostgreSQL SQL source. */
+/** Integration tests for PostgreSQL Table source. */
 public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private final StreamExecutionEnvironment env =
