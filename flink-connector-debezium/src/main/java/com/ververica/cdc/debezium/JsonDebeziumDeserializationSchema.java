@@ -38,18 +38,12 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
 
     private static final long serialVersionUID = 1L;
 
-    private static final JsonConverter CONVERTER = new JsonConverter();
-
-    private static final HashMap<String, Object> CONFIGS = new HashMap<>();
+    private transient JsonConverter jsonConverter;
 
     /**
-     * Configuration {@link JsonConverterConfig.SCHEMAS_ENABLE_CONFIG} enabled to include schema in
-     * the message.
+     * Configuration whether to enable {@link JsonConverterConfig.SCHEMAS_ENABLE_CONFIG} to include schema in messages.
      */
     private final Boolean includeSchema;
-
-    /** When the deserialize method is first called, Configure CONVERTER. */
-    private Boolean isFirst = true;
 
     public JsonDebeziumDeserializationSchema() {
         this(false);
@@ -61,18 +55,16 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
 
     @Override
     public void deserialize(SourceRecord record, Collector<String> out) throws Exception {
-        // Avoid occurred NullPointException in CONVERTER.FromConnectData() was performed when
-        // deploy on the cluster
-        // and can be instantiated by {@ link JsonDebeziumDeserializationSchema} constructor
-        // to control whether to enable or disable inclusion patterns in messages.
-        if (isFirst) {
-            CONFIGS.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
-            CONFIGS.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
-            CONVERTER.configure(CONFIGS);
-            isFirst = false;
+        if (jsonConverter == null) {
+            // initialize jsonConverter
+            jsonConverter = new JsonConverter();
+            final HashMap<String, Object> configs = new HashMap<>(2);
+            configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
+            configs.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
+            jsonConverter.configure(configs);
         }
         byte[] bytes =
-                CONVERTER.fromConnectData(record.topic(), record.valueSchema(), record.value());
+            jsonConverter.fromConnectData(record.topic(), record.valueSchema(), record.value());
         out.collect(new String(bytes));
     }
 
