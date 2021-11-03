@@ -27,8 +27,6 @@ import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.storage.ConverterConfig;
 import org.apache.kafka.connect.storage.ConverterType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 
@@ -39,9 +37,6 @@ import java.util.HashMap;
 public class JsonDebeziumDeserializationSchema implements DebeziumDeserializationSchema<String> {
 
     private static final long serialVersionUID = 1L;
-
-    protected static final Logger LOG =
-            LoggerFactory.getLogger(JsonDebeziumDeserializationSchema.class);
 
     private transient JsonConverter jsonConverter;
 
