@@ -52,7 +52,19 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>*:*</include>
+                                    <include>io.debezium:debezium-api</include>
+                                    <include>io.debezium:debezium-embedded</include>
+                                    <include>io.debezium:debezium-core</include>
+                                    <incldue>io.debezium:debezium-ddl-parser</incldue>
+                                    <include>io.debezium:debezium-connector-oracle</include>
+                                    <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-connector-oracle-cdc</include>
+                                    <include>org.antlr:antlr4-runtime</include>
+                                    <include>com.github.jsqlparser:jsqlparser</include>
+                                    <include>com.oracle.ojdbc:*</include>
+                                    <include>org.apache.kafka:*</include>
+                                    <include>com.fasterxml.*:*</include>
+                                    <include>com.google.guava:*</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -69,6 +81,38 @@ under the License.
                                     </excludes>
                                 </filter>
                             </filters>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.kafka</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.antlr</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.org.antlr
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.com.google
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.com.fasterxml
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>net.sf.jsqlparser</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.net.sf.jsqlparser
+                                    </shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
