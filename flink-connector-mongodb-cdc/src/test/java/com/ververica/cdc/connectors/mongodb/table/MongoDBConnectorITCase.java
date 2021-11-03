@@ -39,8 +39,11 @@ import org.junit.Test;
 
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
@@ -349,6 +352,119 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
 
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testMetadataColumns() throws Exception {
+        String database = executeCommandFileInSeparateDatabase("inventory");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE mongodb_source ("
+                                + " _id STRING NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " collection_name STRING METADATA VIRTUAL,"
+                                + " PRIMARY KEY (_id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'mongodb-cdc',"
+                                + " 'connection.options' = 'connectTimeoutMS=12000&socketTimeoutMS=13000',"
+                                + " 'hosts' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database' = '%s',"
+                                + " 'collection' = '%s'"
+                                + ")",
+                        MONGODB_CONTAINER.getHostAndPort(),
+                        FLINK_USER,
+                        FLINK_USER_PASSWORD,
+                        database,
+                        "products");
+
+        String sinkDDL =
+                "CREATE TABLE meta_sink ("
+                        + " _id STRING NOT NULL,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(10,3),"
+                        + " database_name STRING,"
+                        + " collection_name STRING,"
+                        + " PRIMARY KEY (_id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO meta_sink SELECT * FROM mongodb_source");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("meta_sink", 9);
+
+        MongoCollection<Document> products = getMongoDatabase(database).getCollection("products");
+
+        products.updateOne(
+                Filters.eq("_id", new ObjectId("100000000000000000000106")),
+                Updates.set("description", "18oz carpenter hammer"));
+
+        products.updateOne(
+                Filters.eq("_id", new ObjectId("100000000000000000000107")),
+                Updates.set("weight", 5.1));
+
+        products.insertOne(
+                productDocOf(
+                        "100000000000000000000110",
+                        "jacket",
+                        "water resistent white wind breaker",
+                        0.2));
+
+        products.insertOne(
+                productDocOf("100000000000000000000111", "scooter", "Big 2-wheel scooter", 5.18));
+
+        products.updateOne(
+                Filters.eq("_id", new ObjectId("100000000000000000000110")),
+                Updates.combine(
+                        Updates.set("description", "new water resistent white wind breaker"),
+                        Updates.set("weight", 0.5)));
+
+        products.updateOne(
+                Filters.eq("_id", new ObjectId("100000000000000000000111")),
+                Updates.set("weight", 5.17));
+
+        products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
+
+        waitForSinkSize("meta_sink", 16);
+
+        List<String> expected =
+                Stream.of(
+                                "+I(100000000000000000000101,scooter,Small 2-wheel scooter,3.140,%s,products)",
+                                "+I(100000000000000000000102,car battery,12V car battery,8.100,%s,products)",
+                                "+I(100000000000000000000103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800,%s,products)",
+                                "+I(100000000000000000000104,hammer,12oz carpenter''s hammer,0.750,%s,products)",
+                                "+I(100000000000000000000105,hammer,12oz carpenter''s hammer,0.875,%s,products)",
+                                "+I(100000000000000000000106,hammer,12oz carpenter''s hammer,1.000,%s,products)",
+                                "+I(100000000000000000000107,rocks,box of assorted rocks,5.300,%s,products)",
+                                "+I(100000000000000000000108,jacket,water resistent black wind breaker,0.100,%s,products)",
+                                "+I(100000000000000000000109,spare tire,24 inch spare tire,22.200,%s,products)",
+                                "+I(100000000000000000000110,jacket,water resistent white wind breaker,0.200,%s,products)",
+                                "+I(100000000000000000000111,scooter,Big 2-wheel scooter,5.180,%s,products)",
+                                "+U(100000000000000000000106,hammer,18oz carpenter hammer,1.000,%s,products)",
+                                "+U(100000000000000000000107,rocks,box of assorted rocks,5.100,%s,products)",
+                                "+U(100000000000000000000110,jacket,new water resistent white wind breaker,0.500,%s,products)",
+                                "+U(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products)",
+                                "-D(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products)")
+                        .map(s -> String.format(s, database))
+                        .sorted()
+                        .collect(Collectors.toList());
+
+        List<String> actual = TestValuesTableFactory.getRawResults("meta_sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
     }
 

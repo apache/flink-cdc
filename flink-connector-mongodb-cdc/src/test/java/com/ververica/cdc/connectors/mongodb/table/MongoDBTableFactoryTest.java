@@ -36,6 +36,7 @@ import org.junit.Test;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -57,8 +58,22 @@ public class MongoDBTableFactoryTest {
                             Column.physical("ccc", DataTypes.DOUBLE()),
                             Column.physical("ddd", DataTypes.DECIMAL(31, 18)),
                             Column.physical("eee", DataTypes.TIMESTAMP(3))),
-                    new ArrayList<>(),
+                    Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("_id")));
+
+    private static final ResolvedSchema SCHEMA_WITH_METADATA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("_id", DataTypes.STRING().notNull()),
+                            Column.physical("bbb", DataTypes.STRING().notNull()),
+                            Column.physical("ccc", DataTypes.DOUBLE()),
+                            Column.physical("ddd", DataTypes.DECIMAL(31, 18)),
+                            Column.physical("eee", DataTypes.TIMESTAMP(3)),
+                            Column.metadata("time", DataTypes.TIMESTAMP(3), "op_ts", true),
+                            Column.metadata(
+                                    "_database_name", DataTypes.STRING(), "database_name", true)),
+                    Collections.emptyList(),
+                    UniqueConstraint.primaryKey("pk", Collections.singletonList("_id")));
 
     private static final String MY_HOSTS = "localhost:27017,localhost:27018";
     private static final String USER = "flinkuser";
@@ -75,7 +90,7 @@ public class MongoDBTableFactoryTest {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
@@ -111,7 +126,7 @@ public class MongoDBTableFactoryTest {
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
         options.put("heartbeat.interval.ms", "104");
-        DynamicTableSource actualSource = createTableSource(options);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
@@ -136,13 +151,51 @@ public class MongoDBTableFactoryTest {
     }
 
     @Test
+    public void testMetadataColumns() {
+        Map<String, String> properties = getAllOptions();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        MongoDBTableSource mongoDBSource = (MongoDBTableSource) actualSource;
+        mongoDBSource.applyReadableMetadata(
+                Arrays.asList("op_ts", "database_name"),
+                SCHEMA_WITH_METADATA.toSourceRowDataType());
+        actualSource = mongoDBSource.copy();
+
+        MongoDBTableSource expectedSource =
+                new MongoDBTableSource(
+                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        MY_HOSTS,
+                        USER,
+                        PASSWORD,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        null,
+                        ERROR_TOLERANCE,
+                        ERROR_LOGS_ENABLE,
+                        COPY_EXISTING,
+                        null,
+                        null,
+                        null,
+                        POLL_MAX_BATCH_SIZE_DEFAULT,
+                        POLL_AWAIT_TIME_MILLIS_DEFAULT,
+                        null,
+                        LOCAL_TIME_ZONE);
+
+        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
+
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
     public void testValidation() {
         // validate unsupported option
         try {
             Map<String, String> properties = getAllOptions();
             properties.put("unknown", "abc");
 
-            createTableSource(properties);
+            createTableSource(SCHEMA, properties);
             fail("exception expected");
         } catch (Throwable t) {
             assertTrue(
@@ -162,17 +215,18 @@ public class MongoDBTableFactoryTest {
         return options;
     }
 
-    private static DynamicTableSource createTableSource(Map<String, String> options) {
+    private static DynamicTableSource createTableSource(
+            ResolvedSchema schema, Map<String, String> options) {
         return FactoryUtil.createTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(SCHEMA).toSchema(),
+                                fromResolvedSchema(schema).toSchema(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),
-                        SCHEMA),
+                        schema),
                 new Configuration(),
                 MongoDBTableFactoryTest.class.getClassLoader(),
                 false);

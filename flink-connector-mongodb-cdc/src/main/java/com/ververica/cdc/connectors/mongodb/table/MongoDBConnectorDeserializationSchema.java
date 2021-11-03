@@ -35,7 +35,10 @@ import org.apache.flink.util.Collector;
 
 import com.mongodb.client.model.changestream.OperationType;
 import com.mongodb.internal.HexUtils;
+import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.table.AppendMetadataCollector;
+import com.ververica.cdc.debezium.table.MetadataConverter;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -76,12 +79,6 @@ public class MongoDBConnectorDeserializationSchema
 
     private static final long serialVersionUID = 1750787080613035184L;
 
-    private static final String FULL_DOCUMENT_FIELD = "fullDocument";
-
-    private static final String DOCUMENT_KEY_FIELD = "documentKey";
-
-    private static final String OPERATION_TYPE_FIELD = "operationType";
-
     /** TypeInformation of the produced {@link RowData}. */
     private final TypeInformation<RowData> resultTypeInfo;
 
@@ -90,14 +87,27 @@ public class MongoDBConnectorDeserializationSchema
 
     /**
      * Runtime converter that converts {@link
-     * com.mongodb.client.model.changestream.ChangeStreamDocument}s into objects of Flink SQL
-     * internal data structures.
+     * com.mongodb.client.model.changestream.ChangeStreamDocument}s into {@link RowData} consisted
+     * of physical column values.
      */
-    private final DeserializationRuntimeConverter runtimeConverter;
+    protected final DeserializationRuntimeConverter physicalConverter;
+
+    /** Whether the deserializer needs to handle metadata columns. */
+    protected final boolean hasMetadata;
+
+    /**
+     * A wrapped output collector which is used to append metadata columns after physical columns.
+     */
+    private final AppendMetadataCollector appendMetadataCollector;
 
     public MongoDBConnectorDeserializationSchema(
-            RowType rowType, TypeInformation<RowData> resultTypeInfo, ZoneId localTimeZone) {
-        this.runtimeConverter = createConverter(rowType);
+            RowType physicalDataType,
+            MetadataConverter[] metadataConverters,
+            TypeInformation<RowData> resultTypeInfo,
+            ZoneId localTimeZone) {
+        this.hasMetadata = checkNotNull(metadataConverters).length > 0;
+        this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
+        this.physicalConverter = createConverter(physicalDataType);
         this.resultTypeInfo = resultTypeInfo;
         this.localTimeZone = localTimeZone;
     }
@@ -109,19 +119,22 @@ public class MongoDBConnectorDeserializationSchema
 
         OperationType op = operationTypeFor(record);
         BsonDocument documentKey =
-                checkNotNull(extractBsonDocument(value, valueSchema, DOCUMENT_KEY_FIELD));
-        BsonDocument fullDocument = extractBsonDocument(value, valueSchema, FULL_DOCUMENT_FIELD);
+                checkNotNull(
+                        extractBsonDocument(
+                                value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD));
+        BsonDocument fullDocument =
+                extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_FIELD);
 
         switch (op) {
             case INSERT:
                 GenericRowData insert = extractRowData(fullDocument);
                 insert.setRowKind(RowKind.INSERT);
-                out.collect(insert);
+                emit(record, insert, out);
                 break;
             case DELETE:
                 GenericRowData delete = extractRowData(documentKey);
                 delete.setRowKind(RowKind.DELETE);
-                out.collect(delete);
+                emit(record, delete, out);
                 break;
             case UPDATE:
                 // It’s null if another operation deletes the document
@@ -131,12 +144,12 @@ public class MongoDBConnectorDeserializationSchema
                 }
                 GenericRowData updateAfter = extractRowData(fullDocument);
                 updateAfter.setRowKind(RowKind.UPDATE_AFTER);
-                out.collect(updateAfter);
+                emit(record, updateAfter, out);
                 break;
             case REPLACE:
                 GenericRowData replaceAfter = extractRowData(fullDocument);
                 replaceAfter.setRowKind(RowKind.UPDATE_AFTER);
-                out.collect(replaceAfter);
+                emit(record, replaceAfter, out);
                 break;
             case INVALIDATE:
             case DROP:
@@ -150,7 +163,7 @@ public class MongoDBConnectorDeserializationSchema
 
     private GenericRowData extractRowData(BsonDocument document) throws Exception {
         checkNotNull(document);
-        return (GenericRowData) runtimeConverter.convert(document);
+        return (GenericRowData) physicalConverter.convert(document);
     }
 
     private BsonDocument extractBsonDocument(Struct value, Schema valueSchema, String fieldName) {
@@ -170,7 +183,18 @@ public class MongoDBConnectorDeserializationSchema
 
     private OperationType operationTypeFor(SourceRecord record) {
         Struct value = (Struct) record.value();
-        return OperationType.fromString(value.getString(OPERATION_TYPE_FIELD));
+        return OperationType.fromString(value.getString(MongoDBEnvelope.OPERATION_TYPE_FIELD));
+    }
+
+    private void emit(SourceRecord inRecord, RowData physicalRow, Collector<RowData> collector) {
+        if (!hasMetadata) {
+            collector.collect(physicalRow);
+            return;
+        }
+
+        appendMetadataCollector.inputRecord = inRecord;
+        appendMetadataCollector.outputCollector = collector;
+        appendMetadataCollector.collect(physicalRow);
     }
 
     // -------------------------------------------------------------------------------------
