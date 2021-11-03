@@ -8,6 +8,7 @@ content/connectors/index
 content/formats/index
 content/tutorials/index
 content/downloads
+content/githublink
 ```
 
 # Indices and Search
