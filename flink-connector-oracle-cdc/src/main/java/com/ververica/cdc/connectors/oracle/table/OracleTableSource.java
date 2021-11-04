@@ -121,6 +121,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         .setPhysicalRowType(physicalDataType)
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
+                        .setUserDefinedConverterFactory(
+                                OracleDeserializationConverterFactory.instance())
                         .build();
         OracleSource.Builder<RowData> builder =
                 OracleSource.<RowData>builder()
