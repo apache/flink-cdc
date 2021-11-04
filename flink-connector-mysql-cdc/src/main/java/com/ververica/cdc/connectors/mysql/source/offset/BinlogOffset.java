@@ -226,20 +226,20 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         return Long.compare(this.getRestartSkipRows(), that.getRestartSkipRows());
     }
 
-    public boolean isAtOrBefore(BinlogOffset that) {
-        return this.compareTo(that) <= 0;
-    }
-
-    public boolean isBefore(BinlogOffset that) {
-        return this.compareTo(that) < 0;
-    }
-
     public boolean isAtOrAfter(BinlogOffset that) {
         return this.compareTo(that) >= 0;
     }
 
     public boolean isAfter(BinlogOffset that) {
         return this.compareTo(that) > 0;
+    }
+
+    public boolean isAtOrBefore(BinlogOffset that) {
+        return this.compareTo(that) <= 0;
+    }
+
+    public boolean isBefore(BinlogOffset that) {
+        return this.compareTo(that) < 0;
     }
 
     @Override
