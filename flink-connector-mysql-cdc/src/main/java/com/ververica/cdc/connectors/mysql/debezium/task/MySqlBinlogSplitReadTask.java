@@ -96,7 +96,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
         if (isBoundedRead()) {
             final BinlogOffset currentBinlogOffset = getBinlogPosition(offsetContext.getOffset());
             // reach the high watermark, the binlog reader should finished
-            if (currentBinlogOffset.isAtOrBefore(binlogSplit.getEndingOffset())) {
+            if (currentBinlogOffset.isAtOrAfter(binlogSplit.getEndingOffset())) {
                 // send binlog end event
                 try {
                     signalEventDispatcher.dispatchWatermarkEvent(

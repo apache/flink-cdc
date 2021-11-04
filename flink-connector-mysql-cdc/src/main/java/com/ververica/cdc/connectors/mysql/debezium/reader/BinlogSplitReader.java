@@ -214,7 +214,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
                                     key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
-                            && position.isAtOrBefore(splitInfo.getHighWatermark())) {
+                            && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }
                 }
@@ -230,7 +230,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
-                && position.isAtOrBefore(maxSplitHighWatermarkMap.get(tableId))) {
+                && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
             return true;
         }
         // capture dynamically new added tables
@@ -264,7 +264,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
                 BinlogOffset highWatermark = finishedSplitInfo.getHighWatermark();
                 BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
-                if (maxHighWatermark == null || highWatermark.isAtOrBefore(maxHighWatermark)) {
+                if (maxHighWatermark == null || highWatermark.isAfter(maxHighWatermark)) {
                     tableIdBinlogPositionMap.put(tableId, highWatermark);
                 }
             }

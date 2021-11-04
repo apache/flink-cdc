@@ -176,7 +176,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
             // find the min binlog offset
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
-            if (minBinlogOffset == null || binlogOffset.compareTo(minBinlogOffset) < 0) {
+            if (minBinlogOffset == null || binlogOffset.isBefore(minBinlogOffset)) {
                 minBinlogOffset = binlogOffset;
             }
             finishedSnapshotSplitInfos.add(
@@ -188,7 +188,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             binlogOffset));
         }
 
-        // the finishedSnapshotSplitInfos is to large for transmission, divide it to groups and
+        // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
         // then transfer them
 
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
