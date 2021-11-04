@@ -1,4 +1,4 @@
-flink-sql-connector-mysql-cdc
+flink-sql-connector-postgres-cdc
 Copyright 2020 Ververica Inc.
 
 This project bundles the following dependencies under the Apache Software License 2.0. (http://www.apache.org/licenses/LICENSE-2.0.txt)
