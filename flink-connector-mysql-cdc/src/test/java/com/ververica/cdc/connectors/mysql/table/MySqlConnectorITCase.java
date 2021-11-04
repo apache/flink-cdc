@@ -52,7 +52,7 @@ import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMy
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
 
-/** Integration tests for MySQL binlog SQL source. */
+/** Integration tests for MySQL Table source. */
 @RunWith(Parameterized.class)
 public class MySqlConnectorITCase extends MySqlSourceTestBase {
 

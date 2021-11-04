@@ -37,6 +37,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -60,6 +61,18 @@ public class PostgreSQLTableFactoryTest {
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
 
+    private static final ResolvedSchema SCHEMA_WITH_METADATA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("id", DataTypes.BIGINT().notNull()),
+                            Column.physical("name", DataTypes.STRING()),
+                            Column.physical("count", DataTypes.DECIMAL(38, 18)),
+                            Column.metadata("time", DataTypes.TIMESTAMP(3), "op_ts", true),
+                            Column.metadata(
+                                    "database_name", DataTypes.STRING(), "database_name", true)),
+                    Collections.emptyList(),
+                    UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
@@ -73,7 +86,7 @@ public class PostgreSQLTableFactoryTest {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
         PostgreSQLTableSource expectedSource =
                 new PostgreSQLTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
@@ -118,13 +131,44 @@ public class PostgreSQLTableFactoryTest {
     }
 
     @Test
+    public void testMetadataColumns() {
+        Map<String, String> properties = getAllOptions();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        PostgreSQLTableSource postgreSQLTableSource = (PostgreSQLTableSource) actualSource;
+        postgreSQLTableSource.applyReadableMetadata(
+                Arrays.asList("op_ts", "database_name"),
+                SCHEMA_WITH_METADATA.toSourceRowDataType());
+        actualSource = postgreSQLTableSource.copy();
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        TableSchemaUtils.getPhysicalSchema(
+                                fromResolvedSchema(SCHEMA_WITH_METADATA)),
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        "flink",
+                        new Properties());
+        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
+
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
     public void testValidation() {
         // validate illegal port
         try {
             Map<String, String> properties = getAllOptions();
             properties.put("port", "123b");
 
-            createTableSource(properties);
+            createTableSource(SCHEMA, properties);
             fail("exception expected");
         } catch (Throwable t) {
             assertTrue(
@@ -140,7 +184,7 @@ public class PostgreSQLTableFactoryTest {
             properties.remove(requiredOption.key());
 
             try {
-                createTableSource(properties);
+                createTableSource(SCHEMA, properties);
                 fail("exception expected");
             } catch (Throwable t) {
                 assertTrue(
@@ -156,7 +200,7 @@ public class PostgreSQLTableFactoryTest {
             Map<String, String> properties = getAllOptions();
             properties.put("unknown", "abc");
 
-            createTableSource(properties);
+            createTableSource(SCHEMA, properties);
             fail("exception expected");
         } catch (Throwable t) {
             assertTrue(
@@ -177,19 +221,24 @@ public class PostgreSQLTableFactoryTest {
         return options;
     }
 
-    private static DynamicTableSource createTableSource(Map<String, String> options) {
+    private static DynamicTableSource createTableSource(
+            ResolvedSchema schema, Map<String, String> options) {
         return FactoryUtil.createTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(SCHEMA).toSchema(),
+                                fromResolvedSchema(schema).toSchema(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),
-                        SCHEMA),
+                        schema),
                 new Configuration(),
                 PostgreSQLTableFactoryTest.class.getClassLoader(),
                 false);
+    }
+
+    private static DynamicTableSource createTableSource(Map<String, String> options) {
+        return createTableSource(SCHEMA, options);
     }
 }

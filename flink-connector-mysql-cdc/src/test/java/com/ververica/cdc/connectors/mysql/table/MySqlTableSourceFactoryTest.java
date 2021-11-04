@@ -80,7 +80,7 @@ public class MySqlTableSourceFactoryTest {
                             Column.physical("count", DataTypes.DECIMAL(38, 18)),
                             Column.metadata("time", DataTypes.TIMESTAMP(3), "op_ts", true),
                             Column.metadata(
-                                    "_database_name", DataTypes.STRING(), "database_name", true)),
+                                    "database_name", DataTypes.STRING(), "database_name", true)),
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 

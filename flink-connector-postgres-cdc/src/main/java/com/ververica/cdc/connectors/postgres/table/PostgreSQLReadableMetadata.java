@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.table;
+package com.ververica.cdc.connectors.postgres.table;
 
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.StringData;
@@ -29,8 +29,8 @@ import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
-/** Defines the supported metadata columns for {@link MySqlTableSource}. */
-public enum MySqlReadableMetadata {
+/** Defines the supported metadata columns for {@link PostgreSQLTableSource}. */
+public enum PostgreSQLReadableMetadata {
     /** Name of the table that contain the row. */
     TABLE_NAME(
             "table_name",
@@ -65,7 +65,7 @@ public enum MySqlReadableMetadata {
 
     /**
      * It indicates the time that the change was made in the database. If the record is read from
-     * snapshot of the table instead of the binlog, the value is always 0.
+     * snapshot of the table instead of the change stream, the value is always 0.
      */
     OP_TS(
             "op_ts",
@@ -88,7 +88,7 @@ public enum MySqlReadableMetadata {
 
     private final MetadataConverter converter;
 
-    MySqlReadableMetadata(String key, DataType dataType, MetadataConverter converter) {
+    PostgreSQLReadableMetadata(String key, DataType dataType, MetadataConverter converter) {
         this.key = key;
         this.dataType = dataType;
         this.converter = converter;

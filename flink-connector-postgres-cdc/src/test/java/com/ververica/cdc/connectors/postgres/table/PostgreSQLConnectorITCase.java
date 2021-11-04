@@ -35,6 +35,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -44,7 +45,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
-/** Integration tests for MySQL binlog SQL source. */
+/** Integration tests for PostgreSQL Table source. */
 public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private final StreamExecutionEnvironment env =
@@ -334,6 +335,103 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
 
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testMetadataColumns() throws Throwable {
+        initializePostgresTable("inventory");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source  ("
+                                + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " table_name STRING METADATA VIRTUAL,"
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.slot.name' = '%s'"
+                                + ")",
+                        POSTGERS_CONTAINER.getHost(),
+                        POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGERS_CONTAINER.getUsername(),
+                        POSTGERS_CONTAINER.getPassword(),
+                        POSTGERS_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products",
+                        "meta_data_slot");
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " database_name STRING,"
+                        + " table_name STRING,"
+                        + " id INT,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(10,3),"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // sync submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+
+        waitForSnapshotStarted("sink");
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM inventory.products WHERE id=111;");
+        }
+
+        // waiting for change events finished.
+        waitForSinkSize("sink", 16);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I(postgres,products,101,scooter,Small 2-wheel scooter,3.140)",
+                        "+I(postgres,products,102,car battery,12V car battery,8.100)",
+                        "+I(postgres,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
+                        "+I(postgres,products,104,hammer,12oz carpenter's hammer,0.750)",
+                        "+I(postgres,products,105,hammer,14oz carpenter's hammer,0.875)",
+                        "+I(postgres,products,106,hammer,16oz carpenter's hammer,1.000)",
+                        "+I(postgres,products,107,rocks,box of assorted rocks,5.300)",
+                        "+I(postgres,products,108,jacket,water resistent black wind breaker,0.100)",
+                        "+I(postgres,products,109,spare tire,24 inch spare tire,22.200)",
+                        "+I(postgres,products,110,jacket,water resistent white wind breaker,0.200)",
+                        "+I(postgres,products,111,scooter,Big 2-wheel scooter ,5.180)",
+                        "+U(postgres,products,106,hammer,18oz carpenter hammer,1.000)",
+                        "+U(postgres,products,107,rocks,box of assorted rocks,5.100)",
+                        "+U(postgres,products,110,jacket,new water resistent white wind breaker,0.500)",
+                        "+U(postgres,products,111,scooter,Big 2-wheel scooter ,5.170)",
+                        "-D(postgres,products,111,scooter,Big 2-wheel scooter ,5.170)");
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
     }
 
