@@ -353,11 +353,10 @@ Data Type Mapping
       <td>BOOLEAN</td>
     </tr>
     <tr>
-      <td>DATE</td>
-      <td>DATE</td>
-    </tr>
-    <tr>
-      <td>TIMESTAMP [(p)]</td>
+      <td>
+        DATE<br>
+        TIMESTAMP [(p)]
+      </td>
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
     </tr>
     <tr>
