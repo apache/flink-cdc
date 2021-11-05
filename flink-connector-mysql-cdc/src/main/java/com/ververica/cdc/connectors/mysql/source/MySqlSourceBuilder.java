@@ -139,6 +139,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** The factor is used to determine whether the table is evenly distribution or not. */
+    public MySqlSourceBuilder<T> evenlyDistributionFactor(Double evenlyDistributionFactor) {
+        this.configFactory.evenlyDistributionFactor(evenlyDistributionFactor);
+        return this;
+    }
+
     /** The maximum fetch size for per poll when read table snapshot. */
     public MySqlSourceBuilder<T> fetchSize(int fetchSize) {
         this.configFactory.fetchSize(fetchSize);
