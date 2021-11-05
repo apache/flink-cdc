@@ -328,7 +328,7 @@ public class RecordUtils {
         // the split key field contains single field now
         String splitFieldName = nameAdjuster.adjust(splitBoundaryType.getFieldNames().get(0));
         Struct key = (Struct) dataRecord.key();
-        return new Object[] {key.get(splitFieldName)};
+        return new Object[] {key.get(key.schema().fields().get(0))};
     }
 
     public static BinlogOffset getBinlogPosition(SourceRecord dataRecord) {
