@@ -36,7 +36,7 @@ if (db.system.users.find({user:'flinkuser'}).count() == 0) {
   db.createUser(
    {
      user: 'flinkuser',
-     pwd: 'flinkpw',
+     pwd: 'a1?~!@#$%^&*(){}[]<>.,+_-=/|:;',
      roles: [
         { role: 'read', db: 'admin' },
         { role: 'readAnyDatabase', db: 'admin' }
