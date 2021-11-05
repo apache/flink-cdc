@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.config;
 
+import org.apache.flink.annotation.Experimental;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -105,13 +106,6 @@ public class MySqlSourceOptions {
                     .defaultValue(8096)
                     .withDescription(
                             "The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.");
-    // internal option, won't add to documentaion
-    public static final ConfigOption<Integer> CHUNK_META_GROUP_SIZE =
-            ConfigOptions.key("chunk-meta.group.size")
-                    .intType()
-                    .defaultValue(1000)
-                    .withDescription(
-                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be will be divided into multiple groups.");
 
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
             ConfigOptions.key("scan.snapshot.fetch.size")
@@ -169,4 +163,26 @@ public class MySqlSourceOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Optional timestamp used in case of \"timestamp\" startup mode");
+
+    // ----------------------------------------------------------------------------
+    // experimental options, won't add them to documentation
+    // ----------------------------------------------------------------------------
+    @Experimental
+    public static final ConfigOption<Integer> CHUNK_META_GROUP_SIZE =
+            ConfigOptions.key("chunk-meta.group.size")
+                    .intType()
+                    .defaultValue(1000)
+                    .withDescription(
+                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be will be divided into multiple groups.");
+
+    @Experimental
+    public static final ConfigOption<Double> EVENLY_DISTRIBUTION_FACTOR =
+            ConfigOptions.key("evenly-distribution.factor")
+                    .doubleType()
+                    .defaultValue(1000.0d)
+                    .withDescription(
+                            "The factor is used to determine whether the table is evenly distribution or not."
+                                    + " the table chunks would use evenly calculation optimization when the data distribution is even,"
+                                    + " and the sql query would be used when it is uneven."
+                                    + " The distribution factor could be calculated by MAX(id) - MIN(id) + 1 / rowCount.");
 }

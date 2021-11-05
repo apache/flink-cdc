@@ -69,7 +69,6 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final int currentParallelism;
     private final LinkedList<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
-    private final int chunkSize;
 
     private ChunkSplitter chunkSplitter;
     private boolean isTableIdCaseSensitive;
@@ -130,15 +129,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerFinished = assignerFinished;
         this.remainingTables = new LinkedList<>(remainingTables);
-        this.chunkSize = sourceConfig.getSplitSize();
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
     }
 
     @Override
     public void open() {
-        LOG.info("Open assigner");
-        chunkSplitter = createChunkSplitter(sourceConfig, isTableIdCaseSensitive, chunkSize);
+        chunkSplitter = createChunkSplitter(sourceConfig, isTableIdCaseSensitive);
 
         // the legacy state didn't snapshot remaining tables, discovery remaining table here
         if (!isRemainingTablesCheckpointed && !assignerFinished) {
@@ -303,8 +300,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private static ChunkSplitter createChunkSplitter(
-            MySqlSourceConfig sourceConfig, boolean isTableIdCaseSensitive, int chunkSize) {
+            MySqlSourceConfig sourceConfig, boolean isTableIdCaseSensitive) {
         MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, isTableIdCaseSensitive);
-        return new ChunkSplitter(mySqlSchema, sourceConfig, chunkSize);
+        return new ChunkSplitter(mySqlSchema, sourceConfig);
     }
 }

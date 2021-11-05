@@ -32,6 +32,10 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.EVENLY_DISTRIBUTION_FACTOR;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
@@ -55,9 +59,10 @@ public class MySqlSourceConfigFactory implements Serializable {
     private int splitSize = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
     private int splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private int fetchSize = SCAN_SNAPSHOT_FETCH_SIZE.defaultValue();
-    private Duration connectTimeout = MySqlSourceOptions.CONNECT_TIMEOUT.defaultValue();
-    private int connectMaxRetries = MySqlSourceOptions.CONNECT_MAX_RETRIES.defaultValue();
-    private int connectionPoolSize = MySqlSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
+    private Duration connectTimeout = CONNECT_TIMEOUT.defaultValue();
+    private int connectMaxRetries = CONNECT_MAX_RETRIES.defaultValue();
+    private int connectionPoolSize = CONNECTION_POOL_SIZE.defaultValue();
+    private double evenlyDistributionFactor = EVENLY_DISTRIBUTION_FACTOR.defaultValue();
     private boolean includeSchemaChanges = false;
     private Properties dbzProperties;
 
@@ -144,6 +149,12 @@ public class MySqlSourceConfigFactory implements Serializable {
      */
     public MySqlSourceConfigFactory splitMetaGroupSize(int splitMetaGroupSize) {
         this.splitMetaGroupSize = splitMetaGroupSize;
+        return this;
+    }
+
+    /** The factor is used to determine whether the table is evenly distribution or not. */
+    public MySqlSourceConfigFactory evenlyDistributionFactor(Double evenlyDistributionFactor) {
+        this.evenlyDistributionFactor = evenlyDistributionFactor;
         return this;
     }
 
@@ -273,6 +284,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                evenlyDistributionFactor,
                 includeSchemaChanges,
                 props);
     }

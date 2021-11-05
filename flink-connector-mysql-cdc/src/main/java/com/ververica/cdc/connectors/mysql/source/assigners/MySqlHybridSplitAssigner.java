@@ -88,7 +88,6 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void open() {
-        LOG.info("Open assigner");
         snapshotSplitAssigner.open();
     }
 

@@ -43,6 +43,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.EVENLY_DISTRIBUTION_FACTOR;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
@@ -92,6 +93,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        double evenlyDistributionFactor = config.get(EVENLY_DISTRIBUTION_FACTOR);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         if (enableParallelRead) {
@@ -102,6 +104,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
             validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
             validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
+            validateEvenlyDistributionFactor(evenlyDistributionFactor);
         }
 
         return new MySqlTableSource(
@@ -122,6 +125,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                evenlyDistributionFactor,
                 startupOptions);
     }
 
@@ -157,6 +161,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
         options.add(CONNECTION_POOL_SIZE);
+        options.add(EVENLY_DISTRIBUTION_FACTOR);
         options.add(CONNECT_MAX_RETRIES);
         return options;
     }
@@ -261,5 +266,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                             "The %s '%s' is not a valid regular expression", optionName, regex),
                     e);
         }
+    }
+
+    /** Checks the value of given evenly distribution factor is valid. */
+    private void validateEvenlyDistributionFactor(double evenlyDistributionFactor) {
+        checkState(
+                evenlyDistributionFactor >= 1.0d,
+                String.format(
+                        "The value of option '%s' must larger than or equals %s, but is %s",
+                        EVENLY_DISTRIBUTION_FACTOR.key(), 1.0d, evenlyDistributionFactor));
     }
 }
