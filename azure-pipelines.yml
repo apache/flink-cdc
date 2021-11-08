@@ -21,19 +21,41 @@
 trigger:
   branches:
     include:
-    - '*'  # must quote since "*" is a YAML reserved character; we want a string
+      - '*'  # must quote since "*" is a YAML reserved character; we want a string
+# Define variables:
+# - See tools/azure-pipelines/jobs-template.yml for a short summary of the caching
+# - See https://stackoverflow.com/questions/60742105/how-can-i-access-a-secret-value-from-an-azure-pipelines-expression
+#   to understand why the secrets are handled like this
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  E2E_CACHE_FOLDER: $(Pipeline.Workspace)/e2e_cache
+  E2E_TARBALL_CACHE: $(Pipeline.Workspace)/e2e_artifact_cache
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+  CACHE_KEY: maven | $(Agent.OS) | **/pom.xml, !**/target/**
+  CACHE_FALLBACK_KEY: maven | $(Agent.OS)
+  FLINK_ARTIFACT_DIR: $(Pipeline.Workspace)/flink_artifact
 
-pool:
-  vmImage: 'ubuntu-18.04'
+stages:
+  # CI / PR triggered stage:
+  - stage: ci
+    displayName: "CI build (custom builders)"
+    jobs:
+      - template: tools/azure-pipelines/jobs-template.yml
+        parameters: # see template file for a definition of the parameters.
+          stage_name: ci_build
+          test_pool_definition:
+            vmImage: 'ubuntu-20.04'
+          run_end_to_end: false
+          jdk: 8
 
-steps:
-- task: Maven@3
-  inputs:
-    mavenPomFile: 'pom.xml'
-    mavenOptions: '-Xmx3072m -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120'
-    javaHomeOption: 'JDKVersion'
-    jdkVersionOption: '1.8'
-    jdkArchitectureOption: 'x64'
-    publishJUnitResults: true
-    testResultsFiles: '**/surefire-reports/TEST-*.xml'
-    goals: 'clean verify'
+#steps:
+#  - task: Maven@3
+#    inputs:
+#      mavenPomFile: 'pom.xml'
+#      mavenOptions: '-Xmx3072m -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120'
+#      javaHomeOption: 'JDKVersion'
+#      jdkVersionOption: '1.8'
+#      jdkArchitectureOption: 'x64'
+#      publishJUnitResults: true
+#      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+#      goals: 'clean verify'
