@@ -52,7 +52,7 @@ public class MongoDBTestBase extends AbstractTestBase {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)//.*$");
 
     protected static final String FLINK_USER = "flinkuser";
-    protected static final String FLINK_USER_PASSWORD = "flinkpw";
+    protected static final String FLINK_USER_PASSWORD = "a1?~!@#$%^&*(){}[]<>.,+_-=/|:;";
 
     protected static final String MONGO_SUPER_USER = "superuser";
     protected static final String MONGO_SUPER_PASSWORD = "superpw";
