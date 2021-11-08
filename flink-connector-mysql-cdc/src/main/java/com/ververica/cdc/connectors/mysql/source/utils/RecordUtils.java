@@ -110,11 +110,13 @@ public class RecordUtils {
                 List<SourceRecord> allBinlogRecords =
                         sourceRecords.subList(i, sourceRecords.size() - 1);
                 for (SourceRecord binlog : allBinlogRecords) {
-                    Object[] key =
-                            getSplitKey(snapshotSplit.getSplitKeyType(), binlog, nameAdjuster);
-                    if (splitKeyRangeContains(
-                            key, snapshotSplit.getSplitStart(), snapshotSplit.getSplitEnd())) {
-                        binlogRecords.add(binlog);
+                    if (isDataChangeRecord(binlog)) {
+                        Object[] key =
+                                getSplitKey(snapshotSplit.getSplitKeyType(), binlog, nameAdjuster);
+                        if (splitKeyRangeContains(
+                                key, snapshotSplit.getSplitStart(), snapshotSplit.getSplitEnd())) {
+                            binlogRecords.add(binlog);
+                        }
                     }
                 }
             }
