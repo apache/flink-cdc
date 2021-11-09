@@ -33,7 +33,6 @@ import org.bson.json.JsonReader;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -101,12 +100,10 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     @Override
     public List<SourceRecord> poll() throws InterruptedException {
         List<SourceRecord> sourceRecords = target.poll();
-
+        List<SourceRecord> outSourceRecords = new LinkedList<>();
         if (isInSnapshotPhase) {
             // Step1. Snapshot Phase
-            List<SourceRecord> outSourceRecords = null;
             if (sourceRecords != null && !sourceRecords.isEmpty()) {
-                outSourceRecords = new LinkedList<>();
                 for (SourceRecord sourceRecord : sourceRecords) {
                     SourceRecord current = markRecordTimestamp(sourceRecord);
 
@@ -136,24 +133,22 @@ public class MongoDBConnectorSourceTask extends SourceTask {
                 // then exit the snapshot phase.
                 if (!isCopying()) {
                     if (currentLastSnapshotRecord != null) {
-                        outSourceRecords =
-                                Collections.singletonList(
-                                        markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
+                        outSourceRecords.add(
+                                markLastSnapshotRecordOfAll(currentLastSnapshotRecord));
                         currentLastSnapshotRecord = null;
                     }
                     isInSnapshotPhase = false;
                 }
             }
-            return outSourceRecords;
         } else {
             // Step2. Change Streaming Phase
             if (sourceRecords != null && !sourceRecords.isEmpty()) {
                 for (SourceRecord current : sourceRecords) {
-                    markRecordTimestamp(current);
+                    outSourceRecords.add(markRecordTimestamp(current));
                 }
             }
-            return sourceRecords;
         }
+        return outSourceRecords;
     }
 
     @Override
