@@ -87,6 +87,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
+                                + " 'heartbeat.interval.ms' = '1000'"
                                 + ")",
                         MONGODB_CONTAINER.getHostAndPort(),
                         FLINK_USER,

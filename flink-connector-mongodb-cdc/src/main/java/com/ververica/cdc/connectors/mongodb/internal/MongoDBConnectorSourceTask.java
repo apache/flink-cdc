@@ -23,6 +23,8 @@ import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
@@ -30,6 +32,7 @@ import org.apache.kafka.connect.source.SourceTaskContext;
 import org.bson.json.JsonReader;
 
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,9 +45,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class MongoDBConnectorSourceTask extends SourceTask {
 
-    private static final String COPY_KEY = "copy";
-
     private static final String TRUE = "true";
+
+    private static final Schema HEARTBEAT_VALUE_SCHEMA =
+            SchemaBuilder.struct()
+                    .field(AbstractSourceInfo.TIMESTAMP_KEY, Schema.INT64_SCHEMA)
+                    .build();
 
     private final MongoSourceTask target;
 
@@ -102,7 +108,13 @@ public class MongoDBConnectorSourceTask extends SourceTask {
             if (sourceRecords != null && !sourceRecords.isEmpty()) {
                 outSourceRecords = new LinkedList<>();
                 for (SourceRecord current : sourceRecords) {
+                    if (isHeartbeatRecord(current)) {
+                        outSourceRecords.add(markHeartbeatRecord(current));
+                        continue;
+                    }
+
                     markRecordTimestamp(current);
+
                     if (isSnapshotRecord(current)) {
                         markSnapshotRecord(current);
                         if (currentLastSnapshotRecord != null) {
@@ -186,8 +198,26 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         return record;
     }
 
+    private SourceRecord markHeartbeatRecord(SourceRecord record) {
+        Struct heartbeatValue = new Struct(HEARTBEAT_VALUE_SCHEMA);
+        heartbeatValue.put(AbstractSourceInfo.TIMESTAMP_KEY, Instant.now().toEpochMilli());
+
+        return new SourceRecord(
+                record.sourcePartition(),
+                record.sourceOffset(),
+                record.topic(),
+                record.keySchema(),
+                record.key(),
+                HEARTBEAT_VALUE_SCHEMA,
+                heartbeatValue);
+    }
+
     private boolean isSnapshotRecord(SourceRecord sourceRecord) {
-        return TRUE.equals(sourceRecord.sourceOffset().get(COPY_KEY));
+        return TRUE.equals(sourceRecord.sourceOffset().get(MongoDBEnvelope.COPY_KEY_FIELD));
+    }
+
+    private boolean isHeartbeatRecord(SourceRecord sourceRecord) {
+        return TRUE.equals(sourceRecord.sourceOffset().get(MongoDBEnvelope.HEARTBEAT_KEY_FIELD));
     }
 
     private boolean isCopying() {

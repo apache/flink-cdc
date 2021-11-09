@@ -37,4 +37,8 @@ public class MongoDBEnvelope {
     public static final String NAMESPACE_DATABASE_FIELD = "db";
 
     public static final String NAMESPACE_COLLECTION_FIELD = "coll";
+
+    public static final String COPY_KEY_FIELD = "copy";
+
+    public static final String HEARTBEAT_KEY_FIELD = "HEARTBEAT";
 }
