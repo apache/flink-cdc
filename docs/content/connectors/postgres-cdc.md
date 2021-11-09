@@ -189,6 +189,18 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
 </table>
 </div>
 
+Limitation
+--------
+
+### Can't perform checkpoint during scanning snapshot of tables
+During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In order to not perform checkpoints, Postgres CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout checkpoints:
+
+```
+execution.checkpointing.interval: 10min
+execution.checkpointing.tolerable-failed-checkpoints: 100
+restart-strategy: fixed-delay
+restart-strategy.fixed-delay.attempts: 2147483647
+```
 
 Features
 --------
