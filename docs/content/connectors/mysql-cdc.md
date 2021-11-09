@@ -256,7 +256,6 @@ Available Metadata
 
 The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
 
-<div class="highlight">
 <table class="colwidths-auto docutils">
   <thead>
      <tr>
@@ -283,8 +282,30 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     </tr>
   </tbody>
 </table>
-</div>
 
+The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = 'mydb',
+    'table-name' = 'orders'
+);
+```
 
 Features
 --------

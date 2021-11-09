@@ -255,7 +255,6 @@ Available Metadata
 
 The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
 
-<div class="highlight">
 <table class="colwidths-auto docutils">
   <thead>
      <tr>
@@ -282,8 +281,29 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     </tr>
   </tbody>
 </table>
-</div>
 
+The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    _id STRING, // must be declared
+    name STRING,
+    weight DECIMAL(10,3),
+    tags ARRAY<STRING>, -- array
+    price ROW<amount DECIMAL(10,2), currency STRING>, -- embedded document
+    suppliers ARRAY<ROW<name STRING, address STRING>>, -- embedded documents
+    PRIMARY KEY(_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mongodb-cdc',
+    'hosts' = 'localhost:27017,localhost:27018,localhost:27019',
+    'username' = 'flinkuser',
+    'password' = 'flinkpw',
+    'database' = 'inventory',
+    'collection' = 'products'
+);
+```
 
 Features
 --------
