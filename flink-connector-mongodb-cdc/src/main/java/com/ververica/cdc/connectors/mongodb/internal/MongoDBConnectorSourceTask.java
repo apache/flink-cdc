@@ -23,6 +23,8 @@ import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
@@ -30,6 +32,7 @@ import org.apache.kafka.connect.source.SourceTaskContext;
 import org.bson.json.JsonReader;
 
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,9 +45,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class MongoDBConnectorSourceTask extends SourceTask {
 
-    private static final String COPY_KEY = "copy";
-
     private static final String TRUE = "true";
+
+    private static final Schema HEARTBEAT_VALUE_SCHEMA =
+            SchemaBuilder.struct()
+                    .field(AbstractSourceInfo.TIMESTAMP_KEY, Schema.INT64_SCHEMA)
+                    .build();
 
     private final MongoSourceTask target;
 
@@ -101,8 +107,9 @@ public class MongoDBConnectorSourceTask extends SourceTask {
             List<SourceRecord> outSourceRecords = null;
             if (sourceRecords != null && !sourceRecords.isEmpty()) {
                 outSourceRecords = new LinkedList<>();
-                for (SourceRecord current : sourceRecords) {
-                    markRecordTimestamp(current);
+                for (SourceRecord sourceRecord : sourceRecords) {
+                    SourceRecord current = markRecordTimestamp(sourceRecord);
+
                     if (isSnapshotRecord(current)) {
                         markSnapshotRecord(current);
                         if (currentLastSnapshotRecord != null) {
@@ -154,7 +161,14 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         target.stop();
     }
 
-    private void markRecordTimestamp(SourceRecord record) {
+    private SourceRecord markRecordTimestamp(SourceRecord record) {
+        if (isHeartbeatRecord(record)) {
+            return markTimestampForHeartbeatRecord(record);
+        }
+        return markTimestampForDataRecord(record);
+    }
+
+    private SourceRecord markTimestampForDataRecord(SourceRecord record) {
         final Struct value = (Struct) record.value();
         final Struct source = new Struct(value.schema().field(Envelope.FieldName.SOURCE).schema());
         // It indicates the time that the change was made in the database. If the record is read
@@ -168,6 +182,21 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         }
         source.put(AbstractSourceInfo.TIMESTAMP_KEY, timestamp);
         value.put(Envelope.FieldName.SOURCE, source);
+        return record;
+    }
+
+    private SourceRecord markTimestampForHeartbeatRecord(SourceRecord record) {
+        final Struct heartbeatValue = new Struct(HEARTBEAT_VALUE_SCHEMA);
+        heartbeatValue.put(AbstractSourceInfo.TIMESTAMP_KEY, Instant.now().toEpochMilli());
+
+        return new SourceRecord(
+                record.sourcePartition(),
+                record.sourceOffset(),
+                record.topic(),
+                record.keySchema(),
+                record.key(),
+                HEARTBEAT_VALUE_SCHEMA,
+                heartbeatValue);
     }
 
     private void markSnapshotRecord(SourceRecord record) {
@@ -187,7 +216,11 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     }
 
     private boolean isSnapshotRecord(SourceRecord sourceRecord) {
-        return TRUE.equals(sourceRecord.sourceOffset().get(COPY_KEY));
+        return TRUE.equals(sourceRecord.sourceOffset().get(MongoDBEnvelope.COPY_KEY_FIELD));
+    }
+
+    private boolean isHeartbeatRecord(SourceRecord sourceRecord) {
+        return TRUE.equals(sourceRecord.sourceOffset().get(MongoDBEnvelope.HEARTBEAT_KEY_FIELD));
     }
 
     private boolean isCopying() {
