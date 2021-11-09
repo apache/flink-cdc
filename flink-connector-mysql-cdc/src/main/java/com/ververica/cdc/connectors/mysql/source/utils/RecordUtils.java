@@ -153,6 +153,9 @@ public class RecordUtils {
                     Envelope.Operation operation =
                             Envelope.Operation.forCode(
                                     value.getString(Envelope.FieldName.OPERATION));
+                    if (snapshotRecords.containsKey(key)) {
+                        snapshotRecords.remove(key);
+                    }
                     switch (operation) {
                         case UPDATE:
                             Envelope envelope = Envelope.fromSchema(binlog.valueSchema());
@@ -174,14 +177,7 @@ public class RecordUtils {
                             normalizedBinlogRecords.add(record);
                             break;
                         case DELETE:
-                            if (snapshotRecords.containsKey(key)) {
-                                snapshotRecords.remove(key);
-                            } else {
-                                throw new IllegalStateException(
-                                        String.format(
-                                                "The delete record %s doesn't exists in table split %s.",
-                                                binlog, split));
-                            }
+                            // The deleting from snapshotRecords has been promoted to outer scope.
                             break;
                         case CREATE:
                             normalizedBinlogRecords.add(binlog);
