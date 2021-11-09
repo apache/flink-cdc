@@ -21,6 +21,7 @@
 version: '2.1'
 services:
   sql-client:
+    user: flink:flink
     image: yuxialuo/flink-sql-client:1.13.2.v1 
     depends_on:
       - jobmanager
@@ -29,8 +30,9 @@ services:
       FLINK_JOBMANAGER_HOST: jobmanager
       MYSQL_HOST: mysql
     volumes:
-      - /Users/yuxia/demo/iceberg:/home/iceberg
+      - shared-tmpfs:/tmp/iceberg
   jobmanager:
+    user: flink:flink
     image: flink:1.13.2-scala_2.11
     ports:
       - "8081:8081"
@@ -40,8 +42,9 @@ services:
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
     volumes:
-      - /Users/yuxia/demo/iceberg:/home/iceberg    
+      - shared-tmpfs:/tmp/iceberg
   taskmanager:
+    user: flink:flink
     image: flink:1.13.2-scala_2.11
     depends_on:
       - jobmanager
@@ -52,7 +55,7 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
     volumes:
-      - /Users/yuxia/demo/iceberg:/home/iceberg    
+      - shared-tmpfs:/tmp/iceberg
   mysql:
     image: debezium/example-mysql:1.1
     ports:
@@ -61,6 +64,13 @@ services:
       - MYSQL_ROOT_PASSWORD=123456
       - MYSQL_USER=mysqluser
       - MYSQL_PASSWORD=mysqlpw
+
+volumes:
+  shared-tmpfs:
+    driver: local
+    driver_opts:
+      type: "tmpfs"
+      device: "tmpfs"
 ```
 
 该 Docker Compose 中包含的容器有：
@@ -68,23 +78,25 @@ services:
 - Flink Cluster：包含 Flink JobManager 和 Flink TaskManager，用来执行 Flink SQL  
 - MySQL：作为分库分表的数据源，存储本教程的 `user` 表
 
+***注意：***
+1. 为了简化整个教程，本教程需要的 jar 包都已经被打包进 SQL-Client 容器中了，如果你想要在自己的 Flink 环境运行本教程，需要下载下面列出的包并且把它们放在 Flink 所在目录的 lib 目录下，即 `FLINK_HOME/lib/`。
+
+   **下载链接只在已发布的版本上可用**
+
+   - [flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1-SNAPSHOT/flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar)
+   - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
+   - [iceberg-flink-runtime-0.12.0.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/0.12.0/iceberg-flink-runtime-0.12.0.jar)
+
+   目前支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包还没有发布，所以我们在这里提供了一个支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包，这个 jar 包是基于 Iceberg 的 master 分支打包的。
+   当 Iceberg 0.13 版本发布后，你也可以在 [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) 下载到支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包。
+2. 本教程接下来用到的进入容器的命令都需要在 `docker-compose.yml` 所在目录下执行
+
 在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
 ```shell
 docker-compose up -d
 ```
 该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:8081/](http://localhost:8081//) 来查看 Flink 是否运行正常。
 ![Flink UI](/_static/fig/real-time-data-lake-tutorial/flink-ui.png "Flink UI")
-
-***注意：***
-1. 为了简化整个教程，本教程需要的 jar 包都已经被打包进 SQL-Client 容器中了，如果你想要在自己的 Flink 环境运行本教程，需要下载下面列出的包并且把它们放在 Flink 所在目录的 lib 目录下，即 `Flink_HOME/lib/`。
-   
-    **下载链接只在已发布的版本上可用**
-
-    - [flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1-SNAPSHOT/flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar)
-    - [iceberg-flink-runtime-0.12.0.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/0.12.0/iceberg-flink-runtime-0.12.0.jar)
-    - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-2. 该教程使用本地文件系统作为 Iceberg 的后端存储，为了让本地的文件可被容器访问，需要将其挂载至容器中。本教程使用本地的文件目录 `/Users/yuxia/demo/iceberg`, 你可以在这个 `docker-compose.yml` 文件中将其改成你机器上的其它目录
-3. 本教程接下来用到的进入容器的命令都需要在 `docker-compose.yml` 所在目录下执行
 
 ### 准备数据
 1. 进入 MySQL 容器中
@@ -95,45 +107,45 @@ docker-compose up -d
    
    创建两个不同的数据库，并在每个数据库中创建两个表，作为 `user` 表分库分表下拆分出的表，并且有一个表少了一列。
    ```sql
-    CREATE DATABASE user_db_1;
-    USE user_db_1;
-    CREATE TABLE user_table_1 (
+    CREATE DATABASE db_1;
+    USE db_1;
+    CREATE TABLE user_1 (
       id INTEGER NOT NULL PRIMARY KEY,
       name VARCHAR(255) NOT NULL DEFAULT 'flink',
       address VARCHAR(1024),
       phone_number VARCHAR(512),
       email VARCHAR(255)
     );
-    INSERT INTO user_table_1 VALUES (11100,"user_11100","Shanghai","123567891234","user_11100@foo.com");
+    INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234","user_110@foo.com");
    
-    CREATE TABLE user_table_2 (
+    CREATE TABLE user_2 (
       id INTEGER NOT NULL PRIMARY KEY,
       name VARCHAR(255) NOT NULL DEFAULT 'flink',
       address VARCHAR(1024),
       phone_number VARCHAR(512),
       email VARCHAR(255)
     );
-   INSERT INTO user_table_2 VALUES (12100,"user_12100","Shanghai","123567891234","user_12100@foo.com");
+   INSERT INTO user_2 VALUES (120,"user_120","Shanghai","123567891234","user_120@foo.com");
    ```
    ```sql
-   CREATE DATABASE user_db_2;
-   USE user_db_2;
-   CREATE TABLE user_table_1 (
+   CREATE DATABASE db_2;
+   USE db_2;
+   CREATE TABLE user_1 (
      id INTEGER NOT NULL PRIMARY KEY,
      name VARCHAR(255) NOT NULL DEFAULT 'flink',
      address VARCHAR(1024),
      phone_number VARCHAR(512)
    );
-   INSERT INTO user_table_1 VALUES (21100,"user_21100","Shanghai","123567891234");
+   INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234");
 
-   CREATE TABLE user_table_2 (
+   CREATE TABLE user_2 (
      id INTEGER NOT NULL PRIMARY KEY,
      name VARCHAR(255) NOT NULL DEFAULT 'flink',
      address VARCHAR(1024),
      phone_number VARCHAR(512),
      email VARCHAR(255)
    );
-   INSERT INTO user_table_2 VALUES (22100,"user_22100","Shanghai","123567891234","user_22100@foo.com");
+   INSERT INTO user_2 VALUES (220,"user_220","Shanghai","123567891234","user_220@foo.com");
    ```
 
 ## 在 Flink SQL CLI 中使用 Flink DDL 创建表
@@ -146,19 +158,22 @@ docker-compose exec sql-client ./sql-client
 
 然后，进行如下步骤：
 1. 开启 checkpoint，每隔3秒做一次 checkpoint
+   
+   Checkpoint 默认是不开启的，我们需要开启 Checkpoint 来让 Iceberg 可以提交写入的文件。
+   并且，mysql-cdc 在 binlog 读取阶段开始前，需要等待一个完整的 checkpoint 来避免 binlog 记录乱序的情况。
    ```sql
    -- Flink SQL                   
    Flink SQL> SET execution.checkpointing.interval = 3s;
    ```
-2. 创建 source 表
+2. 创建 MySQL sharding source 表
    
-   创建 source 表 `user_source` 来捕获MySQL中所有 `user` 表，在表的配置项 `database-name` , `table-name` 使用正则表达式来匹配这些表。 
+   创建 source 表 `user_source` 来捕获MySQL中所有 `user` 表的数据，在表的配置项 `database-name` , `table-name` 使用正则表达式来匹配这些表。 
    `user_source` 表包含所有的列，如果数据库表中不存在该列，则对应 `user_source` 表该列的值为 null。
    此外，`user_source` 表也定义了 metadata 列来区分数据是来自哪个数据库和表。
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE user_source (
-       db_name STRING METADATA FROM 'database_name' VIRTUAL,
+       database_name STRING METADATA VIRTUAL,
        table_name STRING METADATA VIRTUAL,
        `id` DECIMAL(20, 0) NOT NULL,
        name STRING,
@@ -172,32 +187,34 @@ docker-compose exec sql-client ./sql-client
        'port' = '3306',
        'username' = 'root',
        'password' = '123456',
-       'database-name' = 'user_db_[0-9]+',
-       'table-name' = 'user_table_[0-9]+'
+       'database-name' = 'db_[0-9]+',
+       'table-name' = 'user_[0-9]+'
      );
    ```
-3. 创建 sink 表
+3. 创建 Iceberg sink 表
    
-   创建 sink 表`all_users_sink`，用来将数据加载至 Iceberg 中
+   创建 sink 表 `all_users_sink`，用来将数据加载至 Iceberg 中。
+   在这个 sink 表，考虑到不同的 MySQL 数据库表的 `id` 字段的值可能相同，我们定义了复合主键 (`database_name`, `table_name`, `id`)。
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE all_users_sink (
-       db_name STRING,
+       database_name STRING,
        table_name    STRING,
        `id`          DECIMAL(20, 0) NOT NULL,
        name          STRING,
        address       STRING,
        phone_number  STRING,
        email         STRING,
-       primary key (db_name, table_name, `id`) not enforced
+       primary key (database_name, table_name, `id`) not enforced
      ) WITH (
        'connector'='iceberg',
        'catalog-name'='iceberg_catalog',
        'catalog-type'='hadoop',  
-       'warehouse'='file:///home/iceberg/warehouse',
+       'warehouse'='file:///tmp/iceberg/warehouse',
        'format-version'='2'
      );
    ```
+   
 ## 流式写入 Iceberg   
 
 1. 使用下面的 Flink SQL 语句将数据从 MySQL 写入 Iceberg 中
@@ -213,29 +230,30 @@ docker-compose exec sql-client ./sql-client
    ```
    在 Flink SQL CLI 中我们可以看到如下查询结果：
    ![Data in Iceberg](/_static/fig/real-time-data-lake-tutorial/data_in_iceberg.png "Data in Iceberg")
-   同时，我们也可以在我们的本地文件系统看到已经写入了一些数据文件。
 
 3. 修改 MySQL 中表的数据，Iceberg 中的表 `all_users_sink` 中的数据也将实时更新：
    
-   (3.1) 在 `user_db_1.user_table_1_1` 表中插入新的一行
+   (3.1) 在 `db_1.user_1`` 表中插入新的一行
    ```sql
-   --- user_db_1
-   INSERT INTO user_db_1.user_table_1 VALUES (11101,"user_11101","Shanghai","123567891234","user_11101@foo.com");
+   --- db_1
+   INSERT INTO db_1.user_1 VALUES (111,"user_111","Shanghai","123567891234","user_111@foo.com");
    ```
-   (3.2) 更新 `user_db_1.user_table_1_2` 表的数据
-    ```sql
-    --- user_db_1
-    UPDATE user_db_1.user_table_2 SET address='Beijing' WHERE id=12100;
-    ```
-   (3.3) 在 `user_db_2.user_table_2_1` 表中删除一行
-    ```sql
-    --- user_db_2
-    DELETE FROM user_db_2.user_table_1 WHERE id=21100;
-    ```
-    每执行一步，我们就可以在 Flink Client CLI 中使用 `SELECT * FROM all_users_sink` 查询表 `all_users_sink` 来看到数据的变化。
+   
+   (3.2) 更新 `db_1.user_2` 表的数据
+   ```sql
+   --- db_1
+   UPDATE db_1.user_2 SET address='Beijing' WHERE id=120;
+   ```
+   
+   (3.3) 在 `db_2.user_2` 表中删除一行
+   ```sql
+   --- db_2
+   DELETE FROM db_2.user_2 WHERE id=220;
+   ```
+   每执行一步，我们就可以在 Flink Client CLI 中使用 `SELECT * FROM all_users_sink` 查询表 `all_users_sink` 来看到数据的变化。
     
-    整体的数据变化如下所示：
-    ![Data Changes in Iceberg](/_static/fig/real-time-data-lake-tutorial/data-changes-in-iceberg.gif "Data Changes in Iceberg")
+   整体的数据变化如下所示：
+   ![Data Changes in Iceberg](/_static/fig/real-time-data-lake-tutorial/data-changes-in-iceberg.gif "Data Changes in Iceberg")
 
 ## 环境清理
 本教程结束后，在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：

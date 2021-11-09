@@ -1,4 +1,4 @@
-# Building a real-time data lake to synchronize data from MySQL sharding table with Flink CDC
+# Build real-time data lake to synchronize data from MySQL sharding tables with Flink CDC
 For OLTP databases, to deal with a huge number of data in a single table, we usually do database and table sharding to get faster performance. 
 But sometimes, for convenient analysis, we need to merge them into one table when loading them to data warehouse or data lake.
 
@@ -22,6 +22,7 @@ Create `docker-compose.yml` file using following contents:
 version: '2.1'
 services:
   sql-client:
+    user: flink:flink
     image: yuxialuo/flink-sql-client:1.13.2.v1 
     depends_on:
       - jobmanager
@@ -30,8 +31,9 @@ services:
       FLINK_JOBMANAGER_HOST: jobmanager
       MYSQL_HOST: mysql
     volumes:
-      - /Users/yuxia/demo/iceberg:/home/iceberg
+      - shared-tmpfs:/tmp/iceberg
   jobmanager:
+    user: flink:flink
     image: flink:1.13.2-scala_2.11
     ports:
       - "8081:8081"
@@ -41,8 +43,9 @@ services:
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
     volumes:
-      - /Users/yuxia/demo/iceberg:/home/iceberg    
+      - shared-tmpfs:/tmp/iceberg
   taskmanager:
+    user: flink:flink
     image: flink:1.13.2-scala_2.11
     depends_on:
       - jobmanager
@@ -53,7 +56,7 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
     volumes:
-      - /Users/yuxia/demo/iceberg:/home/iceberg    
+      - shared-tmpfs:/tmp/iceberg
   mysql:
     image: debezium/example-mysql:1.1
     ports:
@@ -62,6 +65,13 @@ services:
       - MYSQL_ROOT_PASSWORD=123456
       - MYSQL_USER=mysqluser
       - MYSQL_PASSWORD=mysqlpw
+
+volumes:
+  shared-tmpfs:
+    driver: local
+    driver_opts:
+      type: "tmpfs"
+      device: "tmpfs"
 ```
 
 The Docker Compose environment consists of the following containers:
@@ -69,19 +79,19 @@ The Docker Compose environment consists of the following containers:
 - Flink Cluster: a Flink JobManager and a Flink TaskManager container to execute queries.
 - MySQL: mainly used as a data source to store the sharding table.
 
-
 ***Note:***
 1. To simply this tutorial, the jar packages required has been packaged into the SQL-Client container.
-If you want to run with your own Flink environment, remember to download the following packages and then put them to `Flink_HOME/lib/`.
+If you want to run with your own Flink environment, remember to download the following packages and then put them to `FLINK_HOME/lib/`.
    
    **Download links are available only for stable releases.**
    - [flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.1-SNAPSHOT/flink-sql-connector-mysql-cdc-2.1-SNAPSHOT.jar)
-   - [iceberg-flink-runtime-0.12.0.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/0.12.0/iceberg-flink-runtime-0.12.0.jar)
    - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-2. This tutorial will use the local filesystem as the backend of Iceberg. To make it can be accessed by the containers, 
-   we mount the volume `/Users/yuxia/demo/iceberg` in the local filesystem into `/home/iceberg` for the containers in this `docker-compose.yml` file.
-   You can change `/Users/yuxia/demo/iceberg` to any other directory you like in your local file system.
-3. All the following commands for entering the container should be executed in the directory of the `docker-compose.yml` file.
+   - [iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar](https://raw.githubusercontent.com/luoyuxia/flink-cdc-tutorial/main/flink-cdc-iceberg-demo/sql-client/lib/iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar)
+   
+   Currently, the Iceberg official `iceberg-flink-runtime` jar that supports Flink 1.13 isn't released. 
+   Here, we provide a `iceberg-flink-runtime` jar supporting Flink 1.13, which is built based on the master branch of Iceberg. 
+   You can download the `iceberg-flink-runtime` jar from the [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) once Iceberg 0.13 is released.
+2. All the following commands for entering the container should be executed in the directory of the `docker-compose.yml` file.
 
 To start all containers, run the following command in the directory that contains the `docker-compose.yml` file:
 ```shell
@@ -100,45 +110,45 @@ We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Fli
 
    Create a logical sharding table `user` sharded in different databases and tables physically, and one of them misses a column.
    ```sql
-    CREATE DATABASE user_db_1;
-    USE user_db_1;
-    CREATE TABLE user_table_1 (
+    CREATE DATABASE db_1;
+    USE db_1;
+    CREATE TABLE user_1 (
       id INTEGER NOT NULL PRIMARY KEY,
       name VARCHAR(255) NOT NULL DEFAULT 'flink',
       address VARCHAR(1024),
       phone_number VARCHAR(512),
       email VARCHAR(255)
     );
-    INSERT INTO user_table_1 VALUES (11100,"user_11100","Shanghai","123567891234","user_11100@foo.com");
+    INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234","user_110@foo.com");
    
-    CREATE TABLE user_table_2 (
+    CREATE TABLE user_2 (
       id INTEGER NOT NULL PRIMARY KEY,
       name VARCHAR(255) NOT NULL DEFAULT 'flink',
       address VARCHAR(1024),
       phone_number VARCHAR(512),
       email VARCHAR(255)
     );
-   INSERT INTO user_table_2 VALUES (12100,"user_12100","Shanghai","123567891234","user_12100@foo.com");
+   INSERT INTO user_2 VALUES (120,"user_120","Shanghai","123567891234","user_120@foo.com");
    ```
    ```sql
-   CREATE DATABASE user_db_2;
-   USE user_db_2;
-   CREATE TABLE user_table_1 (
+   CREATE DATABASE db_2;
+   USE db_2;
+   CREATE TABLE user_1 (
      id INTEGER NOT NULL PRIMARY KEY,
      name VARCHAR(255) NOT NULL DEFAULT 'flink',
      address VARCHAR(1024),
      phone_number VARCHAR(512)
    );
-   INSERT INTO user_table_1 VALUES (21100,"user_21100","Shanghai","123567891234");
+   INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234");
 
-   CREATE TABLE user_table_2 (
+   CREATE TABLE user_2 (
      id INTEGER NOT NULL PRIMARY KEY,
      name VARCHAR(255) NOT NULL DEFAULT 'flink',
      address VARCHAR(1024),
      phone_number VARCHAR(512),
      email VARCHAR(255)
    );
-   INSERT INTO user_table_2 VALUES (22100,"user_22100","Shanghai","123567891234","user_22100@foo.com");
+   INSERT INTO user_2 VALUES (220,"user_220","Shanghai","123567891234","user_220@foo.com");
    ```
 
 ## Creating tables using Flink DDL in Flink SQL CLI
@@ -153,11 +163,14 @@ We should see the welcome screen of the CLI client:
 Then do the following steps in Flink SQL CLI:
 
 1. Enable checkpoints every 3 seconds
+   
+   Checkpoint is disabled by default, we need to enable it to commit Iceberg files.
+   Besides, the beginning of mysql-cdc binlog phase also requires waiting a complete checkpoint to avoid disorder of binlog records.
    ```sql
    -- Flink SQL                   
    Flink SQL> SET execution.checkpointing.interval = 3s;
    ```
-2. Create source table 
+2. Create MySQL sharding source table 
 
    Create a source table that captures the data from the logical sharding table `user`. Here, we use regex to match all the physical tables.
    The table `user_source` contains all the columns, and the column's value will be null if the record from the underlying table misses the column.
@@ -165,7 +178,7 @@ Then do the following steps in Flink SQL CLI:
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE user_source (
-       db_name STRING METADATA FROM 'database_name' VIRTUAL,
+       database_name STRING METADATA VIRTUAL,
        table_name STRING METADATA VIRTUAL,
        `id` DECIMAL(20, 0) NOT NULL,
        name STRING,
@@ -179,29 +192,30 @@ Then do the following steps in Flink SQL CLI:
        'port' = '3306',
        'username' = 'root',
        'password' = '123456',
-       'database-name' = 'user_db_[0-9]+',
-       'table-name' = 'user_table_[0-9]+'
+       'database-name' = 'db_[0-9]+',
+       'table-name' = 'user_[0-9]+'
      );
    ```
-3. Create sink table 
+3. Create Iceberg sink table
 
-   Create a sink table `all_users_sink` used to load data to Iceberg:
+   Create a sink table `all_users_sink` used to load data to Iceberg.
+   We define `database_name`, `table_name` and `id` as a combined primary key, because `id` maybe not unique across different databases and tables.
    ```sql
    -- FLink SQL
    Flink SQL> CREATE TABLE all_users_sink (
-       db_name STRING,
+       database_name STRING,
        table_name    STRING,
        `id`          DECIMAL(20, 0) NOT NULL,
        name          STRING,
        address       STRING,
        phone_number  STRING,
        email         STRING,
-       primary key (db_name, table_name, `id`) not enforced
+       primary key (database_name, table_name, `id`) not enforced
      ) WITH (
        'connector'='iceberg',
        'catalog-name'='iceberg_catalog',
        'catalog-type'='hadoop',  
-       'warehouse'='file:///home/iceberg/warehouse',
+       'warehouse'='file:///tmp/iceberg/warehouse',
        'format-version'='2'
      );
    ```
@@ -220,27 +234,25 @@ Then do the following steps in Flink SQL CLI:
    ```
    We can see the data queried in the Flink SQL CLI:
    ![Data in Iceberg](/_static/fig/real-time-data-lake-tutorial/data_in_iceberg.png "Data in Iceberg")
-
-   Also, we can find the data files in our local filesystem.
-
+   
 3. Make some changes in the MySQL databases, and then the data in Iceberg table `all_users_sink` will also change in real time.
    
-   (3.1) Insert a new user in table `user_db_1.user_table_1`
+   (3.1) Insert a new user in table `db_1.user_1`
    ```sql
-   --- user_db_1
-   INSERT INTO user_db_1.user_table_1 VALUES (11101,"user_11101","Shanghai","123567891234","user_11101@foo.com");
+   --- db_1
+   INSERT INTO db_1.user_1 VALUES (111,"user_111","Shanghai","123567891234","user_111@foo.com");
    ```
 
-   (3.2) Update a user in table `user_db_1.user_table_2`
+   (3.2) Update a user in table `db_1.user_2`
    ```sql
-   --- user_db_1
-   UPDATE user_db_1.user_table_2 SET address='Beijing' WHERE id=12100;
+   --- db_1
+   UPDATE db_1.user_2 SET address='Beijing' WHERE id=120;
    ```
 
-   (3.3) Delete a user in table `user_db_2.user_table_1`
+   (3.3) Delete a user in table `db_2.user_2`
    ```sql
-   --- user_db_2
-   DELETE FROM user_db_2.user_table_1 WHERE id=21100;
+   --- db_2
+   DELETE FROM db_2.user_2 WHERE id=220;
    ```
 
    After executing each step, we can query the table `all_users_sink` using `SELECT * FROM all_users_sink` in Flink SQL CLI to see the changes.
