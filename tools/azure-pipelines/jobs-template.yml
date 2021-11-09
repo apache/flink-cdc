@@ -82,6 +82,8 @@ jobs:
           module: oracle
         mongodb:
           module: mongodb
+        e2e:
+          module: e2e
         misc:
           module: misc
     steps:

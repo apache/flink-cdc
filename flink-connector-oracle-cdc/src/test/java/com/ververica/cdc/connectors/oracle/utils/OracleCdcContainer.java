@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.oracle.utils;
 
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Docker container for Oracle. The difference between this class and {@link
@@ -40,7 +41,7 @@ public class OracleCdcContainer extends JdbcDatabaseContainer<OracleCdcContainer
                             "assets/activate-archivelog.sql",
                             "docker/assets/activate-archivelog.sql");
 
-    private static final int ORACLE_PORT = 1521;
+    public static final int ORACLE_PORT = 1521;
     private static final int APEX_HTTP_PORT = 8080;
 
     private static final int DEFAULT_STARTUP_TIMEOUT_SECONDS = 240;
@@ -51,6 +52,11 @@ public class OracleCdcContainer extends JdbcDatabaseContainer<OracleCdcContainer
 
     public OracleCdcContainer() {
         super(ORACLE_IMAGE);
+        preconfigure();
+    }
+
+    public OracleCdcContainer(DockerImageName imageName) {
+        super(imageName);
         preconfigure();
     }
 

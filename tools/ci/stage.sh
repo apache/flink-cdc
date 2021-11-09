@@ -20,6 +20,7 @@ STAGE_MYSQL="mysql"
 STAGE_POSTGRES="postgres"
 STAGE_ORACLE="oracle"
 STAGE_MONGODB="mongodb"
+STAGE_E2E="e2e"
 STAGE_MISC="misc"
 
 MODULES_MYSQL="\
@@ -38,6 +39,9 @@ MODULES_MONGODB="\
 flink-connector-mongodb-cdc,\
 flink-sql-connector-mongodb-cdc"
 
+MODULES_E2E="\
+flink-cdc-e2e-tests"
+
 function get_compile_modules_for_stage() {
     local stage=$1
 
@@ -54,6 +58,11 @@ function get_compile_modules_for_stage() {
         (${STAGE_MONGODB})
             echo "-pl $MODULES_MONGODB -am"
         ;;
+        (${STAGE_E2E})
+            # compile everything; using the -am switch does not work with negated module lists!
+            # the negation takes precedence, thus not all required modules would be built
+            echo ""
+        ;;
         (${STAGE_MISC})
             # compile everything; using the -am switch does not work with negated module lists!
             # the negation takes precedence, thus not all required modules would be built
@@ -69,11 +78,13 @@ function get_test_modules_for_stage() {
     local modules_postgres=$MODULES_POSTGRES
     local modules_oracle=$MODULES_ORACLE
     local modules_mongodb=$MODULES_MONGODB
+    local modules_e2e=$MODULES_E2E
     local negated_mysql=\!${MODULES_MYSQL//,/,\!}
     local negated_postgres=\!${MODULES_POSTGRES//,/,\!}
     local negated_oracle=\!${MODULES_ORACLE//,/,\!}
     local negated_mongodb=\!${MODULES_MONGODB//,/,\!}
-    local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb"
+    local negated_e2e=\!${MODULES_E2E//,/,\!}
+    local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_e2e"
 
     case ${stage} in
         (${STAGE_MYSQL})
@@ -87,6 +98,9 @@ function get_test_modules_for_stage() {
         ;;
         (${STAGE_MONGODB})
             echo "-pl $modules_mongodb"
+        ;;
+        (${STAGE_E2E})
+            echo "-pl $modules_e2e"
         ;;
         (${STAGE_MISC})
             echo "-pl $modules_misc"
