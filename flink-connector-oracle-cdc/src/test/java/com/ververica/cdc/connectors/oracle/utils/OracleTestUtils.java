@@ -19,14 +19,12 @@
 package com.ververica.cdc.connectors.oracle.utils;
 
 import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 
 /** Utility class for oracle tests. */
 public class OracleTestUtils {
@@ -41,13 +39,7 @@ public class OracleTestUtils {
                                             "assets/activate-archivelog.sql",
                                             "docker/assets/activate-archivelog.sql"))
                     // override waitStrategy to adapt for wnameless/oracle-xe-11g-r2
-                    // see the output of wnameless/oracle-xe-11g-r2:
-                    // https://github.com/wnameless/docker-oracle-xe-11g/blob/master/assets/startup.sh#L43
-                    .waitingFor(
-                            new LogMessageWaitStrategy()
-                                    .withRegEx(".*DATABASE IS READY TO USE!.*")
-                                    .withTimes(1)
-                                    .withStartupTimeout(Duration.of(240L, ChronoUnit.SECONDS)));
+                    .waitingFor(Wait.defaultWaitStrategy());
 
     public static final String ORACLE_USER = "dbzuser";
 
