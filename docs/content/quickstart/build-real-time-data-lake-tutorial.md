@@ -1,11 +1,11 @@
 # Build real-time data lake to synchronize data from MySQL sharding tables with Flink CDC
-For OLTP databases, to deal with a huge number of data in a single table, we usually do database and table sharding to get faster performance. 
+For OLTP databases, to deal with a huge number of data in a single table, we usually do database and table sharding to get better throughput. 
 But sometimes, for convenient analysis, we need to merge them into one table when loading them to data warehouse or data lake.
 
 This tutorial will show how to use Flink CDC to build a real-time data lake for such a scenario.
-You can walk through the tutorial easily for the environment is built with docker, and the entire process uses standard SQL syntax without a single line of Java/Scala code or IDE installation.
+You can walk through the tutorial easily in the docker environment. The entire process uses standard SQL syntax without a single line of Java/Scala code or IDE installation.
 
-The following sections will take the pipeline from MySQL to Iceberg as an example. The overview of the architecture is as follows:
+The following sections will take the pipeline from MySQL to [Iceberg](https://iceberg.apache.org/) as an example. The overview of the architecture is as follows:
 
 ![Real-time data lake with Flink CDC](/_static/fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png "architecture of real-time data lake")
 
@@ -90,7 +90,7 @@ If you want to run with your own Flink environment, remember to download the fol
    
    Currently, the Iceberg official `iceberg-flink-runtime` jar that supports Flink 1.13 isn't released. 
    Here, we provide a `iceberg-flink-runtime` jar supporting Flink 1.13, which is built based on the master branch of Iceberg. 
-   You can download the `iceberg-flink-runtime` jar from the [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) once Iceberg 0.13 is released.
+   You can download the `iceberg-flink-runtime` jar from the [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) once Iceberg 0.13.0 is released.
 2. All the following commands for entering the container should be executed in the directory of the `docker-compose.yml` file.
 
 To start all containers, run the following command in the directory that contains the `docker-compose.yml` file:
@@ -108,7 +108,7 @@ We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Fli
     ```
 2. Create databases/tables and populate data:
 
-   Create a logical sharding table `user` sharded in different databases and tables physically, and one of them misses a column.
+   Create a logical sharding table `user` sharded in different databases and tables physically.
    ```sql
     CREATE DATABASE db_1;
     USE db_1;
@@ -137,9 +137,10 @@ We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Fli
      id INTEGER NOT NULL PRIMARY KEY,
      name VARCHAR(255) NOT NULL DEFAULT 'flink',
      address VARCHAR(1024),
-     phone_number VARCHAR(512)
+     phone_number VARCHAR(512),
+     email VARCHAR(255)
    );
-   INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234");
+   INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234", NULL);
 
    CREATE TABLE user_2 (
      id INTEGER NOT NULL PRIMARY KEY,
@@ -164,7 +165,7 @@ Then do the following steps in Flink SQL CLI:
 
 1. Enable checkpoints every 3 seconds
    
-   Checkpoint is disabled by default, we need to enable it to commit Iceberg files.
+   Checkpoint is disabled by default, we need to enable it to commit Iceberg transactions.
    Besides, the beginning of mysql-cdc binlog phase also requires waiting a complete checkpoint to avoid disorder of binlog records.
    ```sql
    -- Flink SQL                   
@@ -173,8 +174,7 @@ Then do the following steps in Flink SQL CLI:
 2. Create MySQL sharding source table 
 
    Create a source table that captures the data from the logical sharding table `user`. Here, we use regex to match all the physical tables.
-   The table `user_source` contains all the columns, and the column's value will be null if the record from the underlying table misses the column.
-   Also, the table defines metadata column to identify which database/table the record comes from.
+   Besides, the table defines metadata column to identify which database/table the record comes from.
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE user_source (
@@ -185,7 +185,7 @@ Then do the following steps in Flink SQL CLI:
        address STRING,
        phone_number STRING,
        email STRING,
-       primary key (`id`) not enforced
+       PRIMARY KEY (`id`) NOT ENFORCED
      ) WITH (
        'connector' = 'mysql-cdc',
        'hostname' = 'mysql',
@@ -210,7 +210,7 @@ Then do the following steps in Flink SQL CLI:
        address       STRING,
        phone_number  STRING,
        email         STRING,
-       primary key (database_name, table_name, `id`) not enforced
+       PRIMARY KEY (database_name, table_name, `id`) NOT ENFORCED
      ) WITH (
        'connector'='iceberg',
        'catalog-name'='iceberg_catalog',

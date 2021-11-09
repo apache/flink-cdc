@@ -6,6 +6,5 @@
 mysql-postgres-tutorial-zh
 mongodb-tutorial-zh
 oracle-tutorial-zh
-work-with-sharding-table-tutorial-zh
 build-real-time-data-lake-tutorial-zh
 ```

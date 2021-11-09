@@ -1,10 +1,10 @@
 # 基于 Flink CDC 同步 MySQL 分库分表构建实时数据湖
-在 OLTP 系统中，为了解决单表数据量大的问题，通常采用分库分表的方式将单个大表进行拆分以提高系统的性能。
+在 OLTP 系统中，为了解决单表数据量大的问题，通常采用分库分表的方式将单个大表进行拆分以提高系统的吞吐量。
 但是为了方便数据分析，通常需要将分库分表拆分出的表在同步到数据仓库、数据湖时，再合并成一个大表。
 
 这篇教程将展示如何使用 Flink CDC 构建实时数据湖来应对这种场景，本教程的演示基于 Docker，只涉及 SQL，无需一行 Java/Scala 代码，也无需安装 IDE，你可以很方便地在自己的电脑上完成本教程的全部内容。
 
-接下来将以将数据从 MySQL 同步到 Iceberg 为例展示整个流程，架构图如下所示：
+接下来将以将数据从 MySQL 同步到 [Iceberg](https://iceberg.apache.org/) 为例展示整个流程，架构图如下所示：
 
 ![Architecture of Real-Time Data Lake](/_static/fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png "architecture of real-time data lake")
 
@@ -88,7 +88,7 @@ volumes:
    - [iceberg-flink-runtime-0.12.0.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/0.12.0/iceberg-flink-runtime-0.12.0.jar)
 
    目前支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包还没有发布，所以我们在这里提供了一个支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包，这个 jar 包是基于 Iceberg 的 master 分支打包的。
-   当 Iceberg 0.13 版本发布后，你也可以在 [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) 下载到支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包。
+   当 Iceberg 0.13.0 版本发布后，你也可以在 [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) 下载到支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包。
 2. 本教程接下来用到的进入容器的命令都需要在 `docker-compose.yml` 所在目录下执行
 
 在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
@@ -105,7 +105,7 @@ docker-compose up -d
     ```
 2. 创建数据和表，并填充数据
    
-   创建两个不同的数据库，并在每个数据库中创建两个表，作为 `user` 表分库分表下拆分出的表，并且有一个表少了一列。
+   创建两个不同的数据库，并在每个数据库中创建两个表，作为 `user` 表分库分表下拆分出的表。
    ```sql
     CREATE DATABASE db_1;
     USE db_1;
@@ -134,9 +134,10 @@ docker-compose up -d
      id INTEGER NOT NULL PRIMARY KEY,
      name VARCHAR(255) NOT NULL DEFAULT 'flink',
      address VARCHAR(1024),
-     phone_number VARCHAR(512)
+     phone_number VARCHAR(512),
+     email VARCHAR(255)
    );
-   INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234");
+   INSERT INTO user_1 VALUES (110,"user_110","Shanghai","123567891234", NULL);
 
    CREATE TABLE user_2 (
      id INTEGER NOT NULL PRIMARY KEY,
@@ -159,7 +160,7 @@ docker-compose exec sql-client ./sql-client
 然后，进行如下步骤：
 1. 开启 checkpoint，每隔3秒做一次 checkpoint
    
-   Checkpoint 默认是不开启的，我们需要开启 Checkpoint 来让 Iceberg 可以提交写入的文件。
+   Checkpoint 默认是不开启的，我们需要开启 Checkpoint 来让 Iceberg 可以提交事务。
    并且，mysql-cdc 在 binlog 读取阶段开始前，需要等待一个完整的 checkpoint 来避免 binlog 记录乱序的情况。
    ```sql
    -- Flink SQL                   
@@ -168,8 +169,7 @@ docker-compose exec sql-client ./sql-client
 2. 创建 MySQL sharding source 表
    
    创建 source 表 `user_source` 来捕获MySQL中所有 `user` 表的数据，在表的配置项 `database-name` , `table-name` 使用正则表达式来匹配这些表。 
-   `user_source` 表包含所有的列，如果数据库表中不存在该列，则对应 `user_source` 表该列的值为 null。
-   此外，`user_source` 表也定义了 metadata 列来区分数据是来自哪个数据库和表。
+   并且，`user_source` 表也定义了 metadata 列来区分数据是来自哪个数据库和表。
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE user_source (
@@ -180,7 +180,7 @@ docker-compose exec sql-client ./sql-client
        address STRING,
        phone_number STRING,
        email STRING,
-       primary key (`id`) not enforced
+       PRIMARY KEY (`id`) NOT ENFORCED
      ) WITH (
        'connector' = 'mysql-cdc',
        'hostname' = 'mysql',
@@ -205,7 +205,7 @@ docker-compose exec sql-client ./sql-client
        address       STRING,
        phone_number  STRING,
        email         STRING,
-       primary key (database_name, table_name, `id`) not enforced
+       PRIMARY KEY (database_name, table_name, `id`) NOT ENFORCED
      ) WITH (
        'connector'='iceberg',
        'catalog-name'='iceberg_catalog',
