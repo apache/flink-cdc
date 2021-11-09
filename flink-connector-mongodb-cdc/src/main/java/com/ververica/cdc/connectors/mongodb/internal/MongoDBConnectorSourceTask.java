@@ -107,13 +107,8 @@ public class MongoDBConnectorSourceTask extends SourceTask {
             List<SourceRecord> outSourceRecords = null;
             if (sourceRecords != null && !sourceRecords.isEmpty()) {
                 outSourceRecords = new LinkedList<>();
-                for (SourceRecord current : sourceRecords) {
-                    if (isHeartbeatRecord(current)) {
-                        outSourceRecords.add(markHeartbeatRecord(current));
-                        continue;
-                    }
-
-                    markRecordTimestamp(current);
+                for (SourceRecord sourceRecord : sourceRecords) {
+                    SourceRecord current = markRecordTimestamp(sourceRecord);
 
                     if (isSnapshotRecord(current)) {
                         markSnapshotRecord(current);
@@ -166,7 +161,14 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         target.stop();
     }
 
-    private void markRecordTimestamp(SourceRecord record) {
+    private SourceRecord markRecordTimestamp(SourceRecord record) {
+        if (isHeartbeatRecord(record)) {
+            return markTimestampForHeartbeatRecord(record);
+        }
+        return markTimestampForDataRecord(record);
+    }
+
+    private SourceRecord markTimestampForDataRecord(SourceRecord record) {
         final Struct value = (Struct) record.value();
         final Struct source = new Struct(value.schema().field(Envelope.FieldName.SOURCE).schema());
         // It indicates the time that the change was made in the database. If the record is read
@@ -180,6 +182,21 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         }
         source.put(AbstractSourceInfo.TIMESTAMP_KEY, timestamp);
         value.put(Envelope.FieldName.SOURCE, source);
+        return record;
+    }
+
+    private SourceRecord markTimestampForHeartbeatRecord(SourceRecord record) {
+        final Struct heartbeatValue = new Struct(HEARTBEAT_VALUE_SCHEMA);
+        heartbeatValue.put(AbstractSourceInfo.TIMESTAMP_KEY, Instant.now().toEpochMilli());
+
+        return new SourceRecord(
+                record.sourcePartition(),
+                record.sourceOffset(),
+                record.topic(),
+                record.keySchema(),
+                record.key(),
+                HEARTBEAT_VALUE_SCHEMA,
+                heartbeatValue);
     }
 
     private void markSnapshotRecord(SourceRecord record) {
@@ -196,20 +213,6 @@ public class MongoDBConnectorSourceTask extends SourceTask {
             SnapshotRecord.LAST.toSource(source);
         }
         return record;
-    }
-
-    private SourceRecord markHeartbeatRecord(SourceRecord record) {
-        Struct heartbeatValue = new Struct(HEARTBEAT_VALUE_SCHEMA);
-        heartbeatValue.put(AbstractSourceInfo.TIMESTAMP_KEY, Instant.now().toEpochMilli());
-
-        return new SourceRecord(
-                record.sourcePartition(),
-                record.sourceOffset(),
-                record.topic(),
-                record.keySchema(),
-                record.key(),
-                HEARTBEAT_VALUE_SCHEMA,
-                heartbeatValue);
     }
 
     private boolean isSnapshotRecord(SourceRecord sourceRecord) {
