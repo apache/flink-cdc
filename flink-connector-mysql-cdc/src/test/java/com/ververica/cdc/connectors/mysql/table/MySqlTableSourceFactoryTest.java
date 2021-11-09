@@ -79,7 +79,7 @@ public class MySqlTableSourceFactoryTest {
                             Column.physical("id", DataTypes.BIGINT().notNull()),
                             Column.physical("name", DataTypes.STRING()),
                             Column.physical("count", DataTypes.DECIMAL(38, 18)),
-                            Column.metadata("time", DataTypes.TIMESTAMP(3), "op_ts", true),
+                            Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
                             Column.metadata(
                                     "database_name", DataTypes.STRING(), "database_name", true)),
                     Collections.emptyList(),

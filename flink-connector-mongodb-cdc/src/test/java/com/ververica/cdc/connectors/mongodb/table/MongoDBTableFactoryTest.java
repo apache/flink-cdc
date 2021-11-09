@@ -69,7 +69,7 @@ public class MongoDBTableFactoryTest {
                             Column.physical("ccc", DataTypes.DOUBLE()),
                             Column.physical("ddd", DataTypes.DECIMAL(31, 18)),
                             Column.physical("eee", DataTypes.TIMESTAMP(3)),
-                            Column.metadata("time", DataTypes.TIMESTAMP(3), "op_ts", true),
+                            Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
                             Column.metadata(
                                     "_database_name", DataTypes.STRING(), "database_name", true)),
                     Collections.emptyList(),
