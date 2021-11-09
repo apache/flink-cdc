@@ -244,6 +244,67 @@ restart-strategy: fixed-delay
 restart-strategy.fixed-delay.attempts: 2147483647
 ```
 
+Available Metadata
+----------------
+
+The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+
+<table class="colwidths-auto docutils">
+  <thead>
+     <tr>
+       <th class="text-left" style="width: 15%">Key</th>
+       <th class="text-left" style="width: 30%">DataType</th>
+       <th class="text-left" style="width: 55%">Description</th>
+     </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>table_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the table that contain the row.</td>
+    </tr>
+    <tr>
+      <td>schema_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the schema that contain the row.</td>
+    </tr>
+    <tr>
+      <td>database_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the database that contain the row.</td>
+    </tr>
+    <tr>
+      <td>op_ts</td>
+      <td>TIMESTAMP_LTZ(3) NOT NULL</td>
+      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
+    </tr>
+  </tbody>
+</table>
+
+The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    schema_name STRING METADATA FROM 'schema_name' VIRTUAL, 
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    id INT NOT NULL,
+    name STRING,
+    description STRING,
+    weight DECIMAL(10, 3),
+    PRIMARY KEY(id) NOT ENFORCED
+) WITH (
+    'connector' = 'oracle-cdc',
+    'hostname' = 'localhost',
+    'port' = '1521',
+    'username' = 'flinkuser',
+    'password' = 'flinkpw',
+    'database-name' = 'XE',
+    'schema-name' = 'inventory',
+    'table-name' = 'products'
+);
+```
+
 Features
 --------
 

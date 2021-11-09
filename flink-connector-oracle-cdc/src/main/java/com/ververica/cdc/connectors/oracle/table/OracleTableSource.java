@@ -24,17 +24,25 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.oracle.OracleSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -42,7 +50,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A {@link DynamicTableSource} that describes how to create a Oracle binlog from a logical
  * description.
  */
-public class OracleTableSource implements ScanTableSource {
+public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final TableSchema physicalSchema;
     private final int port;
@@ -54,6 +62,16 @@ public class OracleTableSource implements ScanTableSource {
     private final String schemaName;
     private final Properties dbzProperties;
     private final StartupOptions startupOptions;
+
+    // --------------------------------------------------------------------------------------------
+    // Mutable attributes
+    // --------------------------------------------------------------------------------------------
+
+    /** Data type that describes the final output of the source. */
+    protected DataType producedDataType;
+
+    /** Metadata that is appended at the end of a physical source row. */
+    protected List<String> metadataKeys;
 
     public OracleTableSource(
             TableSchema physicalSchema,
@@ -76,6 +94,8 @@ public class OracleTableSource implements ScanTableSource {
         this.password = checkNotNull(password);
         this.dbzProperties = dbzProperties;
         this.startupOptions = startupOptions;
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
     }
 
     @Override
@@ -90,13 +110,16 @@ public class OracleTableSource implements ScanTableSource {
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        MetadataConverter[] metadataConverters = getMetadataConverters();
         TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType(rowType)
+                        .setPhysicalRowType(physicalDataType)
+                        .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
                         .build();
         OracleSource.Builder<RowData> builder =
@@ -116,19 +139,39 @@ public class OracleTableSource implements ScanTableSource {
         return SourceFunctionProvider.of(sourceFunction, false);
     }
 
+    private MetadataConverter[] getMetadataConverters() {
+        if (metadataKeys.isEmpty()) {
+            return new MetadataConverter[0];
+        }
+
+        return metadataKeys.stream()
+                .map(
+                        key ->
+                                Stream.of(OracleReadableMetaData.values())
+                                        .filter(m -> m.getKey().equals(key))
+                                        .findFirst()
+                                        .orElseThrow(IllegalStateException::new))
+                .map(OracleReadableMetaData::getConverter)
+                .toArray(MetadataConverter[]::new);
+    }
+
     @Override
     public DynamicTableSource copy() {
-        return new OracleTableSource(
-                physicalSchema,
-                port,
-                hostname,
-                database,
-                tableName,
-                schemaName,
-                username,
-                password,
-                dbzProperties,
-                startupOptions);
+        OracleTableSource source =
+                new OracleTableSource(
+                        physicalSchema,
+                        port,
+                        hostname,
+                        database,
+                        tableName,
+                        schemaName,
+                        username,
+                        password,
+                        dbzProperties,
+                        startupOptions);
+        source.metadataKeys = metadataKeys;
+        source.producedDataType = producedDataType;
+        return source;
     }
 
     @Override
@@ -149,7 +192,9 @@ public class OracleTableSource implements ScanTableSource {
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(schemaName, that.schemaName)
                 && Objects.equals(dbzProperties, that.dbzProperties)
-                && Objects.equals(startupOptions, that.startupOptions);
+                && Objects.equals(startupOptions, that.startupOptions)
+                && Objects.equals(producedDataType, that.producedDataType)
+                && Objects.equals(metadataKeys, that.metadataKeys);
     }
 
     @Override
@@ -164,11 +209,28 @@ public class OracleTableSource implements ScanTableSource {
                 tableName,
                 schemaName,
                 dbzProperties,
-                startupOptions);
+                startupOptions,
+                producedDataType,
+                metadataKeys);
     }
 
     @Override
     public String asSummaryString() {
         return "Oracle-CDC";
+    }
+
+    @Override
+    public Map<String, DataType> listReadableMetadata() {
+        return Stream.of(OracleReadableMetaData.values())
+                .collect(
+                        Collectors.toMap(
+                                OracleReadableMetaData::getKey,
+                                OracleReadableMetaData::getDataType));
+    }
+
+    @Override
+    public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+        this.metadataKeys = metadataKeys;
+        this.producedDataType = producedDataType;
     }
 }

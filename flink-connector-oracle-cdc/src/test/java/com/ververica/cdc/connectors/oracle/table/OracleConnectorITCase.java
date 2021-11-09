@@ -39,11 +39,14 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for Oracle binlog SQL source. */
@@ -155,6 +158,101 @@ public class OracleConnectorITCase extends AbstractTestBase {
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testMetadataColumns() throws Throwable {
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " DB_NAME STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " SCHEMA_NAME STRING METADATA FROM 'schema_name' VIRTUAL,"
+                                + " TABLE_NAME STRING METADATA  FROM 'table_name' VIRTUAL,"
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " DESCRIPTION STRING,"
+                                + " WEIGHT DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        "debezium",
+                        "products");
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " database_name STRING,"
+                        + " schema_name STRING,"
+                        + " table_name STRING,"
+                        + " id INT,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(10,3),"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+
+        waitForSnapshotStarted("sink");
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
+            statement.execute("DELETE FROM debezium.products WHERE ID=112");
+        }
+
+        // waiting for change events finished.
+        waitForSinkSize("sink", 16);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I[XE, DEBEZIUM, PRODUCTS, 101, scooter, Small 2-wheel scooter, 3.140]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 102, car battery, 12V car battery, 8.100]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.800]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 104, hammer, 12oz carpenters hammer, 0.750]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 105, hammer, 14oz carpenters hammer, 0.875]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 106, hammer, 16oz carpenters hammer, 1.000]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.300]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 108, jacket, water resistent black wind breaker, 0.100]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 109, spare tire, 24 inch spare tire, 22.200]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 111, jacket, water resistent white wind breaker, 0.200]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.180]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 106, hammer, 18oz carpenter hammer, 1.000]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.100]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 111, jacket, new water resistent white wind breaker, 0.500]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]",
+                        "-D[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
     }
 
