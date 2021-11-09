@@ -19,24 +19,35 @@
 package com.ververica.cdc.connectors.oracle.utils;
 
 import org.testcontainers.containers.OracleContainer;
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
 /** Utility class for oracle tests. */
 public class OracleTestUtils {
     public static final OracleContainer ORACLE_CONTAINER =
             new OracleContainer(
-                    new ImageFromDockerfile("oracle-xe-11g-tmp")
-                            .withFileFromClasspath(".", "docker")
-                            .withFileFromClasspath(
-                                    "assets/activate-archivelog.sh",
-                                    "docker/assets/activate-archivelog.sh")
-                            .withFileFromClasspath(
-                                    "assets/activate-archivelog.sql",
-                                    "docker/assets/activate-archivelog.sql"));
+                            new ImageFromDockerfile("oracle-xe-11g-tmp")
+                                    .withFileFromClasspath(".", "docker")
+                                    .withFileFromClasspath(
+                                            "assets/activate-archivelog.sh",
+                                            "docker/assets/activate-archivelog.sh")
+                                    .withFileFromClasspath(
+                                            "assets/activate-archivelog.sql",
+                                            "docker/assets/activate-archivelog.sql"))
+                    // override waitStrategy to adapt for wnameless/oracle-xe-11g-r2
+                    // see the output of wnameless/oracle-xe-11g-r2:
+                    // https://github.com/wnameless/docker-oracle-xe-11g/blob/master/assets/startup.sh#L43
+                    .waitingFor(
+                            new LogMessageWaitStrategy()
+                                    .withRegEx(".*DATABASE IS READY TO USE!.*")
+                                    .withTimes(1)
+                                    .withStartupTimeout(Duration.of(240L, ChronoUnit.SECONDS)));
 
     public static final String ORACLE_USER = "dbzuser";
 
