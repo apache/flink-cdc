@@ -47,6 +47,22 @@ public enum PostgreSQLReadableMetadata {
                 }
             }),
 
+    /** Name of the schema that contain the row. */
+    SCHEMA_NAME(
+            "schema_name",
+            DataTypes.STRING().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    return StringData.fromString(
+                            sourceStruct.getString(AbstractSourceInfo.SCHEMA_NAME_KEY));
+                }
+            }),
+
     /** Name of the database that contain the row. */
     DATABASE_NAME(
             "database_name",

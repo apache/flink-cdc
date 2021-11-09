@@ -67,9 +67,11 @@ public class PostgreSQLTableFactoryTest {
                             Column.physical("id", DataTypes.BIGINT().notNull()),
                             Column.physical("name", DataTypes.STRING()),
                             Column.physical("count", DataTypes.DECIMAL(38, 18)),
-                            Column.metadata("time", DataTypes.TIMESTAMP(3), "op_ts", true),
+                            Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
                             Column.metadata(
-                                    "database_name", DataTypes.STRING(), "database_name", true)),
+                                    "database_name", DataTypes.STRING(), "database_name", true),
+                            Column.metadata("schema_name", DataTypes.STRING(), "schema_name", true),
+                            Column.metadata("table_name", DataTypes.STRING(), "table_name", true)),
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
@@ -138,7 +140,7 @@ public class PostgreSQLTableFactoryTest {
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
         PostgreSQLTableSource postgreSQLTableSource = (PostgreSQLTableSource) actualSource;
         postgreSQLTableSource.applyReadableMetadata(
-                Arrays.asList("op_ts", "database_name"),
+                Arrays.asList("op_ts", "database_name", "schema_name", "table_name"),
                 SCHEMA_WITH_METADATA.toSourceRowDataType());
         actualSource = postgreSQLTableSource.copy();
         PostgreSQLTableSource expectedSource =
@@ -156,7 +158,8 @@ public class PostgreSQLTableFactoryTest {
                         "flink",
                         new Properties());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
-        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
+        expectedSource.metadataKeys =
+                Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
 
         assertEquals(expectedSource, actualSource);
     }
@@ -168,7 +171,7 @@ public class PostgreSQLTableFactoryTest {
             Map<String, String> properties = getAllOptions();
             properties.put("port", "123b");
 
-            createTableSource(SCHEMA, properties);
+            createTableSource(properties);
             fail("exception expected");
         } catch (Throwable t) {
             assertTrue(
@@ -200,7 +203,7 @@ public class PostgreSQLTableFactoryTest {
             Map<String, String> properties = getAllOptions();
             properties.put("unknown", "abc");
 
-            createTableSource(SCHEMA, properties);
+            createTableSource(properties);
             fail("exception expected");
         } catch (Throwable t) {
             assertTrue(
@@ -221,6 +224,10 @@ public class PostgreSQLTableFactoryTest {
         return options;
     }
 
+    private static DynamicTableSource createTableSource(Map<String, String> options) {
+        return createTableSource(SCHEMA, options);
+    }
+
     private static DynamicTableSource createTableSource(
             ResolvedSchema schema, Map<String, String> options) {
         return FactoryUtil.createTableSource(
@@ -236,9 +243,5 @@ public class PostgreSQLTableFactoryTest {
                 new Configuration(),
                 PostgreSQLTableFactoryTest.class.getClassLoader(),
                 false);
-    }
-
-    private static DynamicTableSource createTableSource(Map<String, String> options) {
-        return createTableSource(SCHEMA, options);
     }
 }
