@@ -37,6 +37,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -61,6 +62,21 @@ public class OracleTableSourceFactoryTest {
                             Column.physical("eee", DataTypes.TIMESTAMP(3))),
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
+
+    private static final ResolvedSchema SCHEMA_WITH_METADATA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("id", DataTypes.BIGINT().notNull()),
+                            Column.physical("name", DataTypes.STRING()),
+                            Column.physical("count", DataTypes.DECIMAL(38, 18)),
+                            Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
+                            Column.metadata(
+                                    "database_name", DataTypes.STRING(), "database_name", true),
+                            Column.metadata("table_name", DataTypes.STRING(), "table_name", true),
+                            Column.metadata(
+                                    "schema_name", DataTypes.STRING(), "schema_name", true)),
+                    Collections.emptyList(),
+                    UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
@@ -160,6 +176,37 @@ public class OracleTableSourceFactoryTest {
     }
 
     @Test
+    public void testMetadataColumns() {
+        Map<String, String> properties = getAllOptions();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        OracleTableSource oracleTableSource = (OracleTableSource) actualSource;
+        oracleTableSource.applyReadableMetadata(
+                Arrays.asList("op_ts", "database_name", "table_name", "schema_name"),
+                SCHEMA_WITH_METADATA.toSourceRowDataType());
+        actualSource = oracleTableSource.copy();
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        TableSchemaUtils.getPhysicalSchema(
+                                fromResolvedSchema(SCHEMA_WITH_METADATA)),
+                        1521,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        new Properties(),
+                        StartupOptions.initial());
+        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
+        expectedSource.metadataKeys =
+                Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
+
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
     public void testValidation() {
         // validate illegal port
         try {
@@ -236,16 +283,21 @@ public class OracleTableSourceFactoryTest {
     }
 
     private static DynamicTableSource createTableSource(Map<String, String> options) {
+        return createTableSource(SCHEMA, options);
+    }
+
+    private static DynamicTableSource createTableSource(
+            ResolvedSchema schema, Map<String, String> options) {
         return FactoryUtil.createTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(SCHEMA).toSchema(),
+                                fromResolvedSchema(schema).toSchema(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),
-                        SCHEMA),
+                        schema),
                 new Configuration(),
                 OracleTableSourceFactoryTest.class.getClassLoader(),
                 false);
