@@ -18,31 +18,19 @@
 
 package com.ververica.cdc.connectors.oracle.utils;
 
-import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.images.builder.ImageFromDockerfile;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 /** Utility class for oracle tests. */
 public class OracleTestUtils {
-    public static final OracleContainer ORACLE_CONTAINER =
-            new OracleContainer(
-                    new ImageFromDockerfile("oracle-xe-11g-tmp")
-                            .withFileFromClasspath(".", "docker")
-                            .withFileFromClasspath(
-                                    "assets/activate-archivelog.sh",
-                                    "docker/assets/activate-archivelog.sh")
-                            .withFileFromClasspath(
-                                    "assets/activate-archivelog.sql",
-                                    "docker/assets/activate-archivelog.sql"));
+    public static final OracleCdcContainer ORACLE_CONTAINER = new OracleCdcContainer();
 
     public static final String ORACLE_USER = "dbzuser";
 
     public static final String ORACLE_PWD = "dbz";
 
-    public static Connection getJdbcConnection(OracleContainer oracleContainer)
+    public static Connection getJdbcConnection(OracleCdcContainer oracleContainer)
             throws SQLException {
         return DriverManager.getConnection(oracleContainer.getJdbcUrl(), ORACLE_USER, ORACLE_PWD);
     }

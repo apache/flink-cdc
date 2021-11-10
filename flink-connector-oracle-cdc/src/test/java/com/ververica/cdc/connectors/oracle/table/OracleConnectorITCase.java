@@ -25,13 +25,13 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
+import com.ververica.cdc.connectors.oracle.utils.OracleCdcContainer;
 import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
@@ -54,7 +54,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleConnectorITCase.class);
 
-    private OracleContainer oracleContainer =
+    private OracleCdcContainer oracleContainer =
             OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
 
     private final StreamExecutionEnvironment env =
