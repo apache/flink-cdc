@@ -258,7 +258,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             return "customers";
         } else {
             // pattern that matches test table: customers and customers_1
-            return "customers.*";
+            return "(customers|customers_1)";
         }
     }
 
