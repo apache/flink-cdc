@@ -9,7 +9,7 @@ The following sections will take the pipeline from MySQL to [Iceberg](https://ic
 
 ![Real-time data lake with Flink CDC](/_static/fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png "architecture of real-time data lake")
 
-You can also use other data sources like Oracle/Postgres and sinks like Hudi/Doris to build your own pipeline.
+You can also use other data sources like Oracle/Postgres and sinks like Hudi to build your own pipeline.
 
 ## Preparation
 Prepare a Linux or MacOS computer with Docker installed.
@@ -80,7 +80,7 @@ The Docker Compose environment consists of the following containers:
 - MySQL: mainly used as a data source to store the sharding table.
 
 ***Note:***
-1. To simply this tutorial, the jar packages required has been packaged into the SQL-Client container.
+1. To simply this tutorial, the jar packages required has been packaged into the SQL-Client container. You can see how it's built in [GitHub](https://github.com/luoyuxia/flink-cdc-tutorial/tree/main/flink-cdc-iceberg-demo/sql-client). 
 If you want to run with your own Flink environment, remember to download the following packages and then put them to `FLINK_HOME/lib/`.
    
    **Download links are available only for stable releases.**
@@ -91,7 +91,7 @@ If you want to run with your own Flink environment, remember to download the fol
    Currently, the Iceberg official `iceberg-flink-runtime` jar that supports Flink 1.13 isn't released. 
    Here, we provide a `iceberg-flink-runtime` jar supporting Flink 1.13, which is built based on the master branch of Iceberg. 
    You can download the `iceberg-flink-runtime` jar from the [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) once Iceberg 0.13.0 is released.
-2. All the following commands for entering the container should be executed in the directory of the `docker-compose.yml` file.
+2. All the following commands involving `docker-compose` should be executed in the directory of the `docker-compose.yml` file.
 
 To start all containers, run the following command in the directory that contains the `docker-compose.yml` file:
 ```shell
@@ -99,6 +99,7 @@ docker-compose up -d
 ```
 This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run `docker ps` to check whether these containers are running properly.
 We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally.
+
 ![Flink UI](/_static/fig/real-time-data-lake-tutorial/flink-ui.png "Flink UI")
 
 ### Preparing data in databases
@@ -159,6 +160,7 @@ docker-compose exec sql-client ./sql-client
 ```
 
 We should see the welcome screen of the CLI client:
+
 ![Flink SQL Client](/_static/fig/real-time-data-lake-tutorial/flink-sql-client.png  "Flink SQL Client" )
 
 Then do the following steps in Flink SQL CLI:
@@ -201,7 +203,7 @@ Then do the following steps in Flink SQL CLI:
    Create a sink table `all_users_sink` used to load data to Iceberg.
    We define `database_name`, `table_name` and `id` as a combined primary key, because `id` maybe not unique across different databases and tables.
    ```sql
-   -- FLink SQL
+   -- Flink SQL
    Flink SQL> CREATE TABLE all_users_sink (
        database_name STRING,
        table_name    STRING,
@@ -226,6 +228,21 @@ Then do the following steps in Flink SQL CLI:
    -- Flink SQL
    Flink SQL> INSERT INTO all_users_sink select * from user_source;
    ```
+   It will start a streaming job which will synchronize data from MySQL to Iceberg continuously.
+   The running job can be found in [Flink UI](http://localhost:8081/#/job/running), and it looks like:
+   
+   
+   ![CDC to Iceberg Running Job](/_static/fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png "CDC to Iceberg Running Job")
+   
+   Then, we can use the following command to see the files written to Iceberg: 
+   ```shell
+   docker-compose exec sql-client tree /tmp/iceberg/warehouse/default_database/
+   ```
+   It should look like:
+
+   ![Files in Iceberg](/_static/fig/real-time-data-lake-tutorial/files-in-iceberg.png "Files in Iceberg")
+
+   The actual files may differ in your environment, but the structure of the directory should be similar.
 
 2. Use the following Flink SQL to query the data written to `all_users_sink`:
    ```sql
@@ -233,6 +250,7 @@ Then do the following steps in Flink SQL CLI:
    Flink SQL> SELECT * FROM all_users_sink;
    ```
    We can see the data queried in the Flink SQL CLI:
+   
    ![Data in Iceberg](/_static/fig/real-time-data-lake-tutorial/data_in_iceberg.png "Data in Iceberg")
    
 3. Make some changes in the MySQL databases, and then the data in Iceberg table `all_users_sink` will also change in real time.
@@ -257,8 +275,9 @@ Then do the following steps in Flink SQL CLI:
 
    After executing each step, we can query the table `all_users_sink` using `SELECT * FROM all_users_sink` in Flink SQL CLI to see the changes.
    
-   The overall changes are as following:
-   ![Data Changes in Iceberg](/_static/fig/real-time-data-lake-tutorial/data-changes-in-iceberg.gif "Data Changes in Iceberg")
+   The final query result is as follows:
+   
+   ![Final Data in Iceberg](/_static/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png "Final Data in Iceberg")
    
 ## Clean up
 After finishing the tutorial, run the following command in the directory of `docker-compose.yml` to stop all containers:
