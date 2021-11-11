@@ -33,8 +33,10 @@ function start_docs_server() {
 }
 
 function stop_docs_server() {
+  project_dir="$(dirname "$(pwd)")"
   echo "stopping docs server....."
   docker stop ${docs_container_name}
+  rm -rf ${project_dir}/docs/_build
   echo "stop docs server successfully."
 }
 
