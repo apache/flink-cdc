@@ -24,7 +24,10 @@ import java.math.BigInteger;
 /** Utilities for operation on {@link Object}. */
 public class ObjectUtils {
 
-    /** Returns a number {@code Object} whose value is {@code (number + augend)}. */
+    /**
+     * Returns a number {@code Object} whose value is {@code (number + augend)}, Note: This method
+     * does not consider number overflow because we don't want to change the object type.
+     */
     public static Object plus(Object number, int augend) {
         if (number instanceof Integer) {
             return (int) number + augend;
@@ -52,9 +55,10 @@ public class ObjectUtils {
                             subtrahend.getClass().getSimpleName()));
         }
         if (minuend instanceof Integer) {
-            return BigDecimal.valueOf((int) minuend - (int) subtrahend);
+            return BigDecimal.valueOf((int) minuend).subtract(BigDecimal.valueOf((int) subtrahend));
         } else if (minuend instanceof Long) {
-            return BigDecimal.valueOf((long) minuend - (long) subtrahend);
+            return BigDecimal.valueOf((long) minuend)
+                    .subtract(BigDecimal.valueOf((long) subtrahend));
         } else if (minuend instanceof BigInteger) {
             return new BigDecimal(
                     ((BigInteger) minuend).subtract((BigInteger) subtrahend).toString());
