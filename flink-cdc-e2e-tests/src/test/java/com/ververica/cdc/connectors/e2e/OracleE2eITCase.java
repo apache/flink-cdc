@@ -21,13 +21,12 @@ package com.ververica.cdc.connectors.e2e;
 import com.ververica.cdc.connectors.e2e.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.e2e.utils.JdbcProxy;
 import com.ververica.cdc.connectors.e2e.utils.TestUtils;
-import com.ververica.cdc.connectors.oracle.utils.OracleCdcContainer;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -38,8 +37,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
-import static com.ververica.cdc.connectors.oracle.utils.OracleCdcContainer.ORACLE_PORT;
-
 /** End-to-end tests for oracle-cdc connector uber jar. */
 public class OracleE2eITCase extends FlinkContainerTestEnvironment {
 
@@ -48,16 +45,16 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     private static final String ORACLE_TEST_PASSWORD = "dbz";
     protected static final String ORACLE_DRIVER_CLASS = "oracle.jdbc.driver.OracleDriver";
     private static final String INTER_CONTAINER_ORACLE_ALIAS = "oracle";
-    private static final DockerImageName ORACLE_IMAGE =
-            DockerImageName.parse("jark/oracle-xe-11g-r2-cdc:0.1");
+    private static final String ORACLE_IMAGE = "jark/oracle-xe-11g-r2-cdc:0.1";
+    private static final int ORACLE_PORT = 1521;
 
     private static final Path oracleCdcJar = TestUtils.getResource("oracle-cdc-connector.jar");
     private static final Path jdbcJar = TestUtils.getResource("jdbc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
     @ClassRule
-    public static final OracleCdcContainer ORACLE =
-            new OracleCdcContainer(ORACLE_IMAGE)
+    public static final OracleContainer ORACLE =
+            new OracleContainer(ORACLE_IMAGE)
                     .withNetwork(NETWORK)
                     .withNetworkAliases(INTER_CONTAINER_ORACLE_ALIAS)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
