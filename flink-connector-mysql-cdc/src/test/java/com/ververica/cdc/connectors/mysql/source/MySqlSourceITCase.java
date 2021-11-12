@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 
 import java.sql.SQLException;
@@ -43,6 +44,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+
+import static org.apache.flink.shaded.guava18.com.google.common.base.Preconditions.checkState;
 
 /** IT tests for {@link MySqlSource}. */
 public class MySqlSourceITCase extends MySqlSourceTestBase {
@@ -254,11 +257,12 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     }
 
     private String getTableName(String[] captureCustomerTables) {
+        checkState(captureCustomerTables.length > 0);
         if (captureCustomerTables.length == 1) {
-            return "customers";
+            return captureCustomerTables[0];
         } else {
-            // pattern that matches test table: customers and customers_1
-            return "customers.*";
+            // pattern that matches multiple tables
+            return String.format("(%s)", StringUtils.join(captureCustomerTables, "|"));
         }
     }
 

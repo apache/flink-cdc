@@ -52,7 +52,8 @@ public class MySqlSourceConfig implements Serializable {
     private final Duration connectTimeout;
     private final int connectMaxRetries;
     private final int connectionPoolSize;
-    private final double evenlyDistributionFactor;
+    private final double distributionFactorUpper;
+    private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
 
     // --------------------------------------------------------------------------------------------
@@ -78,7 +79,8 @@ public class MySqlSourceConfig implements Serializable {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            double evenlyDistributionFactor,
+            double distributionFactorUpper,
+            double distributionFactorLower,
             boolean includeSchemaChanges,
             Properties dbzProperties) {
         this.hostname = checkNotNull(hostname);
@@ -96,7 +98,8 @@ public class MySqlSourceConfig implements Serializable {
         this.connectTimeout = checkNotNull(connectTimeout);
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
-        this.evenlyDistributionFactor = evenlyDistributionFactor;
+        this.distributionFactorUpper = distributionFactorUpper;
+        this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
@@ -144,8 +147,12 @@ public class MySqlSourceConfig implements Serializable {
         return splitMetaGroupSize;
     }
 
-    public double getEvenlyDistributionFactor() {
-        return evenlyDistributionFactor;
+    public double getDistributionFactorUpper() {
+        return distributionFactorUpper;
+    }
+
+    public double getDistributionFactorLower() {
+        return distributionFactorLower;
     }
 
     public int getFetchSize() {

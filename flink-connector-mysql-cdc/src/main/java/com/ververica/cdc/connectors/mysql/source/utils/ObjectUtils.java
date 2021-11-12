@@ -87,4 +87,16 @@ public class ObjectUtils {
         Comparable<Object> c2 = (Comparable<Object>) obj2;
         return c1.compareTo(c2);
     }
+
+    /**
+     * Compares two Double numeric object.
+     *
+     * @return -1, 0, or 1 as this {@code arg1} is numerically less than, equal to, or greater than
+     *     {@code arg2}.
+     */
+    public static int doubleCompare(double arg1, double arg2) {
+        BigDecimal bigDecimal1 = BigDecimal.valueOf(arg1);
+        BigDecimal bigDecimal2 = BigDecimal.valueOf(arg2);
+        return bigDecimal1.compareTo(bigDecimal2);
+    }
 }

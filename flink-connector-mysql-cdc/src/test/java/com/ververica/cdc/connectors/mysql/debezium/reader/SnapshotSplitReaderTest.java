@@ -56,14 +56,14 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @BeforeClass
     public static void init() {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"}, 10);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
     }
 
     @Test
     public void testReadSingleSnapshotSplit() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"}, 4);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -77,12 +77,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                     "+I[101, user_1, Shanghai, 123567891234]",
                     "+I[102, user_2, Shanghai, 123567891234]",
                     "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]"
+                    "+I[104, user_4, Shanghai, 123567891234]"
                 };
         List<String> actual = readTableSnapshotSplits(mySqlSplits, sourceConfig, 1, dataType);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
@@ -90,7 +85,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testReadAllSnapshotSplitsForOneTable() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"}, 4);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -105,24 +100,13 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                     "+I[101, user_1, Shanghai, 123567891234]",
                     "+I[102, user_2, Shanghai, 123567891234]",
                     "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]",
-                    "+I[1009, user_10, Shanghai, 123567891234]",
-                    "+I[1010, user_11, Shanghai, 123567891234]",
-                    "+I[1011, user_12, Shanghai, 123567891234]",
-                    "+I[1012, user_13, Shanghai, 123567891234]",
-                    "+I[1013, user_14, Shanghai, 123567891234]",
-                    "+I[1014, user_15, Shanghai, 123567891234]",
-                    "+I[1015, user_16, Shanghai, 123567891234]",
-                    "+I[1016, user_17, Shanghai, 123567891234]",
-                    "+I[1017, user_18, Shanghai, 123567891234]",
-                    "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
+                    "+I[104, user_4, Shanghai, 123567891234]",
+                    "+I[105, user_5, Shanghai, 123567891234]",
+                    "+I[106, user_6, Shanghai, 123567891234]",
+                    "+I[107, user_7, Shanghai, 123567891234]",
+                    "+I[108, user_8, Shanghai, 123567891234]",
+                    "+I[109, user_9, Shanghai, 123567891234]",
+                    "+I[110, user_10, Shanghai, 123567891234]"
                 };
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, sourceConfig, mySqlSplits.size(), dataType);
@@ -131,7 +115,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testReadAllSplitForTableWithSingleLine() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"}, 10);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -149,7 +133,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testReadAllSnapshotSplitsForTables() throws Exception {
         MySqlSourceConfig sourceConfig =
-                getConfig(new String[] {"customer_card", "customer_card_single_line"});
+                getConfig(new String[] {"customer_card", "customer_card_single_line"}, 10);
 
         DataType dataType =
                 DataTypes.ROW(
@@ -249,7 +233,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         return mySqlSplitList;
     }
 
-    public static MySqlSourceConfig getConfig(String[] captureTables) {
+    public static MySqlSourceConfig getConfig(String[] captureTables, int splitSize) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
@@ -262,7 +246,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .username(customerDatabase.getUsername())
-                .splitSize(10)
+                .splitSize(splitSize)
                 .fetchSize(2)
                 .password(customerDatabase.getPassword())
                 .createConfig(0);

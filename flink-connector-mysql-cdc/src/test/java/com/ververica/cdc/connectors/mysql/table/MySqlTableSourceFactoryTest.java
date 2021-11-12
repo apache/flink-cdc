@@ -48,10 +48,11 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.EVENLY_DISTRIBUTION_FACTOR;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
@@ -117,7 +118,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -129,7 +131,8 @@ public class MySqlTableSourceFactoryTest {
         properties.put("server-id", "123-126");
         properties.put("scan.incremental.snapshot.chunk.size", "8000");
         properties.put("chunk-meta.group.size", "3000");
-        properties.put("evenly-distribution.factor", "40.5");
+        properties.put("split-key.even-distribution.factor.upper-bound", "40.5");
+        properties.put("split-key.even-distribution.factor.lower-bound", "0.01");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
 
@@ -155,6 +158,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
                         40.5d,
+                        0.01d,
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -189,7 +193,8 @@ public class MySqlTableSourceFactoryTest {
                         Duration.ofSeconds(45),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -222,7 +227,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest());
         assertEquals(expectedSource, actualSource);
     }
@@ -257,7 +263,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -312,7 +319,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -376,7 +384,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest());
         assertEquals(expectedSource, actualSource);
     }
@@ -413,7 +422,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
@@ -504,7 +514,7 @@ public class MySqlTableSourceFactoryTest {
         try {
             Map<String, String> properties = getAllOptions();
             properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("evenly-distribution.factor", "0.8");
+            properties.put("split-key.even-distribution.factor.upper-bound", "0.8");
 
             createTableSource(properties);
             fail("exception expected");
@@ -512,7 +522,7 @@ public class MySqlTableSourceFactoryTest {
             assertThat(
                     t,
                     containsMessage(
-                            "The value of option 'evenly-distribution.factor' must larger than or equals 1.0, but is 0.8"));
+                            "The value of option 'split-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8"));
         }
 
         // validate illegal connection pool size

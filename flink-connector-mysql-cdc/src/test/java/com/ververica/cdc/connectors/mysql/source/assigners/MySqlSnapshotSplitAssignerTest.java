@@ -38,7 +38,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.EVENLY_DISTRIBUTION_FACTOR;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -57,17 +58,15 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignSingleTableSplits() {
         List<String> expected =
                 Arrays.asList(
-                        "customers null [462]",
-                        "customers [462] [823]",
-                        "customers [823] [1184]",
-                        "customers [1184] [1545]",
-                        "customers [1545] [1906]",
-                        "customers [1906] null");
+                        "customers_even_dist null [105]",
+                        "customers_even_dist [105] [109]",
+                        "customers_even_dist [109] null");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         4,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                        new String[] {customerDatabase.getDatabaseName() + ".customers"});
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".customers_even_dist"});
         assertEquals(expected, splits);
     }
 
@@ -77,7 +76,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         2000,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".customers"});
         assertEquals(expected, splits);
     }
@@ -86,25 +86,20 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignMultipleTableSplits() {
         List<String> expected =
                 Arrays.asList(
-                        "customers null [462]",
-                        "customers [462] [823]",
-                        "customers [823] [1184]",
-                        "customers [1184] [1545]",
-                        "customers [1545] [1906]",
-                        "customers [1906] null",
-                        "customers_1 null [462]",
-                        "customers_1 [462] [823]",
-                        "customers_1 [823] [1184]",
-                        "customers_1 [1184] [1545]",
-                        "customers_1 [1545] [1906]",
-                        "customers_1 [1906] null");
+                        "customers_even_dist null [105]",
+                        "customers_even_dist [105] [109]",
+                        "customers_even_dist [109] null",
+                        "customers_sparse_dist null [10]",
+                        "customers_sparse_dist [10] [18]",
+                        "customers_sparse_dist [18] null");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         4,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {
-                            customerDatabase.getDatabaseName() + ".customers",
-                            customerDatabase.getDatabaseName() + ".customers_1"
+                            customerDatabase.getDatabaseName() + ".customers_even_dist",
+                            customerDatabase.getDatabaseName() + ".customers_sparse_dist"
                         });
         assertEquals(expected, splits);
     }
@@ -116,7 +111,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         2,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".shopping_cart_big"});
         assertEquals(expected, splits);
     }
@@ -131,7 +127,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         4,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".address"});
         assertEquals(expected, splits);
     }
@@ -140,20 +137,207 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignSnapshotSplitsWithDecimalKey() {
         List<String> expected =
                 Arrays.asList(
-                        "shopping_cart_dec null [124812.1230]",
-                        "shopping_cart_dec [124812.1230] null");
+                        "shopping_cart_dec null [123458.1230]",
+                        "shopping_cart_dec [123458.1230] null");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         2,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".shopping_cart_dec"});
         assertEquals(expected, splits);
     }
 
+    @Test
+    public void testAssignTableWithMultipleKey() {
+        List<String> expected =
+                Arrays.asList(
+                        "customer_card null [20004]",
+                        "customer_card [20004] [30006]",
+                        "customer_card [30006] [30009]",
+                        "customer_card [30009] [40001]",
+                        "customer_card [40001] [50001]",
+                        "customer_card [50001] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignTableWithSparseDistributionSplitKey() {
+        // test table with sparse split key order like 0,2,4,8 instead of 0,1,2,3
+        // test sparse table with bigger distribution factor upper
+        List<String> expected =
+                Arrays.asList(
+                        "customers_sparse_dist null [10]",
+                        "customers_sparse_dist [10] [18]",
+                        "customers_sparse_dist [18] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4,
+                        2000.0d,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customers_sparse_dist"
+                        });
+        assertEquals(expected, splits);
+
+        // test sparse table with smaller distribution factor upper
+        List<String> expected1 =
+                Arrays.asList(
+                        "customers_sparse_dist null [8]",
+                        "customers_sparse_dist [8] [17]",
+                        "customers_sparse_dist [17] null");
+        List<String> splits1 =
+                getTestAssignSnapshotSplits(
+                        4,
+                        2.0d,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customers_sparse_dist"
+                        });
+        assertEquals(expected1, splits1);
+    }
+
+    @Test
+    public void testAssignTableWithDenseDistributionSplitKey() {
+        // test dense table with smaller dense distribution factor lower
+        List<String> expected =
+                Arrays.asList(
+                        "customers_dense_dist null [2]",
+                        "customers_dense_dist [2] [3]",
+                        "customers_dense_dist [3] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customers_dense_dist"
+                        });
+        assertEquals(expected, splits);
+
+        // test dense table with bigger dense distribution factor lower
+        List<String> expected1 =
+                Arrays.asList("customers_dense_dist null [2]", "customers_dense_dist [2] null");
+        List<String> splits1 =
+                getTestAssignSnapshotSplits(
+                        2,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        0.9d,
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customers_dense_dist"
+                        });
+        assertEquals(expected1, splits1);
+    }
+
+    @Test
+    public void testAssignTableWithSingleLine() {
+        List<String> expected = Collections.singletonList("customer_card_single_line null null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customer_card_single_line"
+                        });
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignTableWithCombinedIntSplitKey() {
+        List<String> expected =
+                Arrays.asList(
+                        "shopping_cart null [user_2]",
+                        "shopping_cart [user_2] [user_4]",
+                        "shopping_cart [user_4] [user_5]",
+                        "shopping_cart [user_5] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignTableWithConfiguredStringSplitKey() {
+        List<String> expected =
+                Arrays.asList(
+                        "shopping_cart null [user_2]",
+                        "shopping_cart [user_2] [user_4]",
+                        "shopping_cart [user_4] [user_5]",
+                        "shopping_cart [user_5] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignMinSplitSize() {
+        List<String> expected =
+                Arrays.asList(
+                        "customers_even_dist null [103]",
+                        "customers_even_dist [103] [105]",
+                        "customers_even_dist [105] [107]",
+                        "customers_even_dist [107] [109]",
+                        "customers_even_dist [109] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".customers_even_dist"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignMaxSplitSize() {
+        List<String> expected = Collections.singletonList("customers_even_dist null null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        8096,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".customers_even_dist"});
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testUnMatchedPrimaryKey() {
+        try {
+            getTestAssignSnapshotSplits(
+                    4,
+                    SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                    SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                    new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The defined primary key [card_no] in Flink is not matched with actual primary key [card_no, level] in MySQL")
+                            .isPresent());
+        }
+    }
+
     private List<String> getTestAssignSnapshotSplits(
-            int splitSize, double evenlyDistributionFactor, String[] captureTables) {
+            int splitSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            String[] captureTables) {
         MySqlSourceConfig configuration =
-                getConfig(splitSize, evenlyDistributionFactor, captureTables);
+                getConfig(
+                        splitSize, distributionFactorUpper, distributionFactorLower, captureTables);
         List<TableId> remainingTables =
                 Arrays.stream(captureTables).map(TableId::parse).collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
@@ -187,148 +371,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 .collect(Collectors.toList());
     }
 
-    @Test
-    public void testAssignTableWithMultipleKey() {
-        List<String> expected =
-                Arrays.asList(
-                        "customer_card null [20004]",
-                        "customer_card [20004] [30006]",
-                        "customer_card [30006] [30009]",
-                        "customer_card [30009] [40001]",
-                        "customer_card [40001] [50001]",
-                        "customer_card [50001] null");
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        4,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                        new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
-        assertEquals(expected, splits);
-    }
-
-    @Test
-    public void testAssignTableWithSparseDistributionSplitKey() {
-        // test table with sparse split key order like 0,10000,20000,3000 instead of 0,1,2,3
-        List<String> expected =
-                Arrays.asList(
-                        "customer_card null [26317]",
-                        "customer_card [26317] [32633]",
-                        "customer_card [32633] [38949]",
-                        "customer_card [38949] [45265]",
-                        "customer_card [45265] null");
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        4,
-                        2000.0d,
-                        new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
-        assertEquals(expected, splits);
-
-        // test table with sparse split key and big chunk size
-        List<String> expected1 = Arrays.asList("customer_card null null");
-        List<String> splits1 =
-                getTestAssignSnapshotSplits(
-                        8096,
-                        10000.0d,
-                        new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
-        assertEquals(expected1, splits1);
-    }
-
-    @Test
-    public void testAssignTableWithSingleLine() {
-        List<String> expected = Collections.singletonList("customer_card_single_line null null");
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        4,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                        new String[] {
-                            customerDatabase.getDatabaseName() + ".customer_card_single_line"
-                        });
-        assertEquals(expected, splits);
-    }
-
-    @Test
-    public void testAssignTableWithCombinedIntSplitKey() {
-        List<String> expected =
-                Arrays.asList(
-                        "shopping_cart null [user_2]",
-                        "shopping_cart [user_2] [user_4]",
-                        "shopping_cart [user_4] [user_5]",
-                        "shopping_cart [user_5] null");
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        4,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                        new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
-        assertEquals(expected, splits);
-    }
-
-    @Test
-    public void testAssignTableWithConfiguredStringSplitKey() {
-        List<String> expected =
-                Arrays.asList(
-                        "shopping_cart null [user_2]",
-                        "shopping_cart [user_2] [user_4]",
-                        "shopping_cart [user_4] [user_5]",
-                        "shopping_cart [user_5] null");
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        4,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                        new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
-        assertEquals(expected, splits);
-    }
-
-    @Test
-    public void testAssignMinSplitSize() {
-        List<String> expected =
-                Arrays.asList(
-                        "customers null [281]",
-                        "customers [281] [461]",
-                        "customers [461] [641]",
-                        "customers [641] [821]",
-                        "customers [821] [1001]",
-                        "customers [1001] [1181]",
-                        "customers [1181] [1361]",
-                        "customers [1361] [1541]",
-                        "customers [1541] [1721]",
-                        "customers [1721] [1901]",
-                        "customers [1901] null");
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        2,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                        new String[] {customerDatabase.getDatabaseName() + ".customers"});
-        assertEquals(expected, splits);
-    }
-
-    @Test
-    public void testAssignMaxSplitSize() {
-        List<String> expected = Collections.singletonList("customers null null");
-        List<String> splits =
-                getTestAssignSnapshotSplits(
-                        2000,
-                        EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                        new String[] {customerDatabase.getDatabaseName() + ".customers"});
-        assertEquals(expected, splits);
-    }
-
-    @Test
-    public void testUnMatchedPrimaryKey() {
-        try {
-            getTestAssignSnapshotSplits(
-                    4,
-                    EVENLY_DISTRIBUTION_FACTOR.defaultValue(),
-                    new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The defined primary key [card_no] in Flink is not matched with actual primary key [card_no, level] in MySQL")
-                            .isPresent());
-        }
-    }
-
     private MySqlSourceConfig getConfig(
-            int splitSize, double evenlyDistributionFactor, String[] captureTables) {
+            int splitSize,
+            double distributionFactorUpper,
+            double distributionLower,
+            String[] captureTables) {
         return new MySqlSourceConfigFactory()
                 .startupOptions(StartupOptions.initial())
                 .databaseList(customerDatabase.getDatabaseName())
@@ -337,7 +384,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .splitSize(splitSize)
                 .fetchSize(2)
-                .evenlyDistributionFactor(evenlyDistributionFactor)
+                .distributionFactorUpper(distributionFactorUpper)
+                .distributionFactorLower(distributionLower)
                 .username(customerDatabase.getUsername())
                 .password(customerDatabase.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())

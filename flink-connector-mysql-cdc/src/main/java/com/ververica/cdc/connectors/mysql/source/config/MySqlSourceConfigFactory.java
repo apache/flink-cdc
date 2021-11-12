@@ -35,10 +35,11 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.EVENLY_DISTRIBUTION_FACTOR;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
@@ -62,7 +63,10 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Duration connectTimeout = CONNECT_TIMEOUT.defaultValue();
     private int connectMaxRetries = CONNECT_MAX_RETRIES.defaultValue();
     private int connectionPoolSize = CONNECTION_POOL_SIZE.defaultValue();
-    private double evenlyDistributionFactor = EVENLY_DISTRIBUTION_FACTOR.defaultValue();
+    private double distributionFactorUpper =
+            SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue();
+    private double distributionFactorLower =
+            SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
     private Properties dbzProperties;
 
@@ -152,9 +156,21 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
-    /** The factor is used to determine whether the table is evenly distribution or not. */
-    public MySqlSourceConfigFactory evenlyDistributionFactor(Double evenlyDistributionFactor) {
-        this.evenlyDistributionFactor = evenlyDistributionFactor;
+    /**
+     * The upper bound of split key evenly distribution factor, the factor is used to determine
+     * whether the table is evenly distribution or not.
+     */
+    public MySqlSourceConfigFactory distributionFactorUpper(double distributionFactorUpper) {
+        this.distributionFactorUpper = distributionFactorUpper;
+        return this;
+    }
+
+    /**
+     * The lower bound of split key evenly distribution factor, the factor is used to determine
+     * whether the table is evenly distribution or not.
+     */
+    public MySqlSourceConfigFactory distributionFactorLower(double distributionFactorLower) {
+        this.distributionFactorLower = distributionFactorLower;
         return this;
     }
 
@@ -284,7 +300,8 @@ public class MySqlSourceConfigFactory implements Serializable {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                evenlyDistributionFactor,
+                distributionFactorUpper,
+                distributionFactorLower,
                 includeSchemaChanges,
                 props);
     }
