@@ -160,7 +160,7 @@ public class MySqlSourceConfigFactory implements Serializable {
      * The upper bound of split key evenly distribution factor, the factor is used to determine
      * whether the table is evenly distribution or not.
      */
-    public MySqlSourceConfigFactory distributionFactorUpper(Double distributionFactorUpper) {
+    public MySqlSourceConfigFactory distributionFactorUpper(double distributionFactorUpper) {
         this.distributionFactorUpper = distributionFactorUpper;
         return this;
     }
@@ -169,7 +169,7 @@ public class MySqlSourceConfigFactory implements Serializable {
      * The lower bound of split key evenly distribution factor, the factor is used to determine
      * whether the table is evenly distribution or not.
      */
-    public MySqlSourceConfigFactory distributionFactorLower(Double distributionFactorLower) {
+    public MySqlSourceConfigFactory distributionFactorLower(double distributionFactorLower) {
         this.distributionFactorLower = distributionFactorLower;
         return this;
     }

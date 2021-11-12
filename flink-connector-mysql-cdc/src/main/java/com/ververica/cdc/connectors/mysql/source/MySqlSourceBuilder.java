@@ -143,7 +143,7 @@ public class MySqlSourceBuilder<T> {
      * The upper bound of split key evenly distribution factor, the factor is used to determine
      * whether the table is evenly distribution or not.
      */
-    public MySqlSourceBuilder<T> distributionFactorUpper(Double distributionFactorUpper) {
+    public MySqlSourceBuilder<T> distributionFactorUpper(double distributionFactorUpper) {
         this.configFactory.distributionFactorUpper(distributionFactorUpper);
         return this;
     }
@@ -152,7 +152,7 @@ public class MySqlSourceBuilder<T> {
      * The lower bound of split key evenly distribution factor, the factor is used to determine
      * whether the table is evenly distribution or not.
      */
-    public MySqlSourceBuilder<T> distributionFactorLower(Double distributionFactorLower) {
+    public MySqlSourceBuilder<T> distributionFactorLower(double distributionFactorLower) {
         this.configFactory.distributionFactorLower(distributionFactorLower);
         return this;
     }

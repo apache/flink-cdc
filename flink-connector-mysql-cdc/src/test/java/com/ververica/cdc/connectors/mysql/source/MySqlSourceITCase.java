@@ -259,7 +259,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     private String getTableName(String[] captureCustomerTables) {
         checkState(captureCustomerTables.length > 0);
         if (captureCustomerTables.length == 1) {
-            return "customers";
+            return captureCustomerTables[0];
         } else {
             // pattern that matches multiple tables
             return String.format("(%s)", StringUtils.join(captureCustomerTables, "|"));
