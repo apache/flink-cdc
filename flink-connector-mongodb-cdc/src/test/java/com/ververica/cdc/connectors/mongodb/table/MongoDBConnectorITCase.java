@@ -102,8 +102,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                         + " PRIMARY KEY (name) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
+                        + " 'sink-insert-only' = 'false'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
