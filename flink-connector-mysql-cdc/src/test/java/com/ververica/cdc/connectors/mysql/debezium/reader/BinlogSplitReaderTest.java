@@ -74,7 +74,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_2"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
         final DataType dataType =
@@ -84,7 +84,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         List<MySqlSnapshotSplit> splits =
-                getMySqlSplits(new String[] {"customers_2"}, sourceConfig);
+                getMySqlSplits(new String[] {"customers_even_dist"}, sourceConfig);
         String[] expected =
                 new String[] {
                     "+I[101, user_1, Shanghai, 123567891234]",
@@ -113,7 +113,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testReadAllBinlogSplitsForOneTable() throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_2"});
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
         final DataType dataType =
@@ -123,7 +123,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         List<MySqlSnapshotSplit> splits =
-                getMySqlSplits(new String[] {"customers_2"}, sourceConfig);
+                getMySqlSplits(new String[] {"customers_even_dist"}, sourceConfig);
 
         String[] expected =
                 new String[] {

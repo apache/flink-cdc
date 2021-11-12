@@ -80,13 +80,13 @@ VALUES (101,"user_1","Shanghai","123567891234"),
        (2000,"user_21","Shanghai","123567891234");
 
 -- create table whose split key is evenly distributed
-CREATE TABLE customers_2 (
+CREATE TABLE customers_even_dist (
   id INTEGER NOT NULL PRIMARY KEY,
   name VARCHAR(255) NOT NULL ,
   address VARCHAR(1024),
   phone_number VARCHAR(512)
 );
-INSERT INTO customers_2
+INSERT INTO customers_even_dist
 VALUES (101,'user_1','Shanghai','123567891234'),
        (102,'user_2','Shanghai','123567891234'),
        (103,'user_3','Shanghai','123567891234'),
@@ -99,13 +99,13 @@ VALUES (101,'user_1','Shanghai','123567891234'),
        (110,'user_10','Shanghai','123567891234');
 
 -- create table whose split key is evenly distributed and sparse
-CREATE TABLE customers_3 (
+CREATE TABLE customers_sparse_dist (
   id INTEGER NOT NULL PRIMARY KEY,
   name VARCHAR(255) NOT NULL ,
   address VARCHAR(1024),
   phone_number VARCHAR(512)
 );
-INSERT INTO customers_3
+INSERT INTO customers_sparse_dist
 VALUES (2,'user_1','Shanghai','123567891234'),
        (4,'user_2','Shanghai','123567891234'),
        (6,'user_3','Shanghai','123567891234'),
@@ -118,14 +118,14 @@ VALUES (2,'user_1','Shanghai','123567891234'),
        (22,'user_10','Shanghai','123567891234');
 
 -- create table whose split key is evenly distributed and dense
-CREATE TABLE customers_4 (
+CREATE TABLE customers_dense_dist (
  id1 INTEGER NOT NULL,
  id2 VARCHAR(255) NOT NULL ,
  address VARCHAR(1024),
  phone_number VARCHAR(512),
  PRIMARY KEY(id1, id2)
 );
-INSERT INTO customers_4
+INSERT INTO customers_dense_dist
 VALUES (1,'user_1','Shanghai','123567891234'),
        (1,'user_2','Shanghai','123567891234'),
        (1,'user_3','Shanghai','123567891234'),

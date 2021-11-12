@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
+import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryApproximateRowCnt;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMin;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMinMax;
@@ -62,14 +63,6 @@ import static java.math.BigDecimal.ROUND_CEILING;
 class ChunkSplitter {
 
     private static final Logger LOG = LoggerFactory.getLogger(ChunkSplitter.class);
-
-    /**
-     * The minimum distribution factor used to judge the data distribution in table is dense or not,
-     * the factor could be calculated by MAX(id) - MIN(id) + 1 / rowCount, if the factor is less
-     * than 1 means one id may contains multiple rows, we simply assume the dense factor is 0.05
-     * which means one id may contains 20 rows, this happens in table with combined key.
-     */
-    private static final double DENSE_DISTRIBUTION_FACTOR = 0.05d;
 
     private final MySqlSourceConfig sourceConfig;
     private final MySqlSchema mySqlSchema;
@@ -128,6 +121,11 @@ class ChunkSplitter {
     // Utilities
     // --------------------------------------------------------------------------------------------
 
+    /**
+     * We can use evenly-sized chunks or unevenly-sized chunks when split table into chunks, using
+     * evenly-sized chunks which is much efficient, using unevenly-sized chunks which will request
+     * many queries and is not efficient.
+     */
     private List<ChunkRange> splitTableIntoChunks(
             JdbcConnection jdbc, TableId tableId, Column splitColumn) throws SQLException {
         final String splitColumnName = splitColumn.name();
@@ -140,7 +138,8 @@ class ChunkSplitter {
         }
 
         final int chunkSize = sourceConfig.getSplitSize();
-        final double evenlyDistributionFactor = sourceConfig.getEvenlyDistributionFactor();
+        final double distributionFactorUpper = sourceConfig.getDistributionFactorUpper();
+        final double distributionFactorLower = sourceConfig.getDistributionFactorLower();
 
         if (isEvenlySplitColumn(splitColumn)) {
             long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
@@ -148,21 +147,19 @@ class ChunkSplitter {
                     calculateDistributionFactor(tableId, min, max, approximateRowCnt);
 
             boolean dataIsEvenlyDistributed =
-                    distributionFactor <= evenlyDistributionFactor
-                            && distributionFactor > DENSE_DISTRIBUTION_FACTOR;
+                    doubleCompare(distributionFactor, distributionFactorLower) >= 0
+                            && doubleCompare(distributionFactor, distributionFactorUpper) <= 0;
+
             if (dataIsEvenlyDistributed) {
-                // use evenly-sized chunks which is much efficient
-                final int dynamicChunkSize =
-                        Math.max((int) (distributionFactor * chunkSize), chunkSize);
+                // the minimum dynamic chunk size is at least 1
+                final int dynamicChunkSize = Math.max((int) (distributionFactor * chunkSize), 1);
                 return splitEvenlySizedChunks(
                         tableId, min, max, approximateRowCnt, dynamicChunkSize);
             } else {
-                // use unevenly-sized chunks which will request many queries and is not efficient.
                 return splitUnevenlySizedChunks(
                         jdbc, tableId, splitColumnName, min, max, chunkSize);
             }
         } else {
-            // use unevenly-sized chunks which will request many queries and is not efficient.
             return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
         }
     }
@@ -178,7 +175,7 @@ class ChunkSplitter {
                 tableId,
                 approximateRowCnt,
                 chunkSize);
-        if (approximateRowCnt < chunkSize) {
+        if (approximateRowCnt <= chunkSize) {
             // there is no more than one chunk, return full table as a chunk
             return Collections.singletonList(ChunkRange.all());
         }
@@ -205,7 +202,8 @@ class ChunkSplitter {
             Object max,
             int chunkSize)
             throws SQLException {
-        LOG.info("Use unevenly-sized chunks for table{}, the chunk size is {}", tableId, chunkSize);
+        LOG.info(
+                "Use unevenly-sized chunks for table {}, the chunk size is {}", tableId, chunkSize);
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
         Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize);
@@ -296,7 +294,7 @@ class ChunkSplitter {
             return Double.MAX_VALUE;
         }
         BigDecimal difference = ObjectUtils.minus(max, min);
-        // factor = max - min + 1 / rowCount
+        // factor = (max - min + 1) / rowCount
         final BigDecimal subRowCnt = difference.add(BigDecimal.valueOf(1));
         double distributionFactor =
                 subRowCnt.divide(new BigDecimal(approximateRowCnt), 4, ROUND_CEILING).doubleValue();

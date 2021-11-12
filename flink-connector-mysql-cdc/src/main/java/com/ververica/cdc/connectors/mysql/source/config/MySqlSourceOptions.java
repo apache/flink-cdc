@@ -176,13 +176,26 @@ public class MySqlSourceOptions {
                             "The group size of chunk meta, if the meta size exceeds the group size, the meta will be will be divided into multiple groups.");
 
     @Experimental
-    public static final ConfigOption<Double> EVENLY_DISTRIBUTION_FACTOR =
-            ConfigOptions.key("evenly-distribution.factor")
+    public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
+            ConfigOptions.key("split-key.even-distribution.factor.upper-bound")
                     .doubleType()
                     .defaultValue(1000.0d)
                     .withDescription(
-                            "The factor is used to determine whether the table is evenly distribution or not."
-                                    + " the table chunks would use evenly calculation optimization when the data distribution is even,"
-                                    + " and the sql query would be used when it is uneven."
-                                    + " The distribution factor could be calculated by MAX(id) - MIN(id) + 1 / rowCount.");
+                            "The upper bound of split key distribution factor. The distribution factor is used to determine whether the"
+                                    + " table is evenly distribution or not."
+                                    + " The table chunks would use evenly calculation optimization when the data distribution is even,"
+                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
+    @Experimental
+    public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
+            ConfigOptions.key("split-key.even-distribution.factor.lower-bound")
+                    .doubleType()
+                    .defaultValue(0.05d)
+                    .withDescription(
+                            "The lower bound of split key distribution factor. The distribution factor is used to determine whether the"
+                                    + " table is evenly distribution or not."
+                                    + " The table chunks would use evenly calculation optimization when the data distribution is even,"
+                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 }

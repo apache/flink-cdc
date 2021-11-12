@@ -63,7 +63,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testReadSingleSnapshotSplit() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_2"}, 4);
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"}, 4);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -85,7 +85,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testReadAllSnapshotSplitsForOneTable() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_2"}, 4);
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"}, 4);
 
         final DataType dataType =
                 DataTypes.ROW(
