@@ -1263,6 +1263,64 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testColumnOptionalWithDefaultValue() throws Exception {
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " `product_no` DECIMAL(20, 4) NOT NULL,"
+                                + " product_kind STRING,"
+                                + " user_id STRING,"
+                                + " description STRING,"
+                                + " primary key (`product_no`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "shopping_cart_dec",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "SELECT product_no,\n"
+                                + "product_kind,\n"
+                                + "user_id,\n"
+                                + "description FROM debezium_source");
+
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        String[] expected =
+                new String[] {
+                    "+I[123456.1230, KIND_001, user_1, my shopping cart]",
+                    "+I[123457.4560, KIND_002, user_2, my shopping cart]",
+                    "+I[123458.6789, KIND_003, user_3, my shopping cart]",
+                    "+I[123459.1234, KIND_004, user_4, null]"
+                };
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
     // ------------------------------------------------------------------------------------
 
     private String getDezImplementation() {
