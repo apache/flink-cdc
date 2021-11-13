@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.e2e.utils;
 
-import java.util.Optional;
 import java.util.function.Function;
 
 /** System-property based parameters for tests and resources. */
@@ -30,20 +29,6 @@ public class ParameterProperty<V> {
     public ParameterProperty(final String propertyName, final Function<String, V> converter) {
         this.propertyName = propertyName;
         this.converter = converter;
-    }
-
-    public String getPropertyName() {
-        return propertyName;
-    }
-
-    /**
-     * Retrieves the value of this property.
-     *
-     * @return Optional containing the value of this property
-     */
-    public Optional<V> get() {
-        final String value = System.getProperty(propertyName);
-        return value == null ? Optional.empty() : Optional.of(converter.apply(value));
     }
 
     /**

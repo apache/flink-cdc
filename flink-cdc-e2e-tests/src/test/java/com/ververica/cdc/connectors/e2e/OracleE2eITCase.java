@@ -43,7 +43,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(OracleE2eITCase.class);
     private static final String ORACLE_TEST_USER = "dbzuser";
     private static final String ORACLE_TEST_PASSWORD = "dbz";
-    protected static final String ORACLE_DRIVER_CLASS = "oracle.jdbc.driver.OracleDriver";
+    private static final String ORACLE_DRIVER_CLASS = "oracle.jdbc.driver.OracleDriver";
     private static final String INTER_CONTAINER_ORACLE_ALIAS = "oracle";
     private static final String ORACLE_IMAGE = "jark/oracle-xe-11g-r2-cdc:0.1";
     private static final int ORACLE_PORT = 1521;

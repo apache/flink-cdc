@@ -30,7 +30,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
-/** Proxy to communicate with database using JDBC protocal. */
+/** Proxy to communicate with database using JDBC protocol. */
 public class JdbcProxy {
 
     private final String url;
