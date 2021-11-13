@@ -222,14 +222,15 @@ CREATE TABLE shopping_cart_dec (
   product_no DECIMAL(10, 4) NOT NULL,
   product_kind VARCHAR(255),
   user_id VARCHAR(255) NOT NULL,
-  description VARCHAR(255) NOT NULL,
+  description VARCHAR(255) DEFAULT 'flink',
   PRIMARY KEY(product_no)
 );
 
 insert into shopping_cart_dec
 VALUES (123456.123, 'KIND_001', 'user_1', 'my shopping cart'),
        (123457.456, 'KIND_002', 'user_2', 'my shopping cart'),
-       (123458.6789, 'KIND_003', 'user_3', 'my shopping cart');
+       (123458.6789, 'KIND_003', 'user_3', 'my shopping cart'),
+       (123459.1234, 'KIND_004', 'user_4', null);
 
 -- create table whose primary key are produced by snowflake algorithm
 CREATE TABLE address (
