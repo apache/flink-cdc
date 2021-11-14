@@ -36,7 +36,6 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import com.jayway.jsonpath.JsonPath;
-import com.ververica.cdc.connectors.oracle.utils.OracleCdcContainer;
 import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -47,6 +46,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
@@ -78,7 +78,7 @@ public class OracleSourceTest extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSourceTest.class);
 
-    private OracleCdcContainer oracleContainer =
+    private OracleContainer oracleContainer =
             OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Before
@@ -579,8 +579,7 @@ public class OracleSourceTest extends AbstractTestBase {
         return basicSourceBuilder(oracleContainer).build();
     }
 
-    private OracleSource.Builder<SourceRecord> basicSourceBuilder(
-            OracleCdcContainer oracleContainer) {
+    private OracleSource.Builder<SourceRecord> basicSourceBuilder(OracleContainer oracleContainer) {
 
         return OracleSource.<SourceRecord>builder()
                 .hostname(oracleContainer.getHost())

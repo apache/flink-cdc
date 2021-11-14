@@ -38,7 +38,7 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
 
     private static final String DOCKER_IMAGE_NAME = "mongo:5.0.2";
 
-    private static final int MONGODB_PORT = 27017;
+    public static final int MONGODB_PORT = 27017;
 
     public MongoDBContainer() {
         super(DOCKER_IMAGE_NAME);

@@ -489,7 +489,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public void cancel() {
         // safely and gracefully stop the engine
         shutdownEngine();
-        debeziumChangeFetcher.close();
+        if (debeziumChangeFetcher != null) {
+            debeziumChangeFetcher.close();
+        }
     }
 
     @Override

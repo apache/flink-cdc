@@ -47,15 +47,3 @@ stages:
             vmImage: 'ubuntu-20.04'
           run_end_to_end: false
           jdk: 8
-
-#steps:
-#  - task: Maven@3
-#    inputs:
-#      mavenPomFile: 'pom.xml'
-#      mavenOptions: '-Xmx3072m -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=120'
-#      javaHomeOption: 'JDKVersion'
-#      jdkVersionOption: '1.8'
-#      jdkArchitectureOption: 'x64'
-#      publishJUnitResults: true
-#      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-#      goals: 'clean verify'
