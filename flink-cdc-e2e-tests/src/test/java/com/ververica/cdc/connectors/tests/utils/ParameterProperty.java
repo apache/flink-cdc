@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.e2e.utils;
+package com.ververica.cdc.connectors.tests.utils;
 
 import java.util.function.Function;
 

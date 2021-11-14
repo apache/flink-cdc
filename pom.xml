@@ -70,6 +70,10 @@ under the License.
         <flink.version>1.13.1</flink.version>
         <debezium.version>1.5.4.Final</debezium.version>
         <geometry.version>2.2.0</geometry.version>
+        <!-- OracleE2eITCase will report "container cannot be accessed" error when running in Azure Pipeline with 1.16.1 testconainters.
+          This might be a conflicts with "wnameless/oracle-xe-11g-r2" and 1.16 testcontainers.
+          We may need to upgrade our Oracle base image to "gvenzl/oracle-xe" which is the default image of 1.16 testcontainers.
+          See more https://github.com/testcontainers/testcontainers-java/issues/4297. -->
         <testcontainers.version>1.15.3</testcontainers.version>
         <java.version>1.8</java.version>
         <scala.binary.version>2.11</scala.binary.version>

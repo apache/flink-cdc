@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.e2e;
+package com.ververica.cdc.connectors.tests;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -25,11 +25,11 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.ververica.cdc.connectors.e2e.utils.FlinkContainerTestEnvironment;
-import com.ververica.cdc.connectors.e2e.utils.JdbcProxy;
-import com.ververica.cdc.connectors.e2e.utils.TestUtils;
 import com.ververica.cdc.connectors.mongodb.MongoDBTestBase;
 import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
+import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
+import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
+import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.AfterClass;

@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.e2e;
+package com.ververica.cdc.connectors.tests;
 
-import com.ververica.cdc.connectors.e2e.utils.FlinkContainerTestEnvironment;
-import com.ververica.cdc.connectors.e2e.utils.JdbcProxy;
-import com.ververica.cdc.connectors.e2e.utils.TestUtils;
+import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
+import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
+import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.slf4j.Logger;
