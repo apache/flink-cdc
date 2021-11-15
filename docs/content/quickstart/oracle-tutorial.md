@@ -55,7 +55,7 @@ docker-compose down
 *Download links are available only for stable releases.*
 
 - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
-- [flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.1-SNAPSHOT/flink-sql-connector-oracle-cdc-2.1-SNAPSHOT.jar)
+- [flink-sql-connector-oracle-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.2-SNAPSHOT/flink-sql-connector-oracle-cdc-2.2-SNAPSHOT.jar)
 
 **3. Launch a Flink cluster and start a Flink SQL CLI**
 
