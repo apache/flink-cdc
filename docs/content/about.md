@@ -28,6 +28,7 @@ The version mapping between Flink CDC Connectors and Flink.
 |1.3.0 | 1.12.* |
 |1.4.0 | 1.13.* |
 |2.0.* | 1.13.* |
+|2.1.* | 1.13.* |
 
 ## Features
 
