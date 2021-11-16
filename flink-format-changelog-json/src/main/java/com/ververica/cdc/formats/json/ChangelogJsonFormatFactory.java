@@ -93,8 +93,6 @@ public class ChangelogJsonFormatFactory
     public EncodingFormat<SerializationSchema<RowData>> createEncodingFormat(
             DynamicTableFactory.Context context, ReadableConfig formatOptions) {
         FactoryUtil.validateFactoryOptions(this, formatOptions);
-        TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
-        boolean encodeDecimalAsPlainNumber = formatOptions.get(ENCODE_DECIMAL_AS_PLAIN_NUMBER);
 
         return new EncodingFormat<SerializationSchema<RowData>>() {
 
@@ -112,8 +110,7 @@ public class ChangelogJsonFormatFactory
             public SerializationSchema<RowData> createRuntimeEncoder(
                     DynamicTableSink.Context context, DataType consumedDataType) {
                 final RowType rowType = (RowType) consumedDataType.getLogicalType();
-                return new ChangelogJsonSerializationSchema(
-                        rowType, timestampFormat, encodeDecimalAsPlainNumber);
+                return new ChangelogJsonSerializationSchema(rowType, formatOptions);
             }
         };
     }

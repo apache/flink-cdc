@@ -19,6 +19,7 @@
 package com.ververica.cdc.formats.json;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonOptions;
 import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
@@ -32,6 +33,7 @@ import org.apache.flink.types.RowKind;
 
 import java.util.Objects;
 
+import static com.ververica.cdc.formats.json.ChangelogJsonFormatFactory.ENCODE_DECIMAL_AS_PLAIN_NUMBER;
 import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
 
 /**
@@ -53,15 +55,16 @@ public class ChangelogJsonSerializationSchema implements SerializationSchema<Row
 
     private transient GenericRowData reuse;
 
-    public ChangelogJsonSerializationSchema(
-            RowType rowType, TimestampFormat timestampFormat, boolean encodeDecimalAsPlainNumber) {
+    public ChangelogJsonSerializationSchema(RowType rowType, ReadableConfig formatOptions) {
+        TimestampFormat timestampFormat = JsonOptions.getTimestampFormat(formatOptions);
+
         this.jsonSerializer =
                 new JsonRowDataSerializationSchema(
                         createJsonRowType(fromLogicalToDataType(rowType)),
                         timestampFormat,
                         JsonOptions.MapNullKeyMode.FAIL,
                         JsonOptions.MAP_NULL_KEY_LITERAL.defaultValue(),
-                        encodeDecimalAsPlainNumber);
+                        formatOptions.get(ENCODE_DECIMAL_AS_PLAIN_NUMBER));
         this.timestampFormat = timestampFormat;
     }
 

@@ -18,7 +18,9 @@
 
 package com.ververica.cdc.formats.json;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.formats.common.TimestampFormat;
+import org.apache.flink.formats.json.JsonOptions;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
@@ -82,9 +84,13 @@ public class ChangelogJsonSerDeDecimalTest {
                 collector.list.stream().map(Object::toString).collect(Collectors.toList());
         assertEquals(expected, actual);
 
+        Configuration formatOptions = new Configuration();
+        formatOptions.setString(JsonOptions.TIMESTAMP_FORMAT.key(), JsonOptions.SQL);
+        formatOptions.setBoolean(JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.key(), false);
+
         // decimal字段会启用科学记数法
         ChangelogJsonSerializationSchema serializationSchema =
-                new ChangelogJsonSerializationSchema(SCHEMA, TimestampFormat.SQL, false);
+                new ChangelogJsonSerializationSchema(SCHEMA, formatOptions);
         serializationSchema.open(null);
         List<String> result = new ArrayList<>();
         for (RowData rowData : collector.list) {
@@ -100,8 +106,9 @@ public class ChangelogJsonSerDeDecimalTest {
         assertEquals(expectedResult, result);
 
         // 使decimal字段以plain形式展示
+        formatOptions.setBoolean(JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.key(), true);
         ChangelogJsonSerializationSchema serializationSchema2 =
-                new ChangelogJsonSerializationSchema(SCHEMA, TimestampFormat.SQL, true);
+                new ChangelogJsonSerializationSchema(SCHEMA, formatOptions);
         serializationSchema2.open(null);
         List<String> result2 = new ArrayList<>();
         for (RowData rowData : collector.list) {
