@@ -342,7 +342,7 @@ public class OracleSourceExample {
              .hostname()
              .port(1521)
              .database("XE") // monitor XE database
-             .shemaList("inventory") // monitor inventory schema
+             .schemaList("inventory") // monitor inventory schema
              .tableList("inventory.products") // monitor products table
              .username("flinkuser")
              .password("flinkpw")
