@@ -247,6 +247,8 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
 ```
 Usually, it is recommended to exclude schema because schema fields makes the messages very verbose which reduces parsing performance.
 
+**Note:** `JsonDebeziumDeserializationSchema` may also receive other configuration for `JsonConverter` as the second parameter.
+
 ## Building from source
 
 Prerequisites:

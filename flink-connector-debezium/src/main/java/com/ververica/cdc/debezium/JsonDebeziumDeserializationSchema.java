@@ -29,6 +29,7 @@ import org.apache.kafka.connect.storage.ConverterConfig;
 import org.apache.kafka.connect.storage.ConverterType;
 
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A JSON format implementation of {@link DebeziumDeserializationSchema} which deserializes the
@@ -46,12 +47,21 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
      */
     private final Boolean includeSchema;
 
+    /** Other configurations that need to pass to JsonConverters. */
+    private Map<String, Object> otherJsonConverterConfigs;
+
     public JsonDebeziumDeserializationSchema() {
         this(false);
     }
 
     public JsonDebeziumDeserializationSchema(Boolean includeSchema) {
         this.includeSchema = includeSchema;
+    }
+
+    public JsonDebeziumDeserializationSchema(
+            Boolean includeSchema, Map<String, Object> otherJsonConverterConfigs) {
+        this.includeSchema = includeSchema;
+        this.otherJsonConverterConfigs = otherJsonConverterConfigs;
     }
 
     @Override
@@ -62,6 +72,9 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
             final HashMap<String, Object> configs = new HashMap<>(2);
             configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
             configs.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
+            if (otherJsonConverterConfigs != null) {
+                configs.putAll(otherJsonConverterConfigs);
+            }
             jsonConverter.configure(configs);
         }
         byte[] bytes =
