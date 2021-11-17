@@ -61,7 +61,56 @@ public class ChangelogJsonSerDeDecimalTest {
                             .getLogicalType();
 
     @Test
-    public void testDecimalSerializationDeserialization() throws Exception {
+    public void testSerDesDecimalAsScientificNotation() throws Exception {
+        List<String> lines = readLines("changelog-json-data2.txt");
+        ChangelogJsonDeserializationSchema deserializationSchema =
+                new ChangelogJsonDeserializationSchema(
+                        SCHEMA, InternalTypeInfo.of(SCHEMA), false, TimestampFormat.SQL);
+
+        deserializationSchema.open(null);
+        SimpleCollector collector = new SimpleCollector();
+        for (String line : lines) {
+            deserializationSchema.deserialize(line.getBytes(StandardCharsets.UTF_8), collector);
+        }
+
+        // Flink-json has its own functionality to deserialize scientific notation values.
+        // In this case, 1E+1 is deserialized to 10.00
+        List<String> expected =
+                Arrays.asList(
+                        "+I(112,liaooo,10.00)",
+                        "-U(112,liaooo,10.00)",
+                        "+U(112,liaooo,1000000.00)",
+                        "-U(112,liaooo,1000000.00)",
+                        "+U(112,liaooo,9999999.50)");
+        List<String> actual =
+                collector.list.stream().map(Object::toString).collect(Collectors.toList());
+        assertEquals(expected, actual);
+
+        Configuration formatOptions = new Configuration();
+        formatOptions.setString(JsonOptions.TIMESTAMP_FORMAT.key(), JsonOptions.SQL);
+        // Decimal fields may be serialized to be represented in scientific notation.
+        // See JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER for details.
+        formatOptions.setBoolean(JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.key(), false);
+
+        ChangelogJsonSerializationSchema serializationSchema =
+                new ChangelogJsonSerializationSchema(SCHEMA, formatOptions);
+        serializationSchema.open(null);
+        List<String> result = new ArrayList<>();
+        for (RowData rowData : collector.list) {
+            result.add(new String(serializationSchema.serialize(rowData), StandardCharsets.UTF_8));
+        }
+        List<String> expectedResult =
+                Arrays.asList(
+                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+1},\"op\":\"+I\"}",
+                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+1},\"op\":\"-U\"}",
+                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+6},\"op\":\"+U\"}",
+                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+6},\"op\":\"-U\"}",
+                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":9999999.5},\"op\":\"+U\"}");
+        assertEquals(expectedResult, result);
+    }
+
+    @Test
+    public void testSerDesDecimalAsPlainNumber() throws Exception {
         List<String> lines = readLines("changelog-json-data2.txt");
         ChangelogJsonDeserializationSchema deserializationSchema =
                 new ChangelogJsonDeserializationSchema(
@@ -86,9 +135,9 @@ public class ChangelogJsonSerDeDecimalTest {
 
         Configuration formatOptions = new Configuration();
         formatOptions.setString(JsonOptions.TIMESTAMP_FORMAT.key(), JsonOptions.SQL);
-        formatOptions.setBoolean(JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.key(), false);
+        // Encode decimal field as plain number, not scientific notation.
+        formatOptions.setBoolean(JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.key(), true);
 
-        // decimal字段会启用科学记数法
         ChangelogJsonSerializationSchema serializationSchema =
                 new ChangelogJsonSerializationSchema(SCHEMA, formatOptions);
         serializationSchema.open(null);
@@ -98,31 +147,12 @@ public class ChangelogJsonSerDeDecimalTest {
         }
         List<String> expectedResult =
                 Arrays.asList(
-                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+1},\"op\":\"+I\"}",
-                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+1},\"op\":\"-U\"}",
-                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+6},\"op\":\"+U\"}",
-                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1E+6},\"op\":\"-U\"}",
-                        "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":9999999.5},\"op\":\"+U\"}");
-        assertEquals(expectedResult, result);
-
-        // 使decimal字段以plain形式展示
-        formatOptions.setBoolean(JsonOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER.key(), true);
-        ChangelogJsonSerializationSchema serializationSchema2 =
-                new ChangelogJsonSerializationSchema(SCHEMA, formatOptions);
-        serializationSchema2.open(null);
-        List<String> result2 = new ArrayList<>();
-        for (RowData rowData : collector.list) {
-            result2.add(
-                    new String(serializationSchema2.serialize(rowData), StandardCharsets.UTF_8));
-        }
-        List<String> expectedResult2 =
-                Arrays.asList(
                         "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":10},\"op\":\"+I\"}",
                         "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":10},\"op\":\"-U\"}",
                         "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1000000},\"op\":\"+U\"}",
                         "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":1000000},\"op\":\"-U\"}",
                         "{\"data\":{\"id\":112,\"name\":\"liaooo\",\"money\":9999999.5},\"op\":\"+U\"}");
-        assertEquals(expectedResult2, result2);
+        assertEquals(expectedResult, result);
     }
 
     // --------------------------------------------------------------------------------------------

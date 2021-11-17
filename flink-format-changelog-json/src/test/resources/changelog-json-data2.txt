@@ -1,4 +1,4 @@
-{"data":{"id":112,"name":"liaooo","money":10.00},"op":"+I"}
+{"data":{"id":112,"name":"liaooo","money":1E+1},"op":"+I"}
 {"data":{"id":112,"name":"liaooo","money":10.00},"op":"-U"}
 {"data":{"id":112,"name":"liaooo","money":1000000.00},"op":"+U"}
 {"data":{"id":112,"name":"liaooo","money":1000000.00},"op":"-U"}
