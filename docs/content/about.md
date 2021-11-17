@@ -3,6 +3,8 @@
 Flink CDC Connectors is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink</a>, ingesting changes from different databases using change data capture (CDC).
 The Flink CDC Connectors integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
+![Flink_CDC](/_static/fig/flinkcdc.png "Flink CDC")
+
 ## Supported Connectors
 
 | Database | Version |
