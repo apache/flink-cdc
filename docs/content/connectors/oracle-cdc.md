@@ -120,10 +120,10 @@ The Oracle CDC table can be defined as following:
 ```sql 
 -- register an Oracle table 'products' in Flink SQL
 Flink SQL> CREATE TABLE products (
-     id INT NOT NULL,
-     name STRING,
-     description STRING,
-     weight DECIMAL(10, 3),
+     ID INT NOT NULL,
+     NAME STRING,
+     DESCRIPTION STRING,
+     WEIGHT DECIMAL(10, 3),
      PRIMARY KEY(id) NOT ENFORCED
      ) WITH (
      'connector' = 'oracle-cdc',
@@ -288,10 +288,10 @@ CREATE TABLE products (
     schema_name STRING METADATA FROM 'schema_name' VIRTUAL, 
     table_name STRING METADATA  FROM 'table_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    id INT NOT NULL,
-    name STRING,
-    description STRING,
-    weight DECIMAL(10, 3),
+    ID INT NOT NULL,
+    NAME STRING,
+    DESCRIPTION STRING,
+    WEIGHT DECIMAL(10, 3),
     PRIMARY KEY(id) NOT ENFORCED
 ) WITH (
     'connector' = 'oracle-cdc',
@@ -304,6 +304,8 @@ CREATE TABLE products (
     'table-name' = 'products'
 );
 ```
+
+** Note ** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL. 
 
 Features
 --------
