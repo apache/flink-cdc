@@ -368,3 +368,11 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
+
+
+FAQ
+--------
+
+#### Q1: How to config tableList when we build postgres-cdc source in datastream API?
+
+The tableList is using full path rather than table name in datastream API. For postgres-cdc, the tableList is like 'my_schema.my_table'.

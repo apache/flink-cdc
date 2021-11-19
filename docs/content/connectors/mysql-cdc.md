@@ -776,3 +776,6 @@ This is because the MySQL user account uses `sha256_password` authentication whi
 ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
 FLUSH PRIVILEGES;
 ```
+#### Q5: How to config tableList when we build mysql-cdc source in datastream API?
+
+The tableList is using full path rather than table name in datastream API. For mysql-cdc, the tableList is like 'my_db.my_table'.
