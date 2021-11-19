@@ -779,3 +779,7 @@ FLUSH PRIVILEGES;
 #### Q5: How to config tableList when we build mysql-cdc source in datastream API?
 
 The tableList is using full path rather than table name in datastream API. For mysql-cdc, the tableList is like 'my_db.my_table'.
+
+#### Q6: How to config mysql server timezone in DataStream API?
+
+User who use DataStream API should deal the timezone in their custom deserializer like RowDataDebeziumDeserializeSchema.
