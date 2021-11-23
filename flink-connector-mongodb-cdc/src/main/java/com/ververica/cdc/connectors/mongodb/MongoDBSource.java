@@ -321,14 +321,17 @@ public class MongoDBSource {
         }
 
         /** Build connection uri. */
-        private ConnectionString buildConnectionUri() {
+        ConnectionString buildConnectionUri() {
             StringBuilder sb = new StringBuilder(MONGODB_SCHEME).append("://");
 
-            if (username != null && password != null) {
-                sb.append(encodeValue(username)).append(":").append(encodeValue(password));
+            if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
+                sb.append(encodeValue(username))
+                        .append(":")
+                        .append(encodeValue(password))
+                        .append("@");
             }
 
-            sb.append("@").append(checkNotNull(hosts));
+            sb.append(checkNotNull(hosts));
 
             if (StringUtils.isNotEmpty(connectionOptions)) {
                 sb.append("/?").append(connectionOptions);
