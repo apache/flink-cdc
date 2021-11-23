@@ -99,12 +99,16 @@ public class VitessTableSource implements ScanTableSource {
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType rowType = (RowType) physicalSchema.toRowDataType().getLogicalType();
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
         DebeziumDeserializationSchema<RowData> deserializer =
-                new RowDataDebeziumDeserializeSchema(
-                        rowType, typeInfo, ((rowData, rowKind) -> {}), ZoneId.of("UTC"));
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType(physicalDataType)
+                        .setResultTypeInfo(typeInfo)
+                        .setServerTimeZone(ZoneId.of("UTC"))
+                        .build();
 
         DebeziumSourceFunction<RowData> sourceFunction =
                 VitessSource.<RowData>builder()
