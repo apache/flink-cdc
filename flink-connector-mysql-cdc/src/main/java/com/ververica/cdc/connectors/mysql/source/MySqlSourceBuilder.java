@@ -196,6 +196,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Specifies jdbc driver class name. */
+    public MySqlSourceBuilder<T> driverClassName(String driverClassName) {
+        this.configFactory.driverClassName(driverClassName);
+        return this;
+    }
+
     /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
     public MySqlSourceBuilder<T> debeziumProperties(Properties properties) {
         this.configFactory.debeziumProperties(properties);

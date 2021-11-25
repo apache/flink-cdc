@@ -43,6 +43,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DRIVER_CLASS_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
@@ -111,6 +112,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             validateDistributionFactorLower(distributionFactorLower);
         }
 
+        String driverClassName = config.get(DRIVER_CLASS_NAME);
+
         return new MySqlTableSource(
                 physicalSchema,
                 port,
@@ -120,6 +123,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 username,
                 password,
                 serverTimeZone,
+                driverClassName,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 serverId,
                 enableParallelRead,
@@ -169,6 +173,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
+        options.add(DRIVER_CLASS_NAME);
         return options;
     }
 

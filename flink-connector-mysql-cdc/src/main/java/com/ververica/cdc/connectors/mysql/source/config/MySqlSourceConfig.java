@@ -49,6 +49,7 @@ public class MySqlSourceConfig implements Serializable {
     private final int splitMetaGroupSize;
     private final int fetchSize;
     private final String serverTimeZone;
+    private final String driverClassName;
     private final Duration connectTimeout;
     private final int connectMaxRetries;
     private final int connectionPoolSize;
@@ -76,6 +77,7 @@ public class MySqlSourceConfig implements Serializable {
             int splitMetaGroupSize,
             int fetchSize,
             String serverTimeZone,
+            String driverClassName,
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
@@ -95,6 +97,7 @@ public class MySqlSourceConfig implements Serializable {
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.fetchSize = fetchSize;
         this.serverTimeZone = checkNotNull(serverTimeZone);
+        this.driverClassName = checkNotNull(driverClassName);
         this.connectTimeout = checkNotNull(connectTimeout);
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
@@ -161,6 +164,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public String getServerTimeZone() {
         return serverTimeZone;
+    }
+
+    public String getDriverClassName() {
+        return driverClassName;
     }
 
     public Duration getConnectTimeout() {

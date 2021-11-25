@@ -66,6 +66,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final String password;
     private final String serverId;
     private final String tableName;
+    private final String driverClassName;
     private final ZoneId serverTimeZone;
     private final Properties dbzProperties;
     private final boolean enableParallelRead;
@@ -98,6 +99,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             String username,
             String password,
             ZoneId serverTimeZone,
+            String driverClassName,
             Properties dbzProperties,
             @Nullable String serverId,
             boolean enableParallelRead,
@@ -119,6 +121,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.password = checkNotNull(password);
         this.serverId = serverId;
         this.serverTimeZone = serverTimeZone;
+        this.driverClassName = checkNotNull(driverClassName);
         this.dbzProperties = dbzProperties;
         this.enableParallelRead = enableParallelRead;
         this.splitSize = splitSize;
@@ -172,6 +175,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .username(username)
                             .password(password)
                             .serverTimeZone(serverTimeZone.toString())
+                            .driverClassName(driverClassName)
                             .serverId(serverId)
                             .splitSize(splitSize)
                             .splitMetaGroupSize(splitMetaGroupSize)
@@ -248,6 +252,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         username,
                         password,
                         serverTimeZone,
+                        driverClassName,
                         dbzProperties,
                         serverId,
                         enableParallelRead,
@@ -289,6 +294,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(serverId, that.serverId)
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(serverTimeZone, that.serverTimeZone)
+                && Objects.equals(driverClassName, that.driverClassName)
                 && Objects.equals(dbzProperties, that.dbzProperties)
                 && Objects.equals(connectTimeout, that.connectTimeout)
                 && Objects.equals(connectMaxRetries, that.connectMaxRetries)
@@ -310,6 +316,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 serverId,
                 tableName,
                 serverTimeZone,
+                driverClassName,
                 dbzProperties,
                 enableParallelRead,
                 splitSize,

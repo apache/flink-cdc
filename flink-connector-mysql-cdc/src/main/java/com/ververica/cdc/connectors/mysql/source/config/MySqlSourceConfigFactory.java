@@ -35,6 +35,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DRIVER_CLASS_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
@@ -68,6 +69,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private double distributionFactorLower =
             SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
+    private String driverClassName = DRIVER_CLASS_NAME.defaultValue();
     private Properties dbzProperties;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
@@ -221,6 +223,12 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** JDBC Driver class name used to connect to the MySQL database server. */
+    public MySqlSourceConfigFactory driverClassName(String driverClassName) {
+        this.driverClassName = driverClassName;
+        return this;
+    }
+
     /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
     public MySqlSourceConfigFactory debeziumProperties(Properties properties) {
         this.dbzProperties = properties;
@@ -251,6 +259,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 "database.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
+        props.setProperty("database.jdbc.driver", driverClassName);
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // the underlying debezium reader should always capture the schema changes and forward them.
         // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
@@ -297,6 +306,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 splitMetaGroupSize,
                 fetchSize,
                 serverTimeZone,
+                driverClassName,
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,

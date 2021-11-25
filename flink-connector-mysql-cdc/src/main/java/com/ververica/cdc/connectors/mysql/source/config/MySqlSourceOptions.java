@@ -198,4 +198,12 @@ public class MySqlSourceOptions {
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query MySQL for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
+    @Experimental
+    public static final ConfigOption<String> DRIVER_CLASS_NAME =
+            ConfigOptions.key("driver.class-name")
+                    .stringType()
+                    .defaultValue(com.mysql.cj.jdbc.Driver.class.getName())
+                    .withDescription(
+                            "JDBC Driver class name used to connect to the MySQL database server.");
 }

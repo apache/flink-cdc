@@ -109,6 +109,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
+                        "com.mysql.cj.jdbc.Driver",
                         PROPERTIES,
                         null,
                         false,
@@ -135,6 +136,7 @@ public class MySqlTableSourceFactoryTest {
         properties.put("split-key.even-distribution.factor.lower-bound", "0.01");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
+        properties.put("driver.class-name", "com.mysql.jdbc.Driver");
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
@@ -148,6 +150,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
+                        "com.mysql.jdbc.Driver",
                         PROPERTIES,
                         "123-126",
                         true,
@@ -184,6 +187,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
+                        "com.mysql.cj.jdbc.Driver",
                         PROPERTIES,
                         "123",
                         true,
@@ -218,6 +222,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
+                        "com.mysql.cj.jdbc.Driver",
                         PROPERTIES,
                         "123-126",
                         SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -254,6 +259,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("Asia/Shanghai"),
+                        "com.mysql.cj.jdbc.Driver",
                         dbzProperties,
                         "4321",
                         false,
@@ -310,6 +316,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
+                        "com.mysql.cj.jdbc.Driver",
                         PROPERTIES,
                         null,
                         false,
@@ -375,6 +382,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
+                        "com.mysql.cj.jdbc.Driver",
                         PROPERTIES,
                         null,
                         false,
@@ -413,6 +421,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC"),
+                        "com.mysql.cj.jdbc.Driver",
                         PROPERTIES,
                         null,
                         false,
