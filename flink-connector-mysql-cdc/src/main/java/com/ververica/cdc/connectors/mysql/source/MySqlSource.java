@@ -75,7 +75,7 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbc
  *
  * <pre>{@code
  * MySqlSource
- *     .<RowData>builder()
+ *     .<String>builder()
  *     .hostname("localhost")
  *     .port(3306)
  *     .databaseList("mydb")
