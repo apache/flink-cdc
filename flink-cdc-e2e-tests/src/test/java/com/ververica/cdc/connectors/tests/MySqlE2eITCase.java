@@ -32,7 +32,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /** End-to-end tests for mysql-cdc connector uber jar. */
 public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
@@ -44,7 +47,7 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
 
     @Test
     public void testMySqlCDC() throws Exception {
-        List<String> sqlLines =
+        List<String> sourceSqlLines =
                 Arrays.asList(
                         "CREATE TABLE products_source (",
                         " `id` INT NOT NULL,",
@@ -65,7 +68,9 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                         " 'table-name' = 'products_source',",
                         " 'server-id' = '5800-5900',",
                         " 'scan.incremental.snapshot.chunk.size' = '4'",
-                        ");",
+                        ");");
+        List<String> sinkSqlLines =
+                Arrays.asList(
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
                         " name STRING,",
@@ -88,7 +93,12 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, mysqlCdcJar, jdbcJar);
+        submitSQLJob(
+                Stream.of(sourceSqlLines, sinkSqlLines)
+                        .flatMap(Collection::stream)
+                        .collect(Collectors.toList()),
+                mysqlCdcJar,
+                jdbcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate binlogs
@@ -137,5 +147,44 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                 "products_sink",
                 new String[] {"id", "name", "description", "weight", "enum_c", "json_c", "point_c"},
                 60000L);
+
+        sinkSqlLines =
+                Arrays.asList(
+                        "CREATE TABLE lightest_products_sink (",
+                        " name STRING,",
+                        " weight DECIMAL(10,3),",
+                        " primary key (`name`) not enforced",
+                        ") WITH (",
+                        " 'connector' = 'jdbc',",
+                        String.format(
+                                " 'url' = 'jdbc:mysql://%s:3306/%s',",
+                                INTER_CONTAINER_MYSQL_ALIAS,
+                                mysqlInventoryDatabase.getDatabaseName()),
+                        " 'table-name' = 'lightest_products_sink',",
+                        " 'username' = '" + MYSQL_TEST_USER + "',",
+                        " 'password' = '" + MYSQL_TEST_PASSWORD + "'",
+                        ");",
+                        "INSERT INTO lightest_products_sink",
+                        "SELECT name, MIN(weight) FROM products_source GROUP BY name;");
+        submitSQLJob(
+                Stream.of(sourceSqlLines, sinkSqlLines)
+                        .flatMap(Collection::stream)
+                        .collect(Collectors.toList()),
+                mysqlCdcJar,
+                jdbcJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+
+        expectResult =
+                Arrays.asList(
+                        "12-pack drill bits,0.8",
+                        "car battery,8.1",
+                        "hammer,0.75",
+                        "jacket,0.1",
+                        "rocks,5.1",
+                        "scooter,3.14",
+                        "spare tire,22.2");
+
+        proxy.checkResultWithTimeout(
+                expectResult, "lightest_products_sink", new String[] {"name", "weight"}, 60000L);
     }
 }

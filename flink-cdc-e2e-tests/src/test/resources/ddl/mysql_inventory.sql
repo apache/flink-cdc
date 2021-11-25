@@ -51,6 +51,11 @@ CREATE TABLE products_sink (
   point_c VARCHAR(255)
 );
 
+CREATE TABLE lightest_products_sink (
+  name VARCHAR(255) NOT NULL PRIMARY KEY,
+  weight FLOAT
+);
+
 CREATE TABLE mongodb_products_sink (
   id VARCHAR (255) NOT NULL PRIMARY KEY,
   name VARCHAR(255) NOT NULL DEFAULT 'flink',
