@@ -171,20 +171,13 @@ public class RecordUtils {
                                             binlog.key(),
                                             binlog.valueSchema(),
                                             envelope.read(updateAfter, source, ts));
-                            normalizedBinlogRecords.add(record);
+                            snapshotRecords.put(key, record);
                             break;
                         case DELETE:
-                            if (snapshotRecords.containsKey(key)) {
-                                snapshotRecords.remove(key);
-                            } else {
-                                throw new IllegalStateException(
-                                        String.format(
-                                                "The delete record %s doesn't exists in table split %s.",
-                                                binlog, split));
-                            }
+                            snapshotRecords.remove(key);
                             break;
                         case CREATE:
-                            normalizedBinlogRecords.add(binlog);
+                            snapshotRecords.put(key, binlog);
                             break;
                         case READ:
                             throw new IllegalStateException(
