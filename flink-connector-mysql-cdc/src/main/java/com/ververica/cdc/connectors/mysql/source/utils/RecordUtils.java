@@ -153,9 +153,6 @@ public class RecordUtils {
                     Envelope.Operation operation =
                             Envelope.Operation.forCode(
                                     value.getString(Envelope.FieldName.OPERATION));
-                    if (snapshotRecords.containsKey(key)) {
-                        snapshotRecords.remove(key);
-                    }
                     switch (operation) {
                         case UPDATE:
                             Envelope envelope = Envelope.fromSchema(binlog.valueSchema());
@@ -174,13 +171,13 @@ public class RecordUtils {
                                             binlog.key(),
                                             binlog.valueSchema(),
                                             envelope.read(updateAfter, source, ts));
-                            normalizedBinlogRecords.add(record);
+                            snapshotRecords.put(key, record);
                             break;
                         case DELETE:
-                            // The deleting from snapshotRecords has been promoted to outer scope.
+                            snapshotRecords.remove(key);
                             break;
                         case CREATE:
-                            normalizedBinlogRecords.add(binlog);
+                            snapshotRecords.put(key, binlog);
                             break;
                         case READ:
                             throw new IllegalStateException(
