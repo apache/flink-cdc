@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.mysql.source.connection;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
 
 /** A connection pool factory to create pooled DataSource {@link HikariDataSource}. */
 public class PooledDataSourceFactory {
@@ -45,6 +46,8 @@ public class PooledDataSourceFactory {
         config.setMaximumPoolSize(sourceConfig.getConnectionPoolSize());
         config.setConnectionTimeout(sourceConfig.getConnectTimeout().toMillis());
         config.addDataSourceProperty(SERVER_TIMEZONE_KEY, sourceConfig.getServerTimeZone());
+        config.setDriverClassName(
+                sourceConfig.getDbzConfiguration().getString(MySqlConnectorConfig.JDBC_DRIVER));
 
         // optional optimization configurations for pooled DataSource
         config.addDataSourceProperty("cachePrepStmts", "true");
