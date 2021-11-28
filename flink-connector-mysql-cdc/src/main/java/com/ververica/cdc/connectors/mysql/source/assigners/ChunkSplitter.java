@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -109,7 +108,7 @@ class ChunkSplitter {
                     "Split table {} into {} chunks, time cost: {}ms.",
                     tableId,
                     splits.size(),
-                    Duration.ofMillis(end - start));
+                    end - start);
             return splits;
         } catch (Exception e) {
             throw new FlinkRuntimeException(
