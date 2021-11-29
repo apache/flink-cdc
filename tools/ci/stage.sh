@@ -20,6 +20,7 @@ STAGE_MYSQL="mysql"
 STAGE_POSTGRES="postgres"
 STAGE_ORACLE="oracle"
 STAGE_MONGODB="mongodb"
+STAGE_SQLSERVER="sqlserver"
 STAGE_E2E="e2e"
 STAGE_MISC="misc"
 
@@ -39,6 +40,10 @@ MODULES_MONGODB="\
 flink-connector-mongodb-cdc,\
 flink-sql-connector-mongodb-cdc"
 
+MODULES_SQLSERVER="\
+flink-connector-sqlserver-cdc,\
+flink-sql-connector-sqlserver-cdc"
+
 MODULES_E2E="\
 flink-cdc-e2e-tests"
 
@@ -57,6 +62,9 @@ function get_compile_modules_for_stage() {
         ;;
         (${STAGE_MONGODB})
             echo "-pl $MODULES_MONGODB -am"
+        ;;
+        (${STAGE_SQLSERVER})
+            echo "-pl $MODULES_SQLSERVER -am"
         ;;
         (${STAGE_E2E})
             # compile everything; using the -am switch does not work with negated module lists!
@@ -83,6 +91,7 @@ function get_test_modules_for_stage() {
     local negated_postgres=\!${MODULES_POSTGRES//,/,\!}
     local negated_oracle=\!${MODULES_ORACLE//,/,\!}
     local negated_mongodb=\!${MODULES_MONGODB//,/,\!}
+    local negated_sqlserver=\!${MODULES_SQLSERVER//,/,\!}
     local negated_e2e=\!${MODULES_E2E//,/,\!}
     local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_e2e"
 
@@ -98,6 +107,9 @@ function get_test_modules_for_stage() {
         ;;
         (${STAGE_MONGODB})
             echo "-pl $modules_mongodb"
+        ;;
+        (${STAGE_SQLSERVER})
+            echo "-pl $modules_sqlserver"
         ;;
         (${STAGE_E2E})
             echo "-pl $modules_e2e"
