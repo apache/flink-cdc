@@ -93,7 +93,7 @@ function get_test_modules_for_stage() {
     local negated_mongodb=\!${MODULES_MONGODB//,/,\!}
     local negated_sqlserver=\!${MODULES_SQLSERVER//,/,\!}
     local negated_e2e=\!${MODULES_E2E//,/,\!}
-    local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_e2e"
+    local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_sqlserver,$negated_e2e"
 
     case ${stage} in
         (${STAGE_MYSQL})
