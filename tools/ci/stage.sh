@@ -86,6 +86,7 @@ function get_test_modules_for_stage() {
     local modules_postgres=$MODULES_POSTGRES
     local modules_oracle=$MODULES_ORACLE
     local modules_mongodb=$MODULES_MONGODB
+    local modules_sqlserver=$MODULES_SQLSERVER
     local modules_e2e=$MODULES_E2E
     local negated_mysql=\!${MODULES_MYSQL//,/,\!}
     local negated_postgres=\!${MODULES_POSTGRES//,/,\!}
