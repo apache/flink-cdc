@@ -35,7 +35,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  *
  * <pre>{@code
  * MySqlSource
- *     .<RowData>builder()
+ *     .<String>builder()
  *     .hostname("localhost")
  *     .port(3306)
  *     .databaseList("mydb")
