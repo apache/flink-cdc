@@ -19,6 +19,7 @@
 package com.ververica.cdc.connectors.mongodb;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.annotation.VisibleForTesting;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.changestream.FullDocument;
@@ -321,7 +322,8 @@ public class MongoDBSource {
         }
 
         /** Build connection uri. */
-        ConnectionString buildConnectionUri() {
+        @VisibleForTesting
+        public ConnectionString buildConnectionUri() {
             StringBuilder sb = new StringBuilder(MONGODB_SCHEME).append("://");
 
             if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
