@@ -321,6 +321,74 @@ public class OracleConnectorITCase extends AbstractTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testConsumingNumericColumns() throws Exception {
+        // Prepare numeric type data
+        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE debezium.issue552 (ID NUMBER, WEIGHT NUMBER, PRICE FLOAT(63), PRIMARY KEY (ID))");
+            statement.execute(
+                    "INSERT INTO debezium.issue552 VALUES (111, 1024654321.678, 1024.965)");
+            statement.execute(
+                    "INSERT INTO debezium.issue552 VALUES (112, 1024654321.67, 1024.955)");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " ID BIGINT,"
+                                + " WEIGHT DECIMAL(20,3),"
+                                + " PRICE FLOAT,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        "debezium",
+                        "issue552");
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " id BIGINT,"
+                        + " weight DECIMAL(20,3),"
+                        + " price FLOAT,"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+
+        waitForSnapshotStarted("sink");
+
+        // waiting for change events finished.
+        waitForSinkSize("sink", 2);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I[111, 1024654321.678, 1024.965]", "+I[112, 1024654321.670, 1024.955]");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
     // ------------------------------------------------------------------------------------
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
