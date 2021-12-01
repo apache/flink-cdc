@@ -35,6 +35,7 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import com.jayway.jsonpath.JsonPath;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -345,6 +346,31 @@ public class MongoDBSourceTest extends MongoDBTestBase {
             source3.close();
             runThread3.sync();
         }
+    }
+
+    @Test
+    public void testConnectionUri() {
+        String hosts = MONGODB_CONTAINER.getHostAndPort();
+
+        ConnectionString case0 = MongoDBSource.builder().hosts(hosts).buildConnectionUri();
+        assertEquals(String.format("mongodb://%s", hosts), case0.toString());
+
+        ConnectionString case1 =
+                MongoDBSource.builder().username("").hosts(hosts).buildConnectionUri();
+        assertEquals(String.format("mongodb://%s", hosts), case1.toString());
+
+        ConnectionString case2 =
+                MongoDBSource.builder().password("").hosts(hosts).buildConnectionUri();
+        assertEquals(String.format("mongodb://%s", hosts), case2.toString());
+
+        ConnectionString case3 =
+                MongoDBSource.builder()
+                        .username(FLINK_USER)
+                        .password(FLINK_USER_PASSWORD)
+                        .hosts(hosts)
+                        .buildConnectionUri();
+        assertEquals(FLINK_USER, case3.getUsername());
+        assertEquals(FLINK_USER_PASSWORD, new String(case3.getPassword()));
     }
 
     // ------------------------------------------------------------------------------------------
