@@ -776,10 +776,10 @@ This is because the MySQL user account uses `sha256_password` authentication whi
 ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
 FLUSH PRIVILEGES;
 ```
-#### Q5: How to config tableList when we build mysql-cdc source in datastream API?
+#### Q5: How to config `tableList` option when build MySQL CDC source in DataStream API?
 
-The tableList is using full path rather than table name in datastream API. For mysql-cdc, the tableList is like 'my_db.my_table'.
+The `tableList` option requires table name with database name rather than table name in DataStream API. For MySQL CDC source, the `tableList` option value should  like 'my_db.my_table'.
 
-#### Q6: How to config mysql server timezone in DataStream API?
+#### Q6: How to config MySQL server timezone in DataStream API?
 
-User who use DataStream API should deal the timezone in their custom deserializer like RowDataDebeziumDeserializeSchema.
+The timezone of MySQL server influences the data value of TIMESTAMP column in its binlog file, thus we need to consider the MySQL server timezone when deal record that contains TIMESTAMP column. You can refer `com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema` as an example  when you define your custom deserializer to deal binlog data correctly.
