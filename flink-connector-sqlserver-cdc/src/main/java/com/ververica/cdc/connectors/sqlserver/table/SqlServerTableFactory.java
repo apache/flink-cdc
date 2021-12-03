@@ -48,7 +48,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
     private static final ConfigOption<Integer> PORT =
             ConfigOptions.key("port")
                     .intType()
-                    .defaultValue(1432)
+                    .defaultValue(1433)
                     .withDescription("Integer port number of the SqlServer database server.");
 
     private static final ConfigOption<String> USERNAME =

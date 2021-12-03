@@ -122,9 +122,11 @@ public class SqlServerTestBase extends AbstractTestBase {
                                     connection.createStatement().execute(sql);
                                     return true;
                                 } catch (SQLException e) {
-                                    //                    LOGGER.warn(String.format("DROP DATABASE
-                                    // %s failed (will be retried): {}", databaseName),
-                                    // e.getMessage());
+                                    LOG.warn(
+                                            String.format(
+                                                    "DROP DATABASE %s failed (will be retried): {}",
+                                                    databaseName),
+                                            e.getMessage());
                                     try {
                                         connection
                                                 .createStatement()
@@ -133,8 +135,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                                                                 "ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;",
                                                                 databaseName));
                                     } catch (SQLException e2) {
-                                        //                        LOGGER.error("Failed to rollback
-                                        // immediately", e2);
+                                        LOG.error("Failed to rollbackimmediately", e2);
                                     }
                                     return false;
                                 }

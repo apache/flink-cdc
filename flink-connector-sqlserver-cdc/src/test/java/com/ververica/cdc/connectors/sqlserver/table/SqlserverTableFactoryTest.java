@@ -86,7 +86,7 @@ public class SqlserverTableFactoryTest {
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
-                        1432,
+                        1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
@@ -99,7 +99,7 @@ public class SqlserverTableFactoryTest {
     @Test
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
-        options.put("port", "1432");
+        options.put("port", "1433");
         options.put("debezium.snapshot.mode", "init");
 
         DynamicTableSource actualSource = createTableSource(options);
@@ -108,7 +108,7 @@ public class SqlserverTableFactoryTest {
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
                         TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
-                        1432,
+                        1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
@@ -133,7 +133,7 @@ public class SqlserverTableFactoryTest {
                 new SqlServerTableSource(
                         TableSchemaUtils.getPhysicalSchema(
                                 fromResolvedSchema(SCHEMA_WITH_METADATA)),
-                        1432,
+                        1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
