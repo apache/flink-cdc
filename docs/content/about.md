@@ -13,6 +13,7 @@ The Flink CDC Connectors integrates Debezium as the engine to capture data chang
 | PostgreSQL | Database: 9.6, 10, 11, 12 <br/>JDBC Driver: 42.2.12|
 | MongoDB | Database: 3.6, 4.x, 5.0 <br/>MongoDB Driver: 4.3.1|
 | Oracle | Database: 11, 12, 19 <br/>Oracle Driver: 19.3.0.0|
+| Sqlserver | Database: 2017, 2019 <br/>JDBC Driver: 7.2.2.jre8|
 
 ## Supported Formats
 
