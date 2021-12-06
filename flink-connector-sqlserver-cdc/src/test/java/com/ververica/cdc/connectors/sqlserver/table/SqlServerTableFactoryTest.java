@@ -32,6 +32,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 
 import org.junit.Test;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -73,7 +74,8 @@ public class SqlServerTableFactoryTest {
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
     private static final String MY_DATABASE = "myDB";
-    private static final String MY_TABLE = "dbo.myTable";
+    private static final String MY_SCHEMA = "dbo";
+    private static final String MY_TABLE = "myTable";
     private static final Properties PROPERTIES = new Properties();
 
     @Test
@@ -88,10 +90,12 @@ public class SqlServerTableFactoryTest {
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
+                        MY_SCHEMA,
                         MY_TABLE,
+                        ZoneId.of("UTC"),
                         MY_USERNAME,
                         MY_PASSWORD,
-                        new Properties(),
+                        PROPERTIES,
                         StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
@@ -111,7 +115,9 @@ public class SqlServerTableFactoryTest {
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
+                        MY_SCHEMA,
                         MY_TABLE,
+                        ZoneId.of("UTC"),
                         MY_USERNAME,
                         MY_PASSWORD,
                         dbzProperties,
@@ -136,10 +142,12 @@ public class SqlServerTableFactoryTest {
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
+                        MY_SCHEMA,
                         MY_TABLE,
+                        ZoneId.of("UTC"),
                         MY_USERNAME,
                         MY_PASSWORD,
-                        new Properties(),
+                        PROPERTIES,
                         StartupOptions.initial());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
@@ -153,6 +161,7 @@ public class SqlServerTableFactoryTest {
         options.put("connector", "sqlserver-cdc");
         options.put("hostname", MY_LOCALHOST);
         options.put("database-name", MY_DATABASE);
+        options.put("schema-name", MY_SCHEMA);
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);

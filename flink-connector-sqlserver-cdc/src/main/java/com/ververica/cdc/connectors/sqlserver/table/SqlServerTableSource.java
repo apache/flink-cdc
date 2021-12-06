@@ -36,6 +36,7 @@ import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +57,9 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final int port;
     private final String hostname;
     private final String database;
+    private final String schemaName;
     private final String tableName;
+    private final ZoneId serverTimeZone;
     private final String username;
     private final String password;
     private final Properties dbzProperties;
@@ -77,7 +80,9 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
             int port,
             String hostname,
             String database,
+            String schemaName,
             String tableName,
+            ZoneId serverTimeZone,
             String username,
             String password,
             Properties dbzProperties,
@@ -86,7 +91,9 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.port = port;
         this.hostname = checkNotNull(hostname);
         this.database = checkNotNull(database);
+        this.schemaName = checkNotNull(schemaName);
         this.tableName = checkNotNull(tableName);
+        this.serverTimeZone = serverTimeZone;
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
         this.dbzProperties = dbzProperties;
@@ -117,13 +124,16 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         .setPhysicalRowType(physicalDataType)
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
+                        .setServerTimeZone(serverTimeZone)
+                        .setUserDefinedConverterFactory(
+                                SqlServerDeserializationConverterFactory.instance())
                         .build();
         DebeziumSourceFunction<RowData> sourceFunction =
                 SqlServerSource.<RowData>builder()
                         .hostname(hostname)
                         .port(port)
                         .database(database)
-                        .tableList(tableName)
+                        .tableList(schemaName + "." + tableName)
                         .username(username)
                         .password(password)
                         .debeziumProperties(dbzProperties)
@@ -157,7 +167,9 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         port,
                         hostname,
                         database,
+                        schemaName,
                         tableName,
+                        serverTimeZone,
                         username,
                         password,
                         dbzProperties,
@@ -180,7 +192,9 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
+                && Objects.equals(schemaName, that.schemaName)
                 && Objects.equals(tableName, that.tableName)
+                && Objects.equals(serverTimeZone, that.serverTimeZone)
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
                 && Objects.equals(dbzProperties, that.dbzProperties)
@@ -196,7 +210,9 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 port,
                 hostname,
                 database,
+                schemaName,
                 tableName,
+                serverTimeZone,
                 username,
                 password,
                 dbzProperties,

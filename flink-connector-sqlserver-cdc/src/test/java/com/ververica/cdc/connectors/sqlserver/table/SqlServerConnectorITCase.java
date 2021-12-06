@@ -79,6 +79,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
@@ -86,7 +87,8 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "inventory",
-                        "dbo.products");
+                        "dbo",
+                        "products");
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -192,8 +194,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + "    val_time_p2 TIME(0),\n"
                                 + "    val_time TIME(0),\n"
                                 + "    val_datetime2 TIMESTAMP,\n"
-                                // Currently,flink-sql doesn't support type 'TIMESTAMP(%d) WITH TIME
-                                // ZONE'.So column 'val_datetimeoffset' excluded.
+                                + "    val_datetimeoffset TIMESTAMP_LTZ(3),\n"
                                 + "    val_datetime TIMESTAMP,\n"
                                 + "    val_smalldatetime TIMESTAMP,\n"
                                 + "    val_xml STRING\n"
@@ -204,6 +205,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
@@ -211,7 +213,8 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "column_type_test",
-                        "dbo.full_types");
+                        "dbo",
+                        "full_types");
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id int NOT NULL,\n"
@@ -236,6 +239,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         + "    val_time_p2 TIME(0),\n"
                         + "    val_time TIME(0),\n"
                         + "    val_datetime2 TIMESTAMP,\n"
+                        + "    val_datetimeoffset TIMESTAMP_LTZ(3),\n"
                         + "    val_datetime TIMESTAMP,\n"
                         + "    val_smalldatetime TIMESTAMP,\n"
                         + "    val_xml STRING\n,"
@@ -263,8 +267,8 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,4444,55555,2018-07-13,10:23:45.680,10:23:45.678,2018-07-13T11:23:45.340,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)",
-                        "+U(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,8888,55555,2018-07-13,10:23:45.680,10:23:45.679,2018-07-13T11:23:45.340,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)");
+                        "+I(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,4444,55555,2018-07-13,10:23:45.680,10:23:45.678,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)",
+                        "+U(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,8888,55555,2018-07-13,10:23:45.680,10:23:45.679,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
 
@@ -291,6 +295,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
@@ -298,7 +303,8 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "inventory",
-                        "dbo.products");
+                        "dbo",
+                        "products");
 
         String sinkDDL =
                 "CREATE TABLE sink ("

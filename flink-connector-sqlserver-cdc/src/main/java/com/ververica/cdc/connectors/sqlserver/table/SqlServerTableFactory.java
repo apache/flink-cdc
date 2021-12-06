@@ -27,6 +27,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -70,11 +71,23 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Database name of the SqlServer server to monitor.");
 
+    private static final ConfigOption<String> SCHEMA_NAME =
+            ConfigOptions.key("schema-name")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Schema name of the SqlServer database to monitor.");
+
     private static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("table-name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Table name of the SqlServer database to monitor.");
+
+    public static final ConfigOption<String> SERVER_TIME_ZONE =
+            ConfigOptions.key("server-time-zone")
+                    .stringType()
+                    .defaultValue("UTC")
+                    .withDescription("The session time zone in database server.");
 
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")
@@ -94,8 +107,10 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         String hostname = config.get(HOSTNAME);
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
+        String schemaName = config.get(SCHEMA_NAME);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
+        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
         int port = config.get(PORT);
         StartupOptions startupOptions = getStartupOptions(config);
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
@@ -105,7 +120,9 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 port,
                 hostname,
                 databaseName,
+                schemaName,
                 tableName,
+                serverTimeZone,
                 username,
                 password,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
@@ -124,6 +141,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(DATABASE_NAME);
+        options.add(SCHEMA_NAME);
         options.add(TABLE_NAME);
         return options;
     }
@@ -132,6 +150,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
+        options.add(SERVER_TIME_ZONE);
         options.add(SCAN_STARTUP_MODE);
 
         return options;
