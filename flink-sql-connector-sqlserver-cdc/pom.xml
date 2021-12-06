@@ -58,11 +58,10 @@ under the License.
                                     <include>io.debezium:debezium-connector-sqlserver</include>
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-sqlserver-cdc</include>
-                                    <include>com.google.protobuf:protobuf-java</include>
-                                    <include>com.google.guava:*</include>
+                                    <include>com.microsoft.sqlserver:*</include>
                                     <include>org.apache.kafka:*</include>
-                                    <include>org.sqlserverql:sqlserverql</include>
                                     <include>com.fasterxml.*:*</include>
+                                    <include>com.google.guava:*</include>
                                 </includes>
                             </artifactSet>
                             <filters>
