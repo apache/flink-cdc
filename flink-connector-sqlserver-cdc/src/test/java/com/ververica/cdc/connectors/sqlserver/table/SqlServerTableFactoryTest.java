@@ -43,7 +43,7 @@ import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 
 /** Test for {@link SqlServerTableSource} created by {@link SqlServerTableFactory}. */
-public class SqlserverTableFactoryTest {
+public class SqlServerTableFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -175,7 +175,7 @@ public class SqlserverTableFactoryTest {
                                 options),
                         schema),
                 new Configuration(),
-                SqlserverTableFactoryTest.class.getClassLoader(),
+                SqlServerTableFactoryTest.class.getClassLoader(),
                 false);
     }
 }

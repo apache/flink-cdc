@@ -44,7 +44,7 @@ import static org.junit.Assert.assertThat;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Integration tests for Sqlserver Table source. */
-public class SqlserverConnectorITCase extends SqlServerTestBase {
+public class SqlServerConnectorITCase extends SqlServerTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -64,7 +64,7 @@ public class SqlserverConnectorITCase extends SqlServerTestBase {
     @Test
     public void testConsumingAllEvents()
             throws SQLException, ExecutionException, InterruptedException {
-        initializeSqlserverTable("inventory");
+        initializeSqlServerTable("inventory");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -165,7 +165,7 @@ public class SqlserverConnectorITCase extends SqlServerTestBase {
 
     @Test
     public void testAllTypes() throws Throwable {
-        initializeSqlserverTable("column_type_test");
+        initializeSqlServerTable("column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -192,8 +192,8 @@ public class SqlserverConnectorITCase extends SqlServerTestBase {
                                 + "    val_time_p2 TIME(0),\n"
                                 + "    val_time TIME(0),\n"
                                 + "    val_datetime2 TIMESTAMP,\n"
-                                //                                + "    val_datetimeoffset
-                                // TIMESTAMP_LTZ(3),\n"
+                                // Currently,flink-sql doesn't support type 'TIMESTAMP(%d) WITH TIME
+                                // ZONE'.So column 'val_datetimeoffset' excluded.
                                 + "    val_datetime TIMESTAMP,\n"
                                 + "    val_smalldatetime TIMESTAMP,\n"
                                 + "    val_xml STRING\n"
@@ -236,8 +236,6 @@ public class SqlserverConnectorITCase extends SqlServerTestBase {
                         + "    val_time_p2 TIME(0),\n"
                         + "    val_time TIME(0),\n"
                         + "    val_datetime2 TIMESTAMP,\n"
-                        //                                + "    val_datetimeoffset
-                        // TIMESTAMP_LTZ(3),\n"
                         + "    val_datetime TIMESTAMP,\n"
                         + "    val_smalldatetime TIMESTAMP,\n"
                         + "    val_xml STRING\n,"
@@ -275,7 +273,7 @@ public class SqlserverConnectorITCase extends SqlServerTestBase {
 
     @Test
     public void testMetadataColumns() throws Throwable {
-        initializeSqlserverTable("inventory");
+        initializeSqlServerTable("inventory");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source  ("

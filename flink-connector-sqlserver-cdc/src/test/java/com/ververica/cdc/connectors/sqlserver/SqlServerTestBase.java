@@ -160,7 +160,7 @@ public class SqlServerTestBase extends AbstractTestBase {
      * Executes a JDBC statement using the default jdbc config without autocommitting the
      * connection.
      */
-    protected void initializeSqlserverTable(String sqlFile) {
+    protected void initializeSqlServerTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = SqlServerTestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
