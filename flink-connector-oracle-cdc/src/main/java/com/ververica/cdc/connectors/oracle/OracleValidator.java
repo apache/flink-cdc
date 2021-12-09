@@ -70,6 +70,6 @@ public class OracleValidator implements Validator {
         String userName = properties.getProperty("database.user");
         String userpwd = properties.getProperty("database.password");
         return DriverManager.getConnection(
-                "jdbc:oracle:thin:@" + hostname + ":" + port + ":" + dbname, userName, userpwd);
+                "jdbc:oracle:thin:@" + hostname + ":" + port + "/" + dbname, userName, userpwd);
     }
 }
