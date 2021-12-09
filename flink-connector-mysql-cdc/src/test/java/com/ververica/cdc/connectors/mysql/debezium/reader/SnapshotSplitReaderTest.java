@@ -218,7 +218,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         .collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
+                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false, null);
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {

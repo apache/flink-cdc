@@ -45,6 +45,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsSt
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
+import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceEnumeratorMetrics;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
@@ -164,12 +165,16 @@ public class MySqlSource<T>
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 final List<TableId> remainingTables = discoverCapturedTables(jdbc, sourceConfig);
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                final MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics =
+                        new MySqlSourceEnumeratorMetrics(enumContext.metricGroup());
+                sourceEnumeratorMetrics.registerMetrics();
                 splitAssigner =
                         new MySqlHybridSplitAssigner(
                                 sourceConfig,
                                 enumContext.currentParallelism(),
                                 remainingTables,
-                                isTableIdCaseSensitive);
+                                isTableIdCaseSensitive,
+                                sourceEnumeratorMetrics);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
                         "Failed to discover captured tables for enumerator", e);
@@ -188,11 +193,15 @@ public class MySqlSource<T>
 
         final MySqlSplitAssigner splitAssigner;
         if (checkpoint instanceof HybridPendingSplitsState) {
+            final MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics =
+                    new MySqlSourceEnumeratorMetrics(enumContext.metricGroup());
+            sourceEnumeratorMetrics.registerMetrics();
             splitAssigner =
                     new MySqlHybridSplitAssigner(
                             sourceConfig,
                             enumContext.currentParallelism(),
-                            (HybridPendingSplitsState) checkpoint);
+                            (HybridPendingSplitsState) checkpoint,
+                            sourceEnumeratorMetrics);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(

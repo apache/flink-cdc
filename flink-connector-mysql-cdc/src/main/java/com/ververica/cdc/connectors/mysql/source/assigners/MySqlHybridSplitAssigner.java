@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceEnumeratorMetrics;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -58,10 +59,15 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive) {
+            boolean isTableIdCaseSensitive,
+            MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics) {
         this(
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, currentParallelism, remainingTables, isTableIdCaseSensitive),
+                        sourceConfig,
+                        currentParallelism,
+                        remainingTables,
+                        isTableIdCaseSensitive,
+                        sourceEnumeratorMetrics),
                 false,
                 sourceConfig.getSplitMetaGroupSize());
     }
@@ -69,10 +75,14 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     public MySqlHybridSplitAssigner(
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
-            HybridPendingSplitsState checkpoint) {
+            HybridPendingSplitsState checkpoint,
+            MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics) {
         this(
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, currentParallelism, checkpoint.getSnapshotPendingSplits()),
+                        sourceConfig,
+                        currentParallelism,
+                        checkpoint.getSnapshotPendingSplits(),
+                        sourceEnumeratorMetrics),
                 checkpoint.isBinlogSplitAssigned(),
                 sourceConfig.getSplitMetaGroupSize());
     }

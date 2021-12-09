@@ -541,7 +541,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
+                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false, null);
         assigner.open();
         List<MySqlSnapshotSplit> mySqlSplits = new ArrayList<>();
         while (true) {

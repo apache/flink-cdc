@@ -25,6 +25,7 @@ import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
+import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceEnumeratorMetrics;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -73,13 +74,16 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private ChunkSplitter chunkSplitter;
     private boolean isTableIdCaseSensitive;
 
+    private MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics;
+
     @Nullable private Long checkpointIdToFinish;
 
     public MySqlSnapshotSplitAssigner(
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive) {
+            boolean isTableIdCaseSensitive,
+            MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics) {
         this(
                 sourceConfig,
                 currentParallelism,
@@ -90,13 +94,15 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 false,
                 remainingTables,
                 isTableIdCaseSensitive,
-                true);
+                true,
+                sourceEnumeratorMetrics);
     }
 
     public MySqlSnapshotSplitAssigner(
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
-            SnapshotPendingSplitsState checkpoint) {
+            SnapshotPendingSplitsState checkpoint,
+            MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics) {
         this(
                 sourceConfig,
                 currentParallelism,
@@ -107,7 +113,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 checkpoint.isAssignerFinished(),
                 checkpoint.getRemainingTables(),
                 checkpoint.isTableIdCaseSensitive(),
-                checkpoint.isRemainingTablesCheckpointed());
+                checkpoint.isRemainingTablesCheckpointed(),
+                sourceEnumeratorMetrics);
     }
 
     private MySqlSnapshotSplitAssigner(
@@ -120,7 +127,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             boolean assignerFinished,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            boolean isRemainingTablesCheckpointed) {
+            boolean isRemainingTablesCheckpointed,
+            MySqlSourceEnumeratorMetrics sourceEnumeratorMetrics) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
@@ -131,6 +139,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.remainingTables = new LinkedList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
+        updateSourceEnumeratorMetrics();
     }
 
     @Override
@@ -149,6 +158,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         "Failed to discover remaining tables to capture", e);
             }
         }
+        updateSourceEnumeratorMetrics();
     }
 
     @Override
@@ -159,6 +169,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             MySqlSnapshotSplit split = iterator.next();
             iterator.remove();
             assignedSplits.put(split.splitId(), split);
+            updateSourceEnumeratorMetrics();
             return Optional.of(split);
         } else {
             // it's turn for new table
@@ -168,8 +179,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 Collection<MySqlSnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
                 remainingSplits.addAll(splits);
                 alreadyProcessedTables.add(nextTable);
+                updateSourceEnumeratorMetrics();
                 return getNext();
             } else {
+                updateSourceEnumeratorMetrics();
                 return Optional.empty();
             }
         }
@@ -222,6 +235,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.");
             }
         }
+        updateSourceEnumeratorMetrics();
     }
 
     @Override
@@ -233,6 +247,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             assignedSplits.remove(split.splitId());
             splitFinishedOffsets.remove(split.splitId());
         }
+        updateSourceEnumeratorMetrics();
     }
 
     @Override
@@ -262,6 +277,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (checkpointIdToFinish != null && !assignerFinished && allSplitsFinished()) {
             assignerFinished = checkpointId >= checkpointIdToFinish;
             LOG.info("Snapshot split assigner is turn into finished status.");
+            updateSourceEnumeratorMetrics();
         }
     }
 
@@ -303,5 +319,17 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig, boolean isTableIdCaseSensitive) {
         MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, isTableIdCaseSensitive);
         return new ChunkSplitter(mySqlSchema, sourceConfig);
+    }
+
+    private void updateSourceEnumeratorMetrics() {
+        if (sourceEnumeratorMetrics == null) {
+            return;
+        }
+        sourceEnumeratorMetrics.recordAlreadyProcessedTablesNum(alreadyProcessedTables.size());
+        sourceEnumeratorMetrics.recordRemainingTablesNum(remainingTables.size());
+        sourceEnumeratorMetrics.recordAssignedSplits(assignedSplits.size());
+        sourceEnumeratorMetrics.recordRemainingSplitsNum(remainingSplits.size());
+        sourceEnumeratorMetrics.recordFinishedSplits(splitFinishedOffsets.size());
+        sourceEnumeratorMetrics.recordAssignerFinished(assignerFinished);
     }
 }

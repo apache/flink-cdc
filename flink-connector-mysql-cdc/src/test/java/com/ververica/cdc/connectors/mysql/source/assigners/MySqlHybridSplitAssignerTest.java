@@ -112,7 +112,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
         final MySqlHybridSplitAssigner assigner =
-                new MySqlHybridSplitAssigner(configuration, DEFAULT_PARALLELISM, checkpoint);
+                new MySqlHybridSplitAssigner(configuration, DEFAULT_PARALLELISM, checkpoint, null);
 
         // step 2. Get the MySqlBinlogSplit after all snapshot splits finished
         Optional<MySqlSplit> binlogSplit = assigner.getNext();

@@ -342,7 +342,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 Arrays.stream(captureTables).map(TableId::parse).collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
-                        configuration, DEFAULT_PARALLELISM, remainingTables, false);
+                        configuration, DEFAULT_PARALLELISM, remainingTables, false, null);
 
         assigner.open();
         List<MySqlSplit> sqlSplits = new ArrayList<>();

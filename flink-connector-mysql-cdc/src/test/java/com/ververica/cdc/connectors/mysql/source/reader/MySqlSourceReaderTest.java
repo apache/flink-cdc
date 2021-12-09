@@ -164,7 +164,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         DEFAULT_PARALLELISM,
                         Collections.singletonList(TableId.parse(tableName)),
-                        false);
+                        false,
+                        null);
         assigner.open();
         MySqlSnapshotSplit snapshotSplit = (MySqlSnapshotSplit) assigner.getNext().get();
         // should contain only one split
