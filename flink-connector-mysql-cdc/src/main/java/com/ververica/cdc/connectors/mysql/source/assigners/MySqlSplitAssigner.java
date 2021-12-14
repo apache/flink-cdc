@@ -61,6 +61,16 @@ public interface MySqlSplitAssigner {
      */
     List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();
 
+    int getFinishedSplitCount();
+
+    int getAssignedSplitCount();
+
+    int getRemainingSplitCount();
+
+    int getAlreadyProcessedTableCount();
+
+    int getRemainingTableCount();
+
     /**
      * Callback to handle the finished splits with finished binlog offset. This is useful for
      * determine when to generate binlog split and what binlog split to generate.

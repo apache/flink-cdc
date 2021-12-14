@@ -137,7 +137,13 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
             // send acknowledge event
             FinishedSnapshotSplitsAckEvent ackEvent =
-                    new FinishedSnapshotSplitsAckEvent(new ArrayList<>(finishedOffsets.keySet()));
+                    new FinishedSnapshotSplitsAckEvent(
+                            new ArrayList<>(finishedOffsets.keySet()),
+                            splitAssigner.getAlreadyProcessedTableCount(),
+                            splitAssigner.getRemainingTableCount(),
+                            splitAssigner.getFinishedSplitCount(),
+                            splitAssigner.getAssignedSplitCount(),
+                            splitAssigner.getRemainingSplitCount());
             context.sendEventToSourceReader(subtaskId, ackEvent);
         } else if (sourceEvent instanceof BinlogSplitMetaRequestEvent) {
             LOG.debug(

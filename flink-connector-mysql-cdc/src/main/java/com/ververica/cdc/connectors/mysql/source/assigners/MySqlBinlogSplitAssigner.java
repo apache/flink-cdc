@@ -125,6 +125,31 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void close() {}
 
+    @Override
+    public int getFinishedSplitCount() {
+        return 0;
+    }
+
+    @Override
+    public int getAssignedSplitCount() {
+        return 0;
+    }
+
+    @Override
+    public int getRemainingSplitCount() {
+        return 0;
+    }
+
+    @Override
+    public int getAlreadyProcessedTableCount() {
+        return 0;
+    }
+
+    @Override
+    public int getRemainingTableCount() {
+        return 0;
+    }
+
     // ------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {
