@@ -304,4 +304,29 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, isTableIdCaseSensitive);
         return new ChunkSplitter(mySqlSchema, sourceConfig);
     }
+
+    @Override
+    public int getFinishedSplitCount() {
+        return splitFinishedOffsets.size();
+    }
+
+    @Override
+    public int getAssignedSplitCount() {
+        return assignedSplits.size();
+    }
+
+    @Override
+    public int getRemainingSplitCount() {
+        return remainingSplits.size();
+    }
+
+    @Override
+    public int getAlreadyProcessedTableCount() {
+        return alreadyProcessedTables.size();
+    }
+
+    @Override
+    public int getRemainingTableCount() {
+        return remainingTables.size();
+    }
 }

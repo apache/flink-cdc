@@ -21,7 +21,6 @@ package com.ververica.cdc.connectors.mysql.source.reader;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
@@ -35,6 +34,7 @@ import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEv
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -73,12 +73,13 @@ public class MySqlSourceReader<T>
     private final MySqlSourceConfig sourceConfig;
     private final Map<String, MySqlSnapshotSplit> finishedUnackedSplits;
     private final Map<String, MySqlBinlogSplit> uncompletedBinlogSplits;
+    private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final int subtaskId;
 
     public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
             Supplier<MySqlSplitReader> splitReaderSupplier,
-            RecordEmitter<SourceRecord, T, MySqlSplitState> recordEmitter,
+            MySqlRecordEmitter<T> recordEmitter,
             Configuration config,
             SourceReaderContext context,
             MySqlSourceConfig sourceConfig) {
@@ -92,6 +93,7 @@ public class MySqlSourceReader<T>
         this.finishedUnackedSplits = new HashMap<>();
         this.uncompletedBinlogSplits = new HashMap<>();
         this.subtaskId = context.getIndexOfSubtask();
+        this.sourceReaderMetrics = recordEmitter.getSourceReaderMetrics();
     }
 
     @Override
@@ -202,6 +204,7 @@ public class MySqlSourceReader<T>
             for (String splitId : ackEvent.getFinishedSplits()) {
                 this.finishedUnackedSplits.remove(splitId);
             }
+            reportEnumeratorMetrics(ackEvent);
         } else if (sourceEvent instanceof FinishedSnapshotSplitsRequestEvent) {
             // report finished snapshot splits
             LOG.debug(
@@ -287,5 +290,14 @@ public class MySqlSourceReader<T>
     @Override
     protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState.toMySqlSplit();
+    }
+
+    private void reportEnumeratorMetrics(FinishedSnapshotSplitsAckEvent ackEvent) {
+        sourceReaderMetrics.recordAlreadyProcessedTableCount(
+                ackEvent.getAlreadyProcessedTableCount());
+        sourceReaderMetrics.recordRemainingTableCount(ackEvent.getRemainingTableCount());
+        sourceReaderMetrics.recordAssignedSplitCount(ackEvent.getAssignedSplitCount());
+        sourceReaderMetrics.recordFinishedSplitCount(ackEvent.getFinishedSplitCount());
+        sourceReaderMetrics.recordRemainingSplitCount(ackEvent.getRemainingSplitCount());
     }
 }

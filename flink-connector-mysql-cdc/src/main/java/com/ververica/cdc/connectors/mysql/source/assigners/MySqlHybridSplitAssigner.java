@@ -199,4 +199,29 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                 new HashMap<>(),
                 finishedSnapshotSplitInfos.size());
     }
+
+    @Override
+    public int getFinishedSplitCount() {
+        return snapshotSplitAssigner.getFinishedSplitCount();
+    }
+
+    @Override
+    public int getAssignedSplitCount() {
+        return snapshotSplitAssigner.getAssignedSplitCount();
+    }
+
+    @Override
+    public int getRemainingSplitCount() {
+        return snapshotSplitAssigner.getRemainingSplitCount();
+    }
+
+    @Override
+    public int getAlreadyProcessedTableCount() {
+        return snapshotSplitAssigner.getAlreadyProcessedTableCount();
+    }
+
+    @Override
+    public int getRemainingTableCount() {
+        return snapshotSplitAssigner.getRemainingTableCount();
+    }
 }

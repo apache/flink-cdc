@@ -47,6 +47,21 @@ public class MySqlSourceReaderMetrics {
      */
     private volatile long emitDelay = 0L;
 
+    /** Already processed table count for this flink Job. */
+    private volatile long alreadyProcessedTableCount = 0L;
+
+    /** Remaining table count for this flink job to handle. */
+    private volatile long remainingTableCount = 0L;
+
+    /** Already assigned split count for this flink Job. */
+    private volatile long assignedSplitCount = 0L;
+
+    /** Remaining split count for the table int process. */
+    private volatile long remainingSplitCount = 0L;
+
+    /** Already processed split count for this flink Job. */
+    private volatile long finishedSplitCount = 0L;
+
     public MySqlSourceReaderMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
     }
@@ -55,6 +70,12 @@ public class MySqlSourceReaderMetrics {
         metricGroup.gauge("currentFetchEventTimeLag", (Gauge<Long>) this::getFetchDelay);
         metricGroup.gauge("currentEmitEventTimeLag", (Gauge<Long>) this::getEmitDelay);
         metricGroup.gauge("sourceIdleTime", (Gauge<Long>) this::getIdleTime);
+        metricGroup.gauge(
+                "alreadyProcessedTableCount", (Gauge<Long>) this::getAlreadyProcessedTableCount);
+        metricGroup.gauge("remainingTableCount", (Gauge<Long>) this::getRemainingTableCount);
+        metricGroup.gauge("assignedSplitCount", (Gauge<Long>) this::getAssignedSplitCount);
+        metricGroup.gauge("remainingSplitCount", (Gauge<Long>) this::getRemainingSplitCount);
+        metricGroup.gauge("finishedSplitCount", (Gauge<Long>) this::getFinishedSplitCount);
     }
 
     public long getFetchDelay() {
@@ -73,6 +94,26 @@ public class MySqlSourceReaderMetrics {
         return System.currentTimeMillis() - processTime;
     }
 
+    public long getAlreadyProcessedTableCount() {
+        return alreadyProcessedTableCount;
+    }
+
+    public long getRemainingTableCount() {
+        return remainingTableCount;
+    }
+
+    public long getAssignedSplitCount() {
+        return assignedSplitCount;
+    }
+
+    public long getRemainingSplitCount() {
+        return remainingSplitCount;
+    }
+
+    public long getFinishedSplitCount() {
+        return finishedSplitCount;
+    }
+
     public void recordProcessTime(long processTime) {
         this.processTime = processTime;
     }
@@ -83,5 +124,25 @@ public class MySqlSourceReaderMetrics {
 
     public void recordEmitDelay(long emitDelay) {
         this.emitDelay = emitDelay;
+    }
+
+    public void recordAlreadyProcessedTableCount(final long alreadyProcessedTableCount) {
+        this.alreadyProcessedTableCount = alreadyProcessedTableCount;
+    }
+
+    public void recordRemainingTableCount(final long remainingTableCount) {
+        this.remainingTableCount = remainingTableCount;
+    }
+
+    public void recordAssignedSplitCount(final long assignedSplitCount) {
+        this.assignedSplitCount = assignedSplitCount;
+    }
+
+    public void recordRemainingSplitCount(final long remainingSplitCount) {
+        this.remainingSplitCount = remainingSplitCount;
+    }
+
+    public void recordFinishedSplitCount(final long finishedSplitCount) {
+        this.finishedSplitCount = finishedSplitCount;
     }
 }

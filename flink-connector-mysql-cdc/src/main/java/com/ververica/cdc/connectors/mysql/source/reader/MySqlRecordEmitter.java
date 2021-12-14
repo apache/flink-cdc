@@ -126,6 +126,10 @@ public final class MySqlRecordEmitter<T>
         }
     }
 
+    public MySqlSourceReaderMetrics getSourceReaderMetrics() {
+        return sourceReaderMetrics;
+    }
+
     private static class OutputCollector<T> implements Collector<T> {
         private SourceOutput<T> output;
 
