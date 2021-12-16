@@ -30,6 +30,7 @@ public class PooledDataSourceFactory {
             "jdbc:mysql://%s:%s/?useInformationSchema=true&nullCatalogMeansCurrent=false&useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&zeroDateTimeBehavior=CONVERT_TO_NULL";
     public static final String CONNECTION_POOL_PREFIX = "connection-pool-";
     public static final String SERVER_TIMEZONE_KEY = "serverTimezone";
+    public static final int MINIMUM_POOL_SIZE = 1;
 
     private PooledDataSourceFactory() {}
 
@@ -43,6 +44,7 @@ public class PooledDataSourceFactory {
         config.setJdbcUrl(String.format(JDBC_URL_PATTERN, hostName, port));
         config.setUsername(sourceConfig.getUsername());
         config.setPassword(sourceConfig.getPassword());
+        config.setMinimumIdle(MINIMUM_POOL_SIZE);
         config.setMaximumPoolSize(sourceConfig.getConnectionPoolSize());
         config.setConnectionTimeout(sourceConfig.getConnectTimeout().toMillis());
         config.addDataSourceProperty(SERVER_TIMEZONE_KEY, sourceConfig.getServerTimeZone());
