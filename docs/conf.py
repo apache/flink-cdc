@@ -38,13 +38,9 @@ sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
-
 project = 'Flink CDC'
 copyright = '2021, ververica'
 author = 'ververica'
-
-# The full version, including alpha/beta/rc tags
-release = '2.0.0'
 
 
 # -- General configuration ---------------------------------------------------
