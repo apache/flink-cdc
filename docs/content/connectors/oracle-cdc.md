@@ -472,3 +472,8 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
+
+FAQ
+--------
+* [FAQ(English)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
+* [FAQ(中文)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
