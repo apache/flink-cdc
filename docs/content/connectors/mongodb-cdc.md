@@ -506,9 +506,3 @@ Reference
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
 - [Flink DataTypes](https://ci.apache.org/projects/flink/flink-docs-release-1.13/docs/dev/table/types/)
-
-[FAQ](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
---------
-
-[FAQ(ZH)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
---------

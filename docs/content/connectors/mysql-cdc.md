@@ -751,9 +751,35 @@ The example for different spatial data types mapping is as follows:
 </table>
 </div>
 
-[FAQ](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
+
+
+FAQ
 --------
 
-[FAQ(ZH)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
---------
+#### Q1: How to skip snapshot and only read from binlog? 
 
+Please see [Startup Reading Position](#startup-reading-position) section.
+
+#### Q2: How to read a shared database that contains multiple tables, e.g. user_00, user_01, ..., user_99 ?
+
+The `table-name` option supports regular expressions to monitor multiple tables matches the regular expression. So you can set `table-name` to `user_.*` to monitor all the `user_` prefix tables. The same to the `database-name` option. Note that the shared table should be in the same schema.
+
+#### Q3: ConnectException: Received DML '...' for processing, binlog probably contains events generated with statement or mixed based replication format
+
+If there is above exception, please check `binlog_format` is `ROW`, you can check this by running `show variables like '%binlog_format%'` in MySQL client. Please note that even if the `binlog_format` configuration of your database is `ROW`, this configuration can be changed by other sessions, for example, `SET SESSION binlog_format='MIXED'; SET SESSION tx_isolation='REPEATABLE-READ'; COMMIT;`. Please also make sure there are no other session are changing this configuration.
+
+#### Q4: Mysql8.0 Public Key Retrieval is not allowed ?
+
+This is because the MySQL user account uses `sha256_password` authentication which requires transporting password under protection like TLS protocol. A simple way is to enable the MySQL user account use naive password.
+```sql
+-- MySQL
+ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
+FLUSH PRIVILEGES;
+```
+#### Q5: How to config `tableList` option when build MySQL CDC source in DataStream API?
+
+The `tableList` option requires table name with database name rather than table name in DataStream API. For MySQL CDC source, the `tableList` option value should  like 'my_db.my_table'.
+
+#### Q6: How to config MySQL server timezone in DataStream API?
+
+The timezone of MySQL server influences the data value of TIMESTAMP column in its binlog file, thus we need to consider the MySQL server timezone when deal record that contains TIMESTAMP column. You can refer `com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema` as an example  when you define your custom deserializer to deal binlog data correctly.
