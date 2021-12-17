@@ -81,7 +81,7 @@ Include following Maven dependency (available through Maven Central):
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- the dependency is available only for stable releases. -->
-  <version>2.1.0</version>
+  <version>2.1.1</version>
 </dependency>
 ```
 
