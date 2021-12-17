@@ -14,7 +14,7 @@ In order to setup the Changelog JSON format, the following table provides depend
   <groupId>com.ververica</groupId>
   <artifactId>flink-format-changelog-json</artifactId>
   <!-- the dependency is available only for stable releases. -->
-  <version>2.1.0</version>
+  <version>2.1.1</version>
 </dependency>
 ```
 
@@ -22,7 +22,7 @@ In order to setup the Changelog JSON format, the following table provides depend
 
 ```Download link is available only for stable releases.```
 
-Download [flink-format-changelog-json-2.1.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-format-changelog-json/2.1.0/flink-format-changelog-json-2.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-format-changelog-json-2.1.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-format-changelog-json/2.1.1/flink-format-changelog-json-2.1.1.jar) and put it under `<FLINK_HOME>/lib/`.
 
 
 How to use Changelog JSON format
