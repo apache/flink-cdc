@@ -369,10 +369,8 @@ Data Type Mapping
 </table>
 </div>
 
-
-FAQ
+[FAQ](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
 --------
 
-#### Q1: How to config `tableList` option when build Postgres CDC source in DataStream API?
-
-The `tableList` option requires table name with schema name rather than table name in DataStream API. For Postgres CDC source, the `tableList` option value should  like 'my_schema.my_table'.
+[FAQ(ZH)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
+--------
