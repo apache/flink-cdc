@@ -29,7 +29,7 @@ under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>com.vinted</groupId>
             <artifactId>flink-connector-vitess-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -40,7 +40,7 @@ under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.1.1</version>
+                <version>3.2.4</version>
                 <executions>
                     <execution>
                         <id>shade-flink</id>
@@ -52,7 +52,30 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>*:*</include>
+
+                                    <include>io.debezium:debezium-api</include>
+                                    <include>io.debezium:debezium-embedded</include>
+                                    <include>io.debezium:debezium-core</include>
+                                    <include>io.debezium:debezium-ddl-parser</include>
+                                    <include>io.debezium:debezium-connector-vitess</include>
+                                    <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-connector-vitess-cdc</include>
+                                    <include>org.apache.kafka:*</include>
+                                    <include>com.google.guava:*</include>
+                                    <include>io.vitess:vitess-grpc-client</include>
+                                    <include>io.vitess:vitess-client</include>
+                                    <include>io.grpc:grpc-core</include>
+                                    <include>io.grpc:grpc-netty</include>
+                                    <include>io.grpc:grpc-stub</include>
+                                    <include>io.grpc:grpc-protobuf</include>
+                                    <include>io.grpc:grpc-protobuf-lite</include>
+                                    <include>io.grpc:grpc-context</include>
+                                    <include>io.grpc:grpc-api</include>
+                                    <include>com.google.protobuf:protobuf-java</include>
+                                    <include>com.google.code.gson:gson</include>
+                                    <include>io.opentracing.contrib:opentracing-grpc</include>
+                                    <include>io.perfmark:perfmark-api</include>
+                                    <include>com.github.luben:zstd-jni</include>
                                 </includes>
                             </artifactSet>
                             <filters>
