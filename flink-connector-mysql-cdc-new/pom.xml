@@ -25,13 +25,11 @@ under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-connector-mysql-cdc</artifactId>
-    <name>flink-connector-mysql-cdc</name>
+    <artifactId>flink-connector-mysql-cdc-new</artifactId>
+    <name>flink-connector-mysql-cdc-new</name>
     <packaging>jar</packaging>
 
     <dependencies>
-
-        <!-- Debezium dependencies -->
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-connector-debezium</artifactId>
@@ -44,6 +42,11 @@ under the License.
             </exclusions>
         </dependency>
 
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-connector-base</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-connector-mysql</artifactId>
@@ -67,12 +70,6 @@ under the License.
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>4.0.3</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-api</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <!-- test dependencies on Debezium -->
@@ -183,7 +180,6 @@ under the License.
             <version>2.4.0</version>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
 
 </project>
