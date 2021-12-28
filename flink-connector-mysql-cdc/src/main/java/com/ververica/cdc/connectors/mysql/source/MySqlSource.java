@@ -31,6 +31,7 @@ import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.MySqlValidator;
@@ -58,6 +59,7 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -135,8 +137,13 @@ public class MySqlSource<T>
                 configFactory.createConfig(readerContext.getIndexOfSubtask());
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
+
+        final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
+        metricGroupMethod.setAccessible(true);
+        final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
+
         final MySqlSourceReaderMetrics sourceReaderMetrics =
-                new MySqlSourceReaderMetrics(readerContext.metricGroup());
+                new MySqlSourceReaderMetrics(metricGroup);
         sourceReaderMetrics.registerMetrics();
         MySqlSourceReaderContext mySqlSourceReaderContext =
                 new MySqlSourceReaderContext(readerContext);

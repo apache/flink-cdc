@@ -62,6 +62,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Properties;
@@ -425,7 +426,13 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         debeziumStarted = true;
 
         // initialize metrics
-        MetricGroup metricGroup = getRuntimeContext().getMetricGroup();
+        // make RuntimeContext#getMetricGroup compatible between Flink 1.13 and Flink 1.14
+        final Method getMetricGroupMethod =
+                getRuntimeContext().getClass().getMethod("getMetricGroup");
+        getMetricGroupMethod.setAccessible(true);
+        final MetricGroup metricGroup =
+                (MetricGroup) getMetricGroupMethod.invoke(getRuntimeContext());
+
         metricGroup.gauge(
                 "currentFetchEventTimeLag",
                 (Gauge<Long>) () -> debeziumChangeFetcher.getFetchDelay());

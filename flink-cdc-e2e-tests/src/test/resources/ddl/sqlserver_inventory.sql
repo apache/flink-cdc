@@ -17,17 +17,20 @@
 -- DATABASE:  inventory
 -- ----------------------------------------------------------------------------------------------------------------
 -- Create the inventory database
-CREATE DATABASE inventory;
+CREATE
+DATABASE inventory;
 
-USE inventory;
+USE
+inventory;
 EXEC sys.sp_cdc_enable_db;
 
 -- Create and populate our products using a single insert with many rows
-CREATE TABLE products (
-                          id INTEGER IDENTITY(101,1) NOT NULL PRIMARY KEY,
-                          name VARCHAR(255) NOT NULL,
-                          description VARCHAR(512),
-                          weight FLOAT
+CREATE TABLE products
+(
+    id          INTEGER IDENTITY(101,1) NOT NULL PRIMARY KEY,
+    name        VARCHAR(255) NOT NULL,
+    description VARCHAR(512),
+    weight      FLOAT
 );
 INSERT INTO products(name,description,weight)
 VALUES ('scooter','Small 2-wheel scooter',3.14);
