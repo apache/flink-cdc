@@ -63,6 +63,8 @@ under the License.
                                     <include>org.apache.kafka:*</include>
                                     <include>org.postgresql:postgresql</include>
                                     <include>com.fasterxml.*:*</include>
+                                    <!--  Include fixed version 18.0-13.0 of flink shaded guava  -->
+                                    <include>org.apache.flink:flink-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <filters>

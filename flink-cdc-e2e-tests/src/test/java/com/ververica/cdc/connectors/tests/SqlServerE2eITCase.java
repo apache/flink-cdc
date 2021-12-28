@@ -21,13 +21,15 @@ package com.ververica.cdc.connectors.tests;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
+import org.junit.After;
 import org.junit.Before;
-import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -43,6 +45,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
 
@@ -54,11 +57,10 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     private static final String INTER_CONTAINER_SQL_SERVER_ALIAS = "mssqlserver";
     private static final Path sqlServerCdcJar =
             TestUtils.getResource("sqlserver-cdc-connector.jar");
-    private static final Path jdbcJar = TestUtils.getResource("jdbc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @ClassRule
-    public static final MSSQLServerContainer MSSQL_SERVER_CONTAINER =
+    @Rule
+    public MSSQLServerContainer sqlServer =
             new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
@@ -70,7 +72,18 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     @Before
     public void before() {
         super.before();
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(sqlServer)).join();
+        LOG.info("Containers are started.");
         initializeSqlServerTable("sqlserver_inventory");
+    }
+
+    @After
+    public void after() {
+        if (sqlServer != null) {
+            sqlServer.stop();
+        }
+        super.after();
     }
 
     @Test
@@ -86,9 +99,9 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                         ") WITH (",
                         " 'connector' = 'sqlserver-cdc',",
                         " 'hostname' = '" + INTER_CONTAINER_SQL_SERVER_ALIAS + "',",
-                        " 'port' = '" + MSSQL_SERVER_CONTAINER.MS_SQL_SERVER_PORT + "',",
-                        " 'username' = '" + MSSQL_SERVER_CONTAINER.getUsername() + "',",
-                        " 'password' = '" + MSSQL_SERVER_CONTAINER.getPassword() + "',",
+                        " 'port' = '" + sqlServer.MS_SQL_SERVER_PORT + "',",
+                        " 'username' = '" + sqlServer.getUsername() + "',",
+                        " 'password' = '" + sqlServer.getPassword() + "',",
                         " 'database-name' = 'inventory',",
                         " 'schema-name' = 'dbo',",
                         " 'table-name' = 'products'",
@@ -193,8 +206,6 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
 
     private Connection getSqlServerJdbcConnection() throws SQLException {
         return DriverManager.getConnection(
-                MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                MSSQL_SERVER_CONTAINER.getUsername(),
-                MSSQL_SERVER_CONTAINER.getPassword());
+                sqlServer.getJdbcUrl(), sqlServer.getUsername(), sqlServer.getPassword());
     }
 }

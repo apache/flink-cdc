@@ -58,7 +58,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import static java.lang.String.format;
-import static org.apache.flink.shaded.guava18.com.google.common.base.Preconditions.checkState;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests for {@link MySqlSource}. */
 public class MySqlSourceITCase extends MySqlSourceTestBase {

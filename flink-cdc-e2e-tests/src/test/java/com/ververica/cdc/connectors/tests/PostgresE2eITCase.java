@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.tests;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -61,7 +62,6 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
             DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
 
     private static final Path postgresCdcJar = TestUtils.getResource("postgres-cdc-connector.jar");
-    private static final Path jdbcJar = TestUtils.getResource("jdbc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
     @ClassRule
@@ -78,6 +78,11 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     public void before() {
         super.before();
         initializePostgresTable("postgres_inventory");
+    }
+
+    @After
+    public void after() {
+        super.after();
     }
 
     @Test

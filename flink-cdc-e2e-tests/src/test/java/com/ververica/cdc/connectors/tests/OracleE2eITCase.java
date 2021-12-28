@@ -21,12 +21,15 @@ package com.ververica.cdc.connectors.tests;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
-import org.junit.ClassRule;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -36,6 +39,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 /** End-to-end tests for oracle-cdc connector uber jar. */
 public class OracleE2eITCase extends FlinkContainerTestEnvironment {
@@ -49,15 +53,30 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     private static final int ORACLE_PORT = 1521;
 
     private static final Path oracleCdcJar = TestUtils.getResource("oracle-cdc-connector.jar");
-    private static final Path jdbcJar = TestUtils.getResource("jdbc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @ClassRule
-    public static final OracleContainer ORACLE =
+    @Rule
+    public final OracleContainer oracle =
             new OracleContainer(ORACLE_IMAGE)
                     .withNetwork(NETWORK)
                     .withNetworkAliases(INTER_CONTAINER_ORACLE_ALIAS)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    @Before
+    public void before() {
+        super.before();
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(oracle)).join();
+        LOG.info("Containers are started.");
+    }
+
+    @After
+    public void after() {
+        if (oracle != null) {
+            oracle.stop();
+        }
+        super.after();
+    }
 
     @Test
     public void testOracleCDC() throws Exception {
@@ -155,6 +174,6 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
 
     private Connection getOracleJdbcConnection() throws SQLException {
         return DriverManager.getConnection(
-                ORACLE.getJdbcUrl(), ORACLE_TEST_USER, ORACLE_TEST_PASSWORD);
+                oracle.getJdbcUrl(), ORACLE_TEST_USER, ORACLE_TEST_PASSWORD);
     }
 }
