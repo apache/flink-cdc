@@ -375,6 +375,14 @@ After the server you monitored fails in MySQL cluster, you only need to change t
 
 It's recommended to configure a DNS(Domain Name Service) or VIP(Virtual IP Address) for your MySQL cluster, using the DNS or VIP address for ```mysql-cdc``` connector, the DNS or VIP would automatically route the network request to the active MySQL server. In this way, you don't need to modify the address and restart your pipeline anymore.
 
+#### MySQL Heartbeat Event Support
+
+If the table updates infrequently, the binlog file or GTID set may have been cleaned in its last committed binlog position.
+The CDC job restart fails in this case. So the heartbeat event will update binlog position. It's recommended to configure `debezium.heartbeat.interval.ms`.
+```
+debezium.heartbeat.interval.ms=3000
+```
+
 #### How Incremental Snapshot Reading works
 
 When the MySQL CDC source is started, it reads snapshot of table parallelly and then reads binlog of table with single parallelism.
