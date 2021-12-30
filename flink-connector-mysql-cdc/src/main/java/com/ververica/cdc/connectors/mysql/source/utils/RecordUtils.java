@@ -133,10 +133,10 @@ public class RecordUtils {
     }
 
     private static List<SourceRecord> upsertBinlog(
-        SourceRecord lowWatermarkEvent,
-        SourceRecord highWatermarkEvent,
-        Map<Struct, SourceRecord> snapshotRecords,
-        List<SourceRecord> binlogRecords) {
+            SourceRecord lowWatermarkEvent,
+            SourceRecord highWatermarkEvent,
+            Map<Struct, SourceRecord> snapshotRecords,
+            List<SourceRecord> binlogRecords) {
         // upsert binlog events to snapshot events of split
         if (!binlogRecords.isEmpty()) {
             for (SourceRecord binlog : binlogRecords) {
@@ -144,26 +144,26 @@ public class RecordUtils {
                 Struct value = (Struct) binlog.value();
                 if (value != null) {
                     Envelope.Operation operation =
-                        Envelope.Operation.forCode(
-                            value.getString(Envelope.FieldName.OPERATION));
+                            Envelope.Operation.forCode(
+                                    value.getString(Envelope.FieldName.OPERATION));
                     switch (operation) {
                         case UPDATE:
                             Envelope envelope = Envelope.fromSchema(binlog.valueSchema());
                             Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                             Struct updateAfter = value.getStruct(Envelope.FieldName.AFTER);
                             Instant fetchTs =
-                                Instant.ofEpochMilli(
-                                    (Long) source.get(Envelope.FieldName.TIMESTAMP));
+                                    Instant.ofEpochMilli(
+                                            (Long) source.get(Envelope.FieldName.TIMESTAMP));
                             SourceRecord record =
-                                new SourceRecord(
-                                    binlog.sourcePartition(),
-                                    binlog.sourceOffset(),
-                                    binlog.topic(),
-                                    binlog.kafkaPartition(),
-                                    binlog.keySchema(),
-                                    binlog.key(),
-                                    binlog.valueSchema(),
-                                    envelope.read(updateAfter, source, fetchTs));
+                                    new SourceRecord(
+                                            binlog.sourcePartition(),
+                                            binlog.sourceOffset(),
+                                            binlog.topic(),
+                                            binlog.kafkaPartition(),
+                                            binlog.keySchema(),
+                                            binlog.key(),
+                                            binlog.valueSchema(),
+                                            envelope.read(updateAfter, source, fetchTs));
                             snapshotRecords.put(key, record);
                             break;
                         case DELETE:
@@ -174,9 +174,9 @@ public class RecordUtils {
                             break;
                         case READ:
                             throw new IllegalStateException(
-                                String.format(
-                                    "Binlog record shouldn't use READ operation, the the record is %s.",
-                                    binlog));
+                                    String.format(
+                                            "Binlog record shouldn't use READ operation, the the record is %s.",
+                                            binlog));
                     }
                 }
             }
@@ -193,32 +193,33 @@ public class RecordUtils {
     /**
      * Format message timestamp(source.ts_ms) value to 0L for all records read in snapshot phase.
      */
-    private static List<SourceRecord> formatMessageTimestamp(Collection<SourceRecord> snapshotRecords) {
+    private static List<SourceRecord> formatMessageTimestamp(
+            Collection<SourceRecord> snapshotRecords) {
         return snapshotRecords.stream()
                 .map(
-                    record -> {
-                        Envelope envelope = Envelope.fromSchema(record.valueSchema());
-                        Struct value = (Struct) record.value();
-                        Struct updateAfter = value.getStruct(Envelope.FieldName.AFTER);
-                        // set message timestamp (source.ts_ms) to 0L
-                        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                        source.put(Envelope.FieldName.TIMESTAMP, 0L);
-                        // extend the fetch timestamp(ts_ms)
-                        Instant fetchTs =
-                            Instant.ofEpochMilli(
-                                value.getInt64(Envelope.FieldName.TIMESTAMP));
-                        SourceRecord sourceRecord =
-                            new SourceRecord(
-                                record.sourcePartition(),
-                                record.sourceOffset(),
-                                record.topic(),
-                                record.kafkaPartition(),
-                                record.keySchema(),
-                                record.key(),
-                                record.valueSchema(),
-                                envelope.read(updateAfter, source, fetchTs));
-                        return sourceRecord;
-                    })
+                        record -> {
+                            Envelope envelope = Envelope.fromSchema(record.valueSchema());
+                            Struct value = (Struct) record.value();
+                            Struct updateAfter = value.getStruct(Envelope.FieldName.AFTER);
+                            // set message timestamp (source.ts_ms) to 0L
+                            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                            source.put(Envelope.FieldName.TIMESTAMP, 0L);
+                            // extend the fetch timestamp(ts_ms)
+                            Instant fetchTs =
+                                    Instant.ofEpochMilli(
+                                            value.getInt64(Envelope.FieldName.TIMESTAMP));
+                            SourceRecord sourceRecord =
+                                    new SourceRecord(
+                                            record.sourcePartition(),
+                                            record.sourceOffset(),
+                                            record.topic(),
+                                            record.kafkaPartition(),
+                                            record.keySchema(),
+                                            record.key(),
+                                            record.valueSchema(),
+                                            envelope.read(updateAfter, source, fetchTs));
+                            return sourceRecord;
+                        })
                 .collect(Collectors.toList());
     }
 
