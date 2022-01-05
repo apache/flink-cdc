@@ -25,7 +25,6 @@ import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
@@ -41,10 +40,12 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl.HISTORY_RECORD_FIELD;
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.SIGNAL_EVENT_VALUE_SCHEMA_NAME;
@@ -126,24 +127,16 @@ public class RecordUtils {
                             "The last record should be high watermark signal event, but is %s",
                             highWatermark));
             normalizedRecords =
-                    upsertBinlog(
-                            snapshotSplit,
-                            lowWatermark,
-                            highWatermark,
-                            snapshotRecords,
-                            binlogRecords);
+                    upsertBinlog(lowWatermark, highWatermark, snapshotRecords, binlogRecords);
         }
         return normalizedRecords;
     }
 
     private static List<SourceRecord> upsertBinlog(
-            MySqlSplit split,
             SourceRecord lowWatermarkEvent,
             SourceRecord highWatermarkEvent,
             Map<Struct, SourceRecord> snapshotRecords,
             List<SourceRecord> binlogRecords) {
-        final List<SourceRecord> normalizedBinlogRecords = new ArrayList<>();
-        normalizedBinlogRecords.add(lowWatermarkEvent);
         // upsert binlog events to snapshot events of split
         if (!binlogRecords.isEmpty()) {
             for (SourceRecord binlog : binlogRecords) {
@@ -158,7 +151,7 @@ public class RecordUtils {
                             Envelope envelope = Envelope.fromSchema(binlog.valueSchema());
                             Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                             Struct updateAfter = value.getStruct(Envelope.FieldName.AFTER);
-                            Instant ts =
+                            Instant fetchTs =
                                     Instant.ofEpochMilli(
                                             (Long) source.get(Envelope.FieldName.TIMESTAMP));
                             SourceRecord record =
@@ -170,7 +163,7 @@ public class RecordUtils {
                                             binlog.keySchema(),
                                             binlog.key(),
                                             binlog.valueSchema(),
-                                            envelope.read(updateAfter, source, ts));
+                                            envelope.read(updateAfter, source, fetchTs));
                             snapshotRecords.put(key, record);
                             break;
                         case DELETE:
@@ -188,9 +181,46 @@ public class RecordUtils {
                 }
             }
         }
-        normalizedBinlogRecords.addAll(snapshotRecords.values());
-        normalizedBinlogRecords.add(highWatermarkEvent);
-        return normalizedBinlogRecords;
+
+        final List<SourceRecord> normalizedRecords = new ArrayList<>();
+        normalizedRecords.add(lowWatermarkEvent);
+        normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
+        normalizedRecords.add(highWatermarkEvent);
+
+        return normalizedRecords;
+    }
+
+    /**
+     * Format message timestamp(source.ts_ms) value to 0L for all records read in snapshot phase.
+     */
+    private static List<SourceRecord> formatMessageTimestamp(
+            Collection<SourceRecord> snapshotRecords) {
+        return snapshotRecords.stream()
+                .map(
+                        record -> {
+                            Envelope envelope = Envelope.fromSchema(record.valueSchema());
+                            Struct value = (Struct) record.value();
+                            Struct updateAfter = value.getStruct(Envelope.FieldName.AFTER);
+                            // set message timestamp (source.ts_ms) to 0L
+                            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                            source.put(Envelope.FieldName.TIMESTAMP, 0L);
+                            // extend the fetch timestamp(ts_ms)
+                            Instant fetchTs =
+                                    Instant.ofEpochMilli(
+                                            value.getInt64(Envelope.FieldName.TIMESTAMP));
+                            SourceRecord sourceRecord =
+                                    new SourceRecord(
+                                            record.sourcePartition(),
+                                            record.sourceOffset(),
+                                            record.topic(),
+                                            record.kafkaPartition(),
+                                            record.keySchema(),
+                                            record.key(),
+                                            record.valueSchema(),
+                                            envelope.read(updateAfter, source, fetchTs));
+                            return sourceRecord;
+                        })
+                .collect(Collectors.toList());
     }
 
     public static boolean isWatermarkEvent(SourceRecord record) {
