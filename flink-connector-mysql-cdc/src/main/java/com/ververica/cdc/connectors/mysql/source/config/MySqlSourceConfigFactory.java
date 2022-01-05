@@ -68,6 +68,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private double distributionFactorLower =
             SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
+    private boolean captureNewTables = false;
     private Properties dbzProperties;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
@@ -207,6 +208,12 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should capture the newly added tables or not. */
+    public MySqlSourceConfigFactory captureNewTables(boolean captureNewTables) {
+        this.captureNewTables = captureNewTables;
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceConfigFactory startupOptions(StartupOptions startupOptions) {
         switch (startupOptions.startupMode) {
@@ -303,6 +310,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                captureNewTables,
                 props);
     }
 }

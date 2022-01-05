@@ -51,6 +51,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     private final int splitMetaGroupSize;
 
     private boolean isBinlogSplitAssigned;
+    private boolean shouldWakeupBinlogSplitReader = false;
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
@@ -93,17 +94,28 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public Optional<MySqlSplit> getNext() {
+        if (snapshotSplitAssigner.isAssignerSuspended()) {
+            // do not assign split until Assigner receive SuspendBinlogSplitReaderResponseEvent
+            return Optional.empty();
+        }
         if (snapshotSplitAssigner.noMoreSplits()) {
             // binlog split assigning
             if (isBinlogSplitAssigned) {
                 // no more splits for the assigner
                 return Optional.empty();
-            } else if (snapshotSplitAssigner.isFinished()) {
+            } else if (snapshotSplitAssigner.getAssignerState()
+                    == SnapshotAssignerStatus.INIT_FINISH) {
                 // we need to wait snapshot-assigner to be finished before
                 // assigning the binlog split. Otherwise, records emitted from binlog split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isBinlogSplitAssigned = true;
                 return Optional.of(createBinlogSplit());
+            } else if (snapshotSplitAssigner.getAssignerState()
+                    == SnapshotAssignerStatus.RESUMED_FINISH) {
+                // do not need to create binlog, but send event to wake up the binlog
+                isBinlogSplitAssigned = true;
+                shouldWakeupBinlogSplitReader = true;
+                return Optional.empty();
             } else {
                 // binlog split is not ready by now
                 return Optional.empty();
@@ -157,6 +169,30 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void close() {
         snapshotSplitAssigner.close();
+    }
+
+    @Override
+    public boolean isAssignerSuspended() {
+        return snapshotSplitAssigner.isAssignerSuspended();
+    }
+
+    @Override
+    public void wakeup() {
+        isBinlogSplitAssigned = false;
+        snapshotSplitAssigner.wakeup();
+    }
+
+    public boolean isShouldWakeupBinlogSplitReader() {
+        return shouldWakeupBinlogSplitReader;
+    }
+
+    public void setShouldWakeupBinlogSplitReader(final boolean shouldWakeupBinlogSplitReader) {
+        this.shouldWakeupBinlogSplitReader = shouldWakeupBinlogSplitReader;
+    }
+
+    @Override
+    public int getTotalFinishedSplitSize() {
+        return snapshotSplitAssigner.getTotalFinishedSplitSize();
     }
 
     // --------------------------------------------------------------------------------------------

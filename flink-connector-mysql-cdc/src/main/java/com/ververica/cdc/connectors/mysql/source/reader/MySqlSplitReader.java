@@ -54,22 +54,30 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     private final Queue<MySqlSplit> splits;
     private final MySqlSourceConfig sourceConfig;
     private final int subtaskId;
+    private final MySqlSourceReaderContext context;
 
     @Nullable private DebeziumReader<SourceRecord, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
 
-    public MySqlSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
+    public MySqlSplitReader(
+            MySqlSourceConfig sourceConfig, int subtaskId, MySqlSourceReaderContext context) {
         this.sourceConfig = sourceConfig;
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
+        this.context = context;
     }
 
     @Override
     public RecordsWithSplitIds<SourceRecord> fetch() throws IOException {
         checkSplitOrStartNext();
+
         Iterator<SourceRecord> dataIt = null;
         try {
             dataIt = currentReader.pollSplitRecords();
+            if (context.isShouldBinlogSplitReaderStopped()
+                    && currentReader instanceof BinlogSplitReader) {
+                ((BinlogSplitReader) currentReader).finishBinlogSplit();
+            }
         } catch (InterruptedException e) {
             LOG.warn("fetch data failed.", e);
             throw new IOException(e);
@@ -107,19 +115,20 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     }
 
     private void checkSplitOrStartNext() throws IOException {
-        // the binlog reader should keep alive
-        if (currentReader instanceof BinlogSplitReader) {
-            return;
-        }
-
         if (canAssignNextSplit()) {
-            final MySqlSplit nextSplit = splits.poll();
+            MySqlSplit nextSplit = splits.poll();
             if (nextSplit == null) {
-                throw new IOException("Cannot fetch from another split - no split remaining");
+                return;
             }
+
             currentSplitId = nextSplit.splitId();
 
             if (nextSplit.isSnapshotSplit()) {
+                if (currentReader instanceof BinlogSplitReader) {
+                    LOG.info("This is the point from binlog split back to snapshot split");
+                    currentReader.close();
+                    currentReader = null;
+                }
                 if (currentReader == null) {
                     final MySqlConnection jdbcConnection =
                             createMySqlConnection(sourceConfig.getDbzConfiguration());

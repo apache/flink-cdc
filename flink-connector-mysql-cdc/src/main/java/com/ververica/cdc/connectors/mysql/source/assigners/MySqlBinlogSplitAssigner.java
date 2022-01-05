@@ -114,6 +114,19 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void close() {}
 
+    @Override
+    public boolean isAssignerSuspended() {
+        return false;
+    }
+
+    @Override
+    public int getTotalFinishedSplitSize() {
+        return 0;
+    }
+
+    @Override
+    public void wakeup() {}
+
     // ------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {

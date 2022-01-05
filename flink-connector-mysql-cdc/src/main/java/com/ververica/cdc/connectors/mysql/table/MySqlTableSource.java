@@ -78,6 +78,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
+    private final boolean captureNewTables;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -110,6 +111,52 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorUpper,
             double distributionFactorLower,
             StartupOptions startupOptions) {
+        this(
+                physicalSchema,
+                port,
+                hostname,
+                database,
+                tableName,
+                username,
+                password,
+                serverTimeZone,
+                dbzProperties,
+                serverId,
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                startupOptions,
+                false);
+    }
+
+    public MySqlTableSource(
+            TableSchema physicalSchema,
+            int port,
+            String hostname,
+            String database,
+            String tableName,
+            String username,
+            String password,
+            ZoneId serverTimeZone,
+            Properties dbzProperties,
+            @Nullable String serverId,
+            boolean enableParallelRead,
+            int splitSize,
+            int splitMetaGroupSize,
+            int fetchSize,
+            Duration connectTimeout,
+            int connectMaxRetries,
+            int connectionPoolSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            StartupOptions startupOptions,
+            boolean captureNewTable) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -130,6 +177,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
+        this.captureNewTables = captureNewTable;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -184,6 +232,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .debeziumProperties(dbzProperties)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
+                            .captureNewTables(captureNewTables)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

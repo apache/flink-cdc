@@ -198,4 +198,11 @@ public class MySqlSourceOptions {
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query MySQL for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> CAPTURE_NEW_TABLES =
+            ConfigOptions.key("capture-new-tables")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether capture the snapshot of newly add tables.");
 }

@@ -84,7 +84,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
-        this.currentTaskRunning = false;
+        this.currentTaskRunning = true;
     }
 
     public void submitSplit(MySqlSplit mySqlSplit) {
@@ -112,7 +112,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         executor.submit(
                 () -> {
                     try {
-                        currentTaskRunning = true;
                         binlogSplitReadTask.execute(new BinlogSplitChangeEventSourceContextImpl());
                     } catch (Exception e) {
                         currentTaskRunning = false;
@@ -151,8 +150,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                     sourceRecords.add(event.getRecord());
                 }
             }
+            return sourceRecords.iterator();
+        } else {
+            return null;
         }
-        return sourceRecords.iterator();
     }
 
     private void checkReadException() {
@@ -271,5 +272,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
+    }
+
+    public void finishBinlogSplit() {
+        this.currentTaskRunning = false;
     }
 }

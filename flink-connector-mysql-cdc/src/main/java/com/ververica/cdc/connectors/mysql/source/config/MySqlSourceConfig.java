@@ -55,6 +55,7 @@ public class MySqlSourceConfig implements Serializable {
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
+    private final boolean captureNewTables;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -82,6 +83,7 @@ public class MySqlSourceConfig implements Serializable {
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
+            boolean captureNewTable,
             Properties dbzProperties) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
@@ -101,6 +103,7 @@ public class MySqlSourceConfig implements Serializable {
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
+        this.captureNewTables = captureNewTable;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
@@ -177,6 +180,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isIncludeSchemaChanges() {
         return includeSchemaChanges;
+    }
+
+    public boolean isCaptureNewTables() {
+        return captureNewTables;
     }
 
     public Properties getDbzProperties() {

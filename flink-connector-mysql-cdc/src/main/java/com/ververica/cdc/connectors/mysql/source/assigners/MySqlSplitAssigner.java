@@ -106,4 +106,12 @@ public interface MySqlSplitAssigner {
      * connections.
      */
     void close();
+
+    /** Whether the assigner is suspended. */
+    boolean isAssignerSuspended();
+
+    /** Get the total finished split count. */
+    int getTotalFinishedSplitSize();
+
+    void wakeup();
 }

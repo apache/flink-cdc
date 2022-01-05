@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CAPTURE_NEW_TABLES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
@@ -97,6 +98,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        boolean captureNewTables = config.get(CAPTURE_NEW_TABLES);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         if (enableParallelRead) {
@@ -131,7 +133,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
-                startupOptions);
+                startupOptions,
+                captureNewTables);
     }
 
     @Override
@@ -169,6 +172,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
+        options.add(CAPTURE_NEW_TABLES);
         return options;
     }
 

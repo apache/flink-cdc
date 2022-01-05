@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners.state;
 
+import com.ververica.cdc.connectors.mysql.source.assigners.SnapshotAssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
@@ -59,7 +60,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      * Whether the snapshot split assigner is finished, which indicates there is no more splits and
      * all records of splits have been completely processed in the pipeline.
      */
-    private final boolean isAssignerFinished;
+    private final SnapshotAssignerStatus assignerState;
 
     /** Whether the table identifier is case sensitive. */
     private final boolean isTableIdCaseSensitive;
@@ -72,7 +73,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             List<MySqlSnapshotSplit> remainingSplits,
             Map<String, MySqlSnapshotSplit> assignedSplits,
             Map<String, BinlogOffset> splitFinishedOffsets,
-            boolean isAssignerFinished,
+            SnapshotAssignerStatus assignerState,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed) {
@@ -80,7 +81,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
         this.splitFinishedOffsets = splitFinishedOffsets;
-        this.isAssignerFinished = isAssignerFinished;
+        this.assignerState = assignerState;
         this.remainingTables = remainingTables;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
@@ -102,8 +103,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return splitFinishedOffsets;
     }
 
-    public boolean isAssignerFinished() {
-        return isAssignerFinished;
+    public SnapshotAssignerStatus getAssignerState() {
+        return assignerState;
     }
 
     public List<TableId> getRemainingTables() {
@@ -127,7 +128,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             return false;
         }
         SnapshotPendingSplitsState that = (SnapshotPendingSplitsState) o;
-        return isAssignerFinished == that.isAssignerFinished
+        return assignerState == that.assignerState
                 && isTableIdCaseSensitive == that.isTableIdCaseSensitive
                 && isRemainingTablesCheckpointed == that.isRemainingTablesCheckpointed
                 && Objects.equals(remainingTables, that.remainingTables)
@@ -145,7 +146,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 remainingSplits,
                 assignedSplits,
                 splitFinishedOffsets,
-                isAssignerFinished,
+                assignerState,
                 isTableIdCaseSensitive,
                 isRemainingTablesCheckpointed);
     }
@@ -163,8 +164,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + assignedSplits
                 + ", splitFinishedOffsets="
                 + splitFinishedOffsets
-                + ", isAssignerFinished="
-                + isAssignerFinished
+                + ", assignerState="
+                + assignerState
                 + ", isTableIdCaseSensitive="
                 + isTableIdCaseSensitive
                 + ", isRemainingTablesCheckpointed="

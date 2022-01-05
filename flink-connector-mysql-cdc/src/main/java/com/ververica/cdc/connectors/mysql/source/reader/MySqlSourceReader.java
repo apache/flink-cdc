@@ -19,7 +19,6 @@
 package com.ververica.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
-import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
@@ -27,14 +26,20 @@ import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSource
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitReaderSuspendedReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.events.SuspendBinlogReaderEvent;
+import com.ververica.cdc.connectors.mysql.source.events.TotalFinishedSplitSizeRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.events.TotalFinishedSplitSizeResponseEvent;
+import com.ververica.cdc.connectors.mysql.source.events.WakeupReaderEvent;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -54,6 +59,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +67,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils.getNextMetaGroupId;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /** The source reader for MySQL source splits. */
 public class MySqlSourceReader<T>
@@ -74,24 +79,28 @@ public class MySqlSourceReader<T>
     private final Map<String, MySqlSnapshotSplit> finishedUnackedSplits;
     private final Map<String, MySqlBinlogSplit> uncompletedBinlogSplits;
     private final int subtaskId;
+    private final MySqlSourceReaderContext mySqlSourceReaderContext;
+    private MySqlBinlogSplit suspendedSplit;
 
     public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
             Supplier<MySqlSplitReader> splitReaderSupplier,
             RecordEmitter<SourceRecord, T, MySqlSplitState> recordEmitter,
             Configuration config,
-            SourceReaderContext context,
+            MySqlSourceReaderContext context,
             MySqlSourceConfig sourceConfig) {
         super(
                 elementQueue,
                 new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
                 recordEmitter,
                 config,
-                context);
+                context.getSourceReaderContext());
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
         this.uncompletedBinlogSplits = new HashMap<>();
-        this.subtaskId = context.getIndexOfSubtask();
+        this.subtaskId = context.getSourceReaderContext().getIndexOfSubtask();
+        this.mySqlSourceReaderContext = context;
+        this.suspendedSplit = null;
     }
 
     @Override
@@ -121,6 +130,10 @@ public class MySqlSourceReader<T>
         // add binlog splits who are uncompleted
         stateSplits.addAll(uncompletedBinlogSplits.values());
 
+        if (suspendedSplit != null) {
+            stateSplits.add(suspendedSplit);
+        }
+
         return stateSplits;
     }
 
@@ -128,12 +141,21 @@ public class MySqlSourceReader<T>
     protected void onSplitFinished(Map<String, MySqlSplitState> finishedSplitIds) {
         for (MySqlSplitState mySqlSplitState : finishedSplitIds.values()) {
             MySqlSplit mySqlSplit = mySqlSplitState.toMySqlSplit();
-            checkState(
-                    mySqlSplit.isSnapshotSplit(),
-                    String.format(
-                            "Only snapshot split could finish, but the actual split is binlog split %s",
-                            mySqlSplit));
-            finishedUnackedSplits.put(mySqlSplit.splitId(), mySqlSplit.asSnapshotSplit());
+            if (mySqlSplit.isBinlogSplit()) {
+                LOG.info(
+                        "binlog split finished due to new table added, offset {}",
+                        mySqlSplitState.asBinlogSplitState().getStartingOffset());
+
+                context.sendSourceEventToCoordinator(new BinlogSplitReaderSuspendedReportEvent());
+
+                suspendedSplit =
+                        MySqlBinlogSplit.updateIsSuspended(mySqlSplit.asBinlogSplit(), true);
+                suspendedSplit = MySqlBinlogSplit.emptyFinishedSplitInfos(suspendedSplit);
+                suspendedSplit = MySqlBinlogSplit.emptyTableSchemas(suspendedSplit);
+                mySqlSourceReaderContext.setShouldBinlogSplitReaderStopped(false);
+            } else {
+                finishedUnackedSplits.put(mySqlSplit.splitId(), mySqlSplit.asSnapshotSplit());
+            }
         }
         reportFinishedSnapshotSplitsIfNeed();
         context.sendSplitRequest();
@@ -144,6 +166,7 @@ public class MySqlSourceReader<T>
         // restore for finishedUnackedSplits
         List<MySqlSplit> unfinishedSplits = new ArrayList<>();
         for (MySqlSplit split : splits) {
+            LOG.info("Received Split: " + split);
             if (split.isSnapshotSplit()) {
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
                 if (snapshotSplit.isSnapshotReadFinished()) {
@@ -152,8 +175,11 @@ public class MySqlSourceReader<T>
                     unfinishedSplits.add(split);
                 }
             } else {
+                MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
                 // the binlog split is uncompleted
-                if (!split.asBinlogSplit().isCompletedSplit()) {
+                if (binlogSplit.isSuspended()) {
+                    suspendedSplit = binlogSplit;
+                } else if (!binlogSplit.isCompletedSplit()) {
                     uncompletedBinlogSplits.put(split.splitId(), split.asBinlogSplit());
                     requestBinlogSplitMetaIfNeeded(split.asBinlogSplit());
                 } else {
@@ -214,6 +240,35 @@ public class MySqlSourceReader<T>
                     subtaskId,
                     ((BinlogSplitMetaEvent) sourceEvent).getMetaGroupId());
             fillMetaDataForBinlogSplit((BinlogSplitMetaEvent) sourceEvent);
+        } else if (sourceEvent instanceof SuspendBinlogReaderEvent) {
+            if (!mySqlSourceReaderContext.isShouldBinlogSplitReaderStopped()) {
+                mySqlSourceReaderContext.setShouldBinlogSplitReaderStopped(true);
+            }
+        } else if (sourceEvent instanceof WakeupReaderEvent) {
+            WakeupReaderEvent wakeupReaderEvent = (WakeupReaderEvent) sourceEvent;
+            if (wakeupReaderEvent.getType() == WakeupReaderEvent.WakeUpType.SNAPSHOT) {
+                context.sendSplitRequest();
+            } else {
+                if (suspendedSplit == null) {
+                    return;
+                }
+                context.sendSourceEventToCoordinator(new TotalFinishedSplitSizeRequestEvent());
+            }
+        } else if (sourceEvent instanceof TotalFinishedSplitSizeResponseEvent) {
+            if (suspendedSplit == null) {
+                return;
+            }
+            Preconditions.checkState(suspendedSplit.isSuspended());
+            MySqlBinlogSplit split =
+                    MySqlBinlogSplit.updateTotalFinishedSplitSize(
+                            suspendedSplit,
+                            ((TotalFinishedSplitSizeResponseEvent) sourceEvent)
+                                    .getTotalFinishedSplitSize());
+            split = MySqlBinlogSplit.updateIsSuspended(split, false);
+
+            // Can flink make sure the following two sentense happend in the same checkpoint?
+            suspendedSplit = null;
+            this.addSplits(Collections.singletonList(split));
         } else {
             super.handleSourceEvents(sourceEvent);
         }

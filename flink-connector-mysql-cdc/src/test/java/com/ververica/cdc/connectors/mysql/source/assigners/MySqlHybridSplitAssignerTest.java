@@ -105,7 +105,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         remainingSplits,
                         assignedSplits,
                         splitFinishedOffsets,
-                        true,
+                        SnapshotAssignerStatus.INIT_FINISH,
                         new ArrayList<>(),
                         false,
                         true);

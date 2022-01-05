@@ -120,6 +120,96 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
     }
 
+    @Test
+    public void testJobManagerFailoverInBinlogPhaseWithNewlyAddTable() throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(1);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE address ("
+                                + " id BIGINT NOT NULL,"
+                                + " country STRING,"
+                                + " city STRING,"
+                                + " detail_address STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = 'address.*',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'server-id' = '%s',"
+                                + " 'capture-new-tables' = 'true'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customDatabase.getUsername(),
+                        customDatabase.getPassword(),
+                        customDatabase.getDatabaseName(),
+                        getServerId());
+        // first step: check the snapshot data
+        String[] snapshotForSingleTable =
+                new String[] {
+                    "+I[416874195632735147, China, Beijing, West Town address 1]",
+                    "+I[416927583791428523, China, Beijing, West Town address 2]",
+                    "+I[417022095255614379, China, Beijing, West Town address 3]",
+                    "+I[417111867899200427, America, New York, East Town address 1]",
+                    "+I[417271541558096811, America, New York, East Town address 2]",
+                    "+I[417272886855938987, America, New York, East Town address 3]",
+                    "+I[417420106184475563, Germany, Berlin, West Town address 1]",
+                    "+I[418161258277847979, Germany, Berlin, West Town address 2]"
+                };
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from address");
+        CloseableIterator<Row> iterator = tableResult.collect();
+        JobID jobId = tableResult.getJobClient().get().getJobID();
+        List<String> expectedSnapshotData = Arrays.asList(snapshotForSingleTable);
+
+        assertEqualsInAnyOrder(
+                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+
+        createNewTableAndInsertData(
+                getConnection(), customDatabase.getDatabaseName() + ".address1");
+
+        List<String> expectedBinlogData = expectedSnapshotData;
+        assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
+
+        // after this fail, we hope to fetch address1 snapshot data
+        triggerFailover(
+                FailoverType.JM, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+
+        assertEqualsInAnyOrder(
+                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+
+        String[] binlogForSingleTable =
+                new String[] {
+                    "+I[826874195632735147, China, Beijing, West Town address 1]",
+                    "+I[826927583791428523, China, Beijing, West Town address 2]",
+                    "+I[827022095255614379, China, Beijing, West Town address 3]",
+                    "+I[827111867899200427, America, New York, East Town address 1]",
+                    "+I[827271541558096811, America, New York, East Town address 2]",
+                    "+I[827272886855938987, America, New York, East Town address 3]",
+                    "+I[827420106184475563, Germany, Berlin, West Town address 1]",
+                    "+I[828161258277847979, Germany, Berlin, West Town address 2]"
+                };
+        expectedBinlogData = Arrays.asList(binlogForSingleTable);
+
+        insertDataToGenerateSomeBinlog(
+                getConnection(), customDatabase.getDatabaseName() + ".address1");
+        assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
+
+        tableResult.getJobClient().get().cancel().get();
+    }
+
     private void testMySqlParallelSource(
             FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
             throws Exception {
@@ -312,6 +402,62 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                             + " VALUES(2001, 'user_22','Shanghai','123567891234'),"
                             + " (2002, 'user_23','Shanghai','123567891234'),"
                             + "(2003, 'user_24','Shanghai','123567891234')");
+            connection.commit();
+        } finally {
+            connection.close();
+        }
+    }
+
+    private void createNewTableAndInsertData(JdbcConnection connection, String tableId)
+            throws SQLException {
+        try {
+            connection.setAutoCommit(false);
+
+            connection.execute(
+                    "CREATE TABLE "
+                            + tableId
+                            + "("
+                            + "id BIGINT UNSIGNED NOT NULL PRIMARY KEY,"
+                            + "country VARCHAR(255) NOT NULL,"
+                            + "city VARCHAR(255) NOT NULL,"
+                            + "detail_address VARCHAR(1024))");
+            connection.commit();
+
+            // insert some data
+            connection.execute(
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(416874195632735147, 'China', 'Beijing', 'West Town address 1'),"
+                            + "(416927583791428523, 'China', 'Beijing', 'West Town address 2'),"
+                            + "(417022095255614379, 'China', 'Beijing', 'West Town address 3'),"
+                            + "(417111867899200427, 'America', 'New York', 'East Town address 1'),"
+                            + "(417271541558096811, 'America', 'New York', 'East Town address 2'),"
+                            + "(417272886855938987, 'America', 'New York', 'East Town address 3'),"
+                            + "(417420106184475563, 'Germany', 'Berlin', 'West Town address 1'),"
+                            + "(418161258277847979, 'Germany', 'Berlin', 'West Town address 2')");
+            connection.commit();
+        } finally {
+            connection.close();
+        }
+    }
+
+    private void insertDataToGenerateSomeBinlog(JdbcConnection connection, String tableId)
+            throws SQLException {
+        try {
+            connection.setAutoCommit(false);
+
+            // insert some data
+            connection.execute(
+                    "INSERT INTO "
+                            + tableId
+                            + " VALUES(826874195632735147, 'China', 'Beijing', 'West Town address 1'),"
+                            + "(826927583791428523, 'China', 'Beijing', 'West Town address 2'),"
+                            + "(827022095255614379, 'China', 'Beijing', 'West Town address 3'),"
+                            + "(827111867899200427, 'America', 'New York', 'East Town address 1'),"
+                            + "(827271541558096811, 'America', 'New York', 'East Town address 2'),"
+                            + "(827272886855938987, 'America', 'New York', 'East Town address 3'),"
+                            + "(827420106184475563, 'Germany', 'Berlin', 'West Town address 1'),"
+                            + "(828161258277847979, 'Germany', 'Berlin', 'West Town address 2')");
             connection.commit();
         } finally {
             connection.close();
