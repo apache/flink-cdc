@@ -113,8 +113,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();
-        TypeInformation<RowData> typeInfo =
-                scanContext.createTypeInformation(physicalSchema.toRowDataType());
+        TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
