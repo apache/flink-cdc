@@ -321,6 +321,103 @@ public class OracleConnectorITCase extends AbstractTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testConsumingNumericColumns() throws Exception {
+        // Prepare numeric type data
+        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE debezium.test_numeric_table ("
+                            + " ID NUMBER(18,0),"
+                            + " TEST_BOOLEAN NUMBER(1,0),"
+                            + " TEST_TINYINT NUMBER(2,0),"
+                            + " TEST_SMALLINT NUMBER(4,0),"
+                            + " TEST_INT NUMBER(9,0),"
+                            + " TEST_BIG_NUMERIC NUMBER(32,0),"
+                            + " TEST_DECIMAL NUMBER(20,8),"
+                            + " TEST_NUMBER NUMBER,"
+                            + " TEST_NUMERIC NUMBER,"
+                            + " TEST_FLOAT FLOAT(63),"
+                            + " PRIMARY KEY (ID))");
+            statement.execute(
+                    "INSERT INTO debezium.test_numeric_table "
+                            + "VALUES (11000000000, 0, 98, 9998, 987654320, 20000000000000000000, 987654321.12345678, 2147483647, 1024.955, 1024.955)");
+            statement.execute(
+                    "INSERT INTO debezium.test_numeric_table "
+                            + "VALUES (11000000001, 1, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965)");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE test_numeric_table ("
+                                + " ID BIGINT,"
+                                + " TEST_BOOLEAN BOOLEAN,"
+                                + " TEST_TINYINT TINYINT,"
+                                + " TEST_SMALLINT SMALLINT,"
+                                + " TEST_INT INT,"
+                                + " TEST_BIG_NUMERIC DECIMAL(32, 0),"
+                                + " TEST_DECIMAL DECIMAL(20, 8),"
+                                + " TEST_NUMBER BIGINT,"
+                                + " TEST_NUMERIC DECIMAL(10, 3),"
+                                + " TEST_FLOAT FLOAT,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        "debezium",
+                        "test_numeric_table");
+        String sinkDDL =
+                "CREATE TABLE test_numeric_sink ("
+                        + " id BIGINT,"
+                        + " test_boolean BOOLEAN,"
+                        + " test_tinyint TINYINT,"
+                        + " test_smallint SMALLINT,"
+                        + " test_int INT,"
+                        + " test_big_numeric DECIMAL(32, 0),"
+                        + " test_decimal DECIMAL(20, 8),"
+                        + " test_number BIGINT,"
+                        + " test_numeric DECIMAL(10, 3),"
+                        + " test_float FLOAT,"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql("INSERT INTO test_numeric_sink SELECT * FROM test_numeric_table");
+
+        waitForSnapshotStarted("test_numeric_sink");
+
+        // waiting for change events finished.
+        waitForSinkSize("test_numeric_sink", 2);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I[11000000000, false, 98, 9998, 987654320, 20000000000000000000, 987654321.12345678, 2147483647, 1024.955, 1024.955]",
+                        "+I[11000000001, true, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965]");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("test_numeric_sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
     // ------------------------------------------------------------------------------------
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {

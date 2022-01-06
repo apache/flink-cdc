@@ -38,12 +38,21 @@ public class OracleTestUtils {
                                     "assets/activate-archivelog.sql",
                                     "docker/assets/activate-archivelog.sql"));
 
-    public static final String ORACLE_USER = "dbzuser";
+    public static final String CONNECTOR_USER = "dbzuser";
 
-    public static final String ORACLE_PWD = "dbz";
+    public static final String CONNECTOR_PWD = "dbz";
+
+    public static final String SCHEMA_USER = "debezium";
+
+    public static final String SCHEMA_PWD = "dbz";
 
     public static Connection getJdbcConnection(OracleContainer oracleContainer)
             throws SQLException {
-        return DriverManager.getConnection(oracleContainer.getJdbcUrl(), ORACLE_USER, ORACLE_PWD);
+        return DriverManager.getConnection(
+                oracleContainer.getJdbcUrl(), CONNECTOR_USER, CONNECTOR_PWD);
+    }
+
+    public static Connection testConnection(OracleContainer oracleContainer) throws SQLException {
+        return DriverManager.getConnection(oracleContainer.getJdbcUrl(), SCHEMA_USER, SCHEMA_PWD);
     }
 }
