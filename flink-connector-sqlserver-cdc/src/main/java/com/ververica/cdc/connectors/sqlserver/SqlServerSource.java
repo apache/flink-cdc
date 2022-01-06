@@ -21,7 +21,6 @@ package com.ververica.cdc.connectors.sqlserver;
 import com.ververica.cdc.connectors.sqlserver.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.ververica.cdc.debezium.Validator;
 import io.debezium.connector.sqlserver.SqlServerConnector;
 
 import java.util.Properties;
@@ -149,7 +148,7 @@ public class SqlServerSource {
             }
 
             return new DebeziumSourceFunction<>(
-                    deserializer, props, null, Validator.getDefaultValidator());
+                    deserializer, props, null, new SqlServerValidator(props));
         }
     }
 }

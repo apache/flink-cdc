@@ -86,7 +86,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "inventory",
-                        "products");
+                        "dbo.products");
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -211,7 +211,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "column_type_test",
-                        "full_types");
+                        "dbo.full_types");
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id int NOT NULL,\n"
@@ -298,7 +298,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "inventory",
-                        "products");
+                        "dbo.products");
 
         String sinkDDL =
                 "CREATE TABLE sink ("

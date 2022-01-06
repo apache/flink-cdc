@@ -107,8 +107,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();
-        TypeInformation<RowData> typeInfo =
-                scanContext.createTypeInformation(physicalSchema.toRowDataType());
+        TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
@@ -121,7 +120,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         .hostname(hostname)
                         .port(port)
                         .database(database)
-                        .tableList("dbo." + tableName)
+                        .tableList(tableName)
                         .username(username)
                         .password(password)
                         .debeziumProperties(dbzProperties)

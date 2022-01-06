@@ -74,7 +74,7 @@ public class SqlServerTableFactoryTest {
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
     private static final String MY_DATABASE = "myDB";
-    private static final String MY_TABLE = "myTable";
+    private static final String MY_TABLE = "dbo.myTable";
     private static final Properties PROPERTIES = new Properties();
 
     @Test
