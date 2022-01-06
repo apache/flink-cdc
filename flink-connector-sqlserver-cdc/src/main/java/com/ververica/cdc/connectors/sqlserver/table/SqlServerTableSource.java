@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.sqlserver.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
@@ -52,7 +52,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class SqlServerTableSource implements ScanTableSource, SupportsReadingMetadata {
 
-    private final TableSchema physicalSchema;
+    private final ResolvedSchema physicalSchema;
     private final int port;
     private final String hostname;
     private final String database;
@@ -60,6 +60,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final String username;
     private final String password;
     private final Properties dbzProperties;
+    private final StartupOptions startupOptions;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -72,14 +73,15 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     protected List<String> metadataKeys;
 
     public SqlServerTableSource(
-            TableSchema physicalSchema,
+            ResolvedSchema physicalSchema,
             int port,
             String hostname,
             String database,
             String tableName,
             String username,
             String password,
-            Properties dbzProperties) {
+            Properties dbzProperties,
+            StartupOptions startupOptions) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -90,6 +92,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.dbzProperties = dbzProperties;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
+        this.startupOptions = startupOptions;
     }
 
     @Override
@@ -124,6 +127,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         .username(username)
                         .password(password)
                         .debeziumProperties(dbzProperties)
+                        .startupOptions(startupOptions)
                         .deserializer(deserializer)
                         .build();
         return SourceFunctionProvider.of(sourceFunction, false);
@@ -156,7 +160,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         tableName,
                         username,
                         password,
-                        dbzProperties);
+                        dbzProperties,
+                        startupOptions);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -179,6 +184,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
                 && Objects.equals(dbzProperties, that.dbzProperties)
+                && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys);
     }
@@ -194,6 +200,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 username,
                 password,
                 dbzProperties,
+                startupOptions,
                 producedDataType,
                 metadataKeys);
     }

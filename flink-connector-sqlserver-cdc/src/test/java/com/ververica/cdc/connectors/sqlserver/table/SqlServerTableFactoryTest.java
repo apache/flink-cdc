@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.sqlserver.table;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -28,7 +29,6 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 
 import org.junit.Test;
 
@@ -39,7 +39,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 
 /** Test for {@link SqlServerTableSource} created by {@link SqlServerTableFactory}. */
@@ -85,14 +84,15 @@ public class SqlServerTableFactoryTest {
         DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
                         MY_USERNAME,
                         MY_PASSWORD,
-                        new Properties());
+                        new Properties(),
+                        StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -100,21 +100,22 @@ public class SqlServerTableFactoryTest {
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("port", "1433");
-        options.put("debezium.snapshot.mode", "init");
+        options.put("debezium.snapshot.mode", "initial");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
-        dbzProperties.put("snapshot.mode", "init");
+        dbzProperties.put("snapshot.mode", "initial");
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
                         MY_USERNAME,
                         MY_PASSWORD,
-                        dbzProperties);
+                        dbzProperties,
+                        StartupOptions.initial());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -131,15 +132,15 @@ public class SqlServerTableFactoryTest {
         actualSource = sqlServerTableSource.copy();
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
-                        TableSchemaUtils.getPhysicalSchema(
-                                fromResolvedSchema(SCHEMA_WITH_METADATA)),
+                        SCHEMA_WITH_METADATA,
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
                         MY_USERNAME,
                         MY_PASSWORD,
-                        new Properties());
+                        new Properties(),
+                        StartupOptions.initial());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
@@ -169,7 +170,7 @@ public class SqlServerTableFactoryTest {
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(schema).toSchema(),
+                                Schema.newBuilder().fromResolvedSchema(schema).build(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),

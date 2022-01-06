@@ -21,12 +21,11 @@ package com.ververica.cdc.connectors.sqlserver.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -77,8 +76,16 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Table name of the SqlServer database to monitor.");
 
+    public static final ConfigOption<String> SCAN_STARTUP_MODE =
+            ConfigOptions.key("scan.startup.mode")
+                    .stringType()
+                    .defaultValue("initial")
+                    .withDescription(
+                            "Optional startup mode for SqlServer CDC consumer, valid enumerations are "
+                                    + "\"initial\", \"initial_only\", \"schema_only\"");
+
     @Override
-    public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
+    public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
         helper.validateExcept(DEBEZIUM_OPTIONS_PREFIX);
@@ -90,8 +97,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         int port = config.get(PORT);
-        TableSchema physicalSchema =
-                TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+        StartupOptions startupOptions = getStartupOptions(config);
+        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
         return new SqlServerTableSource(
                 physicalSchema,
@@ -101,7 +108,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 tableName,
                 username,
                 password,
-                getDebeziumProperties(context.getCatalogTable().getOptions()));
+                getDebeziumProperties(context.getCatalogTable().getOptions()),
+                startupOptions);
     }
 
     @Override
@@ -124,6 +132,37 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
+        options.add(SCAN_STARTUP_MODE);
+
         return options;
+    }
+
+    private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
+    private static final String SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY = "initial_only";
+    private static final String SCAN_STARTUP_MODE_VALUE_SCHEMA_ONLY = "schema_only";
+
+    private static StartupOptions getStartupOptions(ReadableConfig config) {
+        String modeString = config.get(SCAN_STARTUP_MODE);
+
+        switch (modeString.toLowerCase()) {
+            case SCAN_STARTUP_MODE_VALUE_INITIAL:
+                return StartupOptions.initial();
+
+            case SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY:
+                return StartupOptions.initialOnly();
+
+            case SCAN_STARTUP_MODE_VALUE_SCHEMA_ONLY:
+                return StartupOptions.schemaOnly();
+
+            default:
+                throw new ValidationException(
+                        String.format(
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
+                                SCAN_STARTUP_MODE.key(),
+                                SCAN_STARTUP_MODE_VALUE_INITIAL,
+                                SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY,
+                                SCAN_STARTUP_MODE_VALUE_SCHEMA_ONLY,
+                                modeString));
+        }
     }
 }

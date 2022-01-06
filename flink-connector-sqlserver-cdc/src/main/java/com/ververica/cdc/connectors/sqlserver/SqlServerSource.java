@@ -108,6 +108,12 @@ public class SqlServerSource {
             return this;
         }
 
+        /** Specifies the startup options. */
+        public Builder<T> startupOptions(StartupOptions startupOptions) {
+            this.startupOptions = startupOptions;
+            return this;
+        }
+
         public DebeziumSourceFunction<T> build() {
             Properties props = new Properties();
             props.setProperty("connector.class", SqlServerConnector.class.getCanonicalName());
@@ -144,7 +150,7 @@ public class SqlServerSource {
             }
 
             if (dbzProperties != null) {
-                dbzProperties.forEach(props::put);
+                props.putAll(dbzProperties);
             }
 
             return new DebeziumSourceFunction<>(
