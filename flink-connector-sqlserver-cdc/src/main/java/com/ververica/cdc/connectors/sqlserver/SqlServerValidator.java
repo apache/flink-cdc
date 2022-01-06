@@ -24,14 +24,15 @@ import org.apache.flink.table.api.ValidationException;
 import com.microsoft.sqlserver.jdbc.SQLServerDriver;
 import com.ververica.cdc.debezium.Validator;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Properties;
 
 /** Validates SqlServer cdc is enabled and version is supported. */
 public class SqlServerValidator implements Validator {
-
-    private final String DB_CDC_STATUS_SQL =
-            "select 1 from sys.databases where name=? AND is_cdc_enabled=1";
 
     private final Properties properties;
 
@@ -43,7 +44,8 @@ public class SqlServerValidator implements Validator {
     public void validate() {
         try (Connection connection = openConnection(properties);
                 PreparedStatement preparedStatement =
-                        connection.prepareStatement(DB_CDC_STATUS_SQL)) {
+                        connection.prepareStatement(
+                                "select 1 from sys.databases where name= ? AND is_cdc_enabled=1")) {
             checkVersion(connection);
             checkCdcEnabled(preparedStatement);
         } catch (SQLException ex) {
