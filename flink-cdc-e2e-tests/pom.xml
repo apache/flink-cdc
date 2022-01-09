@@ -253,6 +253,16 @@ under the License.
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
                         </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ververica</groupId>
+                            <artifactId>flink-sql-connector-tidb-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>tidb-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
                     </artifactItems>
                 </configuration>
             </plugin>
