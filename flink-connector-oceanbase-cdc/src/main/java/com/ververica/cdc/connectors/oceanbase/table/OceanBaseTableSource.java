@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.oceanbase.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
@@ -37,7 +37,7 @@ import java.util.Objects;
 /** A {@link DynamicTableSource} implementation for OceanBase. */
 public class OceanBaseTableSource implements ScanTableSource {
 
-    private final TableSchema physicalSchema;
+    private final ResolvedSchema physicalSchema;
 
     private final OceanBaseTableSourceFactory.StartupMode startupMode;
     private final Long startupTimestamp;
@@ -54,7 +54,7 @@ public class OceanBaseTableSource implements ScanTableSource {
     private final String jdbcUrl;
 
     public OceanBaseTableSource(
-            TableSchema physicalSchema,
+            ResolvedSchema physicalSchema,
             OceanBaseTableSourceFactory.StartupMode startupMode,
             Long startupTimestamp,
             String username,
@@ -94,7 +94,7 @@ public class OceanBaseTableSource implements ScanTableSource {
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext context) {
         RowType rowType = (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         TypeInformation<RowData> resultTypeInfo =
-                context.createTypeInformation(physicalSchema.toRowDataType());
+                context.createTypeInformation(physicalSchema.toPhysicalRowDataType());
 
         OceanBaseSource.Builder<RowData> builder =
                 OceanBaseSource.<RowData>builder()

@@ -21,11 +21,10 @@ package com.ververica.cdc.connectors.oceanbase.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 import io.debezium.config.CommonConnectorConfig;
@@ -140,8 +139,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 FactoryUtil.createTableFactoryHelper(this, context);
         helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
 
-        TableSchema physicalSchema =
-                TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
         ReadableConfig config = helper.getOptions();
 
