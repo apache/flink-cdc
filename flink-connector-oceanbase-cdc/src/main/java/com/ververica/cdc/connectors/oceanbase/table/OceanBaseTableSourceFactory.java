@@ -27,7 +27,6 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.debezium.table.DebeziumOptions;
-import io.debezium.config.CommonConnectorConfig;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -59,12 +58,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         TIMESTAMP
     }
 
-    private static final String STARTUP_PREFIX = "scan.startup.";
-    private static final String JDBC_PREFIX = "jdbc.";
-    private static final String LOG_PROXY_PREFIX = "log_proxy.";
-
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
-            ConfigOptions.key(STARTUP_PREFIX + "mode")
+            ConfigOptions.key("scan.startup.mode")
                     .stringType()
                     .defaultValue("initial")
                     .withDescription(
@@ -72,20 +67,20 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                                     + "\"initial\", \"latest\" or \"timestamp\"");
 
     public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP =
-            ConfigOptions.key(STARTUP_PREFIX + "timestamp")
+            ConfigOptions.key("scan.startup.timestamp")
                     .longType()
                     .noDefaultValue()
                     .withDescription(
                             "Optional timestamp in seconds used in case of \"timestamp\" startup mode.");
 
     public static final ConfigOption<String> USERNAME =
-            ConfigOptions.key(CommonConnectorConfig.DATABASE_CONFIG_PREFIX + "username")
+            ConfigOptions.key("username")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Username to be used when connecting to OceanBase.");
 
     public static final ConfigOption<String> PASSWORD =
-            ConfigOptions.key(CommonConnectorConfig.DATABASE_CONFIG_PREFIX + "password")
+            ConfigOptions.key("password")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Password to be used when connecting to OceanBase.");
@@ -116,19 +111,19 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                             "The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`.");
 
     public static final ConfigOption<String> LOG_PROXY_HOST =
-            ConfigOptions.key(LOG_PROXY_PREFIX + "host")
+            ConfigOptions.key("log_proxy.host")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Hostname or IP address of OceanBase log proxy service.");
 
     public static final ConfigOption<Integer> LOG_PROXY_PORT =
-            ConfigOptions.key(LOG_PROXY_PREFIX + "port")
+            ConfigOptions.key("log_proxy.port")
                     .intType()
                     .defaultValue(2983)
                     .withDescription("Port number of OceanBase log proxy service.");
 
     public static final ConfigOption<String> JDBC_URL =
-            ConfigOptions.key(JDBC_PREFIX + "url")
+            ConfigOptions.key("jdbc.url")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("JDBC url.");
@@ -144,7 +139,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         ReadableConfig config = helper.getOptions();
 
         String modeString = config.get(SCAN_STARTUP_MODE);
-        StartupMode startupMode = StartupMode.valueOf(modeString);
+        StartupMode startupMode = StartupMode.valueOf(modeString.toUpperCase());
         Long startupTimestamp = config.get(SCAN_STARTUP_TIMESTAMP);
 
         String username = config.get(USERNAME);

@@ -22,7 +22,6 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichParallelSourceFunction;
 import com.ververica.cdc.connectors.oceanbase.source.deserializer.OceanBaseChangeEventDeserializerSchema;
 import com.ververica.cdc.connectors.oceanbase.source.deserializer.OceanBaseSnapshotEventDeserializerSchema;
@@ -147,18 +146,6 @@ public class OceanBaseSource {
                     throw new UnsupportedOperationException(
                             startupMode + " mode is not supported.");
             }
-
-            ObReaderConfig obReaderConfig = new ObReaderConfig();
-            obReaderConfig.setRsList(rsList);
-            obReaderConfig.setUsername(username);
-            obReaderConfig.setPassword(password);
-            obReaderConfig.setTableWhiteList(
-                    String.format(
-                            "%s.%s.%s",
-                            checkNotNull(tenantName),
-                            checkNotNull(databaseName),
-                            checkNotNull(tableName)));
-            obReaderConfig.setStartTimestamp(startupTimestamp);
 
             return new OceanBaseRichParallelSourceFunction<T>(
                     resultTypeInfo,

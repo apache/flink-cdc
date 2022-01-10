@@ -48,7 +48,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The source implementation for OceanBase that read snapshot events first and then read the change
@@ -79,9 +79,10 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
     private final OceanBaseSnapshotEventDeserializerSchema<T> snapshotEventDeserializer;
     private final OceanBaseChangeEventDeserializerSchema<T> changeEventDeserializer;
 
-    private final AtomicLong resolvedTimestamp = new AtomicLong(-1);
+    private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
     private final List<T> transactionBuffer = new LinkedList<>();
 
+    private transient volatile long resolvedTimestamp;
     private transient Connection snapshotConnection;
     private transient LogProxyClient logProxyClient;
     private transient ListState<Long> offsetState;
@@ -122,24 +123,30 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
     public void open(final Configuration config) throws Exception {
         super.open(config);
         this.outputCollector = new OutputCollector<>();
+        this.resolvedTimestamp = -1;
     }
 
     @Override
     public void run(SourceContext<T> ctx) throws Exception {
         outputCollector.context = ctx;
 
-        if (snapshot) {
+        LOG.info("Start readChangeEvents process");
+        readChangeEvents();
+
+        if (shouldReadSnapshot()) {
             synchronized (ctx.getCheckpointLock()) {
                 readSnapshotEvents();
-                LOG.info("Snapshot read finished");
+                LOG.info("Snapshot reading finished");
             }
         } else {
             LOG.info("Skip snapshot read");
         }
 
-        LOG.info("Start readChangeEvents process");
-        readChangeEvents();
-        LOG.info("Exit readChangeEvents process");
+        logProxyClient.join();
+    }
+
+    private boolean shouldReadSnapshot() {
+        return resolvedTimestamp == -1 && snapshot;
     }
 
     protected void readSnapshotEvents() throws Exception {
@@ -149,21 +156,13 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         }
 
         String tableFullName = String.format("`%s`.`%s`", databaseName, tableName);
-        String selectTimeSql = "SELECT now(0)";
         String selectTableSql = "SELECT * FROM " + tableFullName;
-        long snapshotStartTimestamp = -1;
         Statement stmt = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
             snapshotConnection = DriverManager.getConnection(jdbcUrl, username, password);
             stmt = snapshotConnection.createStatement();
-
-            ResultSet rs = stmt.executeQuery(selectTimeSql);
-            while (rs.next()) {
-                snapshotStartTimestamp = rs.getTimestamp(1).toInstant().getEpochSecond();
-            }
-
-            rs = stmt.executeQuery(selectTableSql);
+            ResultSet rs = stmt.executeQuery(selectTableSql);
             while (rs.next()) {
                 T data = snapshotEventDeserializer.deserialize(rs);
                 outputCollector.collect(data);
@@ -180,13 +179,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             }
         }
 
-        // Set `resolvedTimestamp` a value witch is the time before snapshot reading.
-        // Note that OceanBase CE does not have lock on table level, we do not implement
-        // exactly-once process here and so there may be duplicated data.
-
-        if (snapshotStartTimestamp != -1) {
-            resolvedTimestamp.set(snapshotStartTimestamp);
-        }
+        snapshotCompleted.set(true);
     }
 
     protected void readChangeEvents() {
@@ -195,8 +188,6 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             return;
         }
 
-        LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
-
         ObReaderConfig obReaderConfig = new ObReaderConfig();
         obReaderConfig.setRsList(rsList);
         obReaderConfig.setUsername(username);
@@ -204,40 +195,45 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         obReaderConfig.setTableWhiteList(
                 String.format("%s.%s.%s", tenantName, databaseName, tableName));
 
-        if (resolvedTimestamp.get() > 0) {
-            obReaderConfig.setStartTimestamp(resolvedTimestamp.get());
+        if (resolvedTimestamp > 0) {
+            obReaderConfig.setStartTimestamp(resolvedTimestamp);
+            LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
         } else {
             obReaderConfig.setStartTimestamp(startTimestamp);
+            LOG.info("Read change events from startTimestamp: {}", startTimestamp);
         }
+
+        // mark service as started when `heartbeat` or `begin` messages received
+        AtomicBoolean started = new AtomicBoolean(false);
 
         logProxyClient = new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig);
 
         logProxyClient.addListener(
                 new RecordListener() {
 
-                    // flag used to make sure processing is started from a `begin` message
-                    boolean started = false;
-
                     @Override
                     public void notify(LogMessage message) {
                         switch (message.getOpt()) {
                             case HEARTBEAT:
                             case BEGIN:
-                                started = true;
+                                started.set(true);
                                 break;
                             case INSERT:
                             case UPDATE:
                             case DELETE:
-                                if (!started) {
+                                if (!started.get()) {
                                     break;
                                 }
                                 transactionBuffer.addAll(
                                         changeEventDeserializer.deserialize(message));
                                 break;
                             case COMMIT:
-                                transactionBuffer.forEach(outputCollector::collect);
-                                transactionBuffer.clear();
-                                resolvedTimestamp.set(Long.parseLong(message.getTimestamp()));
+                                // flush buffer after snapshot completed
+                                if (!shouldReadSnapshot() || snapshotCompleted.get()) {
+                                    transactionBuffer.forEach(outputCollector::collect);
+                                    transactionBuffer.clear();
+                                    resolvedTimestamp = Long.parseLong(message.getTimestamp());
+                                }
                                 break;
                             case DDL:
                                 LOG.trace(
@@ -258,7 +254,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                 });
 
         logProxyClient.start();
-        logProxyClient.join();
+        while (!started.get()) {}
     }
 
     @Override
@@ -278,7 +274,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                 context.getCheckpointId(),
                 resolvedTimestamp);
         offsetState.clear();
-        offsetState.add(resolvedTimestamp.get());
+        offsetState.add(resolvedTimestamp);
     }
 
     @Override
@@ -291,13 +287,10 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                                         "resolvedTimestampState", LongSerializer.INSTANCE));
         if (context.isRestored()) {
             for (final Long offset : offsetState.get()) {
-                resolvedTimestamp.set(offset);
+                resolvedTimestamp = offset;
                 LOG.info("Restore State from resolvedTimestamp: {}", resolvedTimestamp);
                 return;
             }
-        } else {
-            resolvedTimestamp.set(0);
-            LOG.info("Initialize State from resolvedTimestamp: {}", resolvedTimestamp);
         }
     }
 
