@@ -57,6 +57,7 @@ public class OceanBaseSource {
         private String rsList;
         private String logProxyHost;
         private int logProxyPort = 2983;
+        private String jdbcDriver = "com.mysql.jdbc.Driver";
 
         private OceanBaseSnapshotEventDeserializerSchema<T> snapshotEventDeserializer;
         private OceanBaseChangeEventDeserializerSchema<T> changeEventDeserializer;
@@ -121,6 +122,11 @@ public class OceanBaseSource {
             return this;
         }
 
+        public Builder<T> jdbcDriver(String jdbcDriver) {
+            this.jdbcDriver = jdbcDriver;
+            return this;
+        }
+
         public Builder<T> snapshotEventDeserializer(
                 OceanBaseSnapshotEventDeserializerSchema<T> snapshotEventDeserializer) {
             this.snapshotEventDeserializer = snapshotEventDeserializer;
@@ -156,6 +162,7 @@ public class OceanBaseSource {
                     databaseName,
                     tableName,
                     jdbcUrl,
+                    jdbcDriver,
                     rsList,
                     logProxyHost,
                     logProxyPort,

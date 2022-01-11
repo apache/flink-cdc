@@ -35,6 +35,7 @@ import java.util.Set;
 public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "oceanbase-cdc";
+    private static final String MYSQL_DRIVER_CLASS = "com.mysql.jdbc.Driver";
 
     /** Startup modes for the OceanBase CDC Consumer. */
     public enum StartupMode {
@@ -128,6 +129,12 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("JDBC url.");
 
+    public static final ConfigOption<String> JDBC_DRIVER =
+            ConfigOptions.key("jdbc.driver")
+                    .stringType()
+                    .defaultValue(MYSQL_DRIVER_CLASS)
+                    .withDescription("JDBC driver class.");
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -151,6 +158,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         String logProxyHost = config.get(LOG_PROXY_HOST);
         int logProxyPort = config.get(LOG_PROXY_PORT);
         String jdbcUrl = config.get(JDBC_URL);
+        String jdbcDriver = config.get(JDBC_DRIVER);
 
         return new OceanBaseTableSource(
                 physicalSchema,
@@ -164,7 +172,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 rsList,
                 logProxyHost,
                 logProxyPort,
-                jdbcUrl);
+                jdbcUrl,
+                jdbcDriver);
     }
 
     @Override
@@ -192,6 +201,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(SCAN_STARTUP_TIMESTAMP);
         options.add(JDBC_URL);
+        options.add(JDBC_DRIVER);
         return options;
     }
 }

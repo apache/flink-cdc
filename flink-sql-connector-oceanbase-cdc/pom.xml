@@ -52,13 +52,14 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>org.apache.flink:flink-connector-jdbc_${scala.binary.version}</include>
-                                    <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-oceanbase-cdc</include>
+                                    <include>com.ververica:flink-connector-debezium</include>
+                                    <include>org.apache.flink:flink-connector-jdbc_${scala.binary.version}</include>
                                     <include>com.oceanbase.logclient:*</include>
                                     <include>commons-codec:commons-codec</include>
                                     <include>org.apache.commons:commons-collections4</include>
                                     <include>com.google.guava:*</include>
+                                    <!-- TODO make it optional after official driver open source -->
                                     <include>mysql:mysql-connector-java</include>
                                 </includes>
                             </artifactSet>

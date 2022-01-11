@@ -52,6 +52,7 @@ public class OceanBaseTableSource implements ScanTableSource {
     private final String logProxyHost;
     private final int logProxyPort;
     private final String jdbcUrl;
+    private final String jdbcDriver;
 
     public OceanBaseTableSource(
             ResolvedSchema physicalSchema,
@@ -65,7 +66,8 @@ public class OceanBaseTableSource implements ScanTableSource {
             String rsList,
             String logProxyHost,
             int logProxyPort,
-            String jdbcUrl) {
+            String jdbcUrl,
+            String jdbcDriver) {
         this.physicalSchema = physicalSchema;
         this.startupMode = startupMode;
         this.startupTimestamp = startupTimestamp;
@@ -78,6 +80,7 @@ public class OceanBaseTableSource implements ScanTableSource {
         this.logProxyHost = logProxyHost;
         this.logProxyPort = logProxyPort;
         this.jdbcUrl = jdbcUrl;
+        this.jdbcDriver = jdbcDriver;
     }
 
     @Override
@@ -110,6 +113,7 @@ public class OceanBaseTableSource implements ScanTableSource {
                         .logProxyHost(logProxyHost)
                         .logProxyPort(logProxyPort)
                         .jdbcUrl(jdbcUrl)
+                        .jdbcDriver(jdbcDriver)
                         .snapshotEventDeserializer(new OceanBaseSnapshotEventDeserializer(rowType))
                         .changeEventDeserializer(new OceanBaseChangeEventDeserializer());
         return SourceFunctionProvider.of(builder.build(), false);
@@ -129,7 +133,8 @@ public class OceanBaseTableSource implements ScanTableSource {
                 rsList,
                 logProxyHost,
                 logProxyPort,
-                jdbcUrl);
+                jdbcUrl,
+                jdbcDriver);
     }
 
     @Override
@@ -152,7 +157,8 @@ public class OceanBaseTableSource implements ScanTableSource {
                 && Objects.equals(this.rsList, that.rsList)
                 && Objects.equals(this.logProxyHost, that.logProxyHost)
                 && Objects.equals(this.logProxyPort, that.logProxyPort)
-                && Objects.equals(this.jdbcUrl, that.jdbcUrl);
+                && Objects.equals(this.jdbcUrl, that.jdbcUrl)
+                && Objects.equals(this.jdbcDriver, that.jdbcDriver);
     }
 
     @Override
@@ -169,7 +175,8 @@ public class OceanBaseTableSource implements ScanTableSource {
                 rsList,
                 logProxyHost,
                 logProxyPort,
-                jdbcUrl);
+                jdbcUrl,
+                jdbcDriver);
     }
 
     @Override

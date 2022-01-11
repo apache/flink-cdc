@@ -48,6 +48,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -72,6 +73,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
     private final String databaseName;
     private final String tableName;
     private final String jdbcUrl;
+    private final String jdbcDriver;
     private final String rsList;
     private final String logProxyHost;
     private final int logProxyPort;
@@ -97,6 +99,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             String databaseName,
             String tableName,
             String jdbcUrl,
+            String jdbcDriver,
             String rsList,
             String logProxyHost,
             int logProxyPort,
@@ -111,6 +114,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         this.databaseName = databaseName;
         this.tableName = tableName;
         this.jdbcUrl = jdbcUrl;
+        this.jdbcDriver = jdbcDriver;
         this.rsList = rsList;
         this.logProxyHost = logProxyHost;
         this.logProxyPort = logProxyPort;
@@ -159,7 +163,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         String selectTableSql = "SELECT * FROM " + tableFullName;
         Statement stmt = null;
         try {
-            Class.forName("com.mysql.jdbc.Driver");
+            Class.forName(jdbcDriver);
             snapshotConnection = DriverManager.getConnection(jdbcUrl, username, password);
             stmt = snapshotConnection.createStatement();
             ResultSet rs = stmt.executeQuery(selectTableSql);
@@ -182,7 +186,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         snapshotCompleted.set(true);
     }
 
-    protected void readChangeEvents() {
+    protected void readChangeEvents() throws InterruptedException {
         if (changeEventDeserializer == null) {
             LOG.warn("ChangeEventDeserializer not set");
             return;
@@ -203,25 +207,29 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             LOG.info("Read change events from startTimestamp: {}", startTimestamp);
         }
 
-        // mark service as started when `heartbeat` or `begin` messages received
-        AtomicBoolean started = new AtomicBoolean(false);
+        final CountDownLatch latch = new CountDownLatch(1);
 
         logProxyClient = new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig);
 
         logProxyClient.addListener(
                 new RecordListener() {
 
+                    boolean started = false;
+
                     @Override
                     public void notify(LogMessage message) {
                         switch (message.getOpt()) {
                             case HEARTBEAT:
                             case BEGIN:
-                                started.set(true);
+                                if (!started) {
+                                    started = true;
+                                    latch.countDown();
+                                }
                                 break;
                             case INSERT:
                             case UPDATE:
                             case DELETE:
-                                if (!started.get()) {
+                                if (!started) {
                                     break;
                                 }
                                 transactionBuffer.addAll(
@@ -254,7 +262,9 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                 });
 
         logProxyClient.start();
-        while (!started.get()) {}
+        LOG.info("LogProxyClient started");
+        latch.await();
+        LOG.info("LogProxyClient packet processing started");
     }
 
     @Override

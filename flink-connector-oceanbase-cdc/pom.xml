@@ -43,18 +43,21 @@ under the License.
             </exclusions>
         </dependency>
 
+        <!-- Flink dependencies -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-jdbc_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
         </dependency>
 
+        <!-- OceanBase Log Client -->
         <dependency>
             <groupId>com.oceanbase.logclient</groupId>
             <artifactId>logproxy-client</artifactId>
             <version>1.0.2</version>
         </dependency>
 
+        <!-- The recommended version of MySQL JDBC driver -->
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
@@ -135,6 +138,10 @@ under the License.
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
+
+        <!-- tests will have log4j as the default logging framework available -->
+
+        <!-- Logging API -->
 
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>

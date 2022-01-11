@@ -57,7 +57,7 @@ public class OceanBaseTableFactoryTest {
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("aaa")));
 
-    private static final String STARTUP_MODE = "initial";
+    private static final String STARTUP_MODE = "latest";
     private static final String USERNAME = "user@sys";
     private static final String PASSWORD = "pswd";
     private static final String TENANT_NAME = "sys";
@@ -66,6 +66,7 @@ public class OceanBaseTableFactoryTest {
     private static final String RS_LIST = "127.0.0.1:2882:2881";
     private static final String LOG_PROXY_HOST = "127.0.0.1";
     private static final String JDBC_URL = "jdbc:mysql://127.0.0.1:2881";
+    private static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
 
     @Test
     public void testCommonProperties() {
@@ -75,7 +76,7 @@ public class OceanBaseTableFactoryTest {
         OceanBaseTableSource expectedSource =
                 new OceanBaseTableSource(
                         SCHEMA,
-                        OceanBaseTableSourceFactory.StartupMode.INITIAL,
+                        OceanBaseTableSourceFactory.StartupMode.LATEST,
                         null,
                         USERNAME,
                         PASSWORD,
@@ -85,7 +86,8 @@ public class OceanBaseTableFactoryTest {
                         RS_LIST,
                         LOG_PROXY_HOST,
                         2983,
-                        null);
+                        null,
+                        JDBC_DRIVER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -95,6 +97,7 @@ public class OceanBaseTableFactoryTest {
         options.put("scan.startup.mode", "timestamp");
         options.put("scan.startup.timestamp", "0");
         options.put("jdbc.url", JDBC_URL);
+        options.put("jdbc.driver", JDBC_DRIVER);
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         OceanBaseTableSource expectedSource =
@@ -110,7 +113,8 @@ public class OceanBaseTableFactoryTest {
                         RS_LIST,
                         LOG_PROXY_HOST,
                         2983,
-                        JDBC_URL);
+                        JDBC_URL,
+                        JDBC_DRIVER);
         assertEquals(expectedSource, actualSource);
     }
 
