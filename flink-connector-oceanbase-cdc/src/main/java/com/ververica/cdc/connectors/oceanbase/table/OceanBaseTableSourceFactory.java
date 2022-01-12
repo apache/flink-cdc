@@ -64,7 +64,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .stringType()
                     .defaultValue("initial")
                     .withDescription(
-                            "Optional startup mode for MySQL CDC consumer, valid enumerations are "
+                            "Optional startup mode for OceanBase CDC consumer, valid enumerations are "
                                     + "\"initial\", \"latest\" or \"timestamp\"");
 
     public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP =
