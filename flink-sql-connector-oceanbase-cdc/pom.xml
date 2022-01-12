@@ -56,9 +56,12 @@ under the License.
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-jdbc_${scala.binary.version}</include>
                                     <include>com.oceanbase.logclient:*</include>
-                                    <include>commons-codec:commons-codec</include>
-                                    <include>org.apache.commons:commons-collections4</include>
+                                    <include>commons-codec:*</include>
+                                    <include>org.apache.commons:*</include>
+                                    <include>io.netty:*</include>
                                     <include>com.google.guava:*</include>
+                                    <include>com.google.protobuf:*</include>
+                                    <include>org.lz4:*</include>
                                     <!-- TODO make it optional after official driver open source -->
                                     <include>mysql:mysql-connector-java</include>
                                 </includes>
