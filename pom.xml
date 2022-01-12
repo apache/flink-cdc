@@ -83,12 +83,11 @@ under the License.
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <hamcrest.version>1.3</hamcrest.version>
         <slf4j.version>1.7.15</slf4j.version>
-        <log4j.version>2.16.0</log4j.version>
+        <log4j.version>2.17.1</log4j.version>
         <spotless.version>2.4.2</spotless.version>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>
-        <log4j.configuration>log4j2-test.properties</log4j.configuration>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -119,14 +118,45 @@ under the License.
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
 
         <!-- test dependencies -->
-
         <dependency>
             <groupId>org.hamcrest</groupId>
             <artifactId>hamcrest-all</artifactId>
             <version>${hamcrest.version}</version>
             <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- tests will have log4j as the default logging framework available -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>${log4j.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- API bridge between log4j 1 and 2 -->
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-1.2-api</artifactId>
+            <version>${log4j.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -317,7 +347,6 @@ under the License.
                     <reuseForks>${flink.reuseForks}</reuseForks>
                     <systemPropertyVariables>
                         <forkNumber>0${surefire.forkNumber}</forkNumber>
-                        <log4j.configuration>${log4j.configuration}</log4j.configuration>
                     </systemPropertyVariables>
                     <!-- Prevent ORA-01882: timezone region not found errors due to the Oracle DB
                          does not understanding some time zone which used in Ubuntu OS -->

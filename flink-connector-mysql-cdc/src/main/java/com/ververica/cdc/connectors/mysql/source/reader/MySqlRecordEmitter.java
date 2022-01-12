@@ -118,7 +118,7 @@ public final class MySqlRecordEmitter<T>
         if (messageTimestamp != null && messageTimestamp > 0L) {
             // report fetch delay
             Long fetchTimestamp = getFetchTimestamp(element);
-            if (fetchTimestamp != null) {
+            if (fetchTimestamp != null && fetchTimestamp >= messageTimestamp) {
                 sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
             }
             // report emit delay
