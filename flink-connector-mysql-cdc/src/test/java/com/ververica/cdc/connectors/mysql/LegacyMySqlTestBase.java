@@ -31,9 +31,7 @@ import java.util.stream.Stream;
 
 /**
  * Basic class for testing MySQL binlog source, this contains a MySQL container which enables
- * binlog. Then multi-version for testing MySQL use {@link MySqlMultiVersionTestBase}
- *
- * @see MySqlMultiVersionTestBase
+ * binlog.
  */
 public abstract class LegacyMySqlTestBase extends AbstractTestBase {
 
