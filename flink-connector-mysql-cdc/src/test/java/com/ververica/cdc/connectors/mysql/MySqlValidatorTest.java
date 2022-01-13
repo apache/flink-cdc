@@ -23,11 +23,13 @@ import org.apache.flink.table.api.ValidationException;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -51,6 +53,8 @@ import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.basicSourceBuilder;
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.setupSource;
+import static com.ververica.cdc.connectors.mysql.testutils.MySqlVersion.V5_5;
+import static com.ververica.cdc.connectors.mysql.testutils.MySqlVersion.V5_7;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -90,12 +94,13 @@ public class MySqlValidatorTest {
         tempFolder.delete();
     }
 
+    @Ignore("The jdbc driver used in this module cannot connect to MySQL 5.5")
     @Test
     public void testValidateVersion() {
-        String version = "5.6";
+        MySqlVersion version = V5_5;
         String message =
                 String.format(
-                        "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.7, but actual is %s.",
+                        "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.6, but actual is %s.",
                         version);
         doValidate(version, "docker/server/my.cnf", message);
     }
@@ -109,7 +114,7 @@ public class MySqlValidatorTest {
                                 + "connector to work properly. Change the MySQL configuration to use a binlog_format=ROW "
                                 + "and restart the connector.",
                         mode);
-        doValidate("5.7", buildMySqlConfigFile("[mysqld]\nbinlog_format = " + mode), message);
+        doValidate(V5_7, buildMySqlConfigFile("[mysqld]\nbinlog_format = " + mode), message);
     }
 
     @Test
@@ -122,13 +127,14 @@ public class MySqlValidatorTest {
                                 + "binlog_row_image=FULL and restart the connector.",
                         mode);
         doValidate(
-                "5.7",
+                V5_7,
                 buildMySqlConfigFile("[mysqld]\nbinlog_format = ROW\nbinlog_row_image = " + mode),
                 message);
     }
 
-    private void doValidate(String tag, String configPath, String exceptionMessage) {
-        MySqlContainer container = new MySqlContainer(tag).withConfigurationOverride(configPath);
+    private void doValidate(MySqlVersion version, String configPath, String exceptionMessage) {
+        MySqlContainer container =
+                new MySqlContainer(version).withConfigurationOverride(configPath);
 
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(container)).join();
