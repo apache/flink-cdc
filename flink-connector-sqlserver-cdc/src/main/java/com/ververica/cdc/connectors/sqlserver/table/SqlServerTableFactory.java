@@ -82,7 +82,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for SqlServer CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"initial_only\", \"schema_only\"");
+                                    + "\"initial\", \"latest-offset\", \"initial_only\"");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
