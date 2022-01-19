@@ -99,4 +99,3 @@ VALUES ('19-FEB-2016', 1002, 2, 106);
 INSERT INTO orders(order_date,purchaser,quantity,product_id)
 VALUES ('21-FEB-2016', 1003, 1, 107);
 EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'orders', @role_name = NULL, @supports_net_changes = 0;
-

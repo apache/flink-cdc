@@ -25,6 +25,6 @@ package com.ververica.cdc.connectors.sqlserver.table;
  */
 public enum StartupMode {
     INITIAL,
-    LATEST_OFFSET,
     INITIAL_ONLY,
+    LATEST_OFFSET,
 }

@@ -44,8 +44,8 @@ public final class StartupOptions {
      * Takes a snapshot of the structure of captured tables only; useful if only changes happening
      * from now onwards should be propagated to topics.
      */
-    public static StartupOptions schemaOnly() {
-        return new StartupOptions(StartupMode.SCHEMA_ONLY);
+    public static StartupOptions latest() {
+        return new StartupOptions(StartupMode.LATEST_OFFSET);
     }
 
     private StartupOptions(StartupMode startupMode) {
@@ -54,7 +54,7 @@ public final class StartupOptions {
         switch (startupMode) {
             case INITIAL:
             case INITIAL_ONLY:
-            case SCHEMA_ONLY:
+            case LATEST_OFFSET:
                 break;
             default:
                 throw new UnsupportedOperationException(startupMode + " mode is not supported.");

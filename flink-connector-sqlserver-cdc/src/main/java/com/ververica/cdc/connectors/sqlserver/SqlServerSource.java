@@ -142,7 +142,7 @@ public class SqlServerSource {
                 case INITIAL_ONLY:
                     props.setProperty("snapshot.mode", "initial_only");
                     break;
-                case SCHEMA_ONLY:
+                case LATEST_OFFSET:
                     props.setProperty("snapshot.mode", "schema_only");
                     break;
                 default:

@@ -82,7 +82,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for SqlServer CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"latest-offset\", \"initial_only\"");
+                                    + "\"initial\", \"initial-only\", \"latest-offset\"");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -138,8 +138,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
     }
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
-    private static final String SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY = "initial_only";
-    private static final String SCAN_STARTUP_MODE_VALUE_SCHEMA_ONLY = "schema_only";
+    private static final String SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY = "initial-only";
+    private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
@@ -151,8 +151,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
             case SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY:
                 return StartupOptions.initialOnly();
 
-            case SCAN_STARTUP_MODE_VALUE_SCHEMA_ONLY:
-                return StartupOptions.schemaOnly();
+            case SCAN_STARTUP_MODE_VALUE_LATEST:
+                return StartupOptions.latest();
 
             default:
                 throw new ValidationException(
@@ -161,7 +161,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_INITIAL_ONLY,
-                                SCAN_STARTUP_MODE_VALUE_SCHEMA_ONLY,
+                                SCAN_STARTUP_MODE_VALUE_LATEST,
                                 modeString));
         }
     }
