@@ -64,7 +64,7 @@ public class SqlServerDeserializationConverterFactory {
                     public Object convert(Object dbzObj, Schema schema) {
                         if (dbzObj instanceof String) {
                             String str = (String) dbzObj;
-                            // TIMESTAMP type is encoded in string type
+                            // TIMESTAMP_LTZ type is encoded in ISO string type
                             Instant parse =
                                     DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(
                                             str, Instant::from);

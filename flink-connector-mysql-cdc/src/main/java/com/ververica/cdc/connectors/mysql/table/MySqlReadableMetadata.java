@@ -69,7 +69,7 @@ public enum MySqlReadableMetadata {
      */
     OP_TS(
             "op_ts",
-            DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3).notNull(),
+            DataTypes.TIMESTAMP_LTZ(3).notNull(),
             new MetadataConverter() {
                 private static final long serialVersionUID = 1L;
 

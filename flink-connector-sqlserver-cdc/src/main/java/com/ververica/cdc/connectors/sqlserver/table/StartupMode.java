@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.sqlserver.table;
 
 /**
- * Startup modes for the Sqlserver CDC Consumer.
+ * Startup modes for the SqlServer CDC Consumer.
  *
  * @see StartupOptions
  */

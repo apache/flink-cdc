@@ -36,7 +36,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
-/** Integration tests for Sqlserver Table source. */
+/** Integration tests for SqlServer Table source. */
 @RunWith(Parameterized.class)
 public class SqlServerTimezoneITCase extends SqlServerTestBase {
 

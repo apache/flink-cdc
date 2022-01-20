@@ -31,9 +31,13 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Properties;
 
-/** Validates SqlServer cdc is enabled and version is supported. */
+/**
+ * Validator for SqlServer to validate: SqlServer CDC mechanism is enabled or not, SqlServer version
+ * is supported or not.
+ */
 public class SqlServerValidator implements Validator {
 
+    private static final long serialVersionUID = 1L;
     private final Properties properties;
 
     public SqlServerValidator(Properties properties) {

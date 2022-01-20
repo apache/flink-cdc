@@ -93,7 +93,7 @@ public class SqlServerSource {
             return this;
         }
 
-        /** The Debezium Sqlserver connector properties. For example, "snapshot.mode". */
+        /** The Debezium SqlServer connector properties. For example, "snapshot.mode". */
         public Builder<T> debeziumProperties(Properties properties) {
             this.dbzProperties = properties;
             return this;
