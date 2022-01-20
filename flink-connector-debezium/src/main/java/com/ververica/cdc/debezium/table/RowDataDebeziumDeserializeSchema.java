@@ -492,7 +492,7 @@ public final class RowDataDebeziumDeserializeSchema
             public Object convert(Object dbzObj, Schema schema) {
                 if (dbzObj instanceof String) {
                     String str = (String) dbzObj;
-                    // TIMESTAMP type is encoded in string type
+                    // TIMESTAMP_LTZ type is encoded in string type
                     Instant instant = Instant.parse(str);
                     return TimestampData.fromLocalDateTime(
                             LocalDateTime.ofInstant(instant, serverTimeZone));
