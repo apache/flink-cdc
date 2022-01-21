@@ -24,6 +24,7 @@ import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.slf4j.Logger;
@@ -45,15 +46,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
-    protected static final MySqlContainer MYSQL_CONTAINER =
-            (MySqlContainer)
-                    new MySqlContainer()
-                            .withConfigurationOverride("docker/server-gtids/my.cnf")
-                            .withSetupSQL("docker/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
+    protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
 
     @Rule
     public final MiniClusterWithClientResource miniClusterResource =
@@ -70,6 +63,17 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
+    }
+
+    protected static MySqlContainer createMySqlContainer(MySqlVersion version) {
+        return (MySqlContainer)
+                new MySqlContainer(version)
+                        .withConfigurationOverride("docker/server-gtids/my.cnf")
+                        .withSetupSQL("docker/setup.sql")
+                        .withDatabaseName("flink-test")
+                        .withUsername("flinkuser")
+                        .withPassword("flinkpw")
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
