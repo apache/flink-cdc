@@ -196,6 +196,16 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether the {@link MySqlSource} should dispatch watermark at the beginning of binlog split or
+     * not.
+     */
+    public MySqlSourceBuilder<T> dispatchWatermarkOnBinlogStart(
+            boolean dispatchWatermarkOnBinlogStart) {
+        this.configFactory.dispatchWatermarkOnBinlogStart(dispatchWatermarkOnBinlogStart);
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);
