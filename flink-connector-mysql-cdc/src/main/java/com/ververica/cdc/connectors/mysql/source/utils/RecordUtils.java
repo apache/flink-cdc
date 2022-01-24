@@ -252,6 +252,14 @@ public class RecordUtils {
         return false;
     }
 
+    public static boolean isBinlogStartWatermarkEvent(SourceRecord record) {
+        Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
+        if (watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.BINLOG_START) {
+            return true;
+        }
+        return false;
+    }
+
     public static BinlogOffset getWatermark(SourceRecord watermarkEvent) {
         return getBinlogPosition(watermarkEvent.sourceOffset());
     }

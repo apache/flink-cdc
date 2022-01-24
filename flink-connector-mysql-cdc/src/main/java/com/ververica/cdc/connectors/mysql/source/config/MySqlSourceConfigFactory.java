@@ -68,6 +68,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private double distributionFactorLower =
             SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
+    private boolean dispatchWatermarkOnBinlogStart = false;
     private Properties dbzProperties;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
@@ -207,6 +208,16 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether the {@link MySqlSource} should dispatch a watermark event to downstream when a binlog
+     * split is executed.
+     */
+    public MySqlSourceConfigFactory dispatchWatermarkOnBinlogStart(
+            boolean dispatchWatermarkOnBinlogStart) {
+        this.dispatchWatermarkOnBinlogStart = dispatchWatermarkOnBinlogStart;
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceConfigFactory startupOptions(StartupOptions startupOptions) {
         switch (startupOptions.startupMode) {
@@ -303,6 +314,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                dispatchWatermarkOnBinlogStart,
                 props);
     }
 }

@@ -76,6 +76,12 @@ public class StatefulTaskContext {
     private final MySqlConnection connection;
     private final BinaryLogClient binaryLogClient;
 
+    public boolean shouldDispatchWatermarkOnBinlogStart() {
+        return dispatchWatermarkOnBinlogStart;
+    }
+
+    private final boolean dispatchWatermarkOnBinlogStart;
+
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
     private MySqlOffsetContext offsetContext;
@@ -92,6 +98,7 @@ public class StatefulTaskContext {
             MySqlConnection connection) {
         this.sourceConfig = sourceConfig;
         this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
+        this.dispatchWatermarkOnBinlogStart = sourceConfig.shouldDispatchWatermarkOnBinlogStart();
         this.schemaNameAdjuster = SchemaNameAdjuster.create();
         this.metadataProvider = new MySqlEventMetadataProvider();
         this.binaryLogClient = binaryLogClient;
