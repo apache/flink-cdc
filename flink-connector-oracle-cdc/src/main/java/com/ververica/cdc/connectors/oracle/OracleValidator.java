@@ -35,6 +35,7 @@ import java.util.Properties;
 public class OracleValidator implements Validator {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleValidator.class);
+    private static final long serialVersionUID = 1L;
 
     private final Properties properties;
 

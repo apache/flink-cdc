@@ -104,13 +104,13 @@ public class MySqlValidator implements Validator {
         } else if (versionNumbers[0] < 5) {
             isSatisfied = false;
         } else {
-            isSatisfied = versionNumbers[1] >= 7;
+            isSatisfied = versionNumbers[1] >= 6;
         }
         if (!isSatisfied) {
             throw new ValidationException(
                     String.format(
                             "Currently Flink MySql CDC connector only supports MySql "
-                                    + "whose version is larger or equal to 5.7, but actual is %s.%s.",
+                                    + "whose version is larger or equal to 5.6, but actual is %s.%s.",
                             versionNumbers[0], versionNumbers[1]));
         }
     }

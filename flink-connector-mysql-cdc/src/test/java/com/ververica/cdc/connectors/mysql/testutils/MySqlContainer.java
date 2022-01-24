@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.mysql.testutils;
 
 import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.JdbcDatabaseContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -33,7 +34,6 @@ import java.util.Set;
 public class MySqlContainer extends JdbcDatabaseContainer {
 
     public static final String IMAGE = "mysql";
-    public static final String DEFAULT_TAG = "5.7";
     public static final Integer MYSQL_PORT = 3306;
 
     private static final String MY_CNF_CONFIG_OVERRIDE_PARAM_NAME = "MY_CNF";
@@ -45,11 +45,11 @@ public class MySqlContainer extends JdbcDatabaseContainer {
     private String password = "test";
 
     public MySqlContainer() {
-        this(DEFAULT_TAG);
+        this(MySqlVersion.V5_7);
     }
 
-    public MySqlContainer(String tag) {
-        super(IMAGE + ":" + tag);
+    public MySqlContainer(MySqlVersion version) {
+        super(DockerImageName.parse(IMAGE + ":" + version.getVersion()));
         addExposedPort(MYSQL_PORT);
     }
 
