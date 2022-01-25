@@ -212,29 +212,33 @@ class ChunkSplitter {
                 nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize, isCaseSensitive);
         int count = 0;
 
-        boolean compare;
         if (isCaseSensitive) {
-            compare = (ObjectUtils.compare(chunkEnd, max) <= 0);
+            // Case sensitive logic
+            while (chunkEnd != null && (ObjectUtils.compare(chunkEnd, max) <= 0)) {
+                // we start from [null, min + chunk_size) and avoid [null, min)
+                splits.add(ChunkRange.of(chunkStart, chunkEnd));
+                // may sleep a while to avoid DDOS on MySQL server
+                maySleep(count++, tableId);
+                chunkStart = chunkEnd;
+                chunkEnd =
+                        nextChunkEnd(
+                                jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize, true);
+            }
         } else {
+            // Case insensitive logic
             String endId = String.valueOf(chunkEnd);
             String maxId = String.valueOf(max);
-            compare = (ObjectUtils.compare(endId.toLowerCase(), maxId.toLowerCase()) <= 0);
-        }
-        while (chunkEnd != null && compare) {
-            // we start from [null, min + chunk_size) and avoid [null, min)
-            splits.add(ChunkRange.of(chunkStart, chunkEnd));
-            // may sleep a while to avoid DDOS on MySQL server
-            maySleep(count++, tableId);
-            chunkStart = chunkEnd;
-            chunkEnd =
-                    nextChunkEnd(
-                            jdbc,
-                            chunkEnd,
-                            tableId,
-                            splitColumnName,
-                            max,
-                            chunkSize,
-                            isCaseSensitive);
+            while (chunkEnd != null
+                    && (ObjectUtils.compare(endId.toLowerCase(), maxId.toLowerCase()) <= 0)) {
+                // we start from [null, min + chunk_size) and avoid [null, min)
+                splits.add(ChunkRange.of(chunkStart, chunkEnd));
+                // may sleep a while to avoid DDOS on MySQL server
+                maySleep(count++, tableId);
+                chunkStart = chunkEnd;
+                chunkEnd =
+                        nextChunkEnd(
+                                jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize, false);
+            }
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
