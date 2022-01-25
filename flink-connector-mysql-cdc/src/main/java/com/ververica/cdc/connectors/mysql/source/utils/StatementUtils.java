@@ -34,6 +34,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.rowToA
 
 /** Utils to prepare SQL statement. */
 public class StatementUtils {
+    private static final String NOT_CASE_SENSITIVE_SUFFIX = "_ci";
 
     private StatementUtils() {}
 
@@ -322,5 +323,43 @@ public class StatementUtils {
 
     private static String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
+    }
+
+    /**
+     * is the query field case sensitive. With _ci (case insensitive), in _cs (case sensitive) to
+     * _bin (indicates comparison with coded value).
+     *
+     * @param jdbc
+     * @param tableId
+     * @param splitColumnName
+     * @return true:sensitive false: not sensitive
+     * @throws SQLException
+     */
+    public static boolean queryCaseSensitive(
+            JdbcConnection jdbc, TableId tableId, String splitColumnName) throws SQLException {
+        final String caseSensitiveQuery =
+                String.format(
+                        "SHOW FULL COLUMNS FROM %s WHERE Field='%s'",
+                        quote(tableId), splitColumnName);
+        Object[] objects =
+                jdbc.queryAndMap(
+                        caseSensitiveQuery,
+                        rs -> {
+                            if (!rs.next()) {
+                                // this should never happen
+                                throw new SQLException(
+                                        String.format(
+                                                "No result returned after running query [%s]",
+                                                caseSensitiveQuery));
+                            }
+                            return rowToArray(rs, 3);
+                        });
+        // get collation
+        Object collation = objects[2];
+        if (null != collation) {
+            String collationSuffix = String.valueOf(collation).toLowerCase();
+            return collationSuffix.endsWith(NOT_CASE_SENSITIVE_SUFFIX) ? false : true;
+        }
+        return false;
     }
 }
