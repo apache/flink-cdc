@@ -260,13 +260,13 @@ class ChunkSplitter {
         }
         boolean compare;
         if (isCaseSensitive) {
-            compare = (ObjectUtils.compare(chunkEnd, max) <= 0);
+            compare = (ObjectUtils.compare(chunkEnd, max) >= 0);
         } else {
             String endId = String.valueOf(chunkEnd);
             String maxId = String.valueOf(max);
-            compare = (ObjectUtils.compare(endId.toLowerCase(), maxId.toLowerCase()) <= 0);
+            compare = (ObjectUtils.compare(endId.toLowerCase(), maxId.toLowerCase()) >= 0);
         }
-        if (!compare) {
+        if (compare) {
             return null;
         } else {
             return chunkEnd;
