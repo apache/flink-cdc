@@ -160,7 +160,8 @@ class ChunkSplitter {
                         jdbc, tableId, splitColumnName, min, max, chunkSize, true);
             }
         } else {
-            return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize, false);
+            return splitUnevenlySizedChunks(
+                    jdbc, tableId, splitColumnName, min, max, chunkSize, false);
         }
     }
 
@@ -205,8 +206,10 @@ class ChunkSplitter {
             throws SQLException {
         LOG.info(
                 "Use unevenly-sized chunks for table {}, the chunk size is {}", tableId, chunkSize);
-        // If the primary key passed in is a Int, follow the original logic. Otherwise, judge whether it is case sensitive
-        boolean isCaseSensitive = evenlyColumn ? true : queryCaseSensitive(jdbc, tableId, splitColumnName);
+        // If the primary key passed in is a Int, follow the original logic. Otherwise, judge
+        // whether it is case sensitive
+        boolean isCaseSensitive =
+                evenlyColumn ? true : queryCaseSensitive(jdbc, tableId, splitColumnName);
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
         Object chunkEnd =
@@ -286,8 +289,8 @@ class ChunkSplitter {
             Object chunkStart,
             Object chunkEnd) {
         // currently, we only support single split column
-        Object[] splitStart = chunkStart == null ? null : new Object[]{chunkStart};
-        Object[] splitEnd = chunkEnd == null ? null : new Object[]{chunkEnd};
+        Object[] splitStart = chunkStart == null ? null : new Object[] {chunkStart};
+        Object[] splitEnd = chunkEnd == null ? null : new Object[] {chunkEnd};
         Map<TableId, TableChange> schema = new HashMap<>();
         schema.put(tableId, mySqlSchema.getTableSchema(jdbc, tableId));
         return new MySqlSnapshotSplit(
@@ -302,9 +305,7 @@ class ChunkSplitter {
 
     // ------------------------------------------------------------------------------------------
 
-    /**
-     * Checks whether split column is evenly distributed across its range.
-     */
+    /** Checks whether split column is evenly distributed across its range. */
     private static boolean isEvenlySplitColumn(Column splitColumn) {
         DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn);
         LogicalTypeRoot typeRoot = flinkType.getLogicalType().getTypeRoot();
@@ -316,9 +317,7 @@ class ChunkSplitter {
                 || typeRoot == LogicalTypeRoot.DECIMAL;
     }
 
-    /**
-     * Returns the distribution factor of the given table.
-     */
+    /** Returns the distribution factor of the given table. */
     private double calculateDistributionFactor(
             TableId tableId, Object min, Object max, long approximateRowCnt) {
 
