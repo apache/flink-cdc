@@ -190,7 +190,7 @@ public class StatefulTaskContext {
             return checkGtidSet(offset);
         }
 
-        return checkBinlogFileName(offset);
+        return checkBinlogFilename(offset);
     }
 
     private boolean checkGtidSet(MySqlOffsetContext offset) {
@@ -237,7 +237,7 @@ public class StatefulTaskContext {
         return false;
     }
 
-    private boolean checkBinlogFileName(MySqlOffsetContext offset) {
+    private boolean checkBinlogFilename(MySqlOffsetContext offset) {
         String binlogFilename = offset.getSourceInfo().getString(BINLOG_FILENAME_OFFSET_KEY);
         if (binlogFilename == null) {
             return true; // start at current position
