@@ -93,8 +93,12 @@ public class Db2TableSource implements ScanTableSource {
         TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(physicalSchema.toRowDataType());
         DebeziumDeserializationSchema<RowData> deserializer =
-                new RowDataDebeziumDeserializeSchema(
-                        rowType, typeInfo, ((rowData, rowKind) -> {}), serverTimeZone);
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType(rowType)
+                        .setResultTypeInfo(typeInfo)
+                        .setServerTimeZone(serverTimeZone)
+                        .build();
+
         Db2Source.Builder<RowData> builder =
                 Db2Source.<RowData>builder()
                         .hostname(hostname)
