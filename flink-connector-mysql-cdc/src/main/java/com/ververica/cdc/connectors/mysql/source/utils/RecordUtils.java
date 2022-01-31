@@ -53,6 +53,7 @@ import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEvent
 import static com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WATERMARK_KIND;
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
+import static io.debezium.pipeline.txmetadata.TransactionMonitor.DEBEZIUM_TRANSACTION_STATUS_KEY;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Utility class to deal record. */
@@ -338,6 +339,13 @@ public class RecordUtils {
         Struct value = (Struct) record.value();
         return valueSchema.field(Envelope.FieldName.OPERATION) != null
                 && value.getString(Envelope.FieldName.OPERATION) != null;
+    }
+
+    public static boolean isTransactionMetadataRecord(SourceRecord record) {
+        Schema valueSchema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        return valueSchema.field(DEBEZIUM_TRANSACTION_STATUS_KEY) != null
+                && value.getString(DEBEZIUM_TRANSACTION_STATUS_KEY) != null;
     }
 
     public static TableId getTableId(SourceRecord dataRecord) {
