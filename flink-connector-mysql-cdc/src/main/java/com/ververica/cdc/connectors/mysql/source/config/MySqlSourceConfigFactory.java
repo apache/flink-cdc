@@ -271,7 +271,8 @@ public class MySqlSourceConfigFactory implements Serializable {
         // but it'll cause lose of precise when the value is larger than 2^63,
         // so use "precise" mode to avoid it.
         props.put("bigint.unsigned.handling.mode", "precise");
-        props.put("provide.transaction.metadata", includeTransactionMetadata);
+        props.setProperty(
+                "provide.transaction.metadata", String.valueOf(includeTransactionMetadata));
 
         if (serverIdRange != null) {
             int serverId = serverIdRange.getServerId(subtaskId);
