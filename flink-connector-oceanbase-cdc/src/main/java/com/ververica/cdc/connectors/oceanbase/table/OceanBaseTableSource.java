@@ -29,9 +29,11 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
-import com.ververica.cdc.connectors.oceanbase.source.deserializer.rowdata.OceanBaseChangeEventDeserializer;
-import com.ververica.cdc.connectors.oceanbase.source.deserializer.rowdata.OceanBaseSnapshotEventDeserializer;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.table.MetadataConverter;
+import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import java.time.ZoneId;
 import java.util.Objects;
 
 /** A {@link DynamicTableSource} implementation for OceanBase. */
@@ -52,7 +54,6 @@ public class OceanBaseTableSource implements ScanTableSource {
     private final String logProxyHost;
     private final int logProxyPort;
     private final String jdbcUrl;
-    private final String jdbcDriver;
 
     public OceanBaseTableSource(
             ResolvedSchema physicalSchema,
@@ -66,8 +67,7 @@ public class OceanBaseTableSource implements ScanTableSource {
             String rsList,
             String logProxyHost,
             int logProxyPort,
-            String jdbcUrl,
-            String jdbcDriver) {
+            String jdbcUrl) {
         this.physicalSchema = physicalSchema;
         this.startupMode = startupMode;
         this.startupTimestamp = startupTimestamp;
@@ -80,7 +80,6 @@ public class OceanBaseTableSource implements ScanTableSource {
         this.logProxyHost = logProxyHost;
         this.logProxyPort = logProxyPort;
         this.jdbcUrl = jdbcUrl;
-        this.jdbcDriver = jdbcDriver;
     }
 
     @Override
@@ -99,9 +98,16 @@ public class OceanBaseTableSource implements ScanTableSource {
         TypeInformation<RowData> resultTypeInfo =
                 context.createTypeInformation(physicalSchema.toPhysicalRowDataType());
 
+        DebeziumDeserializationSchema<RowData> deserializer =
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType(rowType)
+                        .setMetadataConverters(new MetadataConverter[0])
+                        .setResultTypeInfo(resultTypeInfo)
+                        .setServerTimeZone(ZoneId.systemDefault())
+                        .build();
+
         OceanBaseSource.Builder<RowData> builder =
                 OceanBaseSource.<RowData>builder()
-                        .resultTypeInfo(resultTypeInfo)
                         .startupMode(startupMode)
                         .startupTimestamp(startupTimestamp)
                         .username(username)
@@ -113,9 +119,7 @@ public class OceanBaseTableSource implements ScanTableSource {
                         .logProxyHost(logProxyHost)
                         .logProxyPort(logProxyPort)
                         .jdbcUrl(jdbcUrl)
-                        .jdbcDriver(jdbcDriver)
-                        .snapshotEventDeserializer(new OceanBaseSnapshotEventDeserializer(rowType))
-                        .changeEventDeserializer(new OceanBaseChangeEventDeserializer());
+                        .deserializer(deserializer);
         return SourceFunctionProvider.of(builder.build(), false);
     }
 
@@ -133,8 +137,7 @@ public class OceanBaseTableSource implements ScanTableSource {
                 rsList,
                 logProxyHost,
                 logProxyPort,
-                jdbcUrl,
-                jdbcDriver);
+                jdbcUrl);
     }
 
     @Override
@@ -157,8 +160,7 @@ public class OceanBaseTableSource implements ScanTableSource {
                 && Objects.equals(this.rsList, that.rsList)
                 && Objects.equals(this.logProxyHost, that.logProxyHost)
                 && Objects.equals(this.logProxyPort, that.logProxyPort)
-                && Objects.equals(this.jdbcUrl, that.jdbcUrl)
-                && Objects.equals(this.jdbcDriver, that.jdbcDriver);
+                && Objects.equals(this.jdbcUrl, that.jdbcUrl);
     }
 
     @Override
@@ -175,8 +177,7 @@ public class OceanBaseTableSource implements ScanTableSource {
                 rsList,
                 logProxyHost,
                 logProxyPort,
-                jdbcUrl,
-                jdbcDriver);
+                jdbcUrl);
     }
 
     @Override

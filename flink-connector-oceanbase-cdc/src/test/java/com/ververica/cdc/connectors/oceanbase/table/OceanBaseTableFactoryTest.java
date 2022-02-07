@@ -66,7 +66,6 @@ public class OceanBaseTableFactoryTest {
     private static final String RS_LIST = "127.0.0.1:2882:2881";
     private static final String LOG_PROXY_HOST = "127.0.0.1";
     private static final String JDBC_URL = "jdbc:mysql://127.0.0.1:2881";
-    private static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
 
     @Test
     public void testCommonProperties() {
@@ -86,8 +85,7 @@ public class OceanBaseTableFactoryTest {
                         RS_LIST,
                         LOG_PROXY_HOST,
                         2983,
-                        null,
-                        JDBC_DRIVER);
+                        null);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -97,7 +95,6 @@ public class OceanBaseTableFactoryTest {
         options.put("scan.startup.mode", "timestamp");
         options.put("scan.startup.timestamp", "0");
         options.put("jdbc.url", JDBC_URL);
-        options.put("jdbc.driver", JDBC_DRIVER);
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         OceanBaseTableSource expectedSource =
@@ -113,8 +110,7 @@ public class OceanBaseTableFactoryTest {
                         RS_LIST,
                         LOG_PROXY_HOST,
                         2983,
-                        JDBC_URL,
-                        JDBC_DRIVER);
+                        JDBC_URL);
         assertEquals(expectedSource, actualSource);
     }
 

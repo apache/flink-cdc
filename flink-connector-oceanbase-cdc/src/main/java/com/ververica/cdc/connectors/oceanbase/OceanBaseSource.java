@@ -19,13 +19,11 @@
 package com.ververica.cdc.connectors.oceanbase;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
 import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichParallelSourceFunction;
-import com.ververica.cdc.connectors.oceanbase.source.deserializer.OceanBaseChangeEventDeserializerSchema;
-import com.ververica.cdc.connectors.oceanbase.source.deserializer.OceanBaseSnapshotEventDeserializerSchema;
 import com.ververica.cdc.connectors.oceanbase.table.OceanBaseTableSourceFactory;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -42,8 +40,6 @@ public class OceanBaseSource {
     /** Builder class of {@link OceanBaseSource}. */
     public static class Builder<T> {
 
-        private TypeInformation<T> resultTypeInfo;
-
         private OceanBaseTableSourceFactory.StartupMode startupMode;
         private Long startupTimestamp;
 
@@ -57,15 +53,8 @@ public class OceanBaseSource {
         private String rsList;
         private String logProxyHost;
         private int logProxyPort = 2983;
-        private String jdbcDriver = "com.mysql.jdbc.Driver";
 
-        private OceanBaseSnapshotEventDeserializerSchema<T> snapshotEventDeserializer;
-        private OceanBaseChangeEventDeserializerSchema<T> changeEventDeserializer;
-
-        public Builder<T> resultTypeInfo(TypeInformation<T> resultTypeInfo) {
-            this.resultTypeInfo = resultTypeInfo;
-            return this;
-        }
+        private DebeziumDeserializationSchema<T> deserializer;
 
         public Builder<T> startupMode(OceanBaseTableSourceFactory.StartupMode startupMode) {
             this.startupMode = startupMode;
@@ -122,20 +111,8 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> jdbcDriver(String jdbcDriver) {
-            this.jdbcDriver = jdbcDriver;
-            return this;
-        }
-
-        public Builder<T> snapshotEventDeserializer(
-                OceanBaseSnapshotEventDeserializerSchema<T> snapshotEventDeserializer) {
-            this.snapshotEventDeserializer = snapshotEventDeserializer;
-            return this;
-        }
-
-        public Builder<T> changeEventDeserializer(
-                OceanBaseChangeEventDeserializerSchema<T> changeEventDeserializer) {
-            this.changeEventDeserializer = changeEventDeserializer;
+        public Builder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
+            this.deserializer = deserializer;
             return this;
         }
 
@@ -154,7 +131,6 @@ public class OceanBaseSource {
             }
 
             return new OceanBaseRichParallelSourceFunction<T>(
-                    resultTypeInfo,
                     startupMode.equals(OceanBaseTableSourceFactory.StartupMode.INITIAL),
                     username,
                     password,
@@ -162,13 +138,11 @@ public class OceanBaseSource {
                     databaseName,
                     tableName,
                     jdbcUrl,
-                    jdbcDriver,
                     rsList,
                     logProxyHost,
                     logProxyPort,
                     startupTimestamp,
-                    snapshotEventDeserializer,
-                    changeEventDeserializer);
+                    deserializer);
         }
     }
 }
