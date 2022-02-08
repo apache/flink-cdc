@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.oceanbase.source;
 
+import com.oceanbase.oms.logmessage.ByteString;
 import com.oceanbase.oms.logmessage.DataMessage;
 
 import java.sql.Date;
@@ -84,6 +85,10 @@ public class OceanBaseLogMessageUtils {
     }
 
     public static Object getObject(DataMessage.Record.Field field) {
+        ByteString value = field.getValue();
+        if (value == null) {
+            return null;
+        }
         switch (field.getType()) {
             case NULL:
                 return null;
@@ -93,32 +98,32 @@ public class OceanBaseLogMessageUtils {
             case INT24:
             case INT32:
             case YEAR:
-                return Integer.parseInt(field.getValue().toString());
+                return Integer.parseInt(value.toString());
             case INT64:
-                return Long.parseLong(field.getValue().toString());
+                return Long.parseLong(value.toString());
             case FLOAT:
-                return Float.parseFloat(field.getValue().toString());
+                return Float.parseFloat(value.toString());
             case DOUBLE:
-                return Double.parseDouble(field.getValue().toString());
+                return Double.parseDouble(value.toString());
             case DECIMAL:
             case ENUM:
             case SET:
             case STRING:
             case JSON:
-                return field.getValue().toString();
+                return value.toString();
             case DATETIME:
             case TIMESTAMP:
             case TIMESTAMP_NANO:
             case TIMESTAMP_WITH_TIME_ZONE:
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return Timestamp.valueOf(field.getValue().toString());
+                return Timestamp.valueOf(value.toString());
             case DATE:
-                return Date.valueOf(field.getValue().toString());
+                return Date.valueOf(value.toString());
             case TIME:
-                return Time.valueOf(field.getValue().toString());
+                return Time.valueOf(value.toString());
             case BLOB:
             case BINARY:
-                return field.getValue().getBytes();
+                return value.getBytes();
             case INTERVAL_YEAR_TO_MONTH:
             case INTERVAL_DAY_TO_SECOND:
             case GEOMETRY:

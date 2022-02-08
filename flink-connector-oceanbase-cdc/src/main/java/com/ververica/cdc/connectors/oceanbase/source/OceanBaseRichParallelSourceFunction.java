@@ -58,6 +58,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -257,7 +258,8 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             Struct value = new Struct(tableSchema.valueSchema());
             for (int i = 1; i <= metaData.getColumnCount(); i++) {
                 if (metaData.getColumnType(i) == Types.DECIMAL) {
-                    value.put(metaData.getColumnName(i), rs.getBigDecimal(i).toString());
+                    BigDecimal d = rs.getBigDecimal(i);
+                    value.put(metaData.getColumnName(i), d == null ? null : d.toString());
                 } else {
                     value.put(metaData.getColumnName(i), rs.getObject(i));
                 }
@@ -381,6 +383,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                                         .name(field.getFieldname())
                                         .jdbcType(OceanBaseLogMessageUtils.getJdbcType(field))
                                         .scale(0)
+                                        .optional(true)
                                         .create();
                         tableEditor.addColumn(column);
                     }
