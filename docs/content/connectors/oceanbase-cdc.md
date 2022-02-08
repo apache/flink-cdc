@@ -175,13 +175,6 @@ Connector Options
                 <td>String</td>
                 <td>JDBC url, only used for snapshot.</td>
             </tr>
-            <tr>
-                <td>jdbc.driver</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">'com.mysql.jdbc.Driver'</td>
-                <td>String</td>
-                <td>JDBC driver class, only used for snapshot.</td>
-            </tr>
         </tbody>
     </table>
 </div>
@@ -213,18 +206,8 @@ The OceanBase CDC connector can also be a DataStream source. You can create a So
 public class OceanBaseSourceExample {
 
   public static void main(String[] args) throws Exception {
-
-    ResolvedSchema schema =
-        new ResolvedSchema(
-            Arrays.asList(
-                Column.physical("id", DataTypes.INT()),
-                Column.physical("name", DataTypes.STRING())),
-            new ArrayList<>(),
-            UniqueConstraint.primaryKey("id", Collections.singletonList("id")));
-    RowType rowType = (RowType) schema.toPhysicalRowDataType().getLogicalType();
-
-    SourceFunction<RowData> oceanBaseSource =
-        OceanBaseSource.<RowData>builder()
+    SourceFunction<String> oceanBaseSource =
+        OceanBaseSource.<String>builder()
             .rsList("127.0.0.1:2882:2881")
             .startupMode(OceanBaseTableSourceFactory.StartupMode.INITIAL)
             .username("user@test_tenant")
@@ -235,18 +218,15 @@ public class OceanBaseSourceExample {
             .logProxyHost("127.0.0.1")
             .logProxyPort(2983)
             .jdbcUrl("jdbc:mysql://127.0.0.1:2881")
-            .snapshotEventDeserializer(new OceanBaseSnapshotEventDeserializer(rowType))
-            .changeEventDeserializer(new OceanBaseChangeEventDeserializer())
+            .deserializer(new JsonDebeziumDeserializationSchema())
             .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
     // enable checkpoint
     env.enableCheckpointing(3000);
-
-    TypeInformation<RowData> typeInformation =
-        InternalTypeInfo.of(schema.toPhysicalRowDataType().getLogicalType());
-    env.addSource(oceanBaseSource).returns(typeInformation).print().setParallelism(1);
+    
+    env.addSource(oceanBaseSource).print().setParallelism(1);
 
     env.execute("Print OceanBase Snapshot + Commit Log");
   }
