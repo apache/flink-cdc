@@ -41,8 +41,6 @@ import com.oceanbase.oms.logmessage.DataMessage;
 import com.oceanbase.oms.logmessage.LogMessage;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.data.Envelope;
-import io.debezium.jdbc.JdbcValueConverters;
-import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
 import io.debezium.relational.CustomConverterRegistry;
@@ -58,14 +56,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -88,15 +83,6 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
 
     private static final Logger LOG =
             LoggerFactory.getLogger(OceanBaseRichParallelSourceFunction.class);
-
-    private static final JdbcValueConverters JDBC_VALUE_CONVERTERS =
-            new JdbcValueConverters(
-                    JdbcValueConverters.DecimalMode.STRING,
-                    TemporalPrecisionMode.ADAPTIVE,
-                    ZoneOffset.UTC,
-                    null,
-                    null,
-                    null);
 
     private final boolean snapshot;
     private final String username;
@@ -236,7 +222,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                     }
                     TableSchemaBuilder tableSchemaBuilder =
                             new TableSchemaBuilder(
-                                    JDBC_VALUE_CONVERTERS,
+                                    new OceanBaseValueConverters(),
                                     SchemaNameAdjuster.create(),
                                     new CustomConverterRegistry(null),
                                     OceanBaseSourceInfo.schema(),
@@ -257,12 +243,9 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         while (rs.next()) {
             Struct value = new Struct(tableSchema.valueSchema());
             for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                if (metaData.getColumnType(i) == Types.DECIMAL) {
-                    BigDecimal d = rs.getBigDecimal(i);
-                    value.put(metaData.getColumnName(i), d == null ? null : d.toString());
-                } else {
-                    value.put(metaData.getColumnName(i), rs.getObject(i));
-                }
+                value.put(
+                        metaData.getColumnName(i),
+                        OceanBaseJdbcReader.getField(metaData.getColumnType(i), rs.getObject(i)));
             }
             Struct struct = tableSchema.getEnvelopeSchema().create(value, source, null);
             deserializer.deserialize(
@@ -329,7 +312,8 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                                             msg -> {
                                                 try {
                                                     deserializer.deserialize(
-                                                            toRecord(msg), outputCollector);
+                                                            getRecordFromLogMessage(msg),
+                                                            outputCollector);
                                                 } catch (Exception e) {
                                                     throw new FlinkRuntimeException(e);
                                                 }
@@ -363,8 +347,8 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         LOG.info("LogProxyClient packet processing started");
     }
 
-    private SourceRecord toRecord(LogMessage message) throws Exception {
-        String databaseName = OceanBaseLogMessageUtils.getDatabase(message.getDbName(), tenantName);
+    private SourceRecord getRecordFromLogMessage(LogMessage message) throws Exception {
+        String databaseName = message.getDbName().replace(tenantName + ".", "");
         // TODO make topic name configurable
         String topicName = getDefaultTopicName(tenantName, databaseName, message.getTableName());
 
@@ -381,7 +365,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                         Column column =
                                 Column.editor()
                                         .name(field.getFieldname())
-                                        .jdbcType(OceanBaseLogMessageUtils.getJdbcType(field))
+                                        .jdbcType(OceanBaseJdbcReader.getType(field.getType()))
                                         .scale(0)
                                         .optional(true)
                                         .create();
@@ -389,7 +373,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                     }
                     TableSchemaBuilder tableSchemaBuilder =
                             new TableSchemaBuilder(
-                                    JDBC_VALUE_CONVERTERS,
+                                    new OceanBaseValueConverters(),
                                     SchemaNameAdjuster.create(),
                                     new CustomConverterRegistry(null),
                                     OceanBaseSourceInfo.schema(),
@@ -419,7 +403,9 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             case INSERT:
                 struct =
                         envelope.create(
-                                getValueStruct(valueSchema, message.getFieldList()), source, null);
+                                getLogValueStruct(valueSchema, message.getFieldList()),
+                                source,
+                                null);
                 break;
             case UPDATE:
                 List<DataMessage.Record.Field> before = new ArrayList<>();
@@ -433,15 +419,17 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                 }
                 struct =
                         envelope.update(
-                                getValueStruct(valueSchema, before),
-                                getValueStruct(valueSchema, after),
+                                getLogValueStruct(valueSchema, before),
+                                getLogValueStruct(valueSchema, after),
                                 source,
                                 null);
                 break;
             case DELETE:
                 struct =
                         envelope.delete(
-                                getValueStruct(valueSchema, message.getFieldList()), source, null);
+                                getLogValueStruct(valueSchema, message.getFieldList()),
+                                source,
+                                null);
                 break;
             default:
                 throw new UnsupportedOperationException(
@@ -501,10 +489,12 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         return tableSchema;
     }
 
-    private Struct getValueStruct(Schema valueSchema, List<DataMessage.Record.Field> fieldList) {
+    private Struct getLogValueStruct(Schema valueSchema, List<DataMessage.Record.Field> fieldList) {
         Struct value = new Struct(valueSchema);
         for (DataMessage.Record.Field field : fieldList) {
-            value.put(field.getFieldname(), OceanBaseLogMessageUtils.getObject(field));
+            value.put(
+                    field.getFieldname(),
+                    OceanBaseJdbcReader.getField(field.getType(), field.getValue()));
         }
         return value;
     }
