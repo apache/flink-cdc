@@ -20,25 +20,44 @@ package com.ververica.cdc.connectors.oceanbase.source;
 
 import com.oceanbase.oms.logmessage.ByteString;
 import com.oceanbase.oms.logmessage.DataMessage;
+import io.debezium.config.CommonConnectorConfig;
+import io.debezium.jdbc.JdbcValueConverters;
+import io.debezium.jdbc.TemporalPrecisionMode;
+import io.debezium.relational.ValueConverterProvider;
 
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.ZoneOffset;
 
 /** Utils to get jdbc type and value of a field. */
 public class OceanBaseJdbcReader {
+
+    public static ValueConverterProvider valueConverterProvider() {
+        return new JdbcValueConverters(
+                JdbcValueConverters.DecimalMode.STRING,
+                TemporalPrecisionMode.ADAPTIVE_TIME_MICROSECONDS,
+                ZoneOffset.UTC,
+                null,
+                JdbcValueConverters.BigIntUnsignedMode.LONG,
+                CommonConnectorConfig.BinaryHandlingMode.BYTES);
+    }
 
     public static Object getField(int jdbcType, Object value) {
         if (value == null) {
             return null;
         }
+        jdbcType = getType(jdbcType);
         switch (jdbcType) {
             case Types.DECIMAL:
                 BigDecimal decimal = (BigDecimal) value;
                 return decimal.toString();
             case Types.DATE:
+                if (value instanceof Short) {
+                    return ((Short) value).intValue();
+                }
                 Date date = (Date) value;
                 return io.debezium.time.Date.toEpochDay(date, null);
             case Types.TIME:
@@ -46,10 +65,10 @@ public class OceanBaseJdbcReader {
                 return io.debezium.time.MicroTime.toMicroOfDay(time, true);
             case Types.TIMESTAMP:
                 Timestamp timestamp = (Timestamp) value;
-                return io.debezium.time.Timestamp.toEpochMillis(timestamp, null);
-            case Types.REAL:
-                Float real = (Float) value;
-                return real.doubleValue();
+                return io.debezium.time.MicroTimestamp.toEpochMicros(timestamp, null);
+            case Types.FLOAT:
+                Float f = (Float) value;
+                return f.doubleValue();
             default:
                 return value;
         }
@@ -59,49 +78,41 @@ public class OceanBaseJdbcReader {
         if (value == null) {
             return null;
         }
-        switch (fieldType) {
-            case NULL:
+        int jdbcType = getType(fieldType);
+        switch (jdbcType) {
+            case Types.NULL:
                 return null;
-            case BIT:
-            case INT8:
-            case INT16:
-            case INT24:
-            case INT32:
-            case YEAR:
+            case Types.INTEGER:
                 return Integer.parseInt(value.toString());
-            case INT64:
+            case Types.BIGINT:
                 return Long.parseLong(value.toString());
-            case FLOAT:
-            case DOUBLE:
+            case Types.DOUBLE:
                 return Double.parseDouble(value.toString());
-            case DECIMAL:
-            case ENUM:
-            case SET:
-            case STRING:
-            case JSON:
-                return value.toString();
-            case DATE:
-                return io.debezium.time.Date.toEpochDay(Date.valueOf(value.toString()), null);
-            case TIME:
-                return io.debezium.time.MicroTime.toMicroOfDay(
-                        Time.valueOf(value.toString()), true);
-            case DATETIME:
-            case TIMESTAMP:
-            case TIMESTAMP_NANO:
-            case TIMESTAMP_WITH_TIME_ZONE:
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return io.debezium.time.Timestamp.toEpochMillis(
-                        Timestamp.valueOf(value.toString()), null);
-            case BLOB:
-            case BINARY:
+            case Types.DATE:
+                Date date = Date.valueOf(value.toString());
+                return io.debezium.time.Date.toEpochDay(date, null);
+            case Types.TIME:
+                Time time = Time.valueOf(value.toString());
+                return io.debezium.time.MicroTime.toMicroOfDay(time, true);
+            case Types.TIMESTAMP:
+                Timestamp timestamp = Timestamp.valueOf(value.toString());
+                return io.debezium.time.MicroTimestamp.toEpochMicros(timestamp, null);
+            case Types.BINARY:
                 return value.getBytes();
-            case INTERVAL_YEAR_TO_MONTH:
-            case INTERVAL_DAY_TO_SECOND:
-            case GEOMETRY:
-            case RAW:
-            case UNKOWN:
             default:
-                throw new IllegalArgumentException("Unsupported field type " + fieldType);
+                return value.toString();
+        }
+    }
+
+    public static int getType(int jdbcType) {
+        switch (jdbcType) {
+            case Types.TINYINT:
+            case Types.SMALLINT:
+                return Types.INTEGER;
+            case Types.REAL:
+                return Types.FLOAT;
+            default:
+                return jdbcType;
         }
     }
 
@@ -110,9 +121,7 @@ public class OceanBaseJdbcReader {
             case NULL:
                 return Types.NULL;
             case INT8:
-                return Types.TINYINT;
             case INT16:
-                return Types.SMALLINT;
             case INT24:
             case INT32:
             case YEAR:
@@ -140,9 +149,7 @@ public class OceanBaseJdbcReader {
             case TIME:
                 return Types.TIME;
             case BIT:
-                return Types.BIT;
             case BLOB:
-                return Types.LONGVARBINARY;
             case BINARY:
                 return Types.BINARY;
             case INTERVAL_YEAR_TO_MONTH:

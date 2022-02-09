@@ -61,6 +61,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -206,23 +207,16 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                     TableEditor tableEditor =
                             Table.editor().tableId(tableId(databaseName, tableName));
                     for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                        ColumnEditor columnEditor =
-                                Column.editor()
-                                        .name(metaData.getColumnName(i))
-                                        .position(i)
-                                        .type(metaData.getColumnTypeName(i))
-                                        .jdbcType(metaData.getColumnType(i))
-                                        .length(metaData.getPrecision(i))
-                                        .scale(metaData.getScale(i))
-                                        .optional(
-                                                metaData.isNullable(i)
-                                                        == java.sql.ResultSetMetaData
-                                                                .columnNullable);
-                        tableEditor.addColumn(columnEditor.create());
+                        tableEditor.addColumn(
+                                getColumn(
+                                        metaData.getColumnName(i),
+                                        OceanBaseJdbcReader.getType(metaData.getColumnType(i)),
+                                        metaData.isNullable(i)
+                                                == java.sql.ResultSetMetaData.columnNullable));
                     }
                     TableSchemaBuilder tableSchemaBuilder =
                             new TableSchemaBuilder(
-                                    new OceanBaseValueConverters(),
+                                    OceanBaseJdbcReader.valueConverterProvider(),
                                     SchemaNameAdjuster.create(),
                                     new CustomConverterRegistry(null),
                                     OceanBaseSourceInfo.schema(),
@@ -243,9 +237,21 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         while (rs.next()) {
             Struct value = new Struct(tableSchema.valueSchema());
             for (int i = 1; i <= metaData.getColumnCount(); i++) {
+                int jdbcType = metaData.getColumnType(i);
+                Object fieldValue;
+                switch (metaData.getColumnTypeName(i)) {
+                    case "YEAR":
+                        fieldValue = rs.getShort(i);
+                        break;
+                    case "BIT":
+                        fieldValue = rs.getBytes(i);
+                        break;
+                    default:
+                        fieldValue = rs.getObject(i);
+                }
                 value.put(
                         metaData.getColumnName(i),
-                        OceanBaseJdbcReader.getField(metaData.getColumnType(i), rs.getObject(i)));
+                        OceanBaseJdbcReader.getField(jdbcType, fieldValue));
             }
             Struct struct = tableSchema.getEnvelopeSchema().create(value, source, null);
             deserializer.deserialize(
@@ -360,20 +366,15 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                         if (message.getOpt() == DataMessage.Record.Type.UPDATE && field.isPrev()) {
                             continue;
                         }
-                        // we can't get the scale of decimal, here we set it to 0 to be
-                        // compatible with the logic of JdbcValueConverters#schemaBuilder
-                        Column column =
-                                Column.editor()
-                                        .name(field.getFieldname())
-                                        .jdbcType(OceanBaseJdbcReader.getType(field.getType()))
-                                        .scale(0)
-                                        .optional(true)
-                                        .create();
-                        tableEditor.addColumn(column);
+                        tableEditor.addColumn(
+                                getColumn(
+                                        field.getFieldname(),
+                                        OceanBaseJdbcReader.getType(field.getType()),
+                                        true));
                     }
                     TableSchemaBuilder tableSchemaBuilder =
                             new TableSchemaBuilder(
-                                    new OceanBaseValueConverters(),
+                                    OceanBaseJdbcReader.valueConverterProvider(),
                                     SchemaNameAdjuster.create(),
                                     new CustomConverterRegistry(null),
                                     OceanBaseSourceInfo.schema(),
@@ -471,6 +472,18 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
 
     private TableId tableId(String databaseName, String tableName) {
         return new TableId(databaseName, null, tableName);
+    }
+
+    private Column getColumn(String name, int jdbcType, boolean optional) {
+        // we can't get the scale and length of decimal, timestamp and bit columns from log,
+        // so here we set a constant value to these fields to be compatible with the logic of
+        // JdbcValueConverters#schemaBuilder
+        ColumnEditor columnEditor =
+                Column.editor().name(name).jdbcType(jdbcType).optional(optional).scale(0);
+        if (columnEditor.jdbcType() == Types.TIMESTAMP || columnEditor.jdbcType() == Types.BIT) {
+            columnEditor.length(6);
+        }
+        return columnEditor.create();
     }
 
     interface TableSchemaGenerator {
