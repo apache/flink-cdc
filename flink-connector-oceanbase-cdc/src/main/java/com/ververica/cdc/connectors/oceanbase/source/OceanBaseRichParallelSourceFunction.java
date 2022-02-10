@@ -201,17 +201,26 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         ResultSet rs = stmt.executeQuery(selectSql);
         ResultSetMetaData metaData = (ResultSetMetaData) rs.getMetaData();
 
+        String[] columnNames = new String[metaData.getColumnCount()];
+        int[] jdbcTypes = new int[metaData.getColumnCount()];
+        for (int i = 0; i < metaData.getColumnCount(); i++) {
+            columnNames[i] = metaData.getColumnName(i + 1);
+            jdbcTypes[i] =
+                    OceanBaseJdbcReader.getType(
+                            metaData.getColumnType(i + 1), metaData.getColumnTypeName(i + 1));
+        }
+
         // build table schema from metadata
         TableSchemaGenerator tableSchemaGenerator =
                 () -> {
                     TableEditor tableEditor =
                             Table.editor().tableId(tableId(databaseName, tableName));
-                    for (int i = 1; i <= metaData.getColumnCount(); i++) {
+                    for (int i = 0; i < metaData.getColumnCount(); i++) {
                         tableEditor.addColumn(
                                 getColumn(
-                                        metaData.getColumnName(i),
-                                        OceanBaseJdbcReader.getType(metaData.getColumnType(i)),
-                                        metaData.isNullable(i)
+                                        columnNames[i],
+                                        jdbcTypes[i],
+                                        metaData.isNullable(i + 1)
                                                 == java.sql.ResultSetMetaData.columnNullable));
                     }
                     TableSchemaBuilder tableSchemaBuilder =
@@ -236,22 +245,10 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
 
         while (rs.next()) {
             Struct value = new Struct(tableSchema.valueSchema());
-            for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                int jdbcType = metaData.getColumnType(i);
-                Object fieldValue;
-                switch (metaData.getColumnTypeName(i)) {
-                    case "YEAR":
-                        fieldValue = rs.getShort(i);
-                        break;
-                    case "BIT":
-                        fieldValue = rs.getBytes(i);
-                        break;
-                    default:
-                        fieldValue = rs.getObject(i);
-                }
+            for (int i = 0; i < metaData.getColumnCount(); i++) {
                 value.put(
-                        metaData.getColumnName(i),
-                        OceanBaseJdbcReader.getField(jdbcType, fieldValue));
+                        columnNames[i],
+                        OceanBaseJdbcReader.getField(jdbcTypes[i], rs.getObject(i + 1)));
             }
             Struct struct = tableSchema.getEnvelopeSchema().create(value, source, null);
             deserializer.deserialize(

@@ -24,13 +24,17 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.ValueConverterProvider;
+import io.debezium.util.NumberConversions;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 
 /** Utils to get jdbc type and value of a field. */
 public class OceanBaseJdbcReader {
@@ -49,15 +53,28 @@ public class OceanBaseJdbcReader {
         if (value == null) {
             return null;
         }
-        jdbcType = getType(jdbcType);
+        jdbcType = getType(jdbcType, null);
         switch (jdbcType) {
+            case Types.BIT:
+                if (value instanceof Boolean) {
+                    return new byte[] {NumberConversions.getByte((Boolean) value)};
+                }
+                return value;
+            case Types.INTEGER:
+                if (value instanceof Boolean) {
+                    return NumberConversions.getInteger((Boolean) value);
+                }
+                if (value instanceof Date) {
+                    return ((Date) value).getYear() + 1900;
+                }
+                return value;
+            case Types.FLOAT:
+                Float f = (Float) value;
+                return f.doubleValue();
             case Types.DECIMAL:
                 BigDecimal decimal = (BigDecimal) value;
                 return decimal.toString();
             case Types.DATE:
-                if (value instanceof Short) {
-                    return ((Short) value).intValue();
-                }
                 Date date = (Date) value;
                 return io.debezium.time.Date.toEpochDay(date, null);
             case Types.TIME:
@@ -66,9 +83,6 @@ public class OceanBaseJdbcReader {
             case Types.TIMESTAMP:
                 Timestamp timestamp = (Timestamp) value;
                 return io.debezium.time.MicroTimestamp.toEpochMicros(timestamp, null);
-            case Types.FLOAT:
-                Float f = (Float) value;
-                return f.doubleValue();
             default:
                 return value;
         }
@@ -97,14 +111,36 @@ public class OceanBaseJdbcReader {
             case Types.TIMESTAMP:
                 Timestamp timestamp = Timestamp.valueOf(value.toString());
                 return io.debezium.time.MicroTimestamp.toEpochMicros(timestamp, null);
+            case Types.BIT:
+                long v = Long.parseLong(value.toString());
+                byte[] bytes = ByteBuffer.allocate(8).putLong(v).array();
+                int i = 0;
+                while (bytes[i] == 0 && i < Long.BYTES - 1) {
+                    i++;
+                }
+                return Arrays.copyOfRange(bytes, i, Long.BYTES);
             case Types.BINARY:
-                return value.getBytes();
+                return ByteBuffer.wrap(value.toString().getBytes(StandardCharsets.UTF_8));
             default:
                 return value.toString();
         }
     }
 
-    public static int getType(int jdbcType) {
+    private static boolean isBoolean(int jdbcType, String typeName) {
+        return jdbcType == Types.BOOLEAN || (jdbcType == Types.BIT && "TINYINT".equals(typeName));
+    }
+
+    public static int getType(int jdbcType, String typeName) {
+        // treat boolean as tinyint type
+        if (isBoolean(jdbcType, typeName)) {
+            jdbcType = Types.TINYINT;
+        }
+        // treat year as int type
+        if ("YEAR".equals(typeName)) {
+            jdbcType = Types.INTEGER;
+        }
+
+        // widening conversion according to com.mysql.jdbc.ResultSetImpl#getObject
         switch (jdbcType) {
             case Types.TINYINT:
             case Types.SMALLINT:
@@ -149,6 +185,7 @@ public class OceanBaseJdbcReader {
             case TIME:
                 return Types.TIME;
             case BIT:
+                return Types.BIT;
             case BLOB:
             case BINARY:
                 return Types.BINARY;
