@@ -190,9 +190,9 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
-    /** Whether the {@link MySqlSource} should capture the newly added tables or not. */
-    public MySqlSourceBuilder<T> captureNewTables(boolean captureNewTables) {
-        this.configFactory.captureNewTables(captureNewTables);
+    /** Whether the {@link MySqlSource} should scan the newly added tables or not. */
+    public MySqlSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
+        this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
         return this;
     }
 

@@ -25,27 +25,28 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
  * and {@link MySqlSplitReader}.
  */
 public class MySqlSourceReaderContext {
-    SourceReaderContext sourceReaderContext;
-    boolean shouldBinlogSplitReaderStopped;
+
+    private final SourceReaderContext sourceReaderContext;
+    private volatile boolean stopBinlogSplitReader;
 
     public MySqlSourceReaderContext(final SourceReaderContext sourceReaderContext) {
         this.sourceReaderContext = sourceReaderContext;
-        this.shouldBinlogSplitReaderStopped = false;
+        this.stopBinlogSplitReader = false;
     }
 
     public SourceReaderContext getSourceReaderContext() {
         return sourceReaderContext;
     }
 
-    public void setSourceReaderContext(final SourceReaderContext sourceReaderContext) {
-        this.sourceReaderContext = sourceReaderContext;
+    public boolean needStopBinlogSplitReader() {
+        return stopBinlogSplitReader;
     }
 
-    public boolean isShouldBinlogSplitReaderStopped() {
-        return shouldBinlogSplitReaderStopped;
+    public void setStopBinlogSplitReader() {
+        this.stopBinlogSplitReader = true;
     }
 
-    public void setShouldBinlogSplitReaderStopped(final boolean shouldBinlogSplitReaderStopped) {
-        this.shouldBinlogSplitReaderStopped = shouldBinlogSplitReaderStopped;
+    public void reSetStopBinlogSplitReader() {
+        this.stopBinlogSplitReader = false;
     }
 }

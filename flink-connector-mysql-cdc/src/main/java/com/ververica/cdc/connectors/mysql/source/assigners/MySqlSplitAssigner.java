@@ -101,17 +101,21 @@ public interface MySqlSplitAssigner {
      */
     void notifyCheckpointComplete(long checkpointId);
 
+    /** Gets the split assigner status, see {@code AssignerStatus}. */
+    AssignerStatus getAssignerStatus();
+
+    /**
+     * Suspends the assigner under {@link AssignerStatus#INITIAL_ASSIGNING_FINISHED} or {@link
+     * AssignerStatus#NEWLY_ADDED_ASSIGNING_FINISHED}.
+     */
+    void suspend();
+
+    /** Wakes up the assigner under {@link AssignerStatus#SUSPENDED}. */
+    void wakeup();
+
     /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network
      * connections.
      */
     void close();
-
-    /** Whether the assigner is suspended. */
-    boolean isAssignerSuspended();
-
-    /** Get the total finished split count. */
-    int getTotalFinishedSplitSize();
-
-    void wakeup();
 }

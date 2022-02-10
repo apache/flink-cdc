@@ -39,6 +39,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isInitialAssigningFinished;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningFinished;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
+
 /**
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
  * range and chunk size and also continue with a binlog split.
@@ -51,7 +55,6 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     private final int splitMetaGroupSize;
 
     private boolean isBinlogSplitAssigned;
-    private boolean shouldWakeupBinlogSplitReader = false;
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
@@ -94,8 +97,8 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public Optional<MySqlSplit> getNext() {
-        if (snapshotSplitAssigner.isAssignerSuspended()) {
-            // do not assign split until Assigner receive SuspendBinlogSplitReaderResponseEvent
+        if (isSuspended(getAssignerStatus())) {
+            // do not assign split until the assigner received SuspendBinlogReaderAckEvent
             return Optional.empty();
         }
         if (snapshotSplitAssigner.noMoreSplits()) {
@@ -103,18 +106,15 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             if (isBinlogSplitAssigned) {
                 // no more splits for the assigner
                 return Optional.empty();
-            } else if (snapshotSplitAssigner.getAssignerState()
-                    == SnapshotAssignerStatus.INIT_FINISH) {
+            } else if (isInitialAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
                 // we need to wait snapshot-assigner to be finished before
                 // assigning the binlog split. Otherwise, records emitted from binlog split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isBinlogSplitAssigned = true;
                 return Optional.of(createBinlogSplit());
-            } else if (snapshotSplitAssigner.getAssignerState()
-                    == SnapshotAssignerStatus.RESUMED_FINISH) {
-                // do not need to create binlog, but send event to wake up the binlog
+            } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
+                // do not need to create binlog, but send event to wake up the binlog reader
                 isBinlogSplitAssigned = true;
-                shouldWakeupBinlogSplitReader = true;
                 return Optional.empty();
             } else {
                 // binlog split is not ready by now
@@ -167,32 +167,23 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public void close() {
-        snapshotSplitAssigner.close();
+    public AssignerStatus getAssignerStatus() {
+        return snapshotSplitAssigner.getAssignerStatus();
     }
 
     @Override
-    public boolean isAssignerSuspended() {
-        return snapshotSplitAssigner.isAssignerSuspended();
+    public void suspend() {
+        snapshotSplitAssigner.suspend();
     }
 
     @Override
     public void wakeup() {
-        isBinlogSplitAssigned = false;
         snapshotSplitAssigner.wakeup();
     }
 
-    public boolean isShouldWakeupBinlogSplitReader() {
-        return shouldWakeupBinlogSplitReader;
-    }
-
-    public void setShouldWakeupBinlogSplitReader(final boolean shouldWakeupBinlogSplitReader) {
-        this.shouldWakeupBinlogSplitReader = shouldWakeupBinlogSplitReader;
-    }
-
     @Override
-    public int getTotalFinishedSplitSize() {
-        return snapshotSplitAssigner.getTotalFinishedSplitSize();
+    public void close() {
+        snapshotSplitAssigner.close();
     }
 
     // --------------------------------------------------------------------------------------------

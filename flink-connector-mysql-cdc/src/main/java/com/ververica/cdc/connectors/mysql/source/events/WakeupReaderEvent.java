@@ -25,24 +25,24 @@ import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * wake up source reader to request split again.
+ * wake up source reader to consume split again.
  */
 public class WakeupReaderEvent implements SourceEvent {
     private static final long serialVersionUID = 1L;
 
-    /** Wake up type. */
-    public enum WakeUpType {
-        SNAPSHOT,
-        BINLOG
+    /** Wake up target. */
+    public enum WakeUpTarget {
+        SNAPSHOT_READER,
+        BINLOG_READER
     }
 
-    private WakeUpType type;
+    private WakeUpTarget target;
 
-    public WakeupReaderEvent(WakeUpType type) {
-        this.type = type;
+    public WakeupReaderEvent(WakeUpTarget target) {
+        this.target = target;
     }
 
-    public WakeUpType getType() {
-        return type;
+    public WakeUpTarget getTarget() {
+        return target;
     }
 }
