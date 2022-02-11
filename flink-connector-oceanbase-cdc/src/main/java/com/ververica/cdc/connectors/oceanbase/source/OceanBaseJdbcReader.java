@@ -213,9 +213,10 @@ public class OceanBaseJdbcReader {
             case INTERVAL_DAY_TO_SECOND:
             case GEOMETRY:
             case RAW:
+                // it's weird to get wrong type from TEXT column, temporarily treat it as a string
             case UNKOWN:
             default:
-                throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
+                return Types.VARCHAR;
         }
     }
 }
