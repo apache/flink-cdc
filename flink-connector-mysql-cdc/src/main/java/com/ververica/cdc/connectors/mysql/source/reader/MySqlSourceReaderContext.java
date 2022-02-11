@@ -21,31 +21,32 @@ package com.ververica.cdc.connectors.mysql.source.reader;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 
 /**
- * A wrapper class that wraps SourceReaderContext and some data shared by {@link MySqlSourceReader}
- * and {@link MySqlSplitReader}.
+ * A wrapper class that wraps {@link SourceReaderContext} for sharing message between {@link
+ * MySqlSourceReader} and {@link MySqlSplitReader}.
  */
 public class MySqlSourceReaderContext {
-    SourceReaderContext sourceReaderContext;
-    boolean shouldBinlogSplitReaderStopped;
+
+    private final SourceReaderContext sourceReaderContext;
+    private volatile boolean stopBinlogSplitReader;
 
     public MySqlSourceReaderContext(final SourceReaderContext sourceReaderContext) {
         this.sourceReaderContext = sourceReaderContext;
-        this.shouldBinlogSplitReaderStopped = false;
+        this.stopBinlogSplitReader = false;
     }
 
     public SourceReaderContext getSourceReaderContext() {
         return sourceReaderContext;
     }
 
-    public void setSourceReaderContext(final SourceReaderContext sourceReaderContext) {
-        this.sourceReaderContext = sourceReaderContext;
+    public boolean needStopBinlogSplitReader() {
+        return stopBinlogSplitReader;
     }
 
-    public boolean isShouldBinlogSplitReaderStopped() {
-        return shouldBinlogSplitReaderStopped;
+    public void setStopBinlogSplitReader() {
+        this.stopBinlogSplitReader = true;
     }
 
-    public void setShouldBinlogSplitReaderStopped(final boolean shouldBinlogSplitReaderStopped) {
-        this.shouldBinlogSplitReaderStopped = shouldBinlogSplitReaderStopped;
+    public void resetStopBinlogSplitReader() {
+        this.stopBinlogSplitReader = false;
     }
 }

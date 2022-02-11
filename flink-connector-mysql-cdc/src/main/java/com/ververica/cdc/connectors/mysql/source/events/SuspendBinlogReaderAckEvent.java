@@ -25,25 +25,11 @@ import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
- * ask if the offset has been propagated to Enumerator.
+ * notify the binlog split reader has been suspended.
  */
-public class TotalFinishedSplitSizeResponseEvent implements SourceEvent {
+public class SuspendBinlogReaderAckEvent implements SourceEvent {
+
     private static final long serialVersionUID = 1L;
-    private final int totalFinishedSplitSize;
 
-    public TotalFinishedSplitSizeResponseEvent(final int totalFinishedSplitSize) {
-        this.totalFinishedSplitSize = totalFinishedSplitSize;
-    }
-
-    public int getTotalFinishedSplitSize() {
-        return totalFinishedSplitSize;
-    }
-
-    @Override
-    public String toString() {
-        return "TotalFinishedSplitSizeResponseEvent{"
-                + "totalFinishedSplitSize="
-                + totalFinishedSplitSize
-                + '}';
-    }
+    public SuspendBinlogReaderAckEvent() {}
 }

@@ -69,15 +69,13 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
     @Override
     public RecordsWithSplitIds<SourceRecord> fetch() throws IOException {
-        checkSplitOrStartNext();
 
-        Iterator<SourceRecord> dataIt = null;
+        checkSplitOrStartNext();
+        checkNeedStopBinlogReader();
+
+        Iterator<SourceRecord> dataIt;
         try {
             dataIt = currentReader.pollSplitRecords();
-            if (context.isShouldBinlogSplitReaderStopped()
-                    && currentReader instanceof BinlogSplitReader) {
-                ((BinlogSplitReader) currentReader).finishBinlogSplit();
-            }
         } catch (InterruptedException e) {
             LOG.warn("fetch data failed.", e);
             throw new IOException(e);
@@ -85,6 +83,14 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
         return dataIt == null
                 ? finishedSnapshotSplit()
                 : MySqlRecords.forRecords(currentSplitId, dataIt);
+    }
+
+    private void checkNeedStopBinlogReader() {
+        if (currentReader instanceof BinlogSplitReader
+                && context.needStopBinlogSplitReader()
+                && !currentReader.isFinished()) {
+            ((BinlogSplitReader) currentReader).stopBinlogReadTask();
+        }
     }
 
     @Override
@@ -125,7 +131,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
 
             if (nextSplit.isSnapshotSplit()) {
                 if (currentReader instanceof BinlogSplitReader) {
-                    LOG.info("This is the point from binlog split back to snapshot split");
+                    LOG.info(
+                            "This is the point from binlog split reading change to snapshot split reading");
                     currentReader.close();
                     currentReader = null;
                 }

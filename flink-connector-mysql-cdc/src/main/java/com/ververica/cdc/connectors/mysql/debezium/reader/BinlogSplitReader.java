@@ -274,7 +274,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
     }
 
-    public void finishBinlogSplit() {
+    public void stopBinlogReadTask() {
         this.currentTaskRunning = false;
     }
 }

@@ -166,28 +166,6 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 binlogSplit.isSuspended());
     }
 
-    public static MySqlBinlogSplit emptyFinishedSplitInfos(MySqlBinlogSplit binlogSplit) {
-        return new MySqlBinlogSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
-                new ArrayList<>(),
-                binlogSplit.getTableSchemas(),
-                binlogSplit.getTotalFinishedSplitSize(),
-                binlogSplit.isSuspended());
-    }
-
-    public static MySqlBinlogSplit emptyTableSchemas(MySqlBinlogSplit binlogSplit) {
-        return new MySqlBinlogSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
-                binlogSplit.getFinishedSnapshotSplitInfos(),
-                new HashMap<>(),
-                binlogSplit.getTotalFinishedSplitSize(),
-                binlogSplit.isSuspended());
-    }
-
     public static MySqlBinlogSplit fillTableSchemas(
             MySqlBinlogSplit binlogSplit, Map<TableId, TableChange> tableSchemas) {
         tableSchemas.putAll(binlogSplit.getTableSchemas());
@@ -201,27 +179,26 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 binlogSplit.isSuspended());
     }
 
-    public static MySqlBinlogSplit updateTotalFinishedSplitSize(
-            MySqlBinlogSplit binlogSplit, int totalFinishedSplitSize) {
+    public static MySqlBinlogSplit toNormalBinlogSplit(
+            MySqlBinlogSplit suspendedBinlogSplit, int totalFinishedSplitSize) {
         return new MySqlBinlogSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
-                binlogSplit.getFinishedSnapshotSplitInfos(),
-                binlogSplit.getTableSchemas(),
+                suspendedBinlogSplit.splitId,
+                suspendedBinlogSplit.getStartingOffset(),
+                suspendedBinlogSplit.getEndingOffset(),
+                suspendedBinlogSplit.getFinishedSnapshotSplitInfos(),
+                suspendedBinlogSplit.getTableSchemas(),
                 totalFinishedSplitSize,
-                binlogSplit.isSuspended());
+                false);
     }
 
-    public static MySqlBinlogSplit updateIsSuspended(
-            MySqlBinlogSplit binlogSplit, boolean isSuspended) {
+    public static MySqlBinlogSplit toSuspendedBinlogSplit(MySqlBinlogSplit normalBinlogSplit) {
         return new MySqlBinlogSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
-                binlogSplit.getFinishedSnapshotSplitInfos(),
-                binlogSplit.getTableSchemas(),
-                binlogSplit.getTotalFinishedSplitSize(),
-                isSuspended);
+                normalBinlogSplit.splitId,
+                normalBinlogSplit.getStartingOffset(),
+                normalBinlogSplit.getEndingOffset(),
+                new ArrayList<>(),
+                new HashMap<>(),
+                normalBinlogSplit.getTotalFinishedSplitSize(),
+                true);
     }
 }

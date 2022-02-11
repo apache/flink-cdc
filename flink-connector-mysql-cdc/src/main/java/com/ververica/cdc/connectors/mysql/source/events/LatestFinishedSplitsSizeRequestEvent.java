@@ -24,11 +24,12 @@ import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerato
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * notify the source reader to the offset has been propagated to Enumerator.
+ * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
+ * ask the latest finished snapshot splits size.
  */
-public class TotalFinishedSplitSizeRequestEvent implements SourceEvent {
+public class LatestFinishedSplitsSizeRequestEvent implements SourceEvent {
+
     private static final long serialVersionUID = 1L;
 
-    public TotalFinishedSplitSizeRequestEvent() {}
+    public LatestFinishedSplitsSizeRequestEvent() {}
 }

@@ -78,7 +78,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
-    private final boolean captureNewTables;
+    private final boolean scanNewlyAddedTableEnabled;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -156,7 +156,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorUpper,
             double distributionFactorLower,
             StartupOptions startupOptions,
-            boolean captureNewTable) {
+            boolean scanNewlyAddedTableEnabled) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -177,7 +177,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
-        this.captureNewTables = captureNewTable;
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -232,7 +232,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .debeziumProperties(dbzProperties)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
-                            .captureNewTables(captureNewTables)
+                            .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -308,7 +308,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         connectionPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
-                        startupOptions);
+                        startupOptions,
+                        scanNewlyAddedTableEnabled);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -330,6 +331,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && fetchSize == that.fetchSize
                 && distributionFactorUpper == that.distributionFactorUpper
                 && distributionFactorLower == that.distributionFactorLower
+                && scanNewlyAddedTableEnabled == that.scanNewlyAddedTableEnabled
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
@@ -371,7 +373,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 distributionFactorLower,
                 startupOptions,
                 producedDataType,
-                metadataKeys);
+                metadataKeys,
+                scanNewlyAddedTableEnabled);
     }
 
     @Override
