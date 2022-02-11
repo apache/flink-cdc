@@ -232,5 +232,170 @@ public class OceanBaseSourceExample {
   }
 }
 ```
+Data Type Mapping
+----------------
 
-<!-- TODO add data type mapping -->
+When the startup mode is not `INITIAL`, we will not be able to get the precision and scale of a column. In order to be compatible with different startup modes, we will not map one OceanBase type of different precision to different FLink types.
+
+For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) or BIT(1). BOOLEAN is equivalent to TINYINT(1) in OceanBase, so columns of BOOLEAN and TINYINT types will be mapped to TINYINT in Flink, and BIT(1) will be mapped to BINARY(1) in Flink.
+
+<div class="wy-table-responsive">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left">OceanBase type</th>
+                <th class="text-left">Flink SQL type</th>
+                <th class="text-left">NOTE</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>BOOLEAN<br>
+                    TINYINT</td>
+                <td>TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    SMALLINT<br>
+                    TINYINT UNSIGNED</td>
+                <td>SMALLINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    INT<br>
+                    MEDIUMINT<br>
+                    SMALLINT UNSIGNED</td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    BIGINT<br>
+                    INT UNSIGNED</td>
+                <td>BIGINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BIGINT UNSIGNED</td>
+                <td>DECIMAL(20, 0)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    REAL<br>
+                    FLOAT<br>
+                </td>
+                <td>FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    DOUBLE
+                </td>
+                <td>DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    NUMERIC(p, s)<br>
+                    DECIMAL(p, s)<br>
+                    where p <= 38<br>
+                </td>
+                <td>DECIMAL(p, s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    NUMERIC(p, s)<br>
+                    DECIMAL(p, s)<br>
+                    where 38 < p <=65<br>
+                </td>
+                <td>STRING</td>
+                <td>DECIMAL is equivalent to NUMERIC. The precision for DECIMAL data type is up to 65 in OceanBase, but
+                    the precision for DECIMAL is limited to 38 in Flink.
+                    So if you define a decimal column whose precision is greater than 38, you should map it to STRING to
+                    avoid precision loss.</td>
+            </tr>
+            <tr>
+                <td>DATE</td>
+                <td>DATE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIME [(p)]</td>
+                <td>TIME [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP [(p)]<br>
+                    DATETIME [(p)]
+                </td>
+                <td>TIMESTAMP [(p)]
+                </td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>CHAR(n)</td>
+                <td>CHAR(n)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARCHAR(n)</td>
+                <td>VARCHAR(n)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BIT(n)</td>
+                <td>BINARY(⌈n/8⌉)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY(n)</td>
+                <td>BINARY(n)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARBINARY(N)</td>
+                <td>VARBINARY(N)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    TINYTEXT<br>
+                    TEXT<br>
+                    MEDIUMTEXT<br>
+                    LONGTEXT<br>
+                </td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    TINYBLOB<br>
+                    BLOB<br>
+                    MEDIUMBLOB<br>
+                    LONGBLOB<br>
+                </td>
+                <td>BYTES</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>YEAR</td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ENUM</td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>SET</td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
