@@ -239,6 +239,7 @@ public class MySqlTableSourceFactoryTest {
         options.put("port", "3307");
         options.put("server-id", "4321");
         options.put("server-time-zone", "Asia/Shanghai");
+        options.put("scan.newly-added-table.enabled", "true");
         options.put("debezium.snapshot.mode", "never");
 
         DynamicTableSource actualSource = createTableSource(options);
@@ -265,7 +266,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
