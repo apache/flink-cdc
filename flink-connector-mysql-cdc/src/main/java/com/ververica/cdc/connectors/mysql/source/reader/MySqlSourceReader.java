@@ -153,7 +153,7 @@ public class MySqlSourceReader<T>
                         "binlog split reader suspended due to newly added table, offset {}",
                         mySqlSplitState.asBinlogSplitState().getStartingOffset());
 
-                mySqlSourceReaderContext.reSetStopBinlogSplitReader();
+                mySqlSourceReaderContext.resetStopBinlogSplitReader();
                 suspendedBinlogSplit = toSuspendedBinlogSplit(mySqlSplit.asBinlogSplit());
                 context.sendSourceEventToCoordinator(new SuspendBinlogReaderAckEvent());
             } else {

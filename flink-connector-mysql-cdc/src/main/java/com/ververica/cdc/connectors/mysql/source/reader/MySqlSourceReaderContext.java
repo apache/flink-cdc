@@ -46,7 +46,7 @@ public class MySqlSourceReaderContext {
         this.stopBinlogSplitReader = true;
     }
 
-    public void reSetStopBinlogSplitReader() {
+    public void resetStopBinlogSplitReader() {
         this.stopBinlogSplitReader = false;
     }
 }
