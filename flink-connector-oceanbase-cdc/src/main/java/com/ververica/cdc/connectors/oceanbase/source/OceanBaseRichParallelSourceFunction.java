@@ -40,16 +40,7 @@ import com.oceanbase.clogproxy.client.listener.RecordListener;
 import com.oceanbase.oms.logmessage.DataMessage;
 import com.oceanbase.oms.logmessage.LogMessage;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import io.debezium.data.Envelope;
-import io.debezium.relational.Column;
-import io.debezium.relational.ColumnEditor;
-import io.debezium.relational.CustomConverterRegistry;
-import io.debezium.relational.Table;
-import io.debezium.relational.TableEditor;
-import io.debezium.relational.TableId;
 import io.debezium.relational.TableSchema;
-import io.debezium.relational.TableSchemaBuilder;
-import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -61,7 +52,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -70,6 +60,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * The source implementation for OceanBase that read snapshot events first and then read the change
@@ -210,36 +201,13 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                             metaData.getColumnType(i + 1), metaData.getColumnTypeName(i + 1));
         }
 
-        // build table schema from metadata
-        TableSchemaGenerator tableSchemaGenerator =
-                () -> {
-                    TableEditor tableEditor =
-                            Table.editor().tableId(tableId(databaseName, tableName));
-                    for (int i = 0; i < metaData.getColumnCount(); i++) {
-                        tableEditor.addColumn(
-                                getColumn(
-                                        columnNames[i],
-                                        jdbcTypes[i],
-                                        metaData.isNullable(i + 1)
-                                                == java.sql.ResultSetMetaData.columnNullable));
-                    }
-                    TableSchemaBuilder tableSchemaBuilder =
-                            new TableSchemaBuilder(
-                                    OceanBaseJdbcReader.valueConverterProvider(),
-                                    SchemaNameAdjuster.create(),
-                                    new CustomConverterRegistry(null),
-                                    OceanBaseSourceInfo.schema(),
-                                    false);
-                    // TODO add column filter and mapper
-                    return tableSchemaBuilder.create(
-                            null,
-                            Envelope.schemaName(topicName),
-                            tableEditor.create(),
-                            null,
-                            null,
-                            null);
-                };
-        TableSchema tableSchema = getTableSchema(topicName, tableSchemaGenerator);
+        TableSchema tableSchema = tableSchemaMap.get(topicName);
+        if (tableSchema == null) {
+            tableSchema =
+                    OceanBaseTableSchema.getTableSchema(
+                            topicName, databaseName, tableName, columnNames, jdbcTypes);
+            tableSchemaMap.put(topicName, tableSchema);
+        }
 
         Struct source = OceanBaseSourceInfo.struct(tenantName, databaseName, tableName, null, null);
 
@@ -355,40 +323,24 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         // TODO make topic name configurable
         String topicName = getDefaultTopicName(tenantName, databaseName, message.getTableName());
 
-        TableSchemaGenerator tableSchemaGenerator =
-                () -> {
-                    TableEditor tableEditor =
-                            Table.editor().tableId(tableId(databaseName, tableName));
-                    for (DataMessage.Record.Field field : message.getFieldList()) {
-                        if (message.getOpt() == DataMessage.Record.Type.UPDATE && field.isPrev()) {
-                            continue;
-                        }
-                        tableEditor.addColumn(
-                                getColumn(
-                                        field.getFieldname(),
-                                        OceanBaseJdbcReader.getType(field.getType()),
-                                        true));
-                    }
-                    TableSchemaBuilder tableSchemaBuilder =
-                            new TableSchemaBuilder(
-                                    OceanBaseJdbcReader.valueConverterProvider(),
-                                    SchemaNameAdjuster.create(),
-                                    new CustomConverterRegistry(null),
-                                    OceanBaseSourceInfo.schema(),
-                                    false);
-                    // TODO add column filter and mapper
-                    return tableSchemaBuilder.create(
-                            null,
-                            Envelope.schemaName(topicName),
-                            tableEditor.create(),
-                            null,
-                            null,
-                            null);
-                };
+        if (tableSchemaMap.get(topicName) == null) {
+            String[] columnNames = new String[message.getFieldCount()];
+            int[] jdbcTypes = new int[message.getFieldCount()];
+            int i = 0;
+            for (DataMessage.Record.Field field : message.getFieldList()) {
+                if (message.getOpt() == DataMessage.Record.Type.UPDATE && field.isPrev()) {
+                    continue;
+                }
+                columnNames[i] = field.getFieldname();
+                jdbcTypes[i] = OceanBaseJdbcReader.getType(field.getType());
+                i++;
+            }
+            TableSchema tableSchema =
+                    OceanBaseTableSchema.getTableSchema(
+                            topicName, databaseName, tableName, columnNames, jdbcTypes);
+            tableSchemaMap.put(topicName, tableSchema);
+        }
 
-        TableSchema tableSchema = getTableSchema(topicName, tableSchemaGenerator);
-        Envelope envelope = tableSchema.getEnvelopeSchema();
-        Schema valueSchema = tableSchema.valueSchema();
         Struct source =
                 OceanBaseSourceInfo.struct(
                         tenantName,
@@ -399,35 +351,38 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         Struct struct;
         switch (message.getOpt()) {
             case INSERT:
+                Struct after = getLogValueStruct(topicName, message.getFieldList());
                 struct =
-                        envelope.create(
-                                getLogValueStruct(valueSchema, message.getFieldList()),
-                                source,
-                                null);
+                        tableSchemaMap
+                                .get(topicName)
+                                .getEnvelopeSchema()
+                                .create(after, source, null);
                 break;
             case UPDATE:
-                List<DataMessage.Record.Field> before = new ArrayList<>();
-                List<DataMessage.Record.Field> after = new ArrayList<>();
+                List<DataMessage.Record.Field> beforeFields = new ArrayList<>();
+                List<DataMessage.Record.Field> afterFields = new ArrayList<>();
                 for (DataMessage.Record.Field field : message.getFieldList()) {
                     if (field.isPrev()) {
-                        before.add(field);
+                        beforeFields.add(field);
                     } else {
-                        after.add(field);
+                        afterFields.add(field);
                     }
                 }
+                after = getLogValueStruct(topicName, afterFields);
+                Struct before = getLogValueStruct(topicName, beforeFields);
                 struct =
-                        envelope.update(
-                                getLogValueStruct(valueSchema, before),
-                                getLogValueStruct(valueSchema, after),
-                                source,
-                                null);
+                        tableSchemaMap
+                                .get(topicName)
+                                .getEnvelopeSchema()
+                                .update(before, after, source, null);
                 break;
             case DELETE:
+                before = getLogValueStruct(topicName, message.getFieldList());
                 struct =
-                        envelope.delete(
-                                getLogValueStruct(valueSchema, message.getFieldList()),
-                                source,
-                                null);
+                        tableSchemaMap
+                                .get(topicName)
+                                .getEnvelopeSchema()
+                                .delete(before, source, null);
                 break;
             default:
                 throw new UnsupportedOperationException(
@@ -467,44 +422,30 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         return sourceOffset;
     }
 
-    private TableId tableId(String databaseName, String tableName) {
-        return new TableId(databaseName, null, tableName);
-    }
-
-    private Column getColumn(String name, int jdbcType, boolean optional) {
-        // we can't get the scale and length of decimal, timestamp and bit columns from log,
-        // so here we set a constant value to these fields to be compatible with the logic of
-        // JdbcValueConverters#schemaBuilder
-        ColumnEditor columnEditor =
-                Column.editor().name(name).jdbcType(jdbcType).optional(optional).scale(0);
-        if (columnEditor.jdbcType() == Types.TIMESTAMP || columnEditor.jdbcType() == Types.BIT) {
-            columnEditor.length(6);
-        }
-        return columnEditor.create();
-    }
-
-    interface TableSchemaGenerator {
-        TableSchema generate() throws Exception;
-    }
-
-    private TableSchema getTableSchema(String topicName, TableSchemaGenerator generator)
-            throws Exception {
+    private Struct getLogValueStruct(String topicName, List<DataMessage.Record.Field> fieldList) {
         TableSchema tableSchema = tableSchemaMap.get(topicName);
-        if (tableSchema != null) {
-            return tableSchema;
-        }
-
-        tableSchema = generator.generate();
-        tableSchemaMap.put(topicName, tableSchema);
-        return tableSchema;
-    }
-
-    private Struct getLogValueStruct(Schema valueSchema, List<DataMessage.Record.Field> fieldList) {
-        Struct value = new Struct(valueSchema);
+        Struct value = new Struct(tableSchema.valueSchema());
+        Object fieldValue;
         for (DataMessage.Record.Field field : fieldList) {
-            value.put(
-                    field.getFieldname(),
-                    OceanBaseJdbcReader.getField(field.getType(), field.getValue()));
+            try {
+                Schema fieldSchema = tableSchema.valueSchema().field(field.getFieldname()).schema();
+                fieldValue =
+                        OceanBaseJdbcReader.getField(
+                                fieldSchema.type(), field.getType(), field.getValue());
+                value.put(field.getFieldname(), fieldValue);
+            } catch (NumberFormatException e) {
+                tableSchema =
+                        OceanBaseTableSchema.upcastingTableSchema(
+                                topicName,
+                                tableSchema,
+                                fieldList.stream()
+                                        .collect(
+                                                Collectors.toMap(
+                                                        DataMessage.Record.Field::getFieldname,
+                                                        f -> f.getValue().toString())));
+                tableSchemaMap.put(topicName, tableSchema);
+                return getLogValueStruct(topicName, fieldList);
+            }
         }
         return value;
     }

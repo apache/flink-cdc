@@ -25,8 +25,10 @@ import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.ValueConverterProvider;
 import io.debezium.util.NumberConversions;
+import org.apache.kafka.connect.data.Schema;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
@@ -45,7 +47,7 @@ public class OceanBaseJdbcReader {
                 TemporalPrecisionMode.ADAPTIVE_TIME_MICROSECONDS,
                 ZoneOffset.UTC,
                 null,
-                JdbcValueConverters.BigIntUnsignedMode.LONG,
+                JdbcValueConverters.BigIntUnsignedMode.PRECISE,
                 CommonConnectorConfig.BinaryHandlingMode.BYTES);
     }
 
@@ -72,6 +74,9 @@ public class OceanBaseJdbcReader {
                 Float f = (Float) value;
                 return f.doubleValue();
             case Types.DECIMAL:
+                if (value instanceof BigInteger) {
+                    return value.toString();
+                }
                 BigDecimal decimal = (BigDecimal) value;
                 return decimal.toString();
             case Types.DATE:
@@ -88,7 +93,8 @@ public class OceanBaseJdbcReader {
         }
     }
 
-    public static Object getField(DataMessage.Record.Field.Type fieldType, ByteString value) {
+    public static Object getField(
+            Schema.Type schemaType, DataMessage.Record.Field.Type fieldType, ByteString value) {
         if (value == null) {
             return null;
         }
@@ -97,8 +103,14 @@ public class OceanBaseJdbcReader {
             case Types.NULL:
                 return null;
             case Types.INTEGER:
+                if (schemaType.equals(Schema.Type.INT64)) {
+                    return Long.parseLong(value.toString());
+                }
                 return Integer.parseInt(value.toString());
             case Types.BIGINT:
+                if (schemaType.equals(Schema.Type.STRING)) {
+                    return value.toString();
+                }
                 return Long.parseLong(value.toString());
             case Types.DOUBLE:
                 return Double.parseDouble(value.toString());
@@ -138,6 +150,14 @@ public class OceanBaseJdbcReader {
         // treat year as int type
         if ("YEAR".equals(typeName)) {
             jdbcType = Types.INTEGER;
+        }
+
+        // upcasting
+        if ("INT UNSIGNED".equals(typeName)) {
+            jdbcType = Types.BIGINT;
+        }
+        if ("BIGINT UNSIGNED".equals(typeName)) {
+            jdbcType = Types.DECIMAL;
         }
 
         // widening conversion according to com.mysql.jdbc.ResultSetImpl#getObject
