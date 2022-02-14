@@ -238,7 +238,21 @@ During a snapshot operation, the connector will query each included table to pro
           <td>Duration</td>
           <td>The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.</td>
     </tr>    
-   <tr>
+    <tr>
+          <td>connect.max-retries</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">3</td>
+          <td>Integer</td>
+          <td>The max retry times that the connector should retry to build MySQL database server connection.</td>
+    </tr>
+    <tr>
+          <td>connection.pool.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">20</td>
+          <td>Integer</td>
+          <td>The connection pool size.</td>
+    </tr>
+    <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
