@@ -28,11 +28,16 @@ Setup Oracle
 ----------------
 You have to enable log archiving for Oracle database and define an Oracle user with appropriate permissions on all databases that the Debezium Oracle connector monitors.
 
+### For Non-CDB database
+
 1. Enable log archiving 
 
    (1.1). Connect to the database as DBA
-    ```shells
-    sqlplus sys/password@host:port/SID AS SYSDBA
+    ```sql
+    ORACLE_SID=SID
+    export ORACLE_SID
+    sqlplus /nolog
+      CONNECT sys/password AS SYSDBA
     ```
 
    (1.2). Enable log archiving
@@ -44,7 +49,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
     alter database archivelog;
     alter database open;
    ```
-    <b>Notes:</b>
+    **Note:**
 
     - Enable log archiving requires database restart, pay attention when try to do it
     - The archived logs will occupy a large amount of disk space, so consider clean the expired logs the periodically
@@ -54,7 +59,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
     -- Should now "Database log mode: Archive Mode"
     archive log list;
     ```
-   <b>Notes:</b>
+   **Note:**
    
    Supplemental logging must be enabled for captured tables or the database in order for data changes to capture the <em>before</em> state of changed database rows.
    The following illustrates how to configure this on the table/database level.
@@ -108,9 +113,78 @@ You have to enable log archiving for Oracle database and define an Oracle user w
      GRANT SELECT ON V_$ARCHIVE_DEST_STATUS TO flinkuser;
      exit;
    ```
+   
+### For CDB database
 
+Overall, the steps for configuring CDB database is quite similar to non-CDB database, but the commands may be different.
+1. Enable log archiving
+   ```sql
+   ORACLE_SID=ORCLCDB
+   export ORACLE_SID
+   sqlplus /nolog
+     CONNECT sys/password AS SYSDBA
+     alter system set db_recovery_file_dest_size = 10G;
+     -- should exist
+     alter system set db_recovery_file_dest = '/opt/oracle/oradata/recovery_area' scope=spfile;
+     shutdown immediate
+     startup mount
+     alter database archivelog;
+     alter database open;
+     -- Should show "Database log mode: Archive Mode"
+     archive log list
+     exit;
+   ```
+   **Note:**
+   You can also use the following commands to enable supplemental logging:
+   ```sql
+   -- Enable supplemental logging for a specific table:
+   ALTER TABLE inventory.customers ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
+   -- Enable supplemental logging for database
+   ALTER DATABASE ADD SUPPLEMENTAL LOG DATA;
+   ```
+
+2. Create an Oracle user with permissions
+   ```sql
+   sqlplus sys/password@//localhost:1521/ORCLCDB as sysdba
+     CREATE TABLESPACE logminer_tbs DATAFILE '/opt/oracle/oradata/ORCLCDB/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
+     exit
+   ```
+   ```sql
+   sqlplus sys/password@//localhost:1521/ORCLPDB1 as sysdba
+     CREATE TABLESPACE logminer_tbs DATAFILE '/opt/oracle/oradata/ORCLCDB/ORCLPDB1/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
+     exit
+   ```
+   ```sql
+   sqlplus sys/password@//localhost:1521/ORCLCDB as sysdba
+     CREATE USER flinkuser IDENTIFIED BY flinkpw DEFAULT TABLESPACE logminer_tbs QUOTA UNLIMITED ON logminer_tbs CONTAINER=ALL;
+     GRANT CREATE SESSION TO flinkuser CONTAINER=ALL;
+     GRANT SET CONTAINER TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$DATABASE to flinkuser CONTAINER=ALL;
+     GRANT FLASHBACK ANY TABLE TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ANY TABLE TO flinkuser CONTAINER=ALL;
+     GRANT SELECT_CATALOG_ROLE TO flinkuser CONTAINER=ALL;
+     GRANT EXECUTE_CATALOG_ROLE TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ANY TRANSACTION TO flinkuser CONTAINER=ALL;
+     GRANT LOGMINING TO flinkuser CONTAINER=ALL;
+     GRANT CREATE TABLE TO flinkuser CONTAINER=ALL;
+     GRANT LOCK ANY TABLE TO flinkuser CONTAINER=ALL;
+     GRANT CREATE SEQUENCE TO flinkuser CONTAINER=ALL;
+
+     GRANT EXECUTE ON DBMS_LOGMNR TO flinkuser CONTAINER=ALL;
+     GRANT EXECUTE ON DBMS_LOGMNR_D TO flinkuser CONTAINER=ALL;
+
+     GRANT SELECT ON V_$LOG TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$LOG_HISTORY TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$LOGMNR_LOGS TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$LOGMNR_CONTENTS TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$LOGMNR_PARAMETERS TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$LOGFILE TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$ARCHIVED_LOG TO flinkuser CONTAINER=ALL;
+     GRANT SELECT ON V_$ARCHIVE_DEST_STATUS TO flinkuser CONTAINER=ALL;
+     exit
+   ```
+   
 See more about the [Setting up Oracle](https://debezium.io/documentation/reference/1.5/connectors/oracle.html#setting-up-oracle)
-
 
 How to create an Oracle CDC table
 ----------------
@@ -138,6 +212,8 @@ Flink SQL> CREATE TABLE products (
 -- read snapshot and binlogs from products table
 Flink SQL> SELECT * FROM products;
 ```
+**Note:**
+When working with the CDB + PDB model, you are expected to add an extra option `'debezium.database.pdb.name' = 'xxx'` in Flink DDL to specific the name of the PDB to connect to.
 
 Connector Options
 ----------------
@@ -305,7 +381,7 @@ CREATE TABLE products (
 );
 ```
 
-** Note ** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL. 
+**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL. 
 
 Features
 --------
