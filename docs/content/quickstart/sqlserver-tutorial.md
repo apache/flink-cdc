@@ -191,7 +191,7 @@ Check the data has been written to Elasticsearch successfully, you can visit [Ki
 
 **Make changes in SqlServer and watch result in Elasticsearch**
 
-do some change in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
+Do some changes in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
 
 ```sql
 INSERT INTO orders(order_date,purchaser,quantity,product_id) VALUES ('22-FEB-2016', 1006, 22, 107);
