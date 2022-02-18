@@ -20,12 +20,11 @@ package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
@@ -89,8 +88,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 
-        TableSchema physicalSchema =
-                TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
         String serverId = validateAndGetServerId(config);
         StartupOptions startupOptions = getStartupOptions(config);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
@@ -214,7 +212,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         }
     }
 
-    private void validatePrimaryKeyIfEnableParallel(TableSchema physicalSchema) {
+    private void validatePrimaryKeyIfEnableParallel(ResolvedSchema physicalSchema) {
         if (!physicalSchema.getPrimaryKey().isPresent()) {
             throw new ValidationException(
                     String.format(

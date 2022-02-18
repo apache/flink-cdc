@@ -288,7 +288,7 @@ public class MySqlSourceConfigFactory implements Serializable {
 
         // override the user-defined debezium properties
         if (dbzProperties != null) {
-            dbzProperties.forEach(props::put);
+            props.putAll(dbzProperties);
         }
 
         return new MySqlSourceConfig(

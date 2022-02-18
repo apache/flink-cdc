@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
@@ -58,7 +58,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadata {
 
-    private final TableSchema physicalSchema;
+    private final ResolvedSchema physicalSchema;
     private final int port;
     private final String hostname;
     private final String database;
@@ -91,7 +91,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     protected List<String> metadataKeys;
 
     public MySqlTableSource(
-            TableSchema physicalSchema,
+            ResolvedSchema physicalSchema,
             int port,
             String hostname,
             String database,
@@ -136,7 +136,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     }
 
     public MySqlTableSource(
-            TableSchema physicalSchema,
+            ResolvedSchema physicalSchema,
             int port,
             String hostname,
             String database,

@@ -23,6 +23,7 @@ import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -50,7 +51,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -67,8 +67,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
                     new ArrayList<>(),
                     null);
 
-    private static final RowType ROW_TYPE =
-            (RowType) fromResolvedSchema(SCHEMA).toRowDataType().getLogicalType();
+    private static final RowType ROW_TYPE = (RowType) SCHEMA.toSourceRowDataType().getLogicalType();
 
     @Test
     public void testSeDeSchema() {
@@ -87,8 +86,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 
         DeserializationSchema<RowData> actualDeser =
                 scanSourceMock.valueFormat.createRuntimeDecoder(
-                        ScanRuntimeProviderContext.INSTANCE,
-                        fromResolvedSchema(SCHEMA).toRowDataType());
+                        ScanRuntimeProviderContext.INSTANCE, SCHEMA.toSourceRowDataType());
 
         assertEquals(expectedDeser, actualDeser);
 
@@ -99,8 +97,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
 
         SerializationSchema<RowData> actualSer =
                 sinkMock.valueFormat.createRuntimeEncoder(
-                        new SinkRuntimeProviderContext(false),
-                        fromResolvedSchema(SCHEMA).toRowDataType());
+                        new SinkRuntimeProviderContext(false), SCHEMA.toSourceRowDataType());
 
         assertEquals(expectedSer, actualSer);
     }
@@ -154,7 +151,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(SCHEMA).toSchema(),
+                                Schema.newBuilder().fromResolvedSchema(SCHEMA).build(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),
@@ -170,7 +167,7 @@ public class ChangelogJsonFormatFactoryTest extends TestLogger {
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(SCHEMA).toSchema(),
+                                Schema.newBuilder().fromResolvedSchema(SCHEMA).build(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),

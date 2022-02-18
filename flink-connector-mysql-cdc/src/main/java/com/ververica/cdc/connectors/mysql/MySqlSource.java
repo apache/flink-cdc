@@ -235,7 +235,7 @@ public class MySqlSource {
             }
 
             if (dbzProperties != null) {
-                dbzProperties.forEach(props::put);
+                props.putAll(dbzProperties);
                 // Add default configurations for compatibility when set the legacy mysql connector
                 // implementation
                 if (LEGACY_IMPLEMENTATION_VALUE.equals(
