@@ -41,6 +41,12 @@ under the License.
             </exclusions>
         </dependency>
 
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-base</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Mongo kafka connect dependencies -->
         <dependency>
             <groupId>org.mongodb.kafka</groupId>
@@ -82,6 +88,12 @@ under the License.
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-test-utils</artifactId>
+            <version>${flink.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-test-utils</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
         </dependency>

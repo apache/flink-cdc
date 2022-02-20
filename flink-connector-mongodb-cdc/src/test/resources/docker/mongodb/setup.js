@@ -15,17 +15,30 @@
 // to prevent other clients accessing the log from other machines. For example, 'replicator'@'follower.acme.com'.
 // However, in this database we'll grant flink user with privileges:
 //
-// 'flinkuser' - all privileges required by the snapshot reader AND oplog reader (used for testing)
+// 'flinkuser' - all privileges required by the snapshot reader AND stream reader (used for testing)
 //
 
 //use admin;
+db.createRole(
+    {
+        role: "flinkrole",
+        privileges: [{
+            // Grant privileges on All Non-System Collections in All Databases
+            resource: { db: "", collection: "" },
+            actions: [ "splitVector", "listDatabases", "listCollections", "collStats", "find", "changeStream" ]
+        }],
+        roles: [
+            { role: 'read', db: 'config' }
+        ]
+    }
+);
+
 db.createUser(
  {
    user: 'flinkuser',
    pwd: 'a1?~!@#$%^&*(){}[]<>.,+_-=/|:;',
    roles: [
-      { role: 'read', db: 'admin' },
-      { role: 'readAnyDatabase', db: 'admin' }
+      { role: 'flinkrole', db: 'admin' }
    ]
  }
 );

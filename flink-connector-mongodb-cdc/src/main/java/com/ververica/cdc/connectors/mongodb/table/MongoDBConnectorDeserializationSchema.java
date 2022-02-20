@@ -176,7 +176,7 @@ public class MongoDBConnectorDeserializationSchema
         if (valueSchema.field(fieldName) != null) {
             String docString = value.getString(fieldName);
             if (docString != null) {
-                return BsonDocument.parse(value.getString(fieldName));
+                return BsonDocument.parse(docString);
             }
         }
         return null;

@@ -21,9 +21,14 @@ import com.mongodb.client.model.changestream.OperationType;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /** MongoDB test assert utils. */
 public class MongoDBAssertUtils {
@@ -98,5 +103,18 @@ public class MongoDBAssertUtils {
     public static void assertDelete(SourceRecord record, String idValue) {
         assertDelete(record);
         assertObjectIdEquals(idValue, record);
+    }
+
+    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
+        assertEqualsInOrder(
+                expected.stream().sorted().collect(Collectors.toList()),
+                actual.stream().sorted().collect(Collectors.toList()));
+    }
+
+    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
+        assertEquals(expected.size(), actual.size());
+        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
     }
 }
