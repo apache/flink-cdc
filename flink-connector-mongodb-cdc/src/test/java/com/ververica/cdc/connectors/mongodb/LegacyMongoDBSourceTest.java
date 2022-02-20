@@ -57,21 +57,24 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertDelete;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertInsert;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertObjectIdEquals;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertReplace;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertUpdate;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link MongoDBSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class MongoDBSourceTest extends MongoDBTestBase {
+public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
 
     @Test
     public void testConsumingAllEvents() throws Exception {
-        String database = executeCommandFileInSeparateDatabase("inventory");
+        String database = MONGODB_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         DebeziumSourceFunction<SourceRecord> source = createMongoDBSource(database);
         TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
@@ -142,7 +145,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
 
     @Test
     public void testCheckpointAndRestore() throws Exception {
-        String database = executeCommandFileInSeparateDatabase("inventory");
+        String database = MONGODB_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
@@ -306,7 +309,7 @@ public class MongoDBSourceTest extends MongoDBTestBase {
                     };
             runThread3.start();
 
-            // consume the unconsumed binlog
+            // consume the unconsumed oplog
             List<SourceRecord> records = drain(sourceContext3, 2);
             assertInsert(records.get(0), true);
             assertObjectIdEquals("000000000000000000001003", records.get(0));
@@ -351,23 +354,17 @@ public class MongoDBSourceTest extends MongoDBTestBase {
     public void testConnectionUri() {
         String hosts = MONGODB_CONTAINER.getHostAndPort();
 
-        ConnectionString case0 = MongoDBSource.builder().hosts(hosts).buildConnectionUri();
+        ConnectionString case0 = buildConnectionString(null, null, hosts, null);
         assertEquals(String.format("mongodb://%s", hosts), case0.toString());
 
-        ConnectionString case1 =
-                MongoDBSource.builder().username("").hosts(hosts).buildConnectionUri();
+        ConnectionString case1 = buildConnectionString("", null, hosts, null);
         assertEquals(String.format("mongodb://%s", hosts), case1.toString());
 
-        ConnectionString case2 =
-                MongoDBSource.builder().password("").hosts(hosts).buildConnectionUri();
+        ConnectionString case2 = buildConnectionString(null, "", hosts, null);
         assertEquals(String.format("mongodb://%s", hosts), case2.toString());
 
         ConnectionString case3 =
-                MongoDBSource.builder()
-                        .username(FLINK_USER)
-                        .password(FLINK_USER_PASSWORD)
-                        .hosts(hosts)
-                        .buildConnectionUri();
+                buildConnectionString(FLINK_USER, FLINK_USER_PASSWORD, hosts, null);
         assertEquals(FLINK_USER, case3.getUsername());
         assertEquals(FLINK_USER_PASSWORD, new String(case3.getPassword()));
     }

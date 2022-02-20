@@ -24,7 +24,7 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import com.ververica.cdc.connectors.mongodb.MongoDBTestBase;
+import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,16 +32,17 @@ import org.junit.runners.Parameterized;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests to check mongodb-cdc works well under different local timezone. */
 @RunWith(Parameterized.class)
-public class MongoDBTimeZoneITCase extends MongoDBTestBase {
+public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -49,24 +50,43 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @Parameterized.Parameter public String localTimeZone;
+    private final String localTimeZone;
 
-    @Parameterized.Parameters(name = "localTimeZone: {0}")
-    public static List<String> parameters() {
-        return Arrays.asList("Asia/Shanghai", "Europe/Berlin", "UTC");
+    private final boolean parallelismSnapshot;
+
+    public MongoDBTimeZoneITCase(String localTimeZone, boolean parallelismSnapshot) {
+        this.localTimeZone = localTimeZone;
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "localTimeZone: {0}, parallelismSnapshot: {1}")
+    public static Object[] parameters() {
+        return new Object[][] {
+            new Object[] {"Asia/Shanghai", false},
+            new Object[] {"Europe/Berlin", false},
+            new Object[] {"UTC", false},
+            new Object[] {"Asia/Shanghai", true},
+            new Object[] {"Europe/Berlin", true},
+            new Object[] {"UTC", true}
+        };
     }
 
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.setParallelism(1);
+        if (parallelismSnapshot) {
+            env.setParallelism(DEFAULT_PARALLELISM);
+            env.enableCheckpointing(200);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     @Test
     public void testTemporalTypesWithTimeZone() throws Exception {
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(localTimeZone));
 
-        String database = executeCommandFileInSeparateDatabase("column_type_test");
+        String database = ROUTER.executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -87,12 +107,11 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        MONGODB_CONTAINER.getHostAndPort(),
+                        ROUTER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
-                        "full_types",
-                        localTimeZone);
+                        "full_types");
 
         tEnv.executeSql(sourceDDL);
 
@@ -140,11 +159,11 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
     public void testDateAndTimestampToStringWithTimeZone() throws Exception {
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(localTimeZone));
 
-        String database = executeCommandFileInSeparateDatabase("column_type_test");
+        String database = ROUTER.executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
                 String.format(
-                        "CREATE TABLE full_types (\n"
+                        "CREATE TABLE full_types_1 (\n"
                                 + "    _id STRING,\n"
                                 + "    dateToLocalTimestampField STRING,\n"
                                 + "    timestampToLocalTimestampField STRING,\n"
@@ -157,12 +176,11 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        MONGODB_CONTAINER.getHostAndPort(),
+                        ROUTER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
-                        "full_types",
-                        localTimeZone);
+                        "full_types");
 
         tEnv.executeSql(sourceDDL);
 
@@ -170,7 +188,7 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
                 tEnv.executeSql(
                         "SELECT dateToLocalTimestampField,\n"
                                 + "timestampToLocalTimestampField\n"
-                                + "FROM full_types");
+                                + "FROM full_types_1");
 
         CloseableIterator<Row> iterator = result.collect();
         String[] expectedSnapshot;

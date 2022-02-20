@@ -16,8 +16,15 @@
 
 package com.ververica.cdc.connectors.mongodb.utils;
 
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
+import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
+import org.apache.flink.types.Row;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.fail;
@@ -60,5 +67,61 @@ public class MongoDBTestUtils {
                 return 0;
             }
         }
+    }
+
+    public static List<String> fetchRows(Iterator<Row> iter, int size) {
+        List<String> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Row row = iter.next();
+            rows.add(row.toString());
+            size--;
+        }
+        return rows;
+    }
+
+    /** The type of failover. */
+    public enum FailoverType {
+        TM,
+        JM,
+        NONE
+    }
+
+    /** The phase of failover. */
+    public enum FailoverPhase {
+        SNAPSHOT,
+        STREAM,
+        NEVER
+    }
+
+    public static void triggerFailover(
+            FailoverType type, JobID jobId, MiniCluster miniCluster, Runnable afterFailAction)
+            throws Exception {
+        switch (type) {
+            case TM:
+                restartTaskManager(miniCluster, afterFailAction);
+                break;
+            case JM:
+                triggerJobManagerFailover(jobId, miniCluster, afterFailAction);
+                break;
+            case NONE:
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + type);
+        }
+    }
+
+    public static void triggerJobManagerFailover(
+            JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
+        final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
+        haLeadershipControl.revokeJobMasterLeadership(jobId).get();
+        afterFailAction.run();
+        haLeadershipControl.grantJobMasterLeadership(jobId).get();
+    }
+
+    public static void restartTaskManager(MiniCluster miniCluster, Runnable afterFailAction)
+            throws Exception {
+        miniCluster.terminateTaskManager(0).get();
+        afterFailAction.run();
+        miniCluster.startTaskManager();
     }
 }
