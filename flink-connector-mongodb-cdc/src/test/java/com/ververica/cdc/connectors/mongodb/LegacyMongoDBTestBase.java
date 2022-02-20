@@ -26,7 +26,6 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
 import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
-import org.apache.commons.lang3.StringUtils;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
@@ -35,29 +34,18 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Random;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_USER;
-import static org.junit.Assert.assertNotNull;
 
 /**
- * Basic class for testing MongoDB source, this contains a MongoDB container which enables binlog.
+ * Basic class for testing MongoDB source, this contains a MongoDB container which enables change
+ * streams.
  */
-public class MongoDBTestBase extends AbstractTestBase {
+public class LegacyMongoDBTestBase extends AbstractTestBase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MongoDBTestBase.class);
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)//.*$");
-
-    protected static final String FLINK_USER = "flinkuser";
-    protected static final String FLINK_USER_PASSWORD = "a1?~!@#$%^&*(){}[]<>.,+_-=/|:;";
+    private static final Logger LOG = LoggerFactory.getLogger(LegacyMongoDBTestBase.class);
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
@@ -87,46 +75,5 @@ public class MongoDBTestBase extends AbstractTestBase {
 
     protected static MongoDatabase getMongoDatabase(String dbName) {
         return mongodbClient.getDatabase(dbName);
-    }
-
-    /** Executes a mongo command file. */
-    protected static String executeCommandFile(String fileNameIgnoreSuffix) {
-        return executeCommandFileInDatabase(fileNameIgnoreSuffix, fileNameIgnoreSuffix);
-    }
-
-    /** Executes a mongo command file in separate database. */
-    protected static String executeCommandFileInSeparateDatabase(String fileNameIgnoreSuffix) {
-        return executeCommandFileInDatabase(
-                fileNameIgnoreSuffix,
-                fileNameIgnoreSuffix + "_" + Integer.toUnsignedString(new Random().nextInt(), 36));
-    }
-
-    /** Executes a mongo command file, specify a database name. */
-    protected static String executeCommandFileInDatabase(
-            String fileNameIgnoreSuffix, String databaseName) {
-        final String dbName = databaseName != null ? databaseName : fileNameIgnoreSuffix;
-        final String ddlFile = String.format("ddl/%s.js", fileNameIgnoreSuffix);
-        final URL ddlTestFile = MongoDBTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-
-        try {
-            // use database;
-            String command0 = String.format("db = db.getSiblingDB('%s');\n", dbName);
-            String command1 =
-                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                            .filter(x -> StringUtils.isNotBlank(x) && !x.trim().startsWith("//"))
-                            .map(
-                                    x -> {
-                                        final Matcher m = COMMENT_PATTERN.matcher(x);
-                                        return m.matches() ? m.group(1) : x;
-                                    })
-                            .collect(Collectors.joining("\n"));
-
-            MONGODB_CONTAINER.executeCommand(command0 + command1);
-
-            return dbName;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

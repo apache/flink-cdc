@@ -45,9 +45,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_ALL;
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
-import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NEWLY_ADDED_COLLECTION_ENABLED;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_PARALLELISM_SNAPSHOT_CHUNK_SIZE_MB;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_PARALLELISM_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -85,10 +90,19 @@ public class MongoDBTableFactoryTest {
     private static final String PASSWORD = "flinkpw";
     private static final String MY_DATABASE = "myDB";
     private static final String MY_TABLE = "myTable";
-    private static final String ERROR_TOLERANCE = "none";
-    private static final Boolean ERROR_LOGS_ENABLE = true;
-    private static final Boolean COPY_EXISTING = true;
     private static final ZoneId LOCAL_TIME_ZONE = ZoneId.systemDefault();
+    private static final Boolean COPY_EXISTING_DEFAULT = COPY_EXISTING.defaultValue();
+    private static final int BATCH_SIZE_DEFAULT = BATCH_SIZE.defaultValue();
+    private static final int POLL_MAX_BATCH_SIZE_DEFAULT = POLL_MAX_BATCH_SIZE.defaultValue();
+    private static final int POLL_AWAIT_TIME_MILLIS_DEFAULT = POLL_AWAIT_TIME_MILLIS.defaultValue();
+    private static final int HEARTBEAT_INTERVAL_MILLIS_DEFAULT =
+            HEARTBEAT_INTERVAL_MILLIS.defaultValue();
+    private static final boolean SCAN_PARALLELISM_SNAPSHOT_ENABLED_DEFAULT =
+            SCAN_PARALLELISM_SNAPSHOT_ENABLED.defaultValue();
+    private static final int SCAN_PARALLELISM_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT =
+            SCAN_PARALLELISM_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
+    private static final boolean SCAN_NEWLY_ADDED_COLLECTION_ENABLED_DEFAULT =
+            SCAN_NEWLY_ADDED_COLLECTION_ENABLED.defaultValue();
 
     @Test
     public void testCommonProperties() {
@@ -105,16 +119,16 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         null,
-                        ERROR_TOLERANCE,
-                        ERROR_LOGS_ENABLE,
-                        COPY_EXISTING,
+                        COPY_EXISTING_DEFAULT,
                         null,
-                        null,
-                        null,
+                        BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
-                        null,
-                        LOCAL_TIME_ZONE);
+                        HEARTBEAT_INTERVAL_MILLIS_DEFAULT,
+                        LOCAL_TIME_ZONE,
+                        SCAN_PARALLELISM_SNAPSHOT_ENABLED_DEFAULT,
+                        SCAN_PARALLELISM_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_NEWLY_ADDED_COLLECTION_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -122,15 +136,15 @@ public class MongoDBTableFactoryTest {
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
-        options.put("errors.tolerance", "all");
-        options.put("errors.log.enable", "false");
         options.put("copy.existing", "false");
-        options.put("copy.existing.pipeline", "[ { \"$match\": { \"closed\": \"false\" } } ]");
-        options.put("copy.existing.max.threads", "1");
-        options.put("copy.existing.queue.size", "101");
+        options.put("copy.existing.queue.size", "100");
+        options.put("batch.size", "101");
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
         options.put("heartbeat.interval.ms", "104");
+        options.put("scan.parallelism.snapshot.enabled", "true");
+        options.put("scan.parallelism.snapshot.chunk.size.mb", "10");
+        options.put("scan.newly-added-collection.enabled", "true");
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =
@@ -142,16 +156,16 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         "replicaSet=test&connectTimeoutMS=300000",
-                        ERROR_TOLERANCE_ALL,
                         false,
-                        false,
-                        "[ { \"$match\": { \"closed\": \"false\" } } ]",
-                        1,
+                        100,
                         101,
                         102,
                         103,
                         104,
-                        LOCAL_TIME_ZONE);
+                        LOCAL_TIME_ZONE,
+                        true,
+                        10,
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -176,16 +190,16 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         null,
-                        ERROR_TOLERANCE,
-                        ERROR_LOGS_ENABLE,
-                        COPY_EXISTING,
+                        COPY_EXISTING_DEFAULT,
                         null,
-                        null,
-                        null,
+                        BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
-                        null,
-                        LOCAL_TIME_ZONE);
+                        HEARTBEAT_INTERVAL_MILLIS_DEFAULT,
+                        LOCAL_TIME_ZONE,
+                        SCAN_PARALLELISM_SNAPSHOT_ENABLED_DEFAULT,
+                        SCAN_PARALLELISM_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_NEWLY_ADDED_COLLECTION_ENABLED_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");

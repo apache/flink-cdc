@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mongodb.utils;
+package com.ververica.cdc.connectors.mongodb.source.utils;
 
 import com.mongodb.MongoNamespace;
 import com.mongodb.client.MongoClient;
@@ -28,6 +28,7 @@ import org.bson.conversions.Bson;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -65,7 +66,15 @@ public class CollectionDiscoveryUtils {
             MongoClient mongoClient,
             List<String> databaseNames,
             Predicate<String> collectionFilter) {
-        List<String> collectionNames = new ArrayList<>();
+        return collectionNames(mongoClient, databaseNames, collectionFilter, String::toString);
+    }
+
+    public static <T> List<T> collectionNames(
+            MongoClient mongoClient,
+            List<String> databaseNames,
+            Predicate<String> collectionFilter,
+            Function<String, T> conversion) {
+        List<T> collectionNames = new ArrayList<>();
         for (String dbName : databaseNames) {
             MongoDatabase db = mongoClient.getDatabase(dbName);
             db.listCollectionNames()
@@ -73,7 +82,7 @@ public class CollectionDiscoveryUtils {
                     .forEach(
                             fullName -> {
                                 if (collectionFilter.test(fullName)) {
-                                    collectionNames.add(fullName);
+                                    collectionNames.add(conversion.apply(fullName));
                                 }
                             });
         }
@@ -109,14 +118,35 @@ public class CollectionDiscoveryUtils {
         };
     }
 
+    public static Pattern includeListAsFlatPattern(List<String> includeList) {
+        return includeListAsFlatPattern(includeList, CollectionDiscoveryUtils::completionPattern);
+    }
+
+    public static Pattern includeListAsFlatPattern(
+            List<String> includeList, Function<String, Pattern> conversion) {
+        if (includeList == null || includeList.isEmpty()) {
+            return null;
+        }
+
+        String flatPatternLiteral =
+                includeListAsPatterns(includeList, conversion).stream()
+                        .map(Pattern::pattern)
+                        .collect(Collectors.joining("|"));
+
+        return Pattern.compile(flatPatternLiteral);
+    }
+
     public static List<Pattern> includeListAsPatterns(List<String> includeList) {
+        // Notice that MongoDB's database and collection names are case-sensitive.
+        // Please refer to https://docs.mongodb.com/manual/reference/limits/
+        // We use case-sensitive pattern here to avoid unexpected results.
+        return includeListAsPatterns(includeList, CollectionDiscoveryUtils::completionPattern);
+    }
+
+    public static List<Pattern> includeListAsPatterns(
+            List<String> includeList, Function<String, Pattern> convertion) {
         if (includeList != null && !includeList.isEmpty()) {
-            return includeList.stream()
-                    // Notice that MongoDB's database and collection names are case-sensitive.
-                    // Please refer to https://docs.mongodb.com/manual/reference/limits/
-                    // We use case-sensitive pattern here to avoid unexpected results.
-                    .map(CollectionDiscoveryUtils::completionPattern)
-                    .collect(Collectors.toList());
+            return includeList.stream().map(convertion).collect(Collectors.toList());
         } else {
             return Collections.emptyList();
         }
@@ -173,18 +203,18 @@ public class CollectionDiscoveryUtils {
     }
 
     public static String bsonListToJson(List<Bson> bsonList) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[");
+        StringBuilder builder = new StringBuilder();
+        builder.append("[");
         boolean first = true;
         for (Bson bson : bsonList) {
             if (first) {
                 first = false;
             } else {
-                sb.append(",");
+                builder.append(",");
             }
-            sb.append(bson.toBsonDocument().toJson());
+            builder.append(bson.toBsonDocument().toJson());
         }
-        sb.append("]");
-        return sb.toString();
+        builder.append("]");
+        return builder.toString();
     }
 }
