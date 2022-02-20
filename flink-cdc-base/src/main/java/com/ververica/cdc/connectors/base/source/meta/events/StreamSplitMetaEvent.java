@@ -28,7 +28,8 @@ import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to pass stream split metadata, i.e. {@link FinishedSnapshotSplitInfo}.
+ * JdbcIncrementalSourceReader} to pass stream split metadata, i.e. {@link
+ * FinishedSnapshotSplitInfo}.
  */
 public class StreamSplitMetaEvent implements SourceEvent {
 

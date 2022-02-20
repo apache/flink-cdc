@@ -19,9 +19,7 @@
 package com.ververica.cdc.connectors.mongodb;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.annotation.VisibleForTesting;
 
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
@@ -31,11 +29,7 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.heartbeat.Heartbeat;
-import org.apache.commons.lang3.StringUtils;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -43,8 +37,15 @@ import java.util.Properties;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.COLLECTION_INCLUDE_LIST;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.DATABASE_INCLUDE_LIST;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.HEARTBEAT_TOPIC_NAME;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.OUTPUT_SCHEMA;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * A builder to build a SourceFunction which can read snapshot and continue to consume change stream
@@ -53,72 +54,13 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 @PublicEvolving
 public class MongoDBSource {
 
-    public static final String MONGODB_SCHEME = "mongodb";
-
-    public static final String ERROR_TOLERANCE_NONE = ErrorTolerance.NONE.value();
-
-    public static final String ERROR_TOLERANCE_ALL = ErrorTolerance.ALL.value();
-
     public static final String FULL_DOCUMENT_UPDATE_LOOKUP = FullDocument.UPDATE_LOOKUP.getValue();
-
-    public static final int POLL_MAX_BATCH_SIZE_DEFAULT = 1000;
-
-    public static final int POLL_AWAIT_TIME_MILLIS_DEFAULT = 1500;
-
-    public static final String HEARTBEAT_TOPIC_NAME_DEFAULT = "__mongodb_heartbeats";
 
     public static final String OUTPUT_FORMAT_SCHEMA =
             OutputFormat.SCHEMA.name().toLowerCase(Locale.ROOT);
 
-    // Add "source" field to adapt to debezium SourceRecord
-    public static final String OUTPUT_SCHEMA_VALUE_DEFAULT =
-            "{"
-                    + "  \"name\": \"ChangeStream\","
-                    + "  \"type\": \"record\","
-                    + "  \"fields\": ["
-                    + "    { \"name\": \"_id\", \"type\": \"string\" },"
-                    + "    { \"name\": \"operationType\", \"type\": [\"string\", \"null\"] },"
-                    + "    { \"name\": \"fullDocument\", \"type\": [\"string\", \"null\"] },"
-                    + "    { \"name\": \"source\","
-                    + "      \"type\": [{\"name\": \"source\", \"type\": \"record\", \"fields\": ["
-                    + "                {\"name\": \"ts_ms\", \"type\": \"long\"},"
-                    + "                {\"name\": \"snapshot\", \"type\": [\"string\", \"null\"] } ]"
-                    + "               }, \"null\" ] },"
-                    + "    { \"name\": \"ns\","
-                    + "      \"type\": [{\"name\": \"ns\", \"type\": \"record\", \"fields\": ["
-                    + "                {\"name\": \"db\", \"type\": \"string\"},"
-                    + "                {\"name\": \"coll\", \"type\": [\"string\", \"null\"] } ]"
-                    + "               }, \"null\" ] },"
-                    + "    { \"name\": \"to\","
-                    + "      \"type\": [{\"name\": \"to\", \"type\": \"record\",  \"fields\": ["
-                    + "                {\"name\": \"db\", \"type\": \"string\"},"
-                    + "                {\"name\": \"coll\", \"type\": [\"string\", \"null\"] } ]"
-                    + "               }, \"null\" ] },"
-                    + "    { \"name\": \"documentKey\", \"type\": [\"string\", \"null\"] },"
-                    + "    { \"name\": \"updateDescription\","
-                    + "      \"type\": [{\"name\": \"updateDescription\",  \"type\": \"record\", \"fields\": ["
-                    + "                 {\"name\": \"updatedFields\", \"type\": [\"string\", \"null\"]},"
-                    + "                 {\"name\": \"removedFields\","
-                    + "                  \"type\": [{\"type\": \"array\", \"items\": \"string\"}, \"null\"]"
-                    + "                  }] }, \"null\"] },"
-                    + "    { \"name\": \"clusterTime\", \"type\": [\"string\", \"null\"] },"
-                    + "    { \"name\": \"txnNumber\", \"type\": [\"long\", \"null\"]},"
-                    + "    { \"name\": \"lsid\", \"type\": [{\"name\": \"lsid\", \"type\": \"record\","
-                    + "               \"fields\": [ {\"name\": \"id\", \"type\": \"string\"},"
-                    + "                             {\"name\": \"uid\", \"type\": \"string\"}] }, \"null\"] }"
-                    + "  ]"
-                    + "}";
-
     public static <T> Builder<T> builder() {
         return new Builder<>();
-    }
-
-    private static String encodeValue(String value) {
-        try {
-            return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalArgumentException(e);
-        }
     }
 
     /** Builder class of {@link MongoDBSource}. */
@@ -130,16 +72,14 @@ public class MongoDBSource {
         private List<String> databaseList;
         private List<String> collectionList;
         private String connectionOptions;
-        private Integer batchSize;
-        private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS_DEFAULT;
-        private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE_DEFAULT;
-        private Boolean copyExisting = true;
+        private Integer batchSize = BATCH_SIZE.defaultValue();
+        private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS.defaultValue();
+        private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE.defaultValue();
+        private Boolean copyExisting = COPY_EXISTING.defaultValue();
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
         private String copyExistingPipeline;
-        private Boolean errorsLogEnable;
-        private String errorsTolerance;
-        private Integer heartbeatIntervalMillis;
+        private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
         private DebeziumDeserializationSchema<T> deserializer;
 
         /** The comma-separated list of hostname and port pairs of mongodb servers. */
@@ -188,7 +128,7 @@ public class MongoDBSource {
         /**
          * batch.size
          *
-         * <p>The cursor batch size. Default: 0
+         * <p>The cursor batch size. Default: 1024
          */
         public Builder<T> batchSize(int batchSize) {
             checkArgument(batchSize >= 0);
@@ -200,7 +140,7 @@ public class MongoDBSource {
          * poll.await.time.ms
          *
          * <p>The amount of time to wait before checking for new results on the change stream.
-         * Default: 3000
+         * Default: 1000
          */
         public Builder<T> pollAwaitTimeMillis(int pollAwaitTimeMillis) {
             checkArgument(pollAwaitTimeMillis > 0);
@@ -213,7 +153,7 @@ public class MongoDBSource {
          *
          * <p>Maximum number of change stream documents to include in a single batch when polling
          * for new data. This setting can be used to limit the amount of data buffered internally in
-         * the connector. Default: 1000
+         * the connector. Default: 1024
          */
         public Builder<T> pollMaxBatchSize(int pollMaxBatchSize) {
             checkArgument(pollMaxBatchSize > 0);
@@ -248,7 +188,7 @@ public class MongoDBSource {
         /**
          * copy.existing.queue.size
          *
-         * <p>The max size of the queue to use when copying data. Default: 16000
+         * <p>The max size of the queue to use when copying data. Default: 10240
          */
         public Builder<T> copyExistingQueueSize(int copyExistingQueueSize) {
             checkArgument(copyExistingQueueSize > 0);
@@ -265,33 +205,6 @@ public class MongoDBSource {
          */
         public Builder<T> copyExistingPipeline(String copyExistingPipeline) {
             this.copyExistingPipeline = copyExistingPipeline;
-            return this;
-        }
-
-        /**
-         * errors.log.enable
-         *
-         * <p>Whether details of failed operations should be written to the log file. When set to
-         * true, both errors that are tolerated (determined by the errors.tolerance setting) and not
-         * tolerated are written. When set to false, errors that are tolerated are omitted.
-         */
-        public Builder<T> errorsLogEnable(boolean errorsLogEnable) {
-            this.errorsLogEnable = errorsLogEnable;
-            return this;
-        }
-
-        /**
-         * errors.tolerance
-         *
-         * <p>Whether to continue processing messages if an error is encountered. When set to none,
-         * the connector reports an error and blocks further processing of the rest of the records
-         * when it encounters an error. When set to all, the connector silently ignores any bad
-         * messages.
-         *
-         * <p>Default: "none" Accepted Values: "none" or "all"
-         */
-        public Builder<T> errorsTolerance(String errorsTolerance) {
-            this.errorsTolerance = errorsTolerance;
             return this;
         }
 
@@ -318,27 +231,6 @@ public class MongoDBSource {
             return this;
         }
 
-        /** Build connection uri. */
-        @VisibleForTesting
-        public ConnectionString buildConnectionUri() {
-            StringBuilder sb = new StringBuilder(MONGODB_SCHEME).append("://");
-
-            if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
-                sb.append(encodeValue(username))
-                        .append(":")
-                        .append(encodeValue(password))
-                        .append("@");
-            }
-
-            sb.append(checkNotNull(hosts));
-
-            if (StringUtils.isNotEmpty(connectionOptions)) {
-                sb.append("/?").append(connectionOptions);
-            }
-
-            return new ConnectionString(sb.toString());
-        }
-
         /**
          * The properties of mongodb kafka connector.
          * https://docs.mongodb.com/kafka-connector/current/kafka-source
@@ -348,11 +240,12 @@ public class MongoDBSource {
 
             props.setProperty(
                     "connector.class", MongoDBConnectorSourceConnector.class.getCanonicalName());
-            props.setProperty("name", "mongodb_binlog_source");
+            props.setProperty("name", "mongodb_cdc_source");
 
-            ConnectionString connectionString = buildConnectionUri();
             props.setProperty(
-                    MongoSourceConfig.CONNECTION_URI_CONFIG, String.valueOf(connectionString));
+                    MongoSourceConfig.CONNECTION_URI_CONFIG,
+                    String.valueOf(
+                            buildConnectionString(username, password, hosts, connectionOptions)));
 
             if (databaseList != null) {
                 props.setProperty(DATABASE_INCLUDE_LIST, String.join(",", databaseList));
@@ -372,8 +265,7 @@ public class MongoDBSource {
             props.setProperty(
                     MongoSourceConfig.OUTPUT_SCHEMA_INFER_VALUE_CONFIG,
                     String.valueOf(Boolean.FALSE));
-            props.setProperty(
-                    MongoSourceConfig.OUTPUT_SCHEMA_VALUE_CONFIG, OUTPUT_SCHEMA_VALUE_DEFAULT);
+            props.setProperty(MongoSourceConfig.OUTPUT_SCHEMA_VALUE_CONFIG, OUTPUT_SCHEMA);
 
             if (batchSize != null) {
                 props.setProperty(MongoSourceConfig.BATCH_SIZE_CONFIG, String.valueOf(batchSize));
@@ -389,16 +281,6 @@ public class MongoDBSource {
                 props.setProperty(
                         MongoSourceConfig.POLL_MAX_BATCH_SIZE_CONFIG,
                         String.valueOf(pollMaxBatchSize));
-            }
-
-            if (errorsLogEnable != null) {
-                props.setProperty(
-                        MongoSourceConfig.ERRORS_LOG_ENABLE_CONFIG,
-                        String.valueOf(errorsLogEnable));
-            }
-
-            if (errorsTolerance != null) {
-                props.setProperty(MongoSourceConfig.ERRORS_TOLERANCE_CONFIG, errorsTolerance);
             }
 
             if (copyExisting != null) {
@@ -429,12 +311,15 @@ public class MongoDBSource {
                         String.valueOf(heartbeatIntervalMillis));
             }
 
-            props.setProperty(
-                    MongoSourceConfig.HEARTBEAT_TOPIC_NAME_CONFIG, HEARTBEAT_TOPIC_NAME_DEFAULT);
+            props.setProperty(MongoSourceConfig.HEARTBEAT_TOPIC_NAME_CONFIG, HEARTBEAT_TOPIC_NAME);
 
             // Let DebeziumChangeFetcher recognize heartbeat record
+            props.setProperty(Heartbeat.HEARTBEAT_TOPICS_PREFIX.name(), HEARTBEAT_TOPIC_NAME);
+
             props.setProperty(
-                    Heartbeat.HEARTBEAT_TOPICS_PREFIX.name(), HEARTBEAT_TOPIC_NAME_DEFAULT);
+                    MongoSourceConfig.ERRORS_LOG_ENABLE_CONFIG, String.valueOf(Boolean.TRUE));
+            props.setProperty(
+                    MongoSourceConfig.ERRORS_TOLERANCE_CONFIG, ErrorTolerance.NONE.value());
 
             return new DebeziumSourceFunction<>(
                     deserializer, props, null, Validator.getDefaultValidator());

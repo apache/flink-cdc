@@ -13,21 +13,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// In production you would almost certainly limit the replication user must be on the follower (slave) machine,
-// to prevent other clients accessing the log from other machines. For example, 'replicator'@'follower.acme.com'.
-// However, in this database we'll grant flink user with privileges:
-//
-// 'flinkuser' - all privileges required by the snapshot reader AND oplog reader (used for testing)
-//
+sh.enableSharding(db.getName());
 
-//use admin;
-db.createUser(
- {
-   user: 'flinkuser',
-   pwd: 'a1?~!@#$%^&*(){}[]<>.,+_-=/|:;',
-   roles: [
-      { role: 'read', db: 'admin' },
-      { role: 'readAnyDatabase', db: 'admin' }
-   ]
- }
-);
+db.getCollection('shopping_cart').createIndex({ "user_id": 1, "product_no": 1, "product_kind": 1 }, { "unique": true });
+sh.shardCollection(db.getName() + ".shopping_cart", { "user_id": 1, "product_no": 1, "product_kind": 1});
+
+var shoppingCarts = [];
+for (var i = 1; i <= 20480; i++) {
+    shoppingCarts.push({
+        "product_no": NumberLong(i),
+        "product_kind": 'KIND_' + i,
+        "user_id": 'user_' + i,
+        "description": 'my shopping cart ' + i
+    });
+    if (i % 1024 == 0) {
+        db.getCollection('shopping_cart').insertMany(shoppingCarts);
+        shoppingCarts = [];
+    }
+}

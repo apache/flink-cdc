@@ -126,7 +126,7 @@ public class FinishedSnapshotSplitInfo {
     public static byte[] serialize(FinishedSnapshotSplitInfo splitInfo) {
         try {
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
-            out.writeUTF(splitInfo.getTableId().identifier());
+            out.writeUTF(splitInfo.getTableId().toString());
             out.writeUTF(splitInfo.getSplitId());
             out.writeUTF(rowToSerializedString(splitInfo.getSplitStart()));
             out.writeUTF(rowToSerializedString(splitInfo.getSplitEnd()));

@@ -28,7 +28,7 @@ import org.apache.flink.table.utils.LegacyRowResource;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.ververica.cdc.connectors.mongodb.MongoDBTestBase;
+import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import org.bson.BsonDateTime;
 import org.bson.BsonTimestamp;
 import org.bson.Document;
@@ -36,6 +36,8 @@ import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.time.ZoneId;
 import java.util.Arrays;
@@ -45,6 +47,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkSize;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -52,7 +56,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for MongoDB change stream event SQL source. */
-public class MongoDBConnectorITCase extends MongoDBTestBase {
+@RunWith(Parameterized.class)
+public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -62,16 +67,32 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                     EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
+    private final boolean parallelismSnapshot;
+
+    public MongoDBConnectorITCase(boolean parallelismSnapshot) {
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {false}, new Object[] {true}};
+    }
+
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.setParallelism(1);
         tEnv.getConfig().setLocalTimeZone(ZoneId.of("UTC"));
+        if (parallelismSnapshot) {
+            env.setParallelism(DEFAULT_PARALLELISM);
+            env.enableCheckpointing(200);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     @Test
     public void testConsumingAllEvents() throws ExecutionException, InterruptedException {
-        String database = executeCommandFileInSeparateDatabase("inventory");
+        String database = ROUTER.executeCommandFileInSeparateDatabase("inventory");
 
         String sourceDDL =
                 String.format(
@@ -89,13 +110,15 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s',"
+                                + " 'scan.parallelism.snapshot.enabled' = '%s',"
                                 + " 'heartbeat.interval.ms' = '1000'"
                                 + ")",
-                        MONGODB_CONTAINER.getHostAndPort(),
+                        ROUTER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
-                        "products");
+                        "products",
+                        parallelismSnapshot);
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -116,7 +139,8 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
 
         waitForSnapshotStarted("sink");
 
-        MongoCollection<Document> products = getMongoDatabase(database).getCollection("products");
+        MongoCollection<Document> products =
+                mongodbClient.getDatabase(database).getCollection("products");
 
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000106")),
@@ -201,7 +225,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
 
     @Test
     public void testAllTypes() throws Throwable {
-        executeCommandFile("column_type_test");
+        String database = ROUTER.executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -244,10 +268,10 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        MONGODB_CONTAINER.getHostAndPort(),
+                        ROUTER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
-                        "column_type_test",
+                        database,
                         "full_types");
 
         String sinkDDL =
@@ -325,11 +349,13 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
         waitForSnapshotStarted("sink");
 
         MongoCollection<Document> fullTypes =
-                getMongoDatabase("column_type_test").getCollection("full_types");
+                mongodbClient.getDatabase(database).getCollection("full_types");
 
         fullTypes.updateOne(
                 Filters.eq("_id", new ObjectId("5d505646cf6d4fe581014ab2")),
                 Updates.set("int64Field", 510L));
+
+        waitForSinkSize("sink", 3);
 
         // 2021-09-03T18:36:04.123Z
         BsonDateTime updatedDateTime = new BsonDateTime(1630694164123L);
@@ -362,7 +388,7 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
 
     @Test
     public void testMetadataColumns() throws Exception {
-        String database = executeCommandFileInSeparateDatabase("inventory");
+        String database = ROUTER.executeCommandFileInSeparateDatabase("inventory");
 
         String sourceDDL =
                 String.format(
@@ -381,13 +407,15 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database' = '%s',"
-                                + " 'collection' = '%s'"
+                                + " 'collection' = '%s',"
+                                + " 'scan.parallelism.snapshot.enabled' = '%s'"
                                 + ")",
-                        MONGODB_CONTAINER.getHostAndPort(),
+                        ROUTER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
-                        "products");
+                        "products",
+                        parallelismSnapshot);
 
         String sinkDDL =
                 "CREATE TABLE meta_sink ("
@@ -408,10 +436,11 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO meta_sink SELECT * FROM mongodb_source");
 
-        // wait for snapshot finished and begin binlog
+        // wait for snapshot finished and start change stream
         waitForSinkSize("meta_sink", 9);
 
-        MongoCollection<Document> products = getMongoDatabase(database).getCollection("products");
+        MongoCollection<Document> products =
+                mongodbClient.getDatabase(database).getCollection("products");
 
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000106")),

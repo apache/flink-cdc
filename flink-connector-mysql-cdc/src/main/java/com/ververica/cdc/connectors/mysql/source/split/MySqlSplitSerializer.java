@@ -72,7 +72,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
 
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
             out.writeInt(SNAPSHOT_SPLIT_FLAG);
-            out.writeUTF(snapshotSplit.getTableId().identifier());
+            out.writeUTF(snapshotSplit.getTableId().toString());
             out.writeUTF(snapshotSplit.splitId());
             out.writeUTF(snapshotSplit.getSplitKeyType().asSerializableString());
 
@@ -231,7 +231,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         final int size = finishedSplitsInfo.size();
         out.writeInt(size);
         for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo) {
-            out.writeUTF(splitInfo.getTableId().identifier());
+            out.writeUTF(splitInfo.getTableId().toString());
             out.writeUTF(splitInfo.getSplitId());
             out.writeUTF(rowToSerializedString(splitInfo.getSplitStart()));
             out.writeUTF(rowToSerializedString(splitInfo.getSplitEnd()));

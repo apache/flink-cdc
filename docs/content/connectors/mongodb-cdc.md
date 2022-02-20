@@ -8,7 +8,6 @@ Dependencies
 In order to setup the MongoDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
-<!-- fixme: correct the version -->
 ```
 <dependency>
   <groupId>com.ververica</groupId>
@@ -57,14 +56,37 @@ Starting in version 4.0, MongoDB only supports pv1. pv1 is the default for all n
 
   ```javascript
   use admin;
-  db.createUser({
-    user: "flinkuser",
-    pwd: "flinkpw",
-    roles: [
-      { role: "read", db: "admin" }, //read role includes changeStream privilege 
-      { role: "readAnyDatabase", db: "admin" } //for snapshot reading
-    ]
-  });
+  db.createRole(
+      {
+          role: "flinkrole",
+          privileges: [{
+              // Grant privileges on all non-system collections in all databases
+              resource: { db: "", collection: "" },
+              actions: [
+                  "splitVector",
+                  "listDatabases",
+                  "listCollections",
+                  "collStats",
+                  "find",
+                  "changeStream" ]
+          }],
+          roles: [
+              // Read config.collections and config.chunks
+              // for sharded cluster snapshot splitting.
+              { role: 'read', db: 'config' }
+          ]
+      }
+  );
+
+  db.createUser(
+    {
+        user: 'flinkuser',
+        pwd: 'flinkpw',
+        roles: [
+           { role: 'flinkrole', db: 'admin' }
+        ]
+    }
+  );
   ```
 
 
@@ -96,10 +118,10 @@ CREATE TABLE products (
 SELECT * FROM products;
 ```
 
-**Note that** 
+**Note that**
 
 MongoDB's change event record doesn't have updated before message. So, we can only convert it to Flink's UPSERT changelog stream.
-An upsert stream requires a unique key, so we must declare `_id` as primary key. 
+An upsert stream requires a unique key, so we must declare `_id` as primary key.
 We can't declare other column as primary key, because delete operation does not contain the key and value besides `_id` and `sharding key`.
 
 Connector Options
@@ -177,24 +199,6 @@ Connector Options
       </td>
     </tr>
     <tr>
-      <td>errors.tolerance</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">none</td>
-      <td>String</td>
-      <td>Whether to continue processing messages if an error is encountered.
-          Accept <code>none</code> or <code>all</code>.
-          When set to <code>none</code>, the connector reports an error and blocks further processing of the rest of the records
-          when it encounters an error. When set to <code>all</code>, the connector silently ignores any bad messages.
-      </td>
-    </tr> 
-    <tr>
-      <td>errors.log.enable</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether details of failed operations should be written to the log file.</td>
-    </tr>
-    <tr>
       <td>copy.existing</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
@@ -202,41 +206,30 @@ Connector Options
       <td>Whether copy existing data from source collections.</td>
     </tr>
     <tr>
-      <td>copy.existing.pipeline</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td> An array of JSON objects describing the pipeline operations to run when copying existing data.<br>
-           This can improve the use of indexes by the copying manager and make copying more efficient.
-           eg. <code>[{"$match": {"closed": "false"}}]</code> ensures that 
-           only documents in which the closed field is set to false are copied.
-      </td>
-    </tr>
-    <tr>
-      <td>copy.existing.max.threads</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">Processors Count</td>
-      <td>Integer</td>
-      <td>The number of threads to use when performing the data copy.</td>
-    </tr>
-    <tr>
       <td>copy.existing.queue.size</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">16000</td>
+      <td style="word-wrap: break-word;">10240</td>
       <td>Integer</td>
       <td>The max size of the queue to use when copying data.</td>
     </tr>
     <tr>
+      <td>batch.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1024</td>
+      <td>Integer</td>
+      <td>The cursor batch size.</td>
+    </tr>
+    <tr>
       <td>poll.max.batch.size</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">1000</td>
+      <td style="word-wrap: break-word;">1024</td>
       <td>Integer</td>
       <td>Maximum number of change stream documents to include in a single batch when polling for new data.</td>
     </tr>
     <tr>
       <td>poll.await.time.ms</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">1500</td>
+      <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
       <td>The amount of time to wait before checking for new results on the change stream.</td>
     </tr>
@@ -246,6 +239,20 @@ Connector Options
       <td style="word-wrap: break-word;">0</td>
       <td>Integer</td>
       <td>The length of time in milliseconds between sending heartbeat messages. Use 0 to disable.</td>
+    </tr>
+    <tr>
+      <td>scan.parallelism.snapshot.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether enable parallelism snapshot.</td>
+    </tr>
+    <tr>
+      <td>scan.parallelism.snapshot.chunk.size.mb</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">64</td>
+      <td>Integer</td>
+      <td>The chunk size mb of parallelism snapshot.</td>
     </tr>
     </tbody>
 </table>

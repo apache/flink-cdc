@@ -183,7 +183,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         .getSourceConfig()
                         .getDbzConfiguration()
                         .edit()
-                        .with("table.include.list", currentSnapshotSplit.getTableId().identifier())
+                        .with("table.include.list", currentSnapshotSplit.getTableId().toString())
                         // Disable heartbeat event in snapshot split reader
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
