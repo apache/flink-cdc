@@ -176,10 +176,22 @@ public class DebeziumChangeFetcher<T> {
     // Metric getter
     // ---------------------------------------------------------------------------------------
 
+    /**
+     * The metric indicates delay from data generation to entry into the system.
+     *
+     * <p>Note: the metric is available during the binlog phase. Use 0 to indicate the metric is
+     * unavailable.
+     */
     public long getFetchDelay() {
         return fetchDelay;
     }
 
+    /**
+     * The metric indicates delay from data generation to leaving the source operator.
+     *
+     * <p>Note: the metric is available during the binlog phase. Use 0 to indicate the metric is
+     * unavailable.
+     */
     public long getEmitDelay() {
         return emitDelay;
     }
@@ -202,7 +214,7 @@ public class DebeziumChangeFetcher<T> {
         for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
             SourceRecord record = event.value();
             updateMessageTimestamp(record);
-            fetchDelay = processTime - messageTimestamp;
+            fetchDelay = isInDbSnapshotPhase ? 0L : processTime - messageTimestamp;
 
             if (isHeartbeatEvent(record)) {
                 // keep offset update
@@ -235,7 +247,8 @@ public class DebeziumChangeFetcher<T> {
         synchronized (checkpointLock) {
             T record;
             while ((record = records.poll()) != null) {
-                emitDelay = System.currentTimeMillis() - messageTimestamp;
+                emitDelay =
+                        isInDbSnapshotPhase ? 0L : System.currentTimeMillis() - messageTimestamp;
                 sourceContext.collect(record);
             }
             // update offset to state
