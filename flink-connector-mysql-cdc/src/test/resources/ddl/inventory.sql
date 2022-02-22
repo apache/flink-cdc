@@ -91,3 +91,14 @@ CREATE TABLE category (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     category_name VARCHAR(255)
 );
+
+CREATE TABLE `demo_varbinary_test` (
+   `order_id` varbinary(8) NOT NULL,
+   `order_date` date NOT NULL,
+   `quantity` int(11) NOT NULL,
+   `product_id` int(11) NOT NULL,
+   `purchaser` varchar(512) NOT NULL,
+   PRIMARY KEY (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO demo_varbinary_test(order_id,order_date,quantity, product_id, purchaser)
+VALUE (b'0000010000000100000001000000010000000100000001000000010000000100','2021-03-08', 30, 500, 'flink');
