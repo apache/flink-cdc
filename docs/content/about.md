@@ -22,16 +22,18 @@ The Flink CDC Connectors integrates Debezium as the engine to capture data chang
 | <a href="https://github.com/ververica/flink-cdc-connectors/wiki/Changelog-JSON-Format">Changelog Json</a> | <a href="https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/connectors/kafka.html">Apache Kafka</a> | 1.11+ |
 
 ## Supported Flink Versions 
-The version mapping between Flink CDC Connectors and Flink.
-| Flink CDC Connector Version | Flink Version |
-| --- | --- |
-|1.0.0 | 1.11.* |
-|1.1.0 | 1.11.* |
-|1.2.0 | 1.12.* |
-|1.3.0 | 1.12.* |
-|1.4.0 | 1.13.* |
-|2.0.* | 1.13.* |
-|2.1.* | 1.13.* |
+The following table shows the version mapping between Flink CDC Connectors and Flink:
+
+| Flink CDC Version | Flink Version |
+|:---:|:---:|
+| <font color="DarkCyan">1.0.0</font> | <font color="MediumVioletRed">1.11.*</font> |
+| <font color="DarkCyan">1.1.0</font> | <font color="MediumVioletRed">1.11.*</font> |
+| <font color="DarkCyan">1.2.0</font> | <font color="MediumVioletRed">1.12.*</font> |
+| <font color="DarkCyan">1.3.0</font> | <font color="MediumVioletRed">1.12.*</font> |
+| <font color="DarkCyan">1.4.0</font> | <font color="MediumVioletRed">1.13.*</font> |
+| <font color="DarkCyan">2.0.*</font> | <font color="MediumVioletRed">1.13.*</font> |
+| <font color="DarkCyan">2.1.*</font> | <font color="MediumVioletRed">1.13.*</font> |
+| <font color="DarkCyan">2.2.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font> |
 
 ## Features
 
