@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
@@ -58,7 +58,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadata {
 
-    private final TableSchema physicalSchema;
+    private final ResolvedSchema physicalSchema;
     private final int port;
     private final String hostname;
     private final String database;
@@ -78,6 +78,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
+    private final boolean scanNewlyAddedTableEnabled;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -90,7 +91,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     protected List<String> metadataKeys;
 
     public MySqlTableSource(
-            TableSchema physicalSchema,
+            ResolvedSchema physicalSchema,
             int port,
             String hostname,
             String database,
@@ -110,6 +111,52 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorUpper,
             double distributionFactorLower,
             StartupOptions startupOptions) {
+        this(
+                physicalSchema,
+                port,
+                hostname,
+                database,
+                tableName,
+                username,
+                password,
+                serverTimeZone,
+                dbzProperties,
+                serverId,
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                startupOptions,
+                false);
+    }
+
+    public MySqlTableSource(
+            ResolvedSchema physicalSchema,
+            int port,
+            String hostname,
+            String database,
+            String tableName,
+            String username,
+            String password,
+            ZoneId serverTimeZone,
+            Properties dbzProperties,
+            @Nullable String serverId,
+            boolean enableParallelRead,
+            int splitSize,
+            int splitMetaGroupSize,
+            int fetchSize,
+            Duration connectTimeout,
+            int connectMaxRetries,
+            int connectionPoolSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            StartupOptions startupOptions,
+            boolean scanNewlyAddedTableEnabled) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -130,6 +177,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -184,6 +232,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .debeziumProperties(dbzProperties)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
+                            .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -259,7 +308,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         connectionPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
-                        startupOptions);
+                        startupOptions,
+                        scanNewlyAddedTableEnabled);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -281,6 +331,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && fetchSize == that.fetchSize
                 && distributionFactorUpper == that.distributionFactorUpper
                 && distributionFactorLower == that.distributionFactorLower
+                && scanNewlyAddedTableEnabled == that.scanNewlyAddedTableEnabled
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
@@ -322,7 +373,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 distributionFactorLower,
                 startupOptions,
                 producedDataType,
-                metadataKeys);
+                metadataKeys,
+                scanNewlyAddedTableEnabled);
     }
 
     @Override

@@ -28,6 +28,7 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderOutput;
 import org.apache.flink.core.io.InputStatus;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.Collector;
@@ -54,6 +55,7 @@ import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
+import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -238,31 +240,39 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         }
     }
 
-    private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration) {
+    private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration)
+            throws Exception {
         return createReader(configuration, new TestingReaderContext());
     }
 
     private MySqlSourceReader<SourceRecord> createReader(
-            MySqlSourceConfig configuration, SourceReaderContext readerContext) {
+            MySqlSourceConfig configuration, SourceReaderContext readerContext) throws Exception {
         final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
+        // make  SourceReaderContext#metricGroup compatible between Flink 1.13 and Flink 1.14
+        final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
+        metricGroupMethod.setAccessible(true);
+        final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
+
         final MySqlRecordEmitter<SourceRecord> recordEmitter =
                 new MySqlRecordEmitter<>(
                         new ForwardDeserializeSchema(),
-                        new MySqlSourceReaderMetrics(readerContext.metricGroup()),
-                        configuration.isIncludeSchemaChanges(),
-                        configuration.isIncludeTransactionMetadata());
+                        new MySqlSourceReaderMetrics(metricGroup),
+                        configuration.isIncludeSchemaChanges(), configuration.isIncludeTransactionMetadata());
+        final MySqlSourceReaderContext mySqlSourceReaderContext =
+                new MySqlSourceReaderContext(readerContext);
         return new MySqlSourceReader<>(
                 elementsQueue,
-                () -> createSplitReader(configuration),
+                () -> createSplitReader(configuration, mySqlSourceReaderContext),
                 recordEmitter,
                 readerContext.getConfiguration(),
-                readerContext,
+                mySqlSourceReaderContext,
                 configuration);
     }
 
-    private MySqlSplitReader createSplitReader(MySqlSourceConfig configuration) {
-        return new MySqlSplitReader(configuration, 0);
+    private MySqlSplitReader createSplitReader(
+            MySqlSourceConfig configuration, MySqlSourceReaderContext readerContext) {
+        return new MySqlSplitReader(configuration, 0, readerContext);
     }
 
     private void makeBinlogEventsInOneTransaction(MySqlSourceConfig sourceConfig, String tableId)

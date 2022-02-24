@@ -22,6 +22,7 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
+import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -101,6 +102,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 2:
                 return deserializeLegacyPendingSplitsState(serialized);
             case 3:
+            case 4:
                 return deserializePendingSplitsState(serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -150,7 +152,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeMySqlSplits(state.getRemainingSplits(), out);
         writeAssignedSnapshotSplits(state.getAssignedSplits(), out);
         writeFinishedOffsets(state.getSplitFinishedOffsets(), out);
-        out.writeBoolean(state.isAssignerFinished());
+        out.writeInt(state.getSnapshotAssignerStatus().getStatusCode());
         writeTableIds(state.getRemainingTables(), out);
         out.writeBoolean(state.isTableIdCaseSensitive());
     }
@@ -177,13 +179,20 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, BinlogOffset> finishedOffsets = readFinishedOffsets(splitVersion, in);
+        AssignerStatus assignerStatus;
         boolean isAssignerFinished = in.readBoolean();
+        if (isAssignerFinished) {
+            assignerStatus = AssignerStatus.INITIAL_ASSIGNING_FINISHED;
+        } else {
+            assignerStatus = AssignerStatus.INITIAL_ASSIGNING;
+        }
+
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSplits,
                 assignedSnapshotSplits,
                 finishedOffsets,
-                isAssignerFinished,
+                assignerStatus,
                 new ArrayList<>(),
                 false,
                 false);
@@ -204,7 +213,17 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, BinlogOffset> finishedOffsets = readFinishedOffsets(splitVersion, in);
-        boolean isAssignerFinished = in.readBoolean();
+        AssignerStatus assignerStatus;
+        if (splitVersion < 4) {
+            boolean isAssignerFinished = in.readBoolean();
+            if (isAssignerFinished) {
+                assignerStatus = AssignerStatus.INITIAL_ASSIGNING_FINISHED;
+            } else {
+                assignerStatus = AssignerStatus.INITIAL_ASSIGNING;
+            }
+        } else {
+            assignerStatus = AssignerStatus.fromStatusCode(in.readInt());
+        }
         List<TableId> remainingTableIds = readTableIds(in);
         boolean isTableIdCaseSensitive = in.readBoolean();
         return new SnapshotPendingSplitsState(
@@ -212,7 +231,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 remainingSplits,
                 assignedSnapshotSplits,
                 finishedOffsets,
-                isAssignerFinished,
+                assignerStatus,
                 remainingTableIds,
                 isTableIdCaseSensitive,
                 true);

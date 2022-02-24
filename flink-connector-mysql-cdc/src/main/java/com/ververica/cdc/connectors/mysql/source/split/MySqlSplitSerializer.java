@@ -49,7 +49,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
 
     public static final MySqlSplitSerializer INSTANCE = new MySqlSplitSerializer();
 
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -119,6 +119,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             case 1:
             case 2:
             case 3:
+            case 4:
                 return deserializeSplit(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -156,7 +157,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     readFinishedSplitsInfo(version, in);
             Map<TableId, TableChange> tableChangeMap = readTableSchemas(version, in);
             int totalFinishedSplitSize = finishedSplitsInfo.size();
-            if (version == 3) {
+            if (version > 3) {
                 totalFinishedSplitSize = in.readInt();
             }
             in.releaseArrays();
@@ -202,6 +203,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     break;
                 case 2:
                 case 3:
+                case 4:
                     final int len = in.readInt();
                     final byte[] bytes = new byte[len];
                     in.read(bytes);

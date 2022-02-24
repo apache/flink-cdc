@@ -23,13 +23,13 @@ import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -45,48 +45,49 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
-import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
-/** End-to-end tests for postgres-cdc connector uber jar. */
-public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
+/** End-to-end tests for sqlserver-cdc connector uber jar. */
+public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PostgresE2eITCase.class);
-    private static final String PG_TEST_USER = "postgres";
-    private static final String PG_TEST_PASSWORD = "postgres";
-    protected static final String PG_DRIVER_CLASS = "org.postgresql.Driver";
-    private static final String INTER_CONTAINER_PG_ALIAS = "postgres";
+    private static final Logger LOG = LoggerFactory.getLogger(SqlServerE2eITCase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
-    private static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
-
-    private static final Path postgresCdcJar = TestUtils.getResource("postgres-cdc-connector.jar");
+    private static final String INTER_CONTAINER_SQL_SERVER_ALIAS = "mssqlserver";
+    private static final Path sqlServerCdcJar =
+            TestUtils.getResource("sqlserver-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @ClassRule
-    public static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(PG_IMAGE)
-                    .withDatabaseName("postgres")
-                    .withUsername(PG_TEST_USER)
-                    .withPassword(PG_TEST_PASSWORD)
+    @Rule
+    public MSSQLServerContainer sqlServer =
+            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
+                    .withPassword("Password!")
+                    .withEnv("MSSQL_AGENT_ENABLED", "true")
+                    .withEnv("MSSQL_PID", "Standard")
                     .withNetwork(NETWORK)
-                    .withNetworkAliases(INTER_CONTAINER_PG_ALIAS)
+                    .withNetworkAliases(INTER_CONTAINER_SQL_SERVER_ALIAS)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Before
     public void before() {
         super.before();
-        initializePostgresTable("postgres_inventory");
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(sqlServer)).join();
+        LOG.info("Containers are started.");
+        initializeSqlServerTable("sqlserver_inventory");
     }
 
     @After
     public void after() {
+        if (sqlServer != null) {
+            sqlServer.stop();
+        }
         super.after();
     }
 
     @Test
-    public void testPostgresCDC() throws Exception {
+    public void testSqlServerCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
                         "CREATE TABLE products_source (",
@@ -96,16 +97,14 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                         " weight DECIMAL(10,3),",
                         " primary key (`id`) not enforced",
                         ") WITH (",
-                        " 'connector' = 'postgres-cdc',",
-                        " 'hostname' = '" + INTER_CONTAINER_PG_ALIAS + "',",
-                        " 'port' = '" + POSTGRESQL_PORT + "',",
-                        " 'username' = '" + PG_TEST_USER + "',",
-                        " 'password' = '" + PG_TEST_PASSWORD + "',",
-                        " 'database-name' = '" + POSTGRES.getDatabaseName() + "',",
-                        " 'schema-name' = 'inventory',",
-                        " 'table-name' = 'products',",
-                        // dropping the slot allows WAL segments to be discarded by the database
-                        " 'debezium.slot.drop_on_stop' = 'true'",
+                        " 'connector' = 'sqlserver-cdc',",
+                        " 'hostname' = '" + INTER_CONTAINER_SQL_SERVER_ALIAS + "',",
+                        " 'port' = '" + sqlServer.MS_SQL_SERVER_PORT + "',",
+                        " 'username' = '" + sqlServer.getUsername() + "',",
+                        " 'password' = '" + sqlServer.getPassword() + "',",
+                        " 'database-name' = 'inventory',",
+                        " 'schema-name' = 'dbo',",
+                        " 'table-name' = 'products'",
                         ");",
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
@@ -126,23 +125,24 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, postgresCdcJar, jdbcJar, mysqlDriverJar);
+        submitSQLJob(sqlLines, sqlServerCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate binlogs
-        try (Connection conn = getPgJdbcConnection();
+        try (Connection conn = getSqlServerJdbcConnection();
                 Statement statement = conn.createStatement()) {
+
             statement.execute(
-                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
-            statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
+                    "UPDATE inventory.dbo.products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE inventory.dbo.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('jacket','water resistent white wind breaker',0.2);"); // 110
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+                    "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
-            statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
-            statement.execute("DELETE FROM inventory.products WHERE id=111;");
+                    "UPDATE inventory.dbo.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE inventory.dbo.products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM inventory.dbo.products WHERE id=111;");
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
@@ -176,20 +176,11 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                 60000L);
     }
 
-    /**
-     * Executes a JDBC statement using the default jdbc config without autocommitting the
-     * connection.
-     */
-    private void initializePostgresTable(String sqlFile) {
+    private void initializeSqlServerTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
-        final URL ddlTestFile = PostgresE2eITCase.class.getClassLoader().getResource(ddlFile);
+        final URL ddlTestFile = SqlServerE2eITCase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-        try {
-            Class.forName(PG_DRIVER_CLASS);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-        try (Connection connection = getPgJdbcConnection();
+        try (Connection connection = getSqlServerJdbcConnection();
                 Statement statement = connection.createStatement()) {
             final List<String> statements =
                     Arrays.stream(
@@ -213,8 +204,8 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
         }
     }
 
-    private Connection getPgJdbcConnection() throws SQLException {
+    private Connection getSqlServerJdbcConnection() throws SQLException {
         return DriverManager.getConnection(
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                sqlServer.getJdbcUrl(), sqlServer.getUsername(), sqlServer.getPassword());
     }
 }

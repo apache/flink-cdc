@@ -190,6 +190,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should scan the newly added tables or not. */
+    public MySqlSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
+        this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should output transaction metadata or not. */
     public MySqlSourceBuilder<T> includeTransactionMetadata(boolean includeTransactionMetadata) {
         this.configFactory.includeTransactionMetadata(includeTransactionMetadata);

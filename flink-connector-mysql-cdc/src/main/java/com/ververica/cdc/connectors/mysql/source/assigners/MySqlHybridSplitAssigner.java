@@ -39,6 +39,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isInitialAssigningFinished;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningFinished;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
+
 /**
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
  * range and chunk size and also continue with a binlog split.
@@ -93,17 +97,25 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public Optional<MySqlSplit> getNext() {
+        if (isSuspended(getAssignerStatus())) {
+            // do not assign split until the assigner received SuspendBinlogReaderAckEvent
+            return Optional.empty();
+        }
         if (snapshotSplitAssigner.noMoreSplits()) {
             // binlog split assigning
             if (isBinlogSplitAssigned) {
                 // no more splits for the assigner
                 return Optional.empty();
-            } else if (snapshotSplitAssigner.isFinished()) {
+            } else if (isInitialAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
                 // we need to wait snapshot-assigner to be finished before
                 // assigning the binlog split. Otherwise, records emitted from binlog split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isBinlogSplitAssigned = true;
                 return Optional.of(createBinlogSplit());
+            } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
+                // do not need to create binlog, but send event to wake up the binlog reader
+                isBinlogSplitAssigned = true;
+                return Optional.empty();
             } else {
                 // binlog split is not ready by now
                 return Optional.empty();
@@ -152,6 +164,21 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         snapshotSplitAssigner.notifyCheckpointComplete(checkpointId);
+    }
+
+    @Override
+    public AssignerStatus getAssignerStatus() {
+        return snapshotSplitAssigner.getAssignerStatus();
+    }
+
+    @Override
+    public void suspend() {
+        snapshotSplitAssigner.suspend();
+    }
+
+    @Override
+    public void wakeup() {
+        snapshotSplitAssigner.wakeup();
     }
 
     @Override

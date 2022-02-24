@@ -96,9 +96,9 @@ SELECT * FROM products;
 
 **Note that** 
 
-MongoDB's change event record doesn't have update before message. So, we can only convert it to Flink's UPSERT changelog stream.
+MongoDB's change event record doesn't have updated before message. So, we can only convert it to Flink's UPSERT changelog stream.
 An upsert stream requires a unique key, so we must declare `_id` as primary key. 
-We can't declare other column as primary key, becauce delete operation do not contain's the key and value besides `_id` and `sharding key`.
+We can't declare other column as primary key, because delete operation does not contain the key and value besides `_id` and `sharding key`.
 
 Connector Options
 ----------------
@@ -247,8 +247,8 @@ Connector Options
 </table>
 </div>
 
-Note: `heartbeat.interval.ms` is highly recommended to set a proper value larger than 0 **if the collection changes slowly**.
-The heartbeat event can pushing the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from a checkpoint or savepoint.
+Note: `heartbeat.interval.ms` is highly recommended setting a proper value larger than 0 **if the collection changes slowly**.
+The heartbeat event can push the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from a checkpoint or savepoint.
 
 Available Metadata
 ----------------
@@ -329,14 +329,14 @@ copy.existing.pipeline=[ { "$match": { "closed": "false" } } ]
 
 ### Change Streams
 
-We integrates the [MongoDB's official Kafka Connector](https://docs.mongodb.com/kafka-connector/current/kafka-source/) to read snapshot or change events from MongoDB and drive it by Debezium's `EmbeddedEngine`.
+We integrate the [MongoDB's official Kafka Connector](https://docs.mongodb.com/kafka-connector/current/kafka-source/) to read snapshot or change events from MongoDB and drive it by Debezium's `EmbeddedEngine`.
 
-Debezium's `EmbeddedEngine` provides a mechanism for running a single Kafka Connect `SourceConnector` within an application's process and it can drive any standard Kafka Connect `SourceConnector` properly even which is not provided by Debezium.
+Debezium's `EmbeddedEngine` provides a mechanism for running a single Kafka Connect `SourceConnector` within an application's process, and it can drive any standard Kafka Connect `SourceConnector` properly even which is not provided by Debezium.
 
-We choose **MongoDB's official Kafka Connector** instead of the **Debezium's MongoDB Connector** cause they use a different change data capture mechanism.
+We choose **MongoDB's official Kafka Connector** instead of the **Debezium's MongoDB Connector** because they use a different change data capture mechanism.
 
-- For Debezium's MongoDB Connector, it read the `oplog.rs` collection of each replica-set's master node.
-- For MongoDB's Kafka Connector, it subscribe `Change Stream` of MongoDB.
+- For Debezium's MongoDB Connector, it reads the `oplog.rs` collection of each replica-set's master node.
+- For MongoDB's Kafka Connector, it subscribes `Change Stream` of MongoDB.
 
 MongoDB's `oplog.rs` collection doesn't keep the changed record's update before state, so it's hard to extract the full document state by a single `oplog.rs` record and convert it to change log stream accepted by Flink (Insert Only, Upsert, All).
 Additionally, MongoDB 5 (released in July 2021) has changed the oplog format, so the current Debezium connector cannot be used with it.
