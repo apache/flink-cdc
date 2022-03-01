@@ -185,8 +185,6 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                                 .next()
                                 .toByteString();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         } finally {
             scanClient.close();
         }
