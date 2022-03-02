@@ -41,6 +41,7 @@ public class MySqlSnapshotSplitState extends MySqlSplitState {
         this.highWatermark = highWatermark;
     }
 
+    @Override
     public MySqlSnapshotSplit toMySqlSplit() {
         final MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
         return new MySqlSnapshotSplit(

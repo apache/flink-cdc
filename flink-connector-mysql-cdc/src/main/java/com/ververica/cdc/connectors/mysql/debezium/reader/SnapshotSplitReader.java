@@ -87,6 +87,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         this.reachEnd = new AtomicBoolean(false);
     }
 
+    @Override
     public void submitSplit(MySqlSplit mySqlSplit) {
         this.currentSnapshotSplit = mySqlSplit.asSnapshotSplit();
         statefulTaskContext.configure(currentSnapshotSplit);

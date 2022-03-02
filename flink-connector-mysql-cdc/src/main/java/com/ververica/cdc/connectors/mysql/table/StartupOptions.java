@@ -67,6 +67,10 @@ public final class StartupOptions implements Serializable {
                 StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null, null);
     }
 
+    /**
+     * Never to perform snapshot on the monitored database tables upon first startup, and directly
+     * read binlog from the specified gtid.
+     */
     public static StartupOptions specificGtid(String specificGtid) {
         return new StartupOptions(StartupMode.SPECIFIC_GTID, null, null, null, specificGtid);
     }

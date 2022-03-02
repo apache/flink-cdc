@@ -220,7 +220,7 @@ public class DebeziumChangeFetcher<T> {
             SourceRecord record = event.value();
             updateMessageTimestamp(record);
             fetchDelay = isInDbSnapshotPhase ? 0L : processTime - messageTimestamp;
-                Map<String, ?> newSourceOffset = addSourceOffsetFields(record);
+            Map<String, ?> newSourceOffset = addSourceOffsetFields(record);
 
             if (isHeartbeatEvent(record)) {
                 // keep offset update
