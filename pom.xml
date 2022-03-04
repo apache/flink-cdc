@@ -45,7 +45,6 @@ under the License.
         <module>flink-sql-connector-mongodb-cdc</module>
         <module>flink-sql-connector-oracle-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
-        <module>flink-format-changelog-json</module>
         <module>flink-cdc-e2e-tests</module>
     </modules>
 
