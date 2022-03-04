@@ -323,6 +323,7 @@ under the License.
                     <configLocation>/tools/maven/checkstyle.xml</configLocation>
                     <logViolationsToConsole>true</logViolationsToConsole>
                     <failOnViolation>true</failOnViolation>
+                    <excludes>**/org/tikv/common/**/*</excludes>
                 </configuration>
             </plugin>
 
