@@ -26,6 +26,11 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.tidb.TiKVChangeEventDeserializationSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
+import org.tikv.common.exception.RowValueHasMoreColumnException;
 import org.tikv.common.key.RowKey;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Cdcpb.Event.Row;
@@ -41,76 +46,113 @@ public class RowDataTiKVChangeEventDeserializationSchema
         implements TiKVChangeEventDeserializationSchema<RowData> {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG =
+            LoggerFactory.getLogger(RowDataTiKVChangeEventDeserializationSchema.class);
 
     /** TypeInformation of the produced {@link RowData}. * */
     private final TypeInformation<RowData> resultTypeInfo;
 
+    /** Configuration of TiKV. * */
+    private final TiConfiguration tiConf;
+
+    private final String database;
+    private final String tableName;
+
+    private transient TiSession session = null;
+
     /** Information of the TiKV table. * */
-    private final TiTableInfo tableInfo;
+    private transient TiTableInfo tableInfo = null;
 
     public RowDataTiKVChangeEventDeserializationSchema(
-            TypeInformation<RowData> resultTypeInfo, TiTableInfo tableInfo) {
+            TypeInformation<RowData> resultTypeInfo,
+            TiConfiguration tiConf,
+            String database,
+            String tableName) {
+
         this.resultTypeInfo = resultTypeInfo;
-        this.tableInfo = tableInfo;
+        this.tiConf = tiConf;
+        this.database = database;
+        this.tableName = tableName;
+        try {
+            this.session = TiSession.create(tiConf);
+            this.tableInfo = this.session.getCatalog().getTable(database, tableName);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException(e);
+        }
     }
 
     @Override
     public void deserialize(Row row, Collector<RowData> out) throws Exception {
-        final RowKey rowKey = RowKey.decode(row.getKey().toByteArray());
-        final long handle = rowKey.getHandle();
-        switch (row.getOpType()) {
-            case DELETE:
-                out.collect(
-                        GenericRowData.ofKind(
-                                RowKind.DELETE,
-                                getObjectsWithDataTypes(
-                                        decodeObjects(
-                                                row.getOldValue().toByteArray(), handle, tableInfo),
-                                        tableInfo)));
-                break;
-            case PUT:
-                try {
-                    if (row.getOldValue() == null) {
+        for (int i = 0; i < 2; i++) {
+            try {
+                final RowKey rowKey = RowKey.decode(row.getKey().toByteArray());
+                final long handle = rowKey.getHandle();
+                switch (row.getOpType()) {
+                    case DELETE:
                         out.collect(
                                 GenericRowData.ofKind(
-                                        RowKind.INSERT,
-                                        getRowDataFields(
-                                                row.getValue().toByteArray(), handle, tableInfo)));
+                                        RowKind.DELETE,
+                                        getObjectsWithDataTypes(
+                                                decodeObjects(
+                                                        row.getOldValue().toByteArray(),
+                                                        handle,
+                                                        tableInfo,
+                                                        true),
+                                                tableInfo)));
+                        break;
+                    case PUT:
+                        try {
+                            if (row.getOldValue() == null) {
+                                out.collect(
+                                        GenericRowData.ofKind(
+                                                RowKind.INSERT,
+                                                getRowDataFields(
+                                                        row.getValue().toByteArray(),
+                                                        handle,
+                                                        tableInfo)));
 
-                    } else {
-                        // TODO TiKV cdc client doesn't return old value in PUT event
-                        //                        if (!row.getOldValue().isEmpty()) {
-                        //                            out.collect(
-                        //                                    GenericRowData.ofKind(
-                        //                                            RowKind.UPDATE_BEFORE,
-                        //                                            getRowDataFields(
-                        //
-                        // row.getOldValue().toByteArray(),
-                        //                                                    handle,
-                        //                                                    tableInfo)));
-                        //                        }
-                        out.collect(
-                                GenericRowData.ofKind(
-                                        RowKind.UPDATE_AFTER,
-                                        getRowDataFields(
-                                                row.getValue().toByteArray(), handle, tableInfo)));
-                    }
-                    break;
-                } catch (final RuntimeException e) {
-                    throw new FlinkRuntimeException(
-                            String.format(
-                                    "Fail to deserialize row: %s, table: %s",
-                                    row, tableInfo.getId()),
-                            e);
+                            } else {
+                                // TODO TiKV cdc client doesn't return old value in PUT event
+                                //                        if (!row.getOldValue().isEmpty()) {
+                                //                            out.collect(
+                                //                                    GenericRowData.ofKind(
+                                //                                            RowKind.UPDATE_BEFORE,
+                                //                                            getRowDataFields(
+                                //
+                                // row.getOldValue().toByteArray(),
+                                //                                                    handle,
+                                //                                                    tableInfo)));
+                                //                        }
+                                out.collect(
+                                        GenericRowData.ofKind(
+                                                RowKind.UPDATE_AFTER,
+                                                getRowDataFields(
+                                                        row.getValue().toByteArray(),
+                                                        handle,
+                                                        tableInfo)));
+                            }
+                            break;
+                        } catch (final RuntimeException e) {
+                            throw new FlinkRuntimeException(
+                                    String.format(
+                                            "Fail to deserialize row: %s, table: %s",
+                                            row, tableInfo.getId()),
+                                    e);
+                        }
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unknown Row Op Type: " + row.getOpType().toString());
                 }
-            default:
-                throw new IllegalArgumentException(
-                        "Unknown Row Op Type: " + row.getOpType().toString());
+            } catch (RowValueHasMoreColumnException e) {
+                LOG.warn(
+                        "Row value has more column than TableInfo, reload TableInfo and try again");
+                tableInfo = session.getCatalog().getTable(database, tableName);
+            }
         }
     }
 
     private static Object[] getRowDataFields(byte[] value, Long handle, TiTableInfo tableInfo) {
-        return getObjectsWithDataTypes(decodeObjects(value, handle, tableInfo), tableInfo);
+        return getObjectsWithDataTypes(decodeObjects(value, handle, tableInfo, true), tableInfo);
     }
 
     @Override
