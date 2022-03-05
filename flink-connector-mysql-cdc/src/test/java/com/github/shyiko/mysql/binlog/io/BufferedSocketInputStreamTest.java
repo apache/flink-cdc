@@ -20,6 +20,8 @@ package com.github.shyiko.mysql.binlog.io;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+
 import static org.junit.Assert.assertEquals;
 
 /** Unit test for {@link BufferedSocketInputStream}. */
@@ -33,21 +35,19 @@ public class BufferedSocketInputStreamTest {
                                 new byte[] {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}));
         byte[] buf = new byte[3];
         assertEquals(3, in.read(buf, 0, buf.length));
-        assertCharBytesEquals(new byte[] {'A', 'B', 'C'}, buf);
+        Arrays.equals(new byte[] {'A', 'B', 'C'}, buf);
+        assertEquals(5, in.available());
 
         assertEquals(3, in.read(buf, 0, buf.length));
-        assertCharBytesEquals(new byte[] {'D', 'E', 'F'}, buf);
+        Arrays.equals(new byte[] {'D', 'E', 'F'}, buf);
+        assertEquals(2, in.available());
 
         assertEquals(2, in.read(buf, 0, buf.length));
-        assertCharBytesEquals(new byte[] {'G', 'H'}, buf);
+        Arrays.equals(new byte[] {'G', 'H'}, buf);
+        assertEquals(0, in.available());
 
         // reach the end of stream normally
         assertEquals(-1, in.read(buf, 0, buf.length));
-    }
-
-    private static void assertCharBytesEquals(byte[] expected, byte[] actual) {
-        for (int i = 0; i < expected.length; i++) {
-            assertEquals(expected[i], actual[i]);
-        }
+        assertEquals(0, in.available());
     }
 }

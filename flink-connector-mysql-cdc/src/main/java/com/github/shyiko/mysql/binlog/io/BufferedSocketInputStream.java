@@ -26,8 +26,9 @@ import java.io.InputStream;
  * Copied from https://github.com/osheroff/mysql-binlog-connector-java project to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/460.
  *
- * <p>We should remove this class after we bumped a higher mysql-binlog-connector-java version where
- * the https://github.com/osheroff/mysql-binlog-connector-java/issues/66 has been fixed.
+ * <p>Line 50 and Line 70 ~ 72: Returns -1 means reach the end of InputStream. We should remove this
+ * class after we bumped a higher mysql-binlog-connector-java version where the
+ * https://github.com/osheroff/mysql-binlog-connector-java/issues/66 has been fixed.
  */
 public class BufferedSocketInputStream extends FilterInputStream {
 
@@ -46,7 +47,7 @@ public class BufferedSocketInputStream extends FilterInputStream {
 
     @Override
     public int available() throws IOException {
-        return limit - offset + in.available();
+        return limit == -1 ? in.available() : limit - offset + in.available();
     }
 
     @Override
