@@ -21,7 +21,7 @@ package com.ververica.cdc.connectors.oceanbase;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichParallelSourceFunction;
+import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
 import com.ververica.cdc.connectors.oceanbase.table.OceanBaseTableSourceFactory;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
@@ -130,7 +130,7 @@ public class OceanBaseSource {
                             startupMode + " mode is not supported.");
             }
 
-            return new OceanBaseRichParallelSourceFunction<T>(
+            return new OceanBaseRichSourceFunction<T>(
                     startupMode.equals(OceanBaseTableSourceFactory.StartupMode.INITIAL),
                     username,
                     password,

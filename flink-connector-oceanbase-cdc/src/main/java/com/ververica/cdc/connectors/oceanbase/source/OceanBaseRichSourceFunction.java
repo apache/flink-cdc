@@ -68,13 +68,12 @@ import java.util.stream.Collectors;
  *
  * @param <T> The type created by the deserializer.
  */
-public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T>
+public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         implements CheckpointListener, CheckpointedFunction, ResultTypeQueryable<T> {
 
     private static final long serialVersionUID = 2844054619864617340L;
 
-    private static final Logger LOG =
-            LoggerFactory.getLogger(OceanBaseRichParallelSourceFunction.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseRichSourceFunction.class);
 
     private final boolean snapshot;
     private final String username;
@@ -99,7 +98,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
     private transient ListState<Long> offsetState;
     private transient OutputCollector<T> outputCollector;
 
-    public OceanBaseRichParallelSourceFunction(
+    public OceanBaseRichSourceFunction(
             boolean snapshot,
             String username,
             String password,
