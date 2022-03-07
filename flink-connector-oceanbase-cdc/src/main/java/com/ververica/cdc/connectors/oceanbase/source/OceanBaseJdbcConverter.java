@@ -38,8 +38,8 @@ import java.sql.Types;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 
-/** Utils to get jdbc type and value of a field. */
-public class OceanBaseJdbcReader {
+/** Utils to convert jdbc type and value of a field. */
+public class OceanBaseJdbcConverter {
 
     public static ValueConverterProvider valueConverterProvider() {
         return new JdbcValueConverters(

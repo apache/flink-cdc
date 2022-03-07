@@ -22,10 +22,10 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 
-/** Utils to build source info of record. */
-public class OceanBaseSourceInfo {
+/** Utils to deal with OceanBase SourceRecord schema. */
+public class OceanBaseSchemaUtils {
 
-    public static Schema schema() {
+    public static Schema sourceSchema() {
         return SchemaBuilder.struct()
                 .field("tenant", Schema.STRING_SCHEMA)
                 .field("database", Schema.STRING_SCHEMA)
@@ -35,10 +35,10 @@ public class OceanBaseSourceInfo {
                 .build();
     }
 
-    public static Struct struct(
+    public static Struct sourceStruct(
             String tenant, String database, String table, String timestamp, String uniqueId) {
         Struct struct =
-                new Struct(schema())
+                new Struct(sourceSchema())
                         .put("tenant", tenant)
                         .put("database", database)
                         .put("table", table);

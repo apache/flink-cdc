@@ -197,7 +197,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         for (int i = 0; i < metaData.getColumnCount(); i++) {
             columnNames[i] = metaData.getColumnName(i + 1);
             jdbcTypes[i] =
-                    OceanBaseJdbcReader.getType(
+                    OceanBaseJdbcConverter.getType(
                             metaData.getColumnType(i + 1), metaData.getColumnTypeName(i + 1));
         }
 
@@ -209,14 +209,15 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             tableSchemaMap.put(topicName, tableSchema);
         }
 
-        Struct source = OceanBaseSourceInfo.struct(tenantName, databaseName, tableName, null, null);
+        Struct source =
+                OceanBaseSchemaUtils.sourceStruct(tenantName, databaseName, tableName, null, null);
 
         while (rs.next()) {
             Struct value = new Struct(tableSchema.valueSchema());
             for (int i = 0; i < metaData.getColumnCount(); i++) {
                 value.put(
                         columnNames[i],
-                        OceanBaseJdbcReader.getField(jdbcTypes[i], rs.getObject(i + 1)));
+                        OceanBaseJdbcConverter.getField(jdbcTypes[i], rs.getObject(i + 1)));
             }
             Struct struct = tableSchema.getEnvelopeSchema().create(value, source, null);
             deserializer.deserialize(
@@ -332,7 +333,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
                     continue;
                 }
                 columnNames[i] = field.getFieldname();
-                jdbcTypes[i] = OceanBaseJdbcReader.getType(field.getType());
+                jdbcTypes[i] = OceanBaseJdbcConverter.getType(field.getType());
                 i++;
             }
             TableSchema tableSchema =
@@ -342,7 +343,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
         }
 
         Struct source =
-                OceanBaseSourceInfo.struct(
+                OceanBaseSchemaUtils.sourceStruct(
                         tenantName,
                         databaseName,
                         message.getTableName(),
@@ -430,7 +431,7 @@ public class OceanBaseRichParallelSourceFunction<T> extends RichSourceFunction<T
             try {
                 Schema fieldSchema = tableSchema.valueSchema().field(field.getFieldname()).schema();
                 fieldValue =
-                        OceanBaseJdbcReader.getField(
+                        OceanBaseJdbcConverter.getField(
                                 fieldSchema.type(), field.getType(), field.getValue());
                 value.put(field.getFieldname(), fieldValue);
             } catch (NumberFormatException e) {

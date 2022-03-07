@@ -40,10 +40,10 @@ public class OceanBaseTableSchema {
 
     public static TableSchemaBuilder tableSchemaBuilder() {
         return new TableSchemaBuilder(
-                OceanBaseJdbcReader.valueConverterProvider(),
+                OceanBaseJdbcConverter.valueConverterProvider(),
                 SchemaNameAdjuster.create(),
                 new CustomConverterRegistry(null),
-                OceanBaseSourceInfo.schema(),
+                OceanBaseSchemaUtils.sourceSchema(),
                 false);
     }
 
@@ -111,7 +111,7 @@ public class OceanBaseTableSchema {
         return Envelope.defineSchema()
                 .withName(name)
                 .withRecord(valueSchema)
-                .withSource(OceanBaseSourceInfo.schema())
+                .withSource(OceanBaseSchemaUtils.sourceSchema())
                 .build();
     }
 
