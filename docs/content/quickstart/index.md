@@ -7,4 +7,5 @@ mysql-postgres-tutorial
 mongodb-tutorial
 oracle-tutorial
 build-real-time-data-lake-tutorial
+sqlserver-tutorial
 ```

@@ -13,25 +13,22 @@ The Flink CDC Connectors integrates Debezium as the engine to capture data chang
 | PostgreSQL | Database: 9.6, 10, 11, 12 <br/>JDBC Driver: 42.2.12|
 | MongoDB | Database: 3.6, 4.x, 5.0 <br/>MongoDB Driver: 4.3.1|
 | Oracle | Database: 11, 12, 19 <br/>Oracle Driver: 19.3.0.0|
-| OceanBase CE | Database: 3.1.0 or later <br/>JDBC Driver: MySQL Driver 5.1.47 |
-
-## Supported Formats
-
-| Format | Supported Connector | Flink Version |
-| --- | --- | --- |
-| <a href="https://github.com/ververica/flink-cdc-connectors/wiki/Changelog-JSON-Format">Changelog Json</a> | <a href="https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/connectors/kafka.html">Apache Kafka</a> | 1.11+ |
+| Sqlserver | Database: 2017, 2019 <br/>JDBC Driver: 7.2.2.jre8|
+| OceanBase CE | Database: 3.1.0 or later <br/>JDBC Driver: MySQL Driver 5.1.4x |
 
 ## Supported Flink Versions 
-The version mapping between Flink CDC Connectors and Flink.
-| Flink CDC Connector Version | Flink Version |
-| --- | --- |
-|1.0.0 | 1.11.* |
-|1.1.0 | 1.11.* |
-|1.2.0 | 1.12.* |
-|1.3.0 | 1.12.* |
-|1.4.0 | 1.13.* |
-|2.0.* | 1.13.* |
-|2.1.* | 1.13.* |
+The following table shows the version mapping between Flink CDC Connectors and Flink:
+
+| Flink CDC Version | Flink Version |
+|:---:|:---:|
+| <font color="DarkCyan">1.0.0</font> | <font color="MediumVioletRed">1.11.*</font> |
+| <font color="DarkCyan">1.1.0</font> | <font color="MediumVioletRed">1.11.*</font> |
+| <font color="DarkCyan">1.2.0</font> | <font color="MediumVioletRed">1.12.*</font> |
+| <font color="DarkCyan">1.3.0</font> | <font color="MediumVioletRed">1.12.*</font> |
+| <font color="DarkCyan">1.4.0</font> | <font color="MediumVioletRed">1.13.*</font> |
+| <font color="DarkCyan">2.0.*</font> | <font color="MediumVioletRed">1.13.*</font> |
+| <font color="DarkCyan">2.1.*</font> | <font color="MediumVioletRed">1.13.*</font> |
+| <font color="DarkCyan">2.2.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font> |
 
 ## Features
 

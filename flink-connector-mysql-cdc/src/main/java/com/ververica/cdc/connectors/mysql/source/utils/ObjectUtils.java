@@ -83,9 +83,11 @@ public class ObjectUtils {
      */
     @SuppressWarnings("unchecked")
     public static int compare(Object obj1, Object obj2) {
-        Comparable<Object> c1 = (Comparable<Object>) obj1;
-        Comparable<Object> c2 = (Comparable<Object>) obj2;
-        return c1.compareTo(c2);
+        if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
+            return ((Comparable) obj1).compareTo(obj2);
+        } else {
+            return obj1.toString().compareTo(obj2.toString());
+        }
     }
 
     /**

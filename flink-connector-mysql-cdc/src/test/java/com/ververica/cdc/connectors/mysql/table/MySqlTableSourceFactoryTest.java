@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.mysql.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -30,7 +31,6 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.ExceptionUtils;
 
 import org.junit.Test;
@@ -54,7 +54,6 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -101,7 +100,7 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -140,7 +139,7 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -176,7 +175,7 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -210,7 +209,7 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -239,6 +238,7 @@ public class MySqlTableSourceFactoryTest {
         options.put("port", "3307");
         options.put("server-id", "4321");
         options.put("server-time-zone", "Asia/Shanghai");
+        options.put("scan.newly-added-table.enabled", "true");
         options.put("debezium.snapshot.mode", "never");
 
         DynamicTableSource actualSource = createTableSource(options);
@@ -246,7 +246,7 @@ public class MySqlTableSourceFactoryTest {
         dbzProperties.put("snapshot.mode", "never");
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         3307,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -265,7 +265,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -302,7 +303,7 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -367,7 +368,7 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -404,8 +405,7 @@ public class MySqlTableSourceFactoryTest {
 
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        TableSchemaUtils.getPhysicalSchema(
-                                fromResolvedSchema(SCHEMA_WITH_METADATA)),
+                        SCHEMA_WITH_METADATA,
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -644,7 +644,7 @@ public class MySqlTableSourceFactoryTest {
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(schema).toSchema(),
+                                Schema.newBuilder().fromResolvedSchema(schema).build(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),

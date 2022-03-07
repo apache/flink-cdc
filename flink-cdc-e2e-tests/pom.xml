@@ -30,7 +30,8 @@ under the License.
     <packaging>jar</packaging>
 
     <properties>
-        <flink-1.13>1.13.3</flink-1.13>
+        <flink-1.13>1.13.5</flink-1.13>
+        <flink-1.14>1.14.3</flink-1.14>
         <mysql.driver.version>8.0.27</mysql.driver.version>
     </properties>
 
@@ -78,6 +79,13 @@ under the License.
         </dependency>
         <dependency>
             <groupId>com.ververica</groupId>
+            <artifactId>flink-connector-sqlserver-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-connector-test-util</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -99,6 +107,12 @@ under the License.
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>oracle-xe</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mssqlserver</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
@@ -173,7 +187,18 @@ under the License.
                             <groupId>org.apache.flink</groupId>
                             <artifactId>flink-connector-jdbc_2.11</artifactId>
                             <version>${flink-1.13}</version>
-                            <destFileName>jdbc-connector.jar</destFileName>
+                            <destFileName>jdbc-connector_${flink-1.13}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc_2.11</artifactId>
+                            <version>${flink-1.14}</version>
+                            <destFileName>jdbc-connector_${flink-1.14}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
@@ -214,6 +239,16 @@ under the License.
                             <artifactId>flink-sql-connector-oracle-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>oracle-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ververica</groupId>
+                            <artifactId>flink-sql-connector-sqlserver-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>sqlserver-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

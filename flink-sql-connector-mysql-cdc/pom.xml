@@ -67,6 +67,8 @@ under the License.
                                     <include>com.google.guava:*</include>
                                     <include>com.esri.geometry:esri-geometry-api</include>
                                     <include>com.zaxxer:HikariCP</include>
+                                    <!--  Include fixed version 18.0-13.0 of flink shaded guava  -->
+                                    <include>org.apache.flink:flink-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <filters>

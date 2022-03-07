@@ -167,7 +167,7 @@ public class OracleSource {
             }
 
             if (dbzProperties != null) {
-                dbzProperties.forEach(props::put);
+                props.putAll(dbzProperties);
             }
 
             return new DebeziumSourceFunction<>(

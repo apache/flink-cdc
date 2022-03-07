@@ -47,7 +47,6 @@ under the License.
         <module>flink-sql-connector-oracle-cdc</module>
         <module>flink-sql-connector-oceanbase-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
-        <module>flink-format-changelog-json</module>
         <module>flink-cdc-e2e-tests</module>
     </modules>
 
@@ -71,7 +70,7 @@ under the License.
     </distributionManagement>
 
     <properties>
-        <flink.version>1.13.3</flink.version>
+        <flink.version>1.13.5</flink.version>
         <debezium.version>1.5.4.Final</debezium.version>
         <geometry.version>2.2.0</geometry.version>
         <!-- OracleE2eITCase will report "container cannot be accessed" error when running in Azure Pipeline with 1.16.1 testconainters.
@@ -125,6 +124,13 @@ under the License.
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
+        </dependency>
+
+        <!--  Use fixed version 18.0-13.0 of flink shaded guava  -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-shaded-guava</artifactId>
+            <version>18.0-13.0</version>
         </dependency>
 
         <!-- test dependencies -->

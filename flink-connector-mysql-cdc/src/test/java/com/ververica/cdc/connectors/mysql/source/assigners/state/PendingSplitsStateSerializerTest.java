@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.mysql.source.assigners.state;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
@@ -124,7 +125,7 @@ public class PendingSplitsStateSerializerTest {
                 remainingSplits,
                 assignedSnapshotSplits,
                 finishedOffsets,
-                false,
+                AssignerStatus.INITIAL_ASSIGNING,
                 remainingTables,
                 false,
                 true);

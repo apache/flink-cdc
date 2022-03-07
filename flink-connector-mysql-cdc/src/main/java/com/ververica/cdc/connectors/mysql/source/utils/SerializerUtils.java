@@ -54,6 +54,7 @@ public class SerializerUtils {
                 return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : null;
             case 2:
             case 3:
+            case 4:
                 return readBinlogPosition(in);
             default:
                 throw new IOException("Unknown version: " + offsetVersion);

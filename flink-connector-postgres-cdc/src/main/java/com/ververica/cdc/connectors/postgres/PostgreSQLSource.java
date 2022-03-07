@@ -175,7 +175,7 @@ public class PostgreSQLSource {
             }
 
             if (dbzProperties != null) {
-                dbzProperties.forEach(props::put);
+                props.putAll(dbzProperties);
             }
 
             return new DebeziumSourceFunction<>(

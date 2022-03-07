@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.oracle.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -30,7 +31,6 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.ExceptionUtils;
 
 import org.junit.Test;
@@ -42,7 +42,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -94,7 +93,7 @@ public class OracleTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         OracleTableSource expectedSource =
                 new OracleTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -118,7 +117,7 @@ public class OracleTableSourceFactoryTest {
         dbzProperties.put("snapshot.mode", "initial");
         OracleTableSource expectedSource =
                 new OracleTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -140,7 +139,7 @@ public class OracleTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         OracleTableSource expectedSource =
                 new OracleTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -162,7 +161,7 @@ public class OracleTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         OracleTableSource expectedSource =
                 new OracleTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -188,8 +187,7 @@ public class OracleTableSourceFactoryTest {
         actualSource = oracleTableSource.copy();
         OracleTableSource expectedSource =
                 new OracleTableSource(
-                        TableSchemaUtils.getPhysicalSchema(
-                                fromResolvedSchema(SCHEMA_WITH_METADATA)),
+                        SCHEMA_WITH_METADATA,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -293,7 +291,7 @@ public class OracleTableSourceFactoryTest {
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(schema).toSchema(),
+                                Schema.newBuilder().fromResolvedSchema(schema).build(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),

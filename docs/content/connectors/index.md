@@ -7,5 +7,6 @@ mysql-cdc
 postgres-cdc
 mongodb-cdc
 oracle-cdc
+sqlserver-cdc
 oceanbase-cdc
 ```

@@ -32,13 +32,13 @@ import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -51,6 +51,7 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGODB_PORT;
 import static org.junit.Assert.assertNotNull;
@@ -67,35 +68,46 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     private static final Path mongoCdcJar = TestUtils.getResource("mongodb-cdc-connector.jar");
-    private static final Path jdbcJar = TestUtils.getResource("jdbc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @ClassRule
-    public static final MongoDBContainer MONGODB =
-            new MongoDBContainer()
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    private MongoDBContainer mongodb;
 
-    private static MongoClient mongoClient;
+    private MongoClient mongoClient;
 
-    @BeforeClass
-    public static void beforeClass() {
+    @Before
+    public void before() {
+        super.before();
+        // Tips: If you meet issue like 'errmsg" : "No host described in new configuration 1 for
+        // replica set rs0 maps to this node"' when start the container in you local environment,
+        // please check your '/etc/hosts' file contains the line 'internet_ip(not 127.0.0.1)
+        // hostname' e.g: '30.225.0.87   leonard.machine'
+        mongodb =
+                new MongoDBContainer()
+                        .withNetwork(NETWORK)
+                        .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+        Startables.deepStart(Stream.of(mongodb)).join();
+
         executeCommandFileInMongoDB("mongo_setup", "admin");
         MongoClientSettings settings =
                 MongoClientSettings.builder()
                         .applyConnectionString(
                                 new ConnectionString(
-                                        MONGODB.getConnectionString(
+                                        mongodb.getConnectionString(
                                                 MONGO_SUPER_USER, MONGO_SUPER_PASSWORD)))
                         .build();
         mongoClient = MongoClients.create(settings);
     }
 
-    @AfterClass
-    public static void afterClass() {
+    @After
+    public void after() {
+        super.after();
         if (mongoClient != null) {
             mongoClient.close();
+        }
+        if (mongodb != null) {
+            mongodb.stop();
         }
     }
 
@@ -201,8 +213,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     /** Executes a mongo command file, specify a database name. */
-    private static String executeCommandFileInMongoDB(
-            String fileNameIgnoreSuffix, String databaseName) {
+    private String executeCommandFileInMongoDB(String fileNameIgnoreSuffix, String databaseName) {
         final String dbName = databaseName != null ? databaseName : fileNameIgnoreSuffix;
         final String ddlFile = String.format("ddl/%s.js", fileNameIgnoreSuffix);
         final URL ddlTestFile = MongoDBTestBase.class.getClassLoader().getResource(ddlFile);
@@ -222,7 +233,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                                     })
                             .collect(Collectors.joining("\n"));
 
-            MONGODB.executeCommand(command0 + command1);
+            mongodb.executeCommand(command0 + command1);
 
             return dbName;
         } catch (Exception e) {

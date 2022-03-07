@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.mongodb.table;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -28,7 +29,6 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.ExceptionUtils;
 
 import org.junit.Test;
@@ -43,7 +43,6 @@ import java.util.Map;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_ALL;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -93,7 +92,7 @@ public class MongoDBTableFactoryTest {
         DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         MY_HOSTS,
                         USER,
                         PASSWORD,
@@ -130,7 +129,7 @@ public class MongoDBTableFactoryTest {
 
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         MY_HOSTS,
                         USER,
                         PASSWORD,
@@ -164,7 +163,7 @@ public class MongoDBTableFactoryTest {
 
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA_WITH_METADATA,
                         MY_HOSTS,
                         USER,
                         PASSWORD,
@@ -222,7 +221,7 @@ public class MongoDBTableFactoryTest {
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(schema).toSchema(),
+                                Schema.newBuilder().fromResolvedSchema(schema).build(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),
