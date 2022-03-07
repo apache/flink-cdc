@@ -23,6 +23,7 @@ import org.junit.Test;
 import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /** Unit test for {@link BufferedSocketInputStream}. */
 public class BufferedSocketInputStreamTest {
@@ -35,15 +36,16 @@ public class BufferedSocketInputStreamTest {
                                 new byte[] {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}));
         byte[] buf = new byte[3];
         assertEquals(3, in.read(buf, 0, buf.length));
-        Arrays.equals(new byte[] {'A', 'B', 'C'}, buf);
+        assertTrue(Arrays.equals(new byte[] {'A', 'B', 'C'}, buf));
         assertEquals(5, in.available());
 
         assertEquals(3, in.read(buf, 0, buf.length));
-        Arrays.equals(new byte[] {'D', 'E', 'F'}, buf);
+        assertTrue(Arrays.equals(new byte[] {'D', 'E', 'F'}, buf));
         assertEquals(2, in.available());
 
+        buf = new byte[2];
         assertEquals(2, in.read(buf, 0, buf.length));
-        Arrays.equals(new byte[] {'G', 'H'}, buf);
+        assertTrue(Arrays.equals(new byte[] {'G', 'H'}, buf));
         assertEquals(0, in.available());
 
         // reach the end of stream normally
