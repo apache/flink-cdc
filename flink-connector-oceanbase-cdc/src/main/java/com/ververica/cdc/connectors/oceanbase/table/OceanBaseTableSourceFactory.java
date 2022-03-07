@@ -26,8 +26,6 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
-import com.ververica.cdc.debezium.table.DebeziumOptions;
-
 import java.util.HashSet;
 import java.util.Set;
 
@@ -132,7 +130,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
+        helper.validate();
 
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
