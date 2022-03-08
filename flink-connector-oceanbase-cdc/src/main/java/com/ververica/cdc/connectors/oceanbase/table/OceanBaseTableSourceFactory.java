@@ -84,38 +84,38 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription("Password to be used when connecting to OceanBase.");
 
     public static final ConfigOption<String> TENANT_NAME =
-            ConfigOptions.key("tenant_name")
+            ConfigOptions.key("tenant-name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Tenant name of OceanBase to monitor.");
 
     public static final ConfigOption<String> DATABASE_NAME =
-            ConfigOptions.key("database_name")
+            ConfigOptions.key("database-name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Database name of OceanBase to monitor.");
 
     public static final ConfigOption<String> TABLE_NAME =
-            ConfigOptions.key("table_name")
+            ConfigOptions.key("table-name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Table name of OceanBase to monitor.");
 
     public static final ConfigOption<String> RS_LIST =
-            ConfigOptions.key("rootserver_list")
+            ConfigOptions.key("rootserver-list")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
                             "The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`.");
 
     public static final ConfigOption<String> LOG_PROXY_HOST =
-            ConfigOptions.key("log_proxy.host")
+            ConfigOptions.key("logproxy.host")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Hostname or IP address of OceanBase log proxy service.");
 
     public static final ConfigOption<Integer> LOG_PROXY_PORT =
-            ConfigOptions.key("log_proxy.port")
+            ConfigOptions.key("logproxy.port")
                     .intType()
                     .defaultValue(2983)
                     .withDescription("Port number of OceanBase log proxy service.");

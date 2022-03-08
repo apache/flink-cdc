@@ -62,12 +62,12 @@ Flink SQL> CREATE TABLE orders (
     'scan.startup.mode' = 'initial',
     'username' = 'user@test_tenant',
     'password' = 'pswd',
-    'tenant_name' = 'test_tenant',
-    'database_name' = 'test_db',
-    'table_name' = 'orders',
-    'rootserver_list' = '127.0.0.1:2882:2881',
-    'log_proxy.host' = '127.0.0.1',
-    'log_proxy.port' = '2983',
+    'tenant-name' = 'test_tenant',
+    'database-name' = 'test_db',
+    'table-name' = 'orders',
+    'rootserver-list' = '127.0.0.1:2882:2881',
+    'logproxy.host' = '127.0.0.1',
+    'logproxy.port' = '2983',
     'jdbc.url' = 'jdbc:mysql://127.0.0.1:2881/test_db');
 
 -- read snapshot and binlogs from orders table
@@ -127,42 +127,42 @@ Connector Options
                 <td>Password to be used when connecting to OceanBase.</td>
             </tr>
             <tr>
-                <td>tenant_name</td>
+                <td>tenant-name</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>Tenant name of OceanBase to monitor.</td>
             </tr>
             <tr>
-                <td>database_name</td>
+                <td>database-name</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>Database name of OceanBase to monitor.</td>
             </tr>
             <tr>
-                <td>table_name</td>
+                <td>table-name</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>Table name of OceanBase to monitor.</td>
             </tr>
             <tr>
-                <td>rootserver_list</td>
+                <td>rootserver-list</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`.</td>
             </tr>
             <tr>
-                <td>log_proxy.host</td>
+                <td>logproxy.host</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>Hostname or IP address of OceanBase log proxy service.</td>
             </tr>
             <tr>
-                <td>log_proxy.port</td>
+                <td>logproxy.port</td>
                 <td>optional</td>
                 <td style="word-wrap: break-word;">2983</td>
                 <td>Integer</td>
