@@ -24,7 +24,9 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
@@ -34,10 +36,15 @@ import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
 import java.time.ZoneId;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /** A {@link DynamicTableSource} implementation for OceanBase. */
-public class OceanBaseTableSource implements ScanTableSource {
+public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
 
@@ -54,6 +61,16 @@ public class OceanBaseTableSource implements ScanTableSource {
     private final String logProxyHost;
     private final int logProxyPort;
     private final String jdbcUrl;
+
+    // --------------------------------------------------------------------------------------------
+    // Mutable attributes
+    // --------------------------------------------------------------------------------------------
+
+    /** Data type that describes the final output of the source. */
+    protected DataType producedDataType;
+
+    /** Metadata that is appended at the end of a physical source row. */
+    protected List<String> metadataKeys;
 
     public OceanBaseTableSource(
             ResolvedSchema physicalSchema,
@@ -80,6 +97,9 @@ public class OceanBaseTableSource implements ScanTableSource {
         this.logProxyHost = logProxyHost;
         this.logProxyPort = logProxyPort;
         this.jdbcUrl = jdbcUrl;
+
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
     }
 
     @Override
@@ -94,14 +114,15 @@ public class OceanBaseTableSource implements ScanTableSource {
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext context) {
-        RowType rowType = (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
-        TypeInformation<RowData> resultTypeInfo =
-                context.createTypeInformation(physicalSchema.toPhysicalRowDataType());
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        MetadataConverter[] metadataConverters = getMetadataConverters();
+        TypeInformation<RowData> resultTypeInfo = context.createTypeInformation(producedDataType);
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType(rowType)
-                        .setMetadataConverters(new MetadataConverter[0])
+                        .setPhysicalRowType(physicalDataType)
+                        .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(resultTypeInfo)
                         .setServerTimeZone(ZoneId.systemDefault())
                         .build();
@@ -123,21 +144,55 @@ public class OceanBaseTableSource implements ScanTableSource {
         return SourceFunctionProvider.of(builder.build(), false);
     }
 
+    protected MetadataConverter[] getMetadataConverters() {
+        if (metadataKeys.isEmpty()) {
+            return new MetadataConverter[0];
+        }
+        return metadataKeys.stream()
+                .map(
+                        key ->
+                                Stream.of(OceanBaseReadableMetadata.values())
+                                        .filter(m -> m.getKey().equals(key))
+                                        .findFirst()
+                                        .orElseThrow(IllegalStateException::new))
+                .map(OceanBaseReadableMetadata::getConverter)
+                .toArray(MetadataConverter[]::new);
+    }
+
+    @Override
+    public Map<String, DataType> listReadableMetadata() {
+        return Stream.of(OceanBaseReadableMetadata.values())
+                .collect(
+                        Collectors.toMap(
+                                OceanBaseReadableMetadata::getKey,
+                                OceanBaseReadableMetadata::getDataType));
+    }
+
+    @Override
+    public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+        this.metadataKeys = metadataKeys;
+        this.producedDataType = producedDataType;
+    }
+
     @Override
     public DynamicTableSource copy() {
-        return new OceanBaseTableSource(
-                physicalSchema,
-                startupMode,
-                startupTimestamp,
-                username,
-                password,
-                tenantName,
-                databaseName,
-                tableName,
-                rsList,
-                logProxyHost,
-                logProxyPort,
-                jdbcUrl);
+        OceanBaseTableSource source =
+                new OceanBaseTableSource(
+                        physicalSchema,
+                        startupMode,
+                        startupTimestamp,
+                        username,
+                        password,
+                        tenantName,
+                        databaseName,
+                        tableName,
+                        rsList,
+                        logProxyHost,
+                        logProxyPort,
+                        jdbcUrl);
+        source.metadataKeys = metadataKeys;
+        source.producedDataType = producedDataType;
+        return source;
     }
 
     @Override
@@ -160,7 +215,9 @@ public class OceanBaseTableSource implements ScanTableSource {
                 && Objects.equals(this.rsList, that.rsList)
                 && Objects.equals(this.logProxyHost, that.logProxyHost)
                 && Objects.equals(this.logProxyPort, that.logProxyPort)
-                && Objects.equals(this.jdbcUrl, that.jdbcUrl);
+                && Objects.equals(this.jdbcUrl, that.jdbcUrl)
+                && Objects.equals(this.producedDataType, that.producedDataType)
+                && Objects.equals(this.metadataKeys, that.metadataKeys);
     }
 
     @Override
@@ -177,7 +234,9 @@ public class OceanBaseTableSource implements ScanTableSource {
                 rsList,
                 logProxyHost,
                 logProxyPort,
-                jdbcUrl);
+                jdbcUrl,
+                producedDataType,
+                metadataKeys);
     }
 
     @Override

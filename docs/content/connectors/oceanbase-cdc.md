@@ -179,6 +179,73 @@ Connector Options
     </table>
 </div>
 
+Available Metadata
+----------------
+
+The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+
+<table class="colwidths-auto docutils">
+    <thead>
+        <tr>
+            <th class="text-left" style="width: 15%">Key</th>
+            <th class="text-left" style="width: 30%">DataType</th>
+            <th class="text-left" style="width: 55%">Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>tenant_name</td>
+            <td>STRING NOT NULL</td>
+            <td>Name of the tenant that contains the row.</td>
+        </tr>
+        <tr>
+            <td>database_name</td>
+            <td>STRING NOT NULL</td>
+            <td>Name of the database that contains the row.</td>
+        </tr>
+        <tr>
+            <td>table_name</td>
+            <td>STRING NOT NULL</td>
+            <td>Name of the table that contains the row.</td>
+        </tr>
+        <tr>
+            <td>op_ts</td>
+            <td>TIMESTAMP_LTZ(3) NOT NULL</td>
+            <td>It indicates the time that the change was made in the database. <br>
+                If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
+        </tr>
+    </tbody>
+</table>
+
+The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+
+```sql
+CREATE TABLE products (
+    tenant_name STRING METADATA FROM 'tenant_name' VIRTUAL,
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+   'connector' = 'oceanbase-cdc',
+   'scan.startup.mode' = 'initial',
+   'username' = 'user@test_tenant',
+   'password' = 'pswd',
+   'tenant-name' = 'test_tenant',
+   'database-name' = 'test_db',
+   'table-name' = 'orders',
+   'rootserver-list' = '127.0.0.1:2882:2881',
+   'logproxy.host' = '127.0.0.1',
+   'logproxy.port' = '2983',
+   'jdbc.url' = 'jdbc:mysql://127.0.0.1:2881/test_db');
+```
+
 Features
 --------
 
