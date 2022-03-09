@@ -26,6 +26,8 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import java.time.Duration;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -101,6 +103,33 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Table name of OceanBase to monitor.");
 
+    public static final ConfigOption<String> HOSTNAME =
+            ConfigOptions.key("hostname")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "IP address or hostname of the OceanBase database server or OceanBase proxy server.");
+
+    public static final ConfigOption<Integer> PORT =
+            ConfigOptions.key("port")
+                    .intType()
+                    .defaultValue(2881)
+                    .withDescription(
+                            "Integer port number of OceanBase database server or OceanBase proxy server.");
+
+    public static final ConfigOption<Duration> CONNECT_TIMEOUT =
+            ConfigOptions.key("connect.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription(
+                            "The maximum time that the connector should wait after trying to connect to the OceanBase database server before timing out.");
+
+    public static final ConfigOption<String> SERVER_TIME_ZONE =
+            ConfigOptions.key("server-time-zone")
+                    .stringType()
+                    .defaultValue("UTC")
+                    .withDescription("The session time zone in database server.");
+
     public static final ConfigOption<String> RS_LIST =
             ConfigOptions.key("rootserver-list")
                     .stringType()
@@ -119,12 +148,6 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .intType()
                     .defaultValue(2983)
                     .withDescription("Port number of OceanBase log proxy service.");
-
-    public static final ConfigOption<String> JDBC_URL =
-            ConfigOptions.key("jdbc.url")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("JDBC url.");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -148,7 +171,10 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         String rsList = config.get(RS_LIST);
         String logProxyHost = config.get(LOG_PROXY_HOST);
         int logProxyPort = config.get(LOG_PROXY_PORT);
-        String jdbcUrl = config.get(JDBC_URL);
+        String hostname = config.get(HOSTNAME);
+        Integer port = config.get(PORT);
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
+        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 
         return new OceanBaseTableSource(
                 physicalSchema,
@@ -159,10 +185,13 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 tenantName,
                 databaseName,
                 tableName,
+                hostname,
+                port,
+                connectTimeout,
+                serverTimeZone,
                 rsList,
                 logProxyHost,
-                logProxyPort,
-                jdbcUrl);
+                logProxyPort);
     }
 
     @Override
@@ -189,7 +218,10 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(SCAN_STARTUP_TIMESTAMP);
-        options.add(JDBC_URL);
+        options.add(HOSTNAME);
+        options.add(PORT);
+        options.add(CONNECT_TIMEOUT);
+        options.add(SERVER_TIME_ZONE);
         return options;
     }
 }

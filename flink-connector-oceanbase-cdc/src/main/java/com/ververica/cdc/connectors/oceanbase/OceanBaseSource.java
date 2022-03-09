@@ -25,6 +25,8 @@ import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction
 import com.ververica.cdc.connectors.oceanbase.table.OceanBaseTableSourceFactory;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
+import java.time.Duration;
+
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -48,8 +50,9 @@ public class OceanBaseSource {
         private String tenantName;
         private String databaseName;
         private String tableName;
-
-        private String jdbcUrl;
+        private String hostname;
+        private int port = 2881;
+        private Duration connectTimeout = Duration.ofSeconds(30);
         private String rsList;
         private String logProxyHost;
         private int logProxyPort = 2983;
@@ -91,6 +94,21 @@ public class OceanBaseSource {
             return this;
         }
 
+        public Builder<T> hostname(String hostname) {
+            this.hostname = hostname;
+            return this;
+        }
+
+        public Builder<T> port(int port) {
+            this.port = port;
+            return this;
+        }
+
+        public Builder<T> connectTimeout(Duration connectTimeout) {
+            this.connectTimeout = connectTimeout;
+            return this;
+        }
+
         public Builder<T> rsList(String rsList) {
             this.rsList = rsList;
             return this;
@@ -103,11 +121,6 @@ public class OceanBaseSource {
 
         public Builder<T> logProxyPort(int logProxyPort) {
             this.logProxyPort = logProxyPort;
-            return this;
-        }
-
-        public Builder<T> jdbcUrl(String jdbcUrl) {
-            this.jdbcUrl = jdbcUrl;
             return this;
         }
 
@@ -132,16 +145,18 @@ public class OceanBaseSource {
 
             return new OceanBaseRichSourceFunction<T>(
                     startupMode.equals(OceanBaseTableSourceFactory.StartupMode.INITIAL),
+                    startupTimestamp,
                     username,
                     password,
                     tenantName,
                     databaseName,
                     tableName,
-                    jdbcUrl,
+                    hostname,
+                    port,
+                    connectTimeout.toMillis(),
                     rsList,
                     logProxyHost,
                     logProxyPort,
-                    startupTimestamp,
                     deserializer);
         }
     }

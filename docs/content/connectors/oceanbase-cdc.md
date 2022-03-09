@@ -65,10 +65,11 @@ Flink SQL> CREATE TABLE orders (
     'tenant-name' = 'test_tenant',
     'database-name' = 'test_db',
     'table-name' = 'orders',
+    'hostname' = '127.0.0.1',
+    'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = '127.0.0.1',
-    'logproxy.port' = '2983',
-    'jdbc.url' = 'jdbc:mysql://127.0.0.1:2881/test_db');
+    'logproxy.port' = '2983');
 
 -- read snapshot and binlogs from orders table
 Flink SQL> SELECT * FROM orders;
@@ -148,6 +149,34 @@ Connector Options
                 <td>Table name of OceanBase to monitor.</td>
             </tr>
             <tr>
+                <td>hostname</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>IP address or hostname of the OceanBase database server or OceanBase Proxy server.</td>
+            </tr>
+            <tr>
+                <td>port</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">2881</td>
+                <td>Integer</td>
+                <td>Integer port number of the OceanBase database server or OceanBase Proxy server.</td>
+            </tr>
+            <tr>
+                <td>connect.timeout</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">30s</td>
+                <td>Duration</td>
+                <td>The maximum time that the connector should wait after trying to connect to the OceanBase database server before timing out.</td>
+            </tr>
+            <tr>
+                <td>server-time-zone</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">UTC</td>
+                <td>String</td>
+                <td>The session time zone in database server, e.g. "Asia/Shanghai". It controls how the TIMESTAMP type in OceanBase converted to STRING.</td>
+            </tr>
+            <tr>
                 <td>rootserver-list</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
@@ -167,13 +196,6 @@ Connector Options
                 <td style="word-wrap: break-word;">2983</td>
                 <td>Integer</td>
                 <td>Port number of OceanBase log proxy service.</td>
-            </tr>
-            <tr>
-                <td>jdbc.url</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
-                <td>String</td>
-                <td>JDBC url, only used for snapshot.</td>
             </tr>
         </tbody>
     </table>
@@ -240,10 +262,11 @@ CREATE TABLE products (
    'tenant-name' = 'test_tenant',
    'database-name' = 'test_db',
    'table-name' = 'orders',
+   'hostname' = '127.0.0.1',
+   'port' = '2881',
    'rootserver-list' = '127.0.0.1:2882:2881',
    'logproxy.host' = '127.0.0.1',
-   'logproxy.port' = '2983',
-   'jdbc.url' = 'jdbc:mysql://127.0.0.1:2881/test_db');
+   'logproxy.port' = '2983');
 ```
 
 Features
@@ -282,9 +305,10 @@ public class OceanBaseSourceExample {
             .tenantName("test_tenant")
             .databaseName("test_db")
             .tableName("test_table")
+            .hostname("127.0.0.1")
+            .port(2881)
             .logProxyHost("127.0.0.1")
             .logProxyPort(2983)
-            .jdbcUrl("jdbc:mysql://127.0.0.1:2881")
             .deserializer(new JsonDebeziumDeserializationSchema())
             .build();
 

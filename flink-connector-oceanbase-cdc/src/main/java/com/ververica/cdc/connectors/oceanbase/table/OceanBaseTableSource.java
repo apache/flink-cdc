@@ -35,6 +35,7 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -42,6 +43,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A {@link DynamicTableSource} implementation for OceanBase. */
 public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMetadata {
@@ -56,11 +59,14 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String tenantName;
     private final String databaseName;
     private final String tableName;
+    private final String hostname;
+    private final Integer port;
+    private final Duration connectTimeout;
+    private final ZoneId serverTimeZone;
 
     private final String rsList;
     private final String logProxyHost;
-    private final int logProxyPort;
-    private final String jdbcUrl;
+    private final Integer logProxyPort;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -81,22 +87,28 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             String tenantName,
             String databaseName,
             String tableName,
+            String hostname,
+            Integer port,
+            Duration connectTimeout,
+            ZoneId serverTimeZone,
             String rsList,
             String logProxyHost,
-            int logProxyPort,
-            String jdbcUrl) {
+            int logProxyPort) {
         this.physicalSchema = physicalSchema;
         this.startupMode = startupMode;
         this.startupTimestamp = startupTimestamp;
-        this.username = username;
-        this.password = password;
-        this.tenantName = tenantName;
-        this.databaseName = databaseName;
-        this.tableName = tableName;
-        this.rsList = rsList;
-        this.logProxyHost = logProxyHost;
+        this.username = checkNotNull(username);
+        this.password = checkNotNull(password);
+        this.tenantName = checkNotNull(tenantName);
+        this.databaseName = checkNotNull(databaseName);
+        this.tableName = checkNotNull(tableName);
+        this.hostname = hostname;
+        this.port = port;
+        this.serverTimeZone = serverTimeZone;
+        this.connectTimeout = connectTimeout;
+        this.rsList = checkNotNull(rsList);
+        this.logProxyHost = checkNotNull(logProxyHost);
         this.logProxyPort = logProxyPort;
-        this.jdbcUrl = jdbcUrl;
 
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -124,13 +136,14 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .setPhysicalRowType(physicalDataType)
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(resultTypeInfo)
-                        .setServerTimeZone(ZoneId.systemDefault())
+                        .setServerTimeZone(serverTimeZone)
                         .build();
 
         OceanBaseSource.Builder<RowData> builder =
                 OceanBaseSource.<RowData>builder()
                         .startupMode(startupMode)
                         .startupTimestamp(startupTimestamp)
+                        .hostname(hostname)
                         .username(username)
                         .password(password)
                         .tenantName(tenantName)
@@ -138,9 +151,16 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .tableName(tableName)
                         .rsList(rsList)
                         .logProxyHost(logProxyHost)
-                        .logProxyPort(logProxyPort)
-                        .jdbcUrl(jdbcUrl)
                         .deserializer(deserializer);
+        if (port != null) {
+            builder = builder.port(port);
+        }
+        if (connectTimeout != null) {
+            builder = builder.connectTimeout(connectTimeout);
+        }
+        if (logProxyPort != null) {
+            builder = builder.logProxyPort(logProxyPort);
+        }
         return SourceFunctionProvider.of(builder.build(), false);
     }
 
@@ -186,10 +206,13 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         tenantName,
                         databaseName,
                         tableName,
+                        hostname,
+                        port,
+                        connectTimeout,
+                        serverTimeZone,
                         rsList,
                         logProxyHost,
-                        logProxyPort,
-                        jdbcUrl);
+                        logProxyPort);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -212,10 +235,13 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.tenantName, that.tenantName)
                 && Objects.equals(this.databaseName, that.databaseName)
                 && Objects.equals(this.tableName, that.tableName)
+                && Objects.equals(this.hostname, that.hostname)
+                && Objects.equals(this.port, that.port)
+                && Objects.equals(this.connectTimeout, that.connectTimeout)
+                && Objects.equals(this.serverTimeZone, that.serverTimeZone)
                 && Objects.equals(this.rsList, that.rsList)
                 && Objects.equals(this.logProxyHost, that.logProxyHost)
                 && Objects.equals(this.logProxyPort, that.logProxyPort)
-                && Objects.equals(this.jdbcUrl, that.jdbcUrl)
                 && Objects.equals(this.producedDataType, that.producedDataType)
                 && Objects.equals(this.metadataKeys, that.metadataKeys);
     }
@@ -231,10 +257,13 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 tenantName,
                 databaseName,
                 tableName,
+                hostname,
+                port,
+                connectTimeout,
+                serverTimeZone,
                 rsList,
                 logProxyHost,
                 logProxyPort,
-                jdbcUrl,
                 producedDataType,
                 metadataKeys);
     }

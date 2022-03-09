@@ -33,6 +33,8 @@ import org.apache.flink.util.ExceptionUtils;
 
 import org.junit.Test;
 
+import java.time.Duration;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,7 +67,7 @@ public class OceanBaseTableFactoryTest {
     private static final String TABLE_NAME = "table";
     private static final String RS_LIST = "127.0.0.1:2882:2881";
     private static final String LOG_PROXY_HOST = "127.0.0.1";
-    private static final String JDBC_URL = "jdbc:mysql://127.0.0.1:2881";
+    private static final String HOSTNAME = "127.0.0.1";
 
     @Test
     public void testCommonProperties() {
@@ -82,10 +84,13 @@ public class OceanBaseTableFactoryTest {
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        null,
+                        2881,
+                        null,
+                        null,
                         RS_LIST,
                         LOG_PROXY_HOST,
-                        2983,
-                        null);
+                        2983);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -94,7 +99,7 @@ public class OceanBaseTableFactoryTest {
         Map<String, String> options = getAllOptions();
         options.put("scan.startup.mode", "timestamp");
         options.put("scan.startup.timestamp", "0");
-        options.put("jdbc.url", JDBC_URL);
+        options.put("hostname", HOSTNAME);
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         OceanBaseTableSource expectedSource =
@@ -107,10 +112,13 @@ public class OceanBaseTableFactoryTest {
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        HOSTNAME,
+                        2881,
+                        Duration.ofSeconds(30),
+                        ZoneId.of("UTC"),
                         RS_LIST,
                         LOG_PROXY_HOST,
-                        2983,
-                        JDBC_URL);
+                        2983);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -135,11 +143,11 @@ public class OceanBaseTableFactoryTest {
         options.put("scan.startup.mode", STARTUP_MODE);
         options.put("username", USERNAME);
         options.put("password", PASSWORD);
-        options.put("tenant_name", TENANT_NAME);
-        options.put("database_name", DATABASE_NAME);
-        options.put("table_name", TABLE_NAME);
-        options.put("rootserver_list", RS_LIST);
-        options.put("log_proxy.host", LOG_PROXY_HOST);
+        options.put("tenant-name", TENANT_NAME);
+        options.put("database-name", DATABASE_NAME);
+        options.put("table-name", TABLE_NAME);
+        options.put("rootserver-list", RS_LIST);
+        options.put("logproxy.host", LOG_PROXY_HOST);
         return options;
     }
 
