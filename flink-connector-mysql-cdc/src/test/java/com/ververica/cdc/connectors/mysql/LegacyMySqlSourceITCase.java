@@ -30,7 +30,6 @@ import org.apache.flink.util.CloseableIterator;
 import com.alibaba.fastjson.JSONObject;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.kafka.connect.json.DecimalFormat;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.junit.Test;
 
@@ -67,22 +66,24 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
     }
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatWithOtherConfigs() throws Exception {
-        Map<String, Object> otherConfigs = new HashMap<>();
-        otherConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, DecimalFormat.NUMERIC);
+    public void testConsumingAllEventsWithJsonFormatWithNumericDecimal() throws Exception {
+        Map<String, Object> customConverterConfigs = new HashMap<>();
+        customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
         testConsumingAllEventsWithJsonFormat(
-                false, otherConfigs, "file/debezium-data-schema-exclude-with-other-configs.json");
+                false,
+                customConverterConfigs,
+                "file/debezium-data-schema-exclude-with-numeric-decimal.json");
     }
 
     private void testConsumingAllEventsWithJsonFormat(
-            Boolean includeSchema, Map<String, Object> otherConfigs, String expectedFile)
+            Boolean includeSchema, Map<String, Object> customConverterConfigs, String expectedFile)
             throws Exception {
         fullTypesDatabase.createAndInitialize();
-        otherConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, DecimalFormat.NUMERIC);
         JsonDebeziumDeserializationSchema schema =
-                otherConfigs == null
+                customConverterConfigs == null
                         ? new JsonDebeziumDeserializationSchema(includeSchema)
-                        : new JsonDebeziumDeserializationSchema(includeSchema, otherConfigs);
+                        : new JsonDebeziumDeserializationSchema(
+                                includeSchema, customConverterConfigs);
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())

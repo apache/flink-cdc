@@ -42,13 +42,13 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
     private transient JsonConverter jsonConverter;
 
     /**
-     * Configuration whether to enable {@link JsonConverterConfig.SCHEMAS_ENABLE_CONFIG} to include
+     * Configuration whether to enable {@link JsonConverterConfig#SCHEMAS_ENABLE_CONFIG} to include
      * schema in messages.
      */
     private final Boolean includeSchema;
 
-    /** Other configurations that need to pass to JsonConverters. */
-    private Map<String, Object> otherJsonConverterConfigs;
+    /** The custom configurations for {@link JsonConverter}. */
+    private Map<String, Object> customConverterConfigs;
 
     public JsonDebeziumDeserializationSchema() {
         this(false);
@@ -59,27 +59,31 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
     }
 
     public JsonDebeziumDeserializationSchema(
-            Boolean includeSchema, Map<String, Object> otherJsonConverterConfigs) {
+            Boolean includeSchema, Map<String, Object> customConverterConfigs) {
         this.includeSchema = includeSchema;
-        this.otherJsonConverterConfigs = otherJsonConverterConfigs;
+        this.customConverterConfigs = customConverterConfigs;
     }
 
     @Override
     public void deserialize(SourceRecord record, Collector<String> out) throws Exception {
         if (jsonConverter == null) {
-            // initialize jsonConverter
-            jsonConverter = new JsonConverter();
-            final HashMap<String, Object> configs = new HashMap<>(2);
-            configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
-            configs.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
-            if (otherJsonConverterConfigs != null) {
-                configs.putAll(otherJsonConverterConfigs);
-            }
-            jsonConverter.configure(configs);
+            initializeJsonConverter();
         }
         byte[] bytes =
                 jsonConverter.fromConnectData(record.topic(), record.valueSchema(), record.value());
         out.collect(new String(bytes));
+    }
+
+    /** Initialize {@link JsonConverter} with given configs. */
+    private void initializeJsonConverter() {
+        jsonConverter = new JsonConverter();
+        final HashMap<String, Object> configs = new HashMap<>(2);
+        configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
+        configs.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
+        if (customConverterConfigs != null) {
+            configs.putAll(customConverterConfigs);
+        }
+        jsonConverter.configure(configs);
     }
 
     @Override
