@@ -202,6 +202,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Custom properties that will overwrite the default JDBC connection URL. */
+    public MySqlSourceBuilder<T> jdbcProperties(Properties jdbcProperties) {
+        this.configFactory.jdbcProperties(jdbcProperties);
+        return this;
+    }
+
     /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
     public MySqlSourceBuilder<T> debeziumProperties(Properties properties) {
         this.configFactory.debeziumProperties(properties);

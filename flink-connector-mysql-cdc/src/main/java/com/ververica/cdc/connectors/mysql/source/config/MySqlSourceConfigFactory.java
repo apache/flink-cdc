@@ -70,6 +70,7 @@ public class MySqlSourceConfigFactory implements Serializable {
             SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
 
@@ -216,6 +217,12 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Custom properties that will overwrite the default JDBC connection URL. */
+    public MySqlSourceConfigFactory jdbcProperties(Properties jdbcProperties) {
+        this.jdbcProperties = jdbcProperties;
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceConfigFactory startupOptions(StartupOptions startupOptions) {
         switch (startupOptions.startupMode) {
@@ -299,6 +306,10 @@ public class MySqlSourceConfigFactory implements Serializable {
             props.putAll(dbzProperties);
         }
 
+        if (jdbcProperties == null) {
+            jdbcProperties = new Properties();
+        }
+
         return new MySqlSourceConfig(
                 hostname,
                 port,
@@ -319,6 +330,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorLower,
                 includeSchemaChanges,
                 scanNewlyAddedTableEnabled,
-                props);
+                props,
+                jdbcProperties);
     }
 }
