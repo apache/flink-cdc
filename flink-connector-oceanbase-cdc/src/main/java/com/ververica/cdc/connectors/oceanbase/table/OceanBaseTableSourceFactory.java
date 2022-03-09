@@ -113,7 +113,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public static final ConfigOption<Integer> PORT =
             ConfigOptions.key("port")
                     .intType()
-                    .defaultValue(2881)
+                    .noDefaultValue()
                     .withDescription(
                             "Integer port number of OceanBase database server or OceanBase proxy server.");
 
@@ -146,7 +146,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public static final ConfigOption<Integer> LOG_PROXY_PORT =
             ConfigOptions.key("logproxy.port")
                     .intType()
-                    .defaultValue(2983)
+                    .noDefaultValue()
                     .withDescription("Port number of OceanBase log proxy service.");
 
     @Override

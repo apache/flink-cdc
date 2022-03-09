@@ -48,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -79,7 +80,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final String tableName;
     private final String hostname;
     private final Integer port;
-    private final Long connectTimeout;
+    private final Duration connectTimeout;
     private final String rsList;
     private final String logProxyHost;
     private final int logProxyPort;
@@ -106,7 +107,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             String tableName,
             String hostname,
             Integer port,
-            Long connectTimeout,
+            Duration connectTimeout,
             String rsList,
             String logProxyHost,
             int logProxyPort,

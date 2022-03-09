@@ -158,7 +158,7 @@ Connector Options
             <tr>
                 <td>port</td>
                 <td>optional</td>
-                <td style="word-wrap: break-word;">2881</td>
+                <td style="word-wrap: break-word;">(none))</td>
                 <td>Integer</td>
                 <td>Integer port number of the OceanBase database server or OceanBase Proxy server.</td>
             </tr>
@@ -192,8 +192,8 @@ Connector Options
             </tr>
             <tr>
                 <td>logproxy.port</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">2983</td>
+                <td>required</td>
+                <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Port number of OceanBase log proxy service.</td>
             </tr>

@@ -51,11 +51,11 @@ public class OceanBaseSource {
         private String databaseName;
         private String tableName;
         private String hostname;
-        private int port = 2881;
-        private Duration connectTimeout = Duration.ofSeconds(30);
+        private Integer port;
+        private Duration connectTimeout;
         private String rsList;
         private String logProxyHost;
-        private int logProxyPort = 2983;
+        private Integer logProxyPort;
 
         private DebeziumDeserializationSchema<T> deserializer;
 
@@ -145,19 +145,19 @@ public class OceanBaseSource {
 
             return new OceanBaseRichSourceFunction<T>(
                     startupMode.equals(OceanBaseTableSourceFactory.StartupMode.INITIAL),
-                    startupTimestamp,
-                    username,
-                    password,
-                    tenantName,
-                    databaseName,
-                    tableName,
+                    checkNotNull(startupTimestamp),
+                    checkNotNull(username),
+                    checkNotNull(password),
+                    checkNotNull(tenantName),
+                    checkNotNull(databaseName),
+                    checkNotNull(tableName),
                     hostname,
                     port,
-                    connectTimeout.toMillis(),
-                    rsList,
-                    logProxyHost,
-                    logProxyPort,
-                    deserializer);
+                    connectTimeout,
+                    checkNotNull(rsList),
+                    checkNotNull(logProxyHost),
+                    checkNotNull(logProxyPort),
+                    checkNotNull(deserializer));
         }
     }
 }

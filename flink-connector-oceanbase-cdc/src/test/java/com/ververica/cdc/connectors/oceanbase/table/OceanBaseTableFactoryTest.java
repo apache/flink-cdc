@@ -67,11 +67,11 @@ public class OceanBaseTableFactoryTest {
     private static final String TABLE_NAME = "table";
     private static final String RS_LIST = "127.0.0.1:2882:2881";
     private static final String LOG_PROXY_HOST = "127.0.0.1";
-    private static final String HOSTNAME = "127.0.0.1";
+    private static final String LOG_PROXY_PORT = "2983";
 
     @Test
     public void testCommonProperties() {
-        Map<String, String> properties = getAllOptions();
+        Map<String, String> properties = getRequiredOptions();
 
         DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
         OceanBaseTableSource expectedSource =
@@ -85,9 +85,9 @@ public class OceanBaseTableFactoryTest {
                         DATABASE_NAME,
                         TABLE_NAME,
                         null,
-                        2881,
                         null,
-                        null,
+                        Duration.ofSeconds(30),
+                        ZoneId.of("UTC"),
                         RS_LIST,
                         LOG_PROXY_HOST,
                         2983);
@@ -96,10 +96,11 @@ public class OceanBaseTableFactoryTest {
 
     @Test
     public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
+        Map<String, String> options = getRequiredOptions();
         options.put("scan.startup.mode", "timestamp");
         options.put("scan.startup.timestamp", "0");
-        options.put("hostname", HOSTNAME);
+        options.put("hostname", "127.0.0.1");
+        options.put("port", "2881");
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         OceanBaseTableSource expectedSource =
@@ -112,7 +113,7 @@ public class OceanBaseTableFactoryTest {
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
-                        HOSTNAME,
+                        "127.0.0.1",
                         2881,
                         Duration.ofSeconds(30),
                         ZoneId.of("UTC"),
@@ -125,7 +126,7 @@ public class OceanBaseTableFactoryTest {
     @Test
     public void testValidation() {
         try {
-            Map<String, String> properties = getAllOptions();
+            Map<String, String> properties = getRequiredOptions();
             properties.put("unknown", "abc");
 
             createTableSource(SCHEMA, properties);
@@ -137,7 +138,7 @@ public class OceanBaseTableFactoryTest {
         }
     }
 
-    private Map<String, String> getAllOptions() {
+    private Map<String, String> getRequiredOptions() {
         Map<String, String> options = new HashMap<>();
         options.put("connector", "oceanbase-cdc");
         options.put("scan.startup.mode", STARTUP_MODE);
@@ -148,6 +149,7 @@ public class OceanBaseTableFactoryTest {
         options.put("table-name", TABLE_NAME);
         options.put("rootserver-list", RS_LIST);
         options.put("logproxy.host", LOG_PROXY_HOST);
+        options.put("logproxy.port", LOG_PROXY_PORT);
         return options;
     }
 

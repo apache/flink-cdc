@@ -143,24 +143,18 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 OceanBaseSource.<RowData>builder()
                         .startupMode(startupMode)
                         .startupTimestamp(startupTimestamp)
-                        .hostname(hostname)
                         .username(username)
                         .password(password)
                         .tenantName(tenantName)
                         .databaseName(databaseName)
                         .tableName(tableName)
+                        .hostname(hostname)
+                        .port(port)
+                        .connectTimeout(connectTimeout)
                         .rsList(rsList)
                         .logProxyHost(logProxyHost)
+                        .logProxyPort(logProxyPort)
                         .deserializer(deserializer);
-        if (port != null) {
-            builder = builder.port(port);
-        }
-        if (connectTimeout != null) {
-            builder = builder.connectTimeout(connectTimeout);
-        }
-        if (logProxyPort != null) {
-            builder = builder.logProxyPort(logProxyPort);
-        }
         return SourceFunctionProvider.of(builder.build(), false);
     }
 
