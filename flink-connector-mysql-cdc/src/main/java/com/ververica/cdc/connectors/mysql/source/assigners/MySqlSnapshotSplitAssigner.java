@@ -34,6 +34,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +45,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -169,14 +171,44 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 final List<TableId> newlyAddedTables = discoverCapturedTables(jdbc, sourceConfig);
+                List<TableId> prevTables = new LinkedList<>(alreadyProcessedTables);
+                prevTables.addAll(remainingTables);
+                prevTables.removeAll(newlyAddedTables);
+
                 newlyAddedTables.removeAll(alreadyProcessedTables);
                 newlyAddedTables.removeAll(remainingTables);
-                if (!newlyAddedTables.isEmpty()) {
+                if (!newlyAddedTables.isEmpty() || !prevTables.isEmpty()) {
                     // if job is still in snapshot reading phase, directly add all newly added
                     // tables
                     LOG.info("Found newly added tables, start capture newly added tables process");
+                    Tables.TableFilter tableFilter =
+                            sourceConfig.getTableFilters().dataCollectionFilter();
+
+                    // remove unassigned tables/splits if it does not satisfy new table filter
+                    remainingTables.removeIf(tableId -> !tableFilter.isIncluded(tableId));
+
+                    List<String> splitsToRemove = new LinkedList<>();
+                    for (Map.Entry<String, MySqlSnapshotSplit> splitEntry :
+                            assignedSplits.entrySet()) {
+                        if (!tableFilter.isIncluded(splitEntry.getValue().getTableId())) {
+                            splitsToRemove.add(splitEntry.getKey());
+                        }
+                    }
+
+                    splitsToRemove.forEach(assignedSplits.keySet()::remove);
+                    splitsToRemove.forEach(splitFinishedOffsets.keySet()::remove);
+
+                    remainingSplits.removeIf(split -> !tableFilter.isIncluded(split.getTableId()));
+                    // add new tables
                     remainingTables.addAll(newlyAddedTables);
-                    if (isAssigningFinished(assignerStatus)) {
+
+                    // remove unmatched tables from already processed tables since the abnormal
+                    // tables might be added back in the future
+                    alreadyProcessedTables.removeIf(tableId -> !tableFilter.isIncluded(tableId));
+
+                    // only suspend the assigner if there's new tables added and assigner has
+                    // finished
+                    if (isAssigningFinished(assignerStatus) && !newlyAddedTables.isEmpty()) {
                         // start the newly added tables process under binlog reading phase
                         LOG.info(
                                 "Found newly added tables, start capture newly added tables process under binlog reading phase");

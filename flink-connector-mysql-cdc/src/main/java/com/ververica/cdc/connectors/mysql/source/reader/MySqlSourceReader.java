@@ -174,7 +174,10 @@ public class MySqlSourceReader<T>
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
                 if (snapshotSplit.isSnapshotReadFinished()) {
                     finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
-                } else {
+                } else if (sourceConfig
+                        .getTableFilters()
+                        .dataCollectionFilter()
+                        .isIncluded(split.asSnapshotSplit().getTableId())) {
                     unfinishedSplits.add(split);
                 }
             } else {
@@ -196,7 +199,12 @@ public class MySqlSourceReader<T>
         // notify split enumerator again about the finished unacked snapshot splits
         reportFinishedSnapshotSplitsIfNeed();
         // add all un-finished splits (including binlog split) to SourceReaderBase
-        super.addSplits(unfinishedSplits);
+        if (!unfinishedSplits.isEmpty()) {
+            super.addSplits(unfinishedSplits);
+        } else if (suspendedBinlogSplit
+                != null) { // only request new snapshot split if the binlog split is suspended
+            context.sendSplitRequest();
+        }
     }
 
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(MySqlBinlogSplit split) {
