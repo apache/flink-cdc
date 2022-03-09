@@ -247,6 +247,16 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
 ```
 Usually, it is recommended to exclude schema because schema fields makes the messages very verbose which reduces parsing performance.
 
+The `JsonDebeziumDeserializationSchema` can also accept custom configuration of `JsonConverter`, for example if you want to obtain numeric output for decimal data,
+you can construct `JsonDebeziumDeserializationSchema` as following:
+
+```java
+ Map<String, Object> customConverterConfigs = new HashMap<>();
+ customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
+ JsonDebeziumDeserializationSchema schema = 
+      new JsonDebeziumDeserializationSchema(true, customConverterConfigs);
+```
+
 ## Building from source
 
 Prerequisites:
