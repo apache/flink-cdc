@@ -560,8 +560,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + "]",
                 };
 
-        assertEqualsInAnyOrder(
-                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -632,8 +631,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[0, 1024, " + getIntegerSeqString(2, tableColumnCount) + "]"
                 };
 
-        assertEqualsInAnyOrder(
-                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -896,8 +894,84 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[111, scooter, Big 2-wheel scooter , 5.170]",
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
-        assertEqualsInAnyOrder(
-                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testPrimaryKeyWithVarbinaryType() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        inventoryDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE varbinary_pk_table ("
+                                + " order_id VARBINARY(11),"
+                                + " order_date DATE,"
+                                + " quantity INT,"
+                                + " product_id INT,"
+                                + " purchaser STRING,"
+                                + " PRIMARY KEY(order_id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        inventoryDatabase.getDatabaseName(),
+                        "varbinary_pk_table",
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM varbinary_pk_table");
+
+        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        do {
+            Thread.sleep(5000L);
+        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+
+        CloseableIterator<Row> iterator = result.collect();
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO varbinary_pk_table VALUES (b'0000010000000100000001000000010000000100000001000000010000000101','2021-03-08', 30, 500, 'flink');"); // 110
+            statement.execute(
+                    "INSERT INTO varbinary_pk_table VALUES (b'0000010000000100000001000000010000000100000001000000010000000110','2021-03-08', 30, 500, 'flink-sql');");
+            statement.execute(
+                    "UPDATE varbinary_pk_table SET quantity=50 WHERE order_id=b'0000010000000100000001000000010000000100000001000000010000000101';");
+            statement.execute(
+                    "DELETE FROM varbinary_pk_table WHERE order_id=b'0000010000000100000001000000010000000100000001000000010000000110';");
+        }
+
+        String[] expected =
+                new String[] {
+                    // snapshot records
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 0], 2021-03-08, 0, 0, flink]",
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 1], 2021-03-08, 10, 100, flink]",
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 2], 2021-03-08, 20, 200, flink]",
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 3], 2021-03-08, 30, 300, flink]",
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 4], 2021-03-08, 40, 400, flink]",
+                    // binlog records
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 5], 2021-03-08, 30, 500, flink]",
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 6], 2021-03-08, 30, 500, flink-sql]",
+                    "-U[[4, 4, 4, 4, 4, 4, 4, 5], 2021-03-08, 30, 500, flink]",
+                    "+U[[4, 4, 4, 4, 4, 4, 4, 5], 2021-03-08, 50, 500, flink]",
+                    "-D[[4, 4, 4, 4, 4, 4, 4, 6], 2021-03-08, 30, 500, flink-sql]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -965,8 +1039,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[416927583791428523, China, Hangzhou, West Town address 2]",
                     "+I[418257940021724075, Germany, Berlin, West Town address 3]"
                 };
-        assertEqualsInAnyOrder(
-                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -1039,8 +1112,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[221, user_221, Shanghai, 123567891234, null, 20]",
                 };
 
-        assertEqualsInAnyOrder(
-                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
 
@@ -1347,8 +1419,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[123458.6789, KIND_003, user_3, my shopping cart]",
                     "+I[123459.1234, KIND_004, user_4, null]"
                 };
-        assertEqualsInAnyOrder(
-                Arrays.asList(expected), fetchRows(result.collect(), expected.length));
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
 
