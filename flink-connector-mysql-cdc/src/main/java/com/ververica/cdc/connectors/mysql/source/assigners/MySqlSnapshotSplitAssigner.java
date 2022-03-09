@@ -45,6 +45,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -201,12 +202,43 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 final List<TableId> newlyAddedTables = discoverCapturedTables(jdbc, sourceConfig);
+
+                // Get the removed tables with the new table filter
+                List<TableId> tablesToRemove = new LinkedList<>(alreadyProcessedTables);
+                tablesToRemove.addAll(remainingTables);
+                tablesToRemove.removeAll(newlyAddedTables);
+
                 newlyAddedTables.removeAll(alreadyProcessedTables);
                 newlyAddedTables.removeAll(remainingTables);
+
+                // case 1: there are old tables to remove from state
+                if (!tablesToRemove.isEmpty()) {
+
+                    // remove unassigned tables/splits if it does not satisfy new table filter
+                    List<String> splitsToRemove = new LinkedList<>();
+                    for (Map.Entry<String, MySqlSchemalessSnapshotSplit> splitEntry :
+                            assignedSplits.entrySet()) {
+                        if (tablesToRemove.contains(splitEntry.getValue().getTableId())) {
+                            splitsToRemove.add(splitEntry.getKey());
+                        }
+                    }
+                    splitsToRemove.forEach(assignedSplits.keySet()::remove);
+                    splitsToRemove.forEach(splitFinishedOffsets.keySet()::remove);
+                    tableSchemas
+                            .entrySet()
+                            .removeIf(schema -> tablesToRemove.contains(schema.getKey()));
+                    remainingSplits.removeIf(split -> tablesToRemove.contains(split.getTableId()));
+                    remainingTables.removeAll(tablesToRemove);
+                    alreadyProcessedTables.removeIf(tableId -> tablesToRemove.contains(tableId));
+                }
+
+                // case 2: there are new tables to add
                 if (!newlyAddedTables.isEmpty()) {
                     // if job is still in snapshot reading phase, directly add all newly added
                     // tables
                     LOG.info("Found newly added tables, start capture newly added tables process");
+
+                    // add new tables
                     remainingTables.addAll(newlyAddedTables);
                     if (isAssigningFinished(assignerStatus)) {
                         // start the newly added tables process under binlog reading phase
@@ -534,7 +566,17 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             ChunkSplitterState chunkSplitterState) {
         MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, isTableIdCaseSensitive);
         if (!NO_SPLITTING_TABLE_STATE.equals(chunkSplitterState)) {
-            return new MySqlChunkSplitter(mySqlSchema, sourceConfig, chunkSplitterState);
+            TableId tableId = chunkSplitterState.getCurrentSplittingTableId();
+            return new MySqlChunkSplitter(
+                    mySqlSchema,
+                    sourceConfig,
+                    tableId != null
+                                    && sourceConfig
+                                            .getTableFilters()
+                                            .dataCollectionFilter()
+                                            .isIncluded(tableId)
+                            ? chunkSplitterState
+                            : NO_SPLITTING_TABLE_STATE);
         }
         return new MySqlChunkSplitter(mySqlSchema, sourceConfig);
     }
