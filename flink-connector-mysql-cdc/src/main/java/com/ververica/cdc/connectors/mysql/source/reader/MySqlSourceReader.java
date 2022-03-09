@@ -125,21 +125,12 @@ public class MySqlSourceReader<T>
     public List<MySqlSplit> snapshotState(long checkpointId) {
         List<MySqlSplit> stateSplits = super.snapshotState(checkpointId);
 
-        // unfinished splits
-        List<MySqlSplit> unfinishedSplits =
-                stateSplits.stream()
-                        .filter(split -> !finishedUnackedSplits.containsKey(split.splitId()))
-                        .collect(Collectors.toList());
-
-        // add finished snapshot splits that didn't receive ack yet
-        unfinishedSplits.addAll(finishedUnackedSplits.values());
-
         // add binlog splits who are uncompleted
-        unfinishedSplits.addAll(uncompletedBinlogSplits.values());
+        stateSplits.addAll(uncompletedBinlogSplits.values());
 
         // add suspended BinlogSplit
         if (suspendedBinlogSplit != null) {
-            unfinishedSplits.add(suspendedBinlogSplit);
+            stateSplits.add(suspendedBinlogSplit);
         }
         return stateSplits;
     }
@@ -174,7 +165,10 @@ public class MySqlSourceReader<T>
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
                 if (snapshotSplit.isSnapshotReadFinished()) {
                     finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
-                } else {
+                } else if (sourceConfig
+                        .getTableFilters()
+                        .dataCollectionFilter()
+                        .isIncluded(split.asSnapshotSplit().getTableId())) {
                     unfinishedSplits.add(split);
                 }
             } else {
@@ -196,7 +190,12 @@ public class MySqlSourceReader<T>
         // notify split enumerator again about the finished unacked snapshot splits
         reportFinishedSnapshotSplitsIfNeed();
         // add all un-finished splits (including binlog split) to SourceReaderBase
-        super.addSplits(unfinishedSplits);
+        if (!unfinishedSplits.isEmpty()) {
+            super.addSplits(unfinishedSplits);
+        } else if (suspendedBinlogSplit
+                != null) { // only request new snapshot split if the binlog split is suspended
+            context.sendSplitRequest();
+        }
     }
 
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(MySqlBinlogSplit split) {
