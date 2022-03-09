@@ -28,8 +28,13 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
+import org.apache.flink.table.connector.source.ScanTableSource;
+import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 
+import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -40,6 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
 
 /** Test for {@link SqlServerTableSource} created by {@link SqlServerTableFactory}. */
@@ -154,6 +160,13 @@ public class SqlServerTableFactoryTest {
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
 
         assertEquals(expectedSource, actualSource);
+
+        ScanTableSource.ScanRuntimeProvider provider =
+                sqlServerTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
+        DebeziumSourceFunction<RowData> debeziumSourceFunction =
+                (DebeziumSourceFunction<RowData>)
+                        ((SourceFunctionProvider) provider).createSourceFunction();
+        assertProducedTypeOfSourceFunction(debeziumSourceFunction, expectedSource.producedDataType);
     }
 
     private Map<String, String> getAllOptions() {
