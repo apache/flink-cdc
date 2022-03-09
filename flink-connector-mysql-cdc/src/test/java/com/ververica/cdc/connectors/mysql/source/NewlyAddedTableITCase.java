@@ -244,6 +244,218 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 "address_beijing");
     }
 
+    @Test
+    public void testJobManagerFailoverForRemoveTableSingleParallelism() throws Exception {
+        testRemoveTablesOneByOne(
+                1,
+                FailoverType.JM,
+                FailoverPhase.SNAPSHOT,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    @Test
+    public void testJobManagerFailoverForRemoveTable() throws Exception {
+        testRemoveTablesOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.JM,
+                FailoverPhase.SNAPSHOT,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    @Test
+    public void testTaskManagerFailoverForRemoveTableSingleParallelism() throws Exception {
+        testRemoveTablesOneByOne(
+                1,
+                FailoverType.TM,
+                FailoverPhase.SNAPSHOT,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    @Test
+    public void testTaskManagerFailoverForRemoveTable() throws Exception {
+        testRemoveTablesOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.TM,
+                FailoverPhase.SNAPSHOT,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    @Test
+    public void testRemoveTableSingleParallelism() throws Exception {
+        testRemoveTablesOneByOne(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    @Test
+    public void testRemoveTable() throws Exception {
+        testRemoveTablesOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    private void testRemoveTablesOneByOne(
+            int parallelism,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String... captureAddressTables)
+            throws Exception {
+
+        // step 1: create mysql tables with all tables included
+        initialAddressTables(getConnection(), captureAddressTables);
+
+        final TemporaryFolder temporaryFolder = new TemporaryFolder();
+        temporaryFolder.create();
+        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+
+        // get all expected data
+        List<String> fetchedDataList = new ArrayList<>();
+        for (String table : captureAddressTables) {
+            String cityName = table.split("_")[1];
+            fetchedDataList.addAll(
+                    Arrays.asList(
+                            format(
+                                    "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
+                                    table, cityName, cityName),
+                            format(
+                                    "+I[%s, 416927583791428523, China, %s, %s West Town address 2]",
+                                    table, cityName, cityName),
+                            format(
+                                    "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
+                                    table, cityName, cityName)));
+        }
+
+        String finishedSavePointPath = null;
+        // step 2: execute insert and trigger savepoint with all tables added
+        {
+            StreamExecutionEnvironment env =
+                    getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
+            StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+            String createTableStatement = getCreateTableStatement(captureAddressTables);
+            tEnv.executeSql(createTableStatement);
+            tEnv.executeSql(
+                    "CREATE TABLE sink ("
+                            + " table_name STRING,"
+                            + " id BIGINT,"
+                            + " country STRING,"
+                            + " city STRING,"
+                            + " detail_address STRING,"
+                            + " primary key (city, id) not enforced"
+                            + ") WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false'"
+                            + ")");
+            TableResult tableResult = tEnv.executeSql("insert into sink select * from address");
+            JobClient jobClient = tableResult.getJobClient().get();
+
+            // trigger failover after some snapshot data read finished
+            if (failoverPhase == FailoverPhase.SNAPSHOT) {
+                triggerFailover(
+                        failoverType,
+                        jobClient.getJobID(),
+                        miniClusterResource.getMiniCluster(),
+                        () -> sleepMs(100));
+            }
+            waitForSinkSize("sink", fetchedDataList.size());
+            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
+            jobClient.cancel().get();
+        }
+
+        // test removing table one by one, note that there should be at least one table remaining
+        for (int round = 0; round < captureAddressTables.length - 1; round++) {
+            String[] captureTablesThisRound =
+                    Arrays.asList(captureAddressTables)
+                            .subList(round + 1, captureAddressTables.length)
+                            .toArray(new String[0]);
+
+            StreamExecutionEnvironment env =
+                    getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
+            StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+            String createTableStatement = getCreateTableStatement(captureTablesThisRound);
+            tEnv.executeSql(createTableStatement);
+            tEnv.executeSql(
+                    "CREATE TABLE sink ("
+                            + " table_name STRING,"
+                            + " id BIGINT,"
+                            + " country STRING,"
+                            + " city STRING,"
+                            + " detail_address STRING,"
+                            + " primary key (city, id) not enforced"
+                            + ") WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false'"
+                            + ")");
+            TableResult tableResult = tEnv.executeSql("insert into sink select * from address");
+            JobClient jobClient = tableResult.getJobClient().get();
+
+            waitForSinkSize("sink", fetchedDataList.size());
+            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+
+            // step 3: make binlog data for all tables
+            List<String> expectedBinlogDataThisRound = new ArrayList<>();
+
+            for (int i = 0, captureAddressTablesLength = captureAddressTables.length;
+                    i < captureAddressTablesLength;
+                    i++) {
+                String tableName = captureAddressTables[i];
+                makeBinlogForAddressTable(getConnection(), tableName, round);
+                if (i <= round) {
+                    continue;
+                }
+                String cityName = tableName.split("_")[1];
+                expectedBinlogDataThisRound.addAll(
+                        Arrays.asList(
+                                format(
+                                        "+U[%s, 416874195632735147, CHINA_%s, %s, %s West Town address 1]",
+                                        tableName, round, cityName, cityName),
+                                format(
+                                        "+I[%s, %d, China, %s, %s West Town address 4]",
+                                        tableName,
+                                        417022095255614380L + round,
+                                        cityName,
+                                        cityName)));
+            }
+
+            if (failoverPhase == FailoverPhase.BINLOG
+                    && TestValuesTableFactory.getRawResults("sink").size()
+                            > fetchedDataList.size()) {
+                triggerFailover(
+                        failoverType,
+                        jobClient.getJobID(),
+                        miniClusterResource.getMiniCluster(),
+                        () -> sleepMs(100));
+            }
+
+            fetchedDataList.addAll(expectedBinlogDataThisRound);
+            // step 4: assert fetched binlog data in this round
+            waitForSinkSize("sink", fetchedDataList.size());
+            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+
+            // step 5: trigger savepoint
+            finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
+            jobClient.cancel().get();
+        }
+    }
+
     private void testNewlyAddedTableOneByOne(
             int parallelism,
             FailoverType failoverType,
@@ -574,5 +786,44 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
         return DebeziumUtils.createMySqlConnection(configuration, new Properties());
+    }
+
+    private void makeBinlogForAddressTable(JdbcConnection connection, String tableName, int round)
+            throws SQLException {
+        try {
+            connection.setAutoCommit(false);
+            // make binlog events for the first split
+            String tableId = customDatabase.getDatabaseName() + "." + tableName;
+            String cityName = tableName.split("_")[1];
+            connection.execute(
+                    format(
+                            "UPDATE %s SET COUNTRY = 'CHINA_%s' where id = 416874195632735147",
+                            tableId, round));
+            connection.execute(
+                    format(
+                            "INSERT INTO %s VALUES(%d, 'China','%s','%s West Town address 4')",
+                            tableId, 417022095255614380L + round, cityName, cityName));
+            connection.commit();
+        } finally {
+            connection.close();
+        }
+    }
+
+    private static void waitForSinkSize(String sinkName, int expectedSize)
+            throws InterruptedException {
+        while (sinkSize(sinkName) < expectedSize) {
+            Thread.sleep(100);
+        }
+    }
+
+    private static int sinkSize(String sinkName) {
+        synchronized (TestValuesTableFactory.class) {
+            try {
+                return TestValuesTableFactory.getRawResults(sinkName).size();
+            } catch (IllegalArgumentException e) {
+                // job is not started yet
+                return 0;
+            }
+        }
     }
 }
