@@ -30,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
-import org.tikv.common.exception.RowValueHasMoreColumnException;
+import org.tikv.common.exception.DifferentColumnCountException;
 import org.tikv.common.key.RowKey;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Cdcpb.Event.Row;
@@ -75,7 +75,8 @@ public class RowDataTiKVChangeEventDeserializationSchema
 
     @Override
     public void deserialize(Row row, Collector<RowData> out) throws Exception {
-        for (int i = 0; i < 2; i++) {
+        int i = 0;
+        for (; i < 2; i++) {
             TiTableInfo tableInfo = getTableInfo();
             try {
                 final RowKey rowKey = RowKey.decode(row.getKey().toByteArray());
@@ -125,6 +126,8 @@ public class RowDataTiKVChangeEventDeserializationSchema
                                                         tableInfo)));
                             }
                             break;
+                        } catch (DifferentColumnCountException e) {
+                            throw e;
                         } catch (final RuntimeException e) {
                             throw new FlinkRuntimeException(
                                     String.format(
@@ -137,11 +140,16 @@ public class RowDataTiKVChangeEventDeserializationSchema
                                 "Unknown Row Op Type: " + row.getOpType().toString());
                 }
                 break;
-            } catch (RowValueHasMoreColumnException e) {
+            } catch (DifferentColumnCountException e) {
                 LOG.warn(
-                        "Row value has more column than TableInfo, reload TableInfo and try again");
+                        "Row value and TableInfo has different column count, reload TableInfo and try again");
                 initTableInfo();
             }
+        }
+
+        if (2 == i) {
+            LOG.warn("Row value is lost, value: {}", row);
+            throw new FlinkRuntimeException(String.format("row value is lost, %s", row));
         }
     }
 
@@ -152,9 +160,12 @@ public class RowDataTiKVChangeEventDeserializationSchema
         return gTableInfo;
     }
 
-    private void initTableInfo() {
-        TiSession session = TiSession.create(tiConf);
-        gTableInfo = session.getCatalog().getTable(database, tableName);
+    private synchronized void initTableInfo() {
+        try (TiSession session = TiSession.create(tiConf)) {
+            gTableInfo = session.getCatalog().getTable(database, tableName);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static Object[] getRowDataFields(byte[] value, Long handle, TiTableInfo tableInfo) {

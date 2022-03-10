@@ -17,7 +17,7 @@
 
 package org.tikv.common.codec;
 
-import org.tikv.common.exception.RowValueHasMoreColumnException;
+import org.tikv.common.exception.DifferentColumnCountException;
 import org.tikv.common.meta.TiColumnInfo;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.row.ObjectRowImpl;
@@ -68,8 +68,8 @@ public class TableCodecV2 {
         HashMap<Long, Object> decodedDataMap = new HashMap<>(colSize);
         RowV2 rowV2 = RowV2.createNew(value);
 
-        if (tableInfo.getColumns().size() < rowV2.columnCount() && enableSchemaCheck) {
-            throw new RowValueHasMoreColumnException();
+        if (enableSchemaCheck && !isColCountEquals(tableInfo, handle, rowV2)) {
+            throw new DifferentColumnCountException();
         }
 
         for (TiColumnInfo col : tableInfo.getColumns()) {
@@ -100,6 +100,16 @@ public class TableCodecV2 {
             res[i] = decodedDataMap.get(col.getId());
         }
         return res;
+    }
+
+    private static boolean isColCountEquals(TiTableInfo tableInfo, Long handle, RowV2 rowV2) {
+        int colSize = tableInfo.getColumns().size();
+        int rowColSize = rowV2.columnCount();
+        if (tableInfo.isPkHandle()) {
+            return colSize == rowColSize + 1;
+        } else {
+            return colSize == rowColSize;
+        }
     }
 
     protected static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {

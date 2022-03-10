@@ -18,7 +18,7 @@
 package org.tikv.common.codec;
 
 import org.tikv.common.codec.Codec.IntegerCodec;
-import org.tikv.common.exception.RowValueHasMoreColumnException;
+import org.tikv.common.exception.DifferentColumnCountException;
 import org.tikv.common.meta.TiColumnInfo;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.row.ObjectRowImpl;
@@ -82,7 +82,7 @@ public class TableCodecV1 {
                 decodedDataMap.put(colID, colValue);
             } else {
                 if (enableTableInfoCheck) {
-                    throw new RowValueHasMoreColumnException();
+                    throw new DifferentColumnCountException();
                 }
             }
         }

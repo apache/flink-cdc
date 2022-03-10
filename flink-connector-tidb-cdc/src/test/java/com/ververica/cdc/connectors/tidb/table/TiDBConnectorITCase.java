@@ -30,7 +30,11 @@ import org.apache.flink.table.utils.LegacyRowResource;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.*;
+import org.junit.Before;
+import org.junit.ClassRule;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -78,41 +82,44 @@ public class TiDBConnectorITCase extends TestLogger {
         env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
     }
 
-    @BeforeClass
-    public static void beforeClass() {
-        try(Connection connection =
-                     DriverManager.getConnection(
-                             "jdbc:mysql://root@localhost:4000/inventory", FLINK_USER, null);
-             ) {
+    @Before
+    public void initDatabase() {
+        try (Connection connection =
+                DriverManager.getConnection(
+                        "jdbc:mysql://root@localhost:4000/inventory", FLINK_USER, null); ) {
             executeSql(connection, "DROP DATABASE IF EXISTS inventory");
             executeSql(connection, "CREATE DATABASE inventory");
             executeSql(connection, "USE inventory");
-            executeSql(connection, "CREATE TABLE products\n" +
-                    "(\n" +
-                    "    id          INTEGER      NOT NULL AUTO_INCREMENT PRIMARY KEY,\n" +
-                    "    name        VARCHAR(255) NOT NULL DEFAULT 'flink',\n" +
-                    "    description VARCHAR(512),\n" +
-                    "    weight      DECIMAL(20, 10)\n" +
-                    ");");
+            executeSql(
+                    connection,
+                    "CREATE TABLE products\n"
+                            + "(\n"
+                            + "    id          INTEGER      NOT NULL AUTO_INCREMENT PRIMARY KEY,\n"
+                            + "    name        VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
+                            + "    description VARCHAR(512),\n"
+                            + "    weight      DECIMAL(20, 10)\n"
+                            + ");");
             executeSql(connection, "ALTER TABLE products AUTO_INCREMENT = 101;");
 
-            executeSql(connection,"INSERT INTO products\n" +
-                    "VALUES (default, \"scooter\", \"Small 2-wheel scooter\", 3.14),\n" +
-                    "       (default, \"car battery\", \"12V car battery\", 8.1),\n" +
-                    "       (default, \"12-pack drill bits\", \"12-pack of drill bits with sizes ranging from #40 to #3\", 0.8),\n" +
-                    "       (default, \"hammer\", \"12oz carpenter's hammer\", 0.75),\n" +
-                    "       (default, \"hammer\", \"14oz carpenter's hammer\", 0.875),\n" +
-                    "       (default, \"hammer\", \"16oz carpenter's hammer\", 1.0),\n" +
-                    "       (default, \"rocks\", \"box of assorted rocks\", 5.3),\n" +
-                    "       (default, \"jacket\", \"water resistent black wind breaker\", 0.1),\n" +
-                    "       (default, \"spare tire\", \"24 inch spare tire\", 22.2);");
+            executeSql(
+                    connection,
+                    "INSERT INTO products\n"
+                            + "VALUES (default, \"scooter\", \"Small 2-wheel scooter\", 3.14),\n"
+                            + "       (default, \"car battery\", \"12V car battery\", 8.1),\n"
+                            + "       (default, \"12-pack drill bits\", \"12-pack of drill bits with sizes ranging from #40 to #3\", 0.8),\n"
+                            + "       (default, \"hammer\", \"12oz carpenter's hammer\", 0.75),\n"
+                            + "       (default, \"hammer\", \"14oz carpenter's hammer\", 0.875),\n"
+                            + "       (default, \"hammer\", \"16oz carpenter's hammer\", 1.0),\n"
+                            + "       (default, \"rocks\", \"box of assorted rocks\", 5.3),\n"
+                            + "       (default, \"jacket\", \"water resistent black wind breaker\", 0.1),\n"
+                            + "       (default, \"spare tire\", \"24 inch spare tire\", 22.2);");
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     @Test
-//    @Ignore("Test ignored because it need manually install TiDB suites by TiUP")
+    @Ignore("Test ignored because it need manually install TiDB suites by TiUP")
     public void testConsumingAllEvents() throws Exception {
         String sourceDDL =
                 String.format(
@@ -216,6 +223,158 @@ public class TiDBConnectorITCase extends TestLogger {
                         "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEqualsInAnyOrder(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    @Ignore("Test ignored because it need manually install TiDB suites by TiUP")
+    public void testConsumingEventsAfterAddColumn() throws Exception {
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE tidb_source ("
+                                + " `id` INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(20, 10),"
+                                + " PRIMARY KEY (`id`) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'tidb-cdc',"
+                                + " 'hostname' = '127.0.0.1',"
+                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
+                                + " 'tikv.pd.addresses' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        "127.0.0.1:2379", FLINK_USER, FLINK_USER_PASSWORD, "inventory", "products");
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " `id` INT NOT NULL,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(20, 10),"
+                        + " PRIMARY KEY (`id`) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", 9);
+
+        try (Connection connection =
+                        DriverManager.getConnection(
+                                "jdbc:mysql://root@localhost:4000/inventory", FLINK_USER, null);
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM products WHERE id=111;");
+        }
+
+        waitForSinkSize("sink", 16);
+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | id  | name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I(101,scooter,Small 2-wheel scooter,3.1400000000)",
+                        "+I(102,car battery,12V car battery,8.1000000000)",
+                        "+I(103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                        "+I(104,hammer,12oz carpenter's hammer,0.7500000000)",
+                        "+I(105,hammer,14oz carpenter's hammer,0.8750000000)",
+                        "+I(106,hammer,16oz carpenter's hammer,1.0000000000)",
+                        "+I(107,rocks,box of assorted rocks,5.3000000000)",
+                        "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(109,spare tire,24 inch spare tire,22.2000000000)",
+                        "+U(106,hammer,18oz carpenter hammer,1.0000000000)",
+                        "+U(107,rocks,box of assorted rocks,5.1000000000)",
+                        "+I(110,jacket,water resistent white wind breaker,0.2000000000)",
+                        "+I(111,scooter,Big 2-wheel scooter ,5.1800000000)",
+                        "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
+                        "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
+                        "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        assertEqualsInAnyOrder(expected, actual);
+
+        // schema change and then add new rows
+        try (Connection connection =
+                        DriverManager.getConnection(
+                                "jdbc:mysql://root@localhost:4000/inventory", FLINK_USER, null);
+                Statement statement = connection.createStatement()) {
+
+            statement.execute("ALTER TABLE products ADD COLUMN new_col VARCHAR(255)");
+
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket_2','water resistent white wind breaker',0.2, 'col_value');"); // 110
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter_2','Big 2-wheel scooter ',5.18, 'col_value');");
+            statement.execute(
+                    "UPDATE products SET name='new jacket',new_col='col_value' WHERE id=110;");
+        }
+
+        waitForSinkSize("sink", 19);
+
+        List<String> expected2 =
+                Arrays.asList(
+                        "+I(101,scooter,Small 2-wheel scooter,3.1400000000)",
+                        "+I(102,car battery,12V car battery,8.1000000000)",
+                        "+I(103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                        "+I(104,hammer,12oz carpenter's hammer,0.7500000000)",
+                        "+I(105,hammer,14oz carpenter's hammer,0.8750000000)",
+                        "+I(106,hammer,16oz carpenter's hammer,1.0000000000)",
+                        "+I(107,rocks,box of assorted rocks,5.3000000000)",
+                        "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(109,spare tire,24 inch spare tire,22.2000000000)",
+                        "+U(106,hammer,18oz carpenter hammer,1.0000000000)",
+                        "+U(107,rocks,box of assorted rocks,5.1000000000)",
+                        "+I(110,jacket,water resistent white wind breaker,0.2000000000)",
+                        "+I(111,scooter,Big 2-wheel scooter ,5.1800000000)",
+                        "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
+                        "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
+                        "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)",
+                        "+I(112,jacket_2,water resistent white wind breaker,0.2000000000)",
+                        "+I(113,scooter_2,Big 2-wheel scooter ,5.1800000000)",
+                        "+U(110,new jacket,new water resistent white wind breaker,0.5000000000)");
+
+        List<String> actual2 = TestValuesTableFactory.getRawResults("sink");
+        assertEqualsInAnyOrder(expected2, actual2);
+
         result.getJobClient().get().cancel().get();
     }
 

@@ -17,8 +17,8 @@
 
 package org.tikv.common.exception;
 
-public class RowValueHasMoreColumnException extends RuntimeException {
-    public RowValueHasMoreColumnException() {
-        super("Row value has more column than TableInfo");
+public class DifferentColumnCountException extends RuntimeException {
+    public DifferentColumnCountException() {
+        super("Row value and TableInfo has different column count");
     }
 }
