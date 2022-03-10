@@ -58,10 +58,8 @@ public class RowDataTiKVChangeEventDeserializationSchema
     private final String database;
     private final String tableName;
 
-    private transient TiSession session = null;
-
     /** Information of the TiKV table. * */
-    private transient TiTableInfo tableInfo = null;
+    private transient TiTableInfo gTableInfo = null;
 
     public RowDataTiKVChangeEventDeserializationSchema(
             TypeInformation<RowData> resultTypeInfo,
@@ -73,17 +71,12 @@ public class RowDataTiKVChangeEventDeserializationSchema
         this.tiConf = tiConf;
         this.database = database;
         this.tableName = tableName;
-        try {
-            this.session = TiSession.create(tiConf);
-            this.tableInfo = this.session.getCatalog().getTable(database, tableName);
-        } catch (Exception e) {
-            throw new FlinkRuntimeException(e);
-        }
     }
 
     @Override
     public void deserialize(Row row, Collector<RowData> out) throws Exception {
         for (int i = 0; i < 2; i++) {
+            TiTableInfo tableInfo = getTableInfo();
             try {
                 final RowKey rowKey = RowKey.decode(row.getKey().toByteArray());
                 final long handle = rowKey.getHandle();
@@ -143,12 +136,25 @@ public class RowDataTiKVChangeEventDeserializationSchema
                         throw new IllegalArgumentException(
                                 "Unknown Row Op Type: " + row.getOpType().toString());
                 }
+                break;
             } catch (RowValueHasMoreColumnException e) {
                 LOG.warn(
                         "Row value has more column than TableInfo, reload TableInfo and try again");
-                tableInfo = session.getCatalog().getTable(database, tableName);
+                initTableInfo();
             }
         }
+    }
+
+    private TiTableInfo getTableInfo() {
+        if (null == gTableInfo) {
+            initTableInfo();
+        }
+        return gTableInfo;
+    }
+
+    private void initTableInfo() {
+        TiSession session = TiSession.create(tiConf);
+        gTableInfo = session.getCatalog().getTable(database, tableName);
     }
 
     private static Object[] getRowDataFields(byte[] value, Long handle, TiTableInfo tableInfo) {
