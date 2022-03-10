@@ -18,6 +18,12 @@
 -- ----------------------------------------------------------------------------------------------------------------
 
 -- Create and populate our products using a single insert with many rows
+DROP DATABASE IF EXISTS inventory;
+
+CREATE DATABASE inventory;
+
+USE inventory;
+
 CREATE TABLE products
 (
     id          INTEGER      NOT NULL AUTO_INCREMENT PRIMARY KEY,
