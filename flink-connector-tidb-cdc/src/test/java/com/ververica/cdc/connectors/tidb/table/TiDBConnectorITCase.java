@@ -18,26 +18,19 @@
 
 package com.ververica.cdc.connectors.tidb.table;
 
-import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
-import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
-import org.apache.flink.test.util.MiniClusterWithClientResource;
-import org.apache.flink.util.TestLogger;
 
+import com.ververica.cdc.connectors.tidb.TiDBTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.Ignore;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
@@ -48,11 +41,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** Integration tests for TiDB change stream event SQL source. */
-public class TiDBConnectorITCase extends TestLogger {
-
-    private static final String FLINK_USER = "flinkuser";
-    private static final String FLINK_USER_PASSWORD = "flinkpwd";
-    private static final int DEFAULT_PARALLELISM = 4;
+public class TiDBConnectorITCase extends TiDBTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(1);
@@ -63,26 +52,15 @@ public class TiDBConnectorITCase extends TestLogger {
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(4)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
-
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.enableCheckpointing(1000);
-        env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
-        env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
+        env.setParallelism(1);
     }
 
     @Test
     public void testConsumingAllEvents() throws Exception {
+        initializeTidbTable("inventory");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE tidb_source ("
@@ -93,7 +71,7 @@ public class TiDBConnectorITCase extends TestLogger {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'hostname' = '127.0.0.1',"
+                                + " 'hostname' = '%s',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'tikv.pd.addresses' = '%s',"
                                 + " 'username' = '%s',"
@@ -101,7 +79,12 @@ public class TiDBConnectorITCase extends TestLogger {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        "127.0.0.1:2379", FLINK_USER, FLINK_USER_PASSWORD, "inventory", "products");
+                        getTIDBHost(),
+                        getPDHost() + ":" + getPDPort(),
+                        TIDB_USER,
+                        TIDB_PASSWORD,
+                        "inventory",
+                        "products");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -123,9 +106,7 @@ public class TiDBConnectorITCase extends TestLogger {
         // wait for snapshot finished and begin binlog
         waitForSinkSize("sink", 9);
 
-        try (Connection connection =
-                        DriverManager.getConnection(
-                                "jdbc:mysql://root@localhost:4000/inventory", FLINK_USER, null);
+        try (Connection connection = getJdbcConnection("inventory");
                 Statement statement = connection.createStatement()) {
 
             statement.execute(

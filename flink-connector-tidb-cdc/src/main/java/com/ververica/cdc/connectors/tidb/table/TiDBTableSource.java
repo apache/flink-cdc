@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.tidb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
@@ -46,12 +46,13 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class TiDBTableSource implements ScanTableSource {
 
-    private final TableSchema physicalSchema;
+    private final ResolvedSchema physicalSchema;
     private final String hostname;
     private final String database;
     private final String tableName;
     private final String username;
     private final String password;
+    private final String pdAddresses;
     private final StartupOptions startupOptions;
     private final Map<String, String> options;
 
@@ -63,12 +64,13 @@ public class TiDBTableSource implements ScanTableSource {
     protected DataType producedDataType;
 
     public TiDBTableSource(
-            TableSchema physicalSchema,
+            ResolvedSchema physicalSchema,
             String hostname,
             String database,
             String tableName,
             String username,
             String password,
+            String pdAddresses,
             StartupOptions startupOptions,
             Map<String, String> options) {
         this.physicalSchema = physicalSchema;
@@ -77,6 +79,7 @@ public class TiDBTableSource implements ScanTableSource {
         this.tableName = checkNotNull(tableName);
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
+        this.pdAddresses = checkNotNull(pdAddresses);
         this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.options = options;
@@ -99,8 +102,7 @@ public class TiDBTableSource implements ScanTableSource {
         try (final TiSession session = TiSession.create(tiConf)) {
             final TiTableInfo tableInfo = session.getCatalog().getTable(database, tableName);
 
-            TypeInformation<RowData> typeInfo =
-                    scanContext.createTypeInformation(physicalSchema.toRowDataType());
+            TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
             RowDataTiKVSnapshotEventDeserializationSchema snapshotEventDeserializationSchema =
                     new RowDataTiKVSnapshotEventDeserializationSchema(typeInfo, tableInfo);
             RowDataTiKVChangeEventDeserializationSchema changeEventDeserializationSchema =
@@ -134,6 +136,7 @@ public class TiDBTableSource implements ScanTableSource {
                         tableName,
                         username,
                         password,
+                        pdAddresses,
                         startupOptions,
                         options);
         source.producedDataType = producedDataType;
