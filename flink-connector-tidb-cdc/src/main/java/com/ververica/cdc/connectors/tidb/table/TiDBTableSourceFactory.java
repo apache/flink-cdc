@@ -20,14 +20,11 @@ package com.ververica.cdc.connectors.tidb.table;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.api.TableSchema;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
-
-import com.ververica.cdc.connectors.tidb.TDBSourceOptions;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -37,6 +34,13 @@ import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TABLE_NAME;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_DELETE_CONCURRENCY;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_GET_CONCURRENCY;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_PUT_CONCURRENCY;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_SCAN_CONCURRENCY;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_SCAN_TIMEOUT;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_TIMEOUT;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_PD_ADDRESSES;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.USERNAME;
 
 /** Factory for creating configured instance of {@link TiDBTableSource}. */
@@ -55,9 +59,9 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
+        String pdAddresses = config.get(TIKV_PD_ADDRESSES);
         StartupOptions startupOptions = getStartupOptions(config);
-        TableSchema physicalSchema =
-                TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
         return new TiDBTableSource(
                 physicalSchema,
@@ -66,6 +70,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
                 tableName,
                 username,
                 password,
+                pdAddresses,
                 startupOptions,
                 context.getCatalogTable().getOptions());
     }
@@ -83,7 +88,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(PASSWORD);
         options.add(DATABASE_NAME);
         options.add(TABLE_NAME);
-        options.add(TDBSourceOptions.TIKV_PD_ADDRESSES);
+        options.add(TIKV_PD_ADDRESSES);
         return options;
     }
 
@@ -91,12 +96,12 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(SCAN_STARTUP_MODE);
-        options.add(TDBSourceOptions.TIKV_GRPC_TIMEOUT);
-        options.add(TDBSourceOptions.TIKV_GRPC_SCAN_TIMEOUT);
-        options.add(TDBSourceOptions.TIKV_BATCH_GET_CONCURRENCY);
-        options.add(TDBSourceOptions.TIKV_BATCH_PUT_CONCURRENCY);
-        options.add(TDBSourceOptions.TIKV_BATCH_SCAN_CONCURRENCY);
-        options.add(TDBSourceOptions.TIKV_BATCH_DELETE_CONCURRENCY);
+        options.add(TIKV_GRPC_TIMEOUT);
+        options.add(TIKV_GRPC_SCAN_TIMEOUT);
+        options.add(TIKV_BATCH_GET_CONCURRENCY);
+        options.add(TIKV_BATCH_PUT_CONCURRENCY);
+        options.add(TIKV_BATCH_SCAN_CONCURRENCY);
+        options.add(TIKV_BATCH_DELETE_CONCURRENCY);
         return options;
     }
 
