@@ -32,9 +32,9 @@ import org.apache.flink.util.TestLogger;
 
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.Ignore;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -119,7 +119,6 @@ public class TiDBConnectorITCase extends TestLogger {
     }
 
     @Test
-    @Ignore("Test ignored because it need manually install TiDB suites by TiUP")
     public void testConsumingAllEvents() throws Exception {
         String sourceDDL =
                 String.format(
