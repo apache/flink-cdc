@@ -22,3 +22,7 @@ build-targetatlassian-ide-plugin.xml
 *.ipr
 *.iws
 docs/_build
+
+gen/
+*.tokens
+generated-sources/

@@ -28,6 +28,14 @@ under the License.
     <artifactId>flink-connector-debezium</artifactId>
     <name>flink-connector-debezium</name>
 
+    <properties>
+        <!-- ANTLR -->
+        <antlr.version>4.7.2</antlr.version>
+        <antlr.source.directory>${project.basedir}/src/main/java</antlr.source.directory>
+        <docker.skip>false</docker.skip>
+        <antlr.tests.enabled>true</antlr.tests.enabled>
+    </properties>
+
     <dependencies>
 
         <!-- Debezium dependencies -->
@@ -53,10 +61,60 @@ under the License.
         </dependency>
 
         <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${antlr.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-test-utils_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-maven-plugin</artifactId>
+                <version>${antlr.version}</version>
+                <configuration>
+                    <sourceDirectory>${antlr.source.directory}</sourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>antlr4</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- https://github.com/antlr/antlr4test-maven-plugin -->
+                <groupId>com.khubla.antlr</groupId>
+                <artifactId>antlr4test-maven-plugin</artifactId>
+                <version>1.11</version>
+                <executions>
+                    <execution>
+                        <id>MySql</id>
+                        <configuration>
+                            <verbose>false</verbose>
+                            <showTree>false</showTree>
+                            <entryPoint>root</entryPoint>
+                            <grammarName>MySql</grammarName>
+                            <packageName>io.debezium.ddl.parser.mysql.generated</packageName>
+                            <caseInsensitiveType>UPPER</caseInsensitiveType>
+                            <exampleFiles>src/test/resources/mysql/examples</exampleFiles>
+                            <enabled>${antlr.tests.enabled}</enabled>
+                        </configuration>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
