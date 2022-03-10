@@ -79,7 +79,7 @@ public class PolardbxSourceTCase extends AbstractTestBase {
             DockerImageName.parse("polardbx/polardb-x:latest");
 
     @Rule
-    public GenericContainer POLARDBX_CONTAINER =
+    public GenericContainer polardbxContainer =
             new GenericContainer<>(POLARDBX_IMAGE)
                     .withExposedPorts(PORT)
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
@@ -96,7 +96,7 @@ public class PolardbxSourceTCase extends AbstractTestBase {
         // no need to start container when the port 8527 is listening
         if (!checkConnection()) {
             LOG.info("Polardbx connection is not valid, so try to start containers...");
-            Startables.deepStart(Stream.of(POLARDBX_CONTAINER)).join();
+            Startables.deepStart(Stream.of(polardbxContainer)).join();
             LOG.info("Containers are started.");
         }
     }
