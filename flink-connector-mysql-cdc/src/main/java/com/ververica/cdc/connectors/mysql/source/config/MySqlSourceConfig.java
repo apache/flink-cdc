@@ -29,7 +29,6 @@ import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -201,9 +200,5 @@ public class MySqlSourceConfig implements Serializable {
 
     public RelationalTableFilters getTableFilters() {
         return dbzMySqlConfig.getTableFilters();
-    }
-
-    public boolean isHeartbeatEvent() {
-        return Optional.ofNullable(dbzConfiguration.getString("heartbeat.interval.ms")).isPresent();
     }
 }

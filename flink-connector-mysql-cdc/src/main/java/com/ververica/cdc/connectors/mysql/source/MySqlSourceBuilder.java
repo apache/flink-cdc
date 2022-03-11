@@ -217,6 +217,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** The interval of heartbeat event. */
+    public MySqlSourceBuilder<T> heartbeatInterval(Duration heartbeatInterval) {
+        this.configFactory.heartbeatInterval(heartbeatInterval);
+        return this;
+    }
+
     /**
      * Build the {@link MySqlSource}.
      *
