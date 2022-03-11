@@ -39,6 +39,9 @@ public class MySqlBinlogSplit extends MySqlSplit {
     private final Map<TableId, TableChange> tableSchemas;
     private final int totalFinishedSplitSize;
     private final boolean isSuspended;
+    // true means the binlog split is assigned from Enumerator, false means split is assigned from
+    // readerState
+    private final boolean isInit;
     @Nullable transient byte[] serializedFormCache;
 
     public MySqlBinlogSplit(
@@ -48,7 +51,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
             List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
             Map<TableId, TableChange> tableSchemas,
             int totalFinishedSplitSize,
-            boolean isSuspended) {
+            boolean isSuspended,
+            boolean isInit) {
         super(splitId);
         this.startingOffset = startingOffset;
         this.endingOffset = endingOffset;
@@ -56,6 +60,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = isSuspended;
+        this.isInit = isInit;
     }
 
     public MySqlBinlogSplit(
@@ -72,6 +77,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = false;
+        this.isInit = true;
     }
 
     public BinlogOffset getStartingOffset() {
@@ -99,6 +105,10 @@ public class MySqlBinlogSplit extends MySqlSplit {
         return isSuspended;
     }
 
+    public boolean isInit() {
+        return isInit;
+    }
+
     public boolean isCompletedSplit() {
         return totalFinishedSplitSize == finishedSnapshotSplitInfos.size();
     }
@@ -117,6 +127,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         MySqlBinlogSplit that = (MySqlBinlogSplit) o;
         return totalFinishedSplitSize == that.totalFinishedSplitSize
                 && isSuspended == that.isSuspended
+                && isInit == that.isInit
                 && Objects.equals(startingOffset, that.startingOffset)
                 && Objects.equals(endingOffset, that.endingOffset)
                 && Objects.equals(finishedSnapshotSplitInfos, that.finishedSnapshotSplitInfos)
@@ -132,7 +143,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 finishedSnapshotSplitInfos,
                 tableSchemas,
                 totalFinishedSplitSize,
-                isSuspended);
+                isSuspended,
+                isInit);
     }
 
     @Override
@@ -147,6 +159,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 + endingOffset
                 + ", isSuspended="
                 + isSuspended
+                + ", isInit="
+                + isInit
                 + '}';
     }
 
@@ -163,7 +177,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 splitInfos,
                 binlogSplit.getTableSchemas(),
                 binlogSplit.getTotalFinishedSplitSize(),
-                binlogSplit.isSuspended());
+                binlogSplit.isSuspended(),
+                binlogSplit.isInit());
     }
 
     public static MySqlBinlogSplit fillTableSchemas(
@@ -176,7 +191,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 binlogSplit.getFinishedSnapshotSplitInfos(),
                 tableSchemas,
                 binlogSplit.getTotalFinishedSplitSize(),
-                binlogSplit.isSuspended());
+                binlogSplit.isSuspended(),
+                binlogSplit.isInit());
     }
 
     public static MySqlBinlogSplit toNormalBinlogSplit(
@@ -188,6 +204,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 suspendedBinlogSplit.getFinishedSnapshotSplitInfos(),
                 suspendedBinlogSplit.getTableSchemas(),
                 totalFinishedSplitSize,
+                false,
                 false);
     }
 
@@ -199,6 +216,19 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 new ArrayList<>(),
                 new HashMap<>(),
                 normalBinlogSplit.getTotalFinishedSplitSize(),
-                true);
+                true,
+                false);
+    }
+
+    public static MySqlBinlogSplit toUnInitBinlogSplit(MySqlBinlogSplit initBinlogSplit) {
+        return new MySqlBinlogSplit(
+                initBinlogSplit.splitId,
+                initBinlogSplit.getStartingOffset(),
+                initBinlogSplit.getEndingOffset(),
+                initBinlogSplit.getFinishedSnapshotSplitInfos(),
+                initBinlogSplit.getTableSchemas(),
+                initBinlogSplit.getTotalFinishedSplitSize(),
+                initBinlogSplit.isSuspended(),
+                false);
     }
 }

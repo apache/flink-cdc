@@ -259,20 +259,17 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         new ForwardDeserializeSchema(),
                         new MySqlSourceReaderMetrics(metricGroup),
                         configuration.isIncludeSchemaChanges());
-        final MySqlSourceReaderContext mySqlSourceReaderContext =
-                new MySqlSourceReaderContext(readerContext);
         return new MySqlSourceReader<>(
                 elementsQueue,
-                () -> createSplitReader(configuration, mySqlSourceReaderContext),
+                () -> createSplitReader(configuration),
                 recordEmitter,
                 readerContext.getConfiguration(),
-                mySqlSourceReaderContext,
+                readerContext,
                 configuration);
     }
 
-    private MySqlSplitReader createSplitReader(
-            MySqlSourceConfig configuration, MySqlSourceReaderContext readerContext) {
-        return new MySqlSplitReader(configuration, 0, readerContext);
+    private MySqlSplitReader createSplitReader(MySqlSourceConfig configuration) {
+        return new MySqlSplitReader(configuration, 0);
     }
 
     private void makeBinlogEventsInOneTransaction(MySqlSourceConfig sourceConfig, String tableId)

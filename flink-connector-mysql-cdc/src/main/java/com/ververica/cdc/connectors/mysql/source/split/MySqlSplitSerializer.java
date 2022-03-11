@@ -104,6 +104,8 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             writeFinishedSplitsInfo(binlogSplit.getFinishedSnapshotSplitInfos(), out);
             writeTableSchemas(binlogSplit.getTableSchemas(), out);
             out.writeInt(binlogSplit.getTotalFinishedSplitSize());
+            out.writeBoolean(binlogSplit.isSuspended());
+            out.writeBoolean(binlogSplit.isInit());
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
@@ -157,8 +159,12 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     readFinishedSplitsInfo(version, in);
             Map<TableId, TableChange> tableChangeMap = readTableSchemas(version, in);
             int totalFinishedSplitSize = finishedSplitsInfo.size();
+            boolean isSuspended = false;
+            boolean isInit = false;
             if (version > 3) {
                 totalFinishedSplitSize = in.readInt();
+                isSuspended = in.readBoolean();
+                isInit = in.readBoolean();
             }
             in.releaseArrays();
             return new MySqlBinlogSplit(
@@ -167,7 +173,9 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     endingOffset,
                     finishedSplitsInfo,
                     tableChangeMap,
-                    totalFinishedSplitSize);
+                    totalFinishedSplitSize,
+                    isSuspended,
+                    isInit);
         } else {
             throw new IOException("Unknown split kind: " + splitKind);
         }

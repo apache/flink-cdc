@@ -54,24 +54,20 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     private final Queue<MySqlSplit> splits;
     private final MySqlSourceConfig sourceConfig;
     private final int subtaskId;
-    private final MySqlSourceReaderContext context;
 
     @Nullable private DebeziumReader<SourceRecord, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
 
-    public MySqlSplitReader(
-            MySqlSourceConfig sourceConfig, int subtaskId, MySqlSourceReaderContext context) {
+    public MySqlSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
         this.sourceConfig = sourceConfig;
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
-        this.context = context;
     }
 
     @Override
     public RecordsWithSplitIds<SourceRecord> fetch() throws IOException {
 
         checkSplitOrStartNext();
-        checkNeedStopBinlogReader();
 
         Iterator<SourceRecord> dataIt;
         try {
@@ -83,14 +79,6 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
         return dataIt == null
                 ? finishedSnapshotSplit()
                 : MySqlRecords.forRecords(currentSplitId, dataIt);
-    }
-
-    private void checkNeedStopBinlogReader() {
-        if (currentReader instanceof BinlogSplitReader
-                && context.needStopBinlogSplitReader()
-                && !currentReader.isFinished()) {
-            ((BinlogSplitReader) currentReader).stopBinlogReadTask();
-        }
     }
 
     @Override

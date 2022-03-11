@@ -24,12 +24,12 @@ import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerato
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link MySqlSourceEnumerator} broadcasts to {@link
- * MySqlSourceReader} to tell the source reader to suspend the binlog reader.
+ * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
+ * notify the binlog split reader has been suspended.
  */
-public class SuspendBinlogReaderEvent implements SourceEvent {
+public class BinlogReaderSuspendedEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    public SuspendBinlogReaderEvent() {}
+    public BinlogReaderSuspendedEvent() {}
 }

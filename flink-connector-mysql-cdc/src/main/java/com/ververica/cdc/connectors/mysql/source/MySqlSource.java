@@ -49,7 +49,6 @@ import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerato
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
-import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReaderContext;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
@@ -145,14 +144,8 @@ public class MySqlSource<T>
         final MySqlSourceReaderMetrics sourceReaderMetrics =
                 new MySqlSourceReaderMetrics(metricGroup);
         sourceReaderMetrics.registerMetrics();
-        MySqlSourceReaderContext mySqlSourceReaderContext =
-                new MySqlSourceReaderContext(readerContext);
         Supplier<MySqlSplitReader> splitReaderSupplier =
-                () ->
-                        new MySqlSplitReader(
-                                sourceConfig,
-                                readerContext.getIndexOfSubtask(),
-                                mySqlSourceReaderContext);
+                () -> new MySqlSplitReader(sourceConfig, readerContext.getIndexOfSubtask());
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
@@ -161,7 +154,7 @@ public class MySqlSource<T>
                         sourceReaderMetrics,
                         sourceConfig.isIncludeSchemaChanges()),
                 readerContext.getConfiguration(),
-                mySqlSourceReaderContext,
+                readerContext,
                 sourceConfig);
     }
 
