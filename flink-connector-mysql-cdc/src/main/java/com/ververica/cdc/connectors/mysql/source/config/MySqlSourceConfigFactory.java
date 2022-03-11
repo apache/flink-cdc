@@ -35,6 +35,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
@@ -69,6 +70,7 @@ public class MySqlSourceConfigFactory implements Serializable {
             SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
@@ -228,6 +230,11 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    public MySqlSourceConfigFactory heartbeatInterval(Duration heartbeatInterval) {
+        this.heartbeatInterval = heartbeatInterval;
+        return this;
+    }
+
     /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
     public MySqlSourceConfigFactory debeziumProperties(Properties properties) {
         this.dbzProperties = properties;
@@ -267,6 +274,7 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
         props.setProperty("tombstones.on.delete", String.valueOf(false));
+        props.setProperty("heartbeat.interval.ms", String.valueOf(heartbeatInterval.toMillis()));
         // debezium use "long" mode to handle unsigned bigint by default,
         // but it'll cause lose of precise when the value is larger than 2^63,
         // so use "precise" mode to avoid it.

@@ -48,6 +48,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
@@ -119,7 +120,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -158,7 +160,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         40.5d,
                         0.01d,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -194,7 +197,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -228,7 +232,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.latest());
+                        StartupOptions.latest(),
+                        HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -240,6 +245,7 @@ public class MySqlTableSourceFactoryTest {
         options.put("server-time-zone", "Asia/Shanghai");
         options.put("scan.newly-added-table.enabled", "true");
         options.put("debezium.snapshot.mode", "never");
+        options.put("heartbeat.interval", "15213ms");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -266,7 +272,8 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
-                        true);
+                        true,
+                        Duration.ofMillis(15213));
         assertEquals(expectedSource, actualSource);
     }
 
@@ -322,7 +329,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -387,7 +395,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.latest());
+                        StartupOptions.latest(),
+                        HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -424,7 +433,8 @@ public class MySqlTableSourceFactoryTest {
                         CONNECTION_POOL_SIZE.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        HEARTBEAT_INTERVAL.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 

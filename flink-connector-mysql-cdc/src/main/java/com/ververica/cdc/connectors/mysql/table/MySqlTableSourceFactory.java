@@ -42,6 +42,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
@@ -97,6 +98,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         if (enableParallelRead) {
@@ -132,7 +134,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 startupOptions,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                heartbeatInterval);
     }
 
     @Override
@@ -171,6 +174,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(HEARTBEAT_INTERVAL);
         return options;
     }
 
