@@ -169,7 +169,7 @@ public class RowDataTiKVChangeEventDeserializationSchema
     }
 
     private static Object[] getRowDataFields(byte[] value, Long handle, TiTableInfo tableInfo) {
-        return getObjectsWithDataTypes(decodeObjects(value, handle, tableInfo, true), tableInfo);
+        return getObjectsWithDataTypes(decodeObjects(value, handle, tableInfo), tableInfo);
     }
 
     @Override
