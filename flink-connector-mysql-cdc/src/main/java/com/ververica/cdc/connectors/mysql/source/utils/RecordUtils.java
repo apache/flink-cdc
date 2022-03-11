@@ -301,12 +301,9 @@ public class RecordUtils {
     }
 
     public static boolean isHeartbeatEvent(SourceRecord record) {
-        Schema keySchema = record.keySchema();
-        if (keySchema != null
-                && SCHEMA_HEARTBEAT_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name())) {
-            return true;
-        }
-        return false;
+        Schema valueSchema = record.valueSchema();
+        return valueSchema != null
+                && SCHEMA_HEARTBEAT_EVENT_KEY_NAME.equalsIgnoreCase(valueSchema.name());
     }
 
     /**
