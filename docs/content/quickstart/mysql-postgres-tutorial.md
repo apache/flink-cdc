@@ -74,7 +74,7 @@ This command automatically starts all the containers defined in the Docker Compo
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
 ### Preparing Flink and JAR package required
-1. Download [Flink 1.13.2](https://downloads.apache.org/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) and unzip it to the directory `flink-1.13.2`
+1. Download [Flink 1.13.2](https://archive.apache.org/dist/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) and unzip it to the directory `flink-1.13.2`
 2. Download following JAR package required and put them under `flink-1.13.2/lib/`:
 
    **Download links are available only for stable releases.**

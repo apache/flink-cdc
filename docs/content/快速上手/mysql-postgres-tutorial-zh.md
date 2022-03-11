@@ -70,7 +70,7 @@ docker-compose up -d
 该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:5601/](http://localhost:5601/) 来查看 Kibana 是否运行正常。
 
 ### 下载 Flink 和所需要的依赖包
-1. 下载 [Flink 1.13.2](https://downloads.apache.org/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) 并将其解压至目录 `flink-1.13.2`
+1. 下载 [Flink 1.13.2](https://archive.apache.org/dist/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) 并将其解压至目录 `flink-1.13.2`
 2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.13.2/lib/` 下：
 
    **下载链接只在已发布的版本上可用**
