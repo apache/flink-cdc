@@ -45,7 +45,7 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final String TIKV_SERVICE_NAME = "tikv";
     public static final String PD_SERVICE_NAME = "pd";
 
-    public static final DockerComposeContainer environment =
+    public static final DockerComposeContainer TIDB_DOCKER_COMPOSE =
             new DockerComposeContainer(new File("src/test/resources/docker/docker-compose.yml"))
                     .withExposedService(
                             TIDB_SERVICE_NAME + "_1",
@@ -60,31 +60,31 @@ public class TiDBTestBase extends AbstractTestBase {
     @BeforeClass
     public static void startContainers() throws Exception {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(environment)).join();
+        Startables.deepStart(Stream.of(TIDB_DOCKER_COMPOSE)).join();
         LOG.info("Containers are started.");
     }
 
     @AfterClass
     public static void stopContainers() {
-        if (environment != null) {
-            environment.stop();
+        if (TIDB_DOCKER_COMPOSE != null) {
+            TIDB_DOCKER_COMPOSE.stop();
         }
     }
 
     public String getTIDBHost() {
-        return environment.getServiceHost(TIDB_SERVICE_NAME, TIDB_PORT);
+        return TIDB_DOCKER_COMPOSE.getServiceHost(TIDB_SERVICE_NAME, TIDB_PORT);
     }
 
     public Integer getTIDBPort() {
-        return environment.getServicePort(TIDB_SERVICE_NAME, TIDB_PORT);
+        return TIDB_DOCKER_COMPOSE.getServicePort(TIDB_SERVICE_NAME, TIDB_PORT);
     }
 
     public String getPDHost() {
-        return environment.getServiceHost(PD_SERVICE_NAME, PD_PORT);
+        return TIDB_DOCKER_COMPOSE.getServiceHost(PD_SERVICE_NAME, PD_PORT);
     }
 
     public Integer getPDPort() {
-        return environment.getServicePort(PD_SERVICE_NAME, PD_PORT);
+        return TIDB_DOCKER_COMPOSE.getServicePort(PD_SERVICE_NAME, PD_PORT);
     }
 
     public String getJdbcUrl(String databaseName) {
