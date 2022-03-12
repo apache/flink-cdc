@@ -73,7 +73,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'connector' = 'tidb-cdc',"
                                 + " 'hostname' = '%s',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
-                                + " 'tikv.pd.addresses' = '%s',"
+                                + " 'pd-addresses' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"

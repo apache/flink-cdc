@@ -98,7 +98,7 @@ public class TiDBTableSource implements ScanTableSource {
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        final TiConfiguration tiConf = TDBSourceOptions.getTiConfiguration(options);
+        final TiConfiguration tiConf = TDBSourceOptions.getTiConfiguration(pdAddresses, options);
         try (final TiSession session = TiSession.create(tiConf)) {
             final TiTableInfo tableInfo = session.getCatalog().getTable(database, tableName);
 
