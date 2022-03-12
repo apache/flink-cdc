@@ -25,7 +25,7 @@ services:
     command:
       - --client-urls=http://0.0.0.0:2379
       - --peer-urls=http://0.0.0.0:2380
-      - --advertise-client-urls=http://192.168.30.157:2379
+      - --advertise-client-urls=http://%s:2379
       - --advertise-peer-urls=http://pd:2380
       - --initial-cluster=pd=http://pd:2380
       - --data-dir=/data/pd
@@ -41,7 +41,7 @@ services:
       - ./config/tikv.toml:/tikv.toml
     command:
       - --addr=0.0.0.0:20160
-      - --advertise-addr=192.168.30.157:20160
+      - --advertise-addr=%s:20160
       - --data-dir=/data/tikv
       - --pd=pd:2379
       - --config=/tikv.toml

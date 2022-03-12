@@ -31,8 +31,14 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.lifecycle.Startables;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -40,6 +46,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.Formatter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -64,7 +72,9 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final String PD_SERVICE_NAME = "pd";
 
     public static final DockerComposeContainer TIDB_DOCKER_COMPOSE =
-            new DockerComposeContainer(new File("src/test/resources/docker/docker-compose.yml"))
+            new DockerComposeContainer(
+                            getRenderedDockerComposeFile(
+                                    "src/test/resources/docker/docker-compose.yml"))
                     .withExposedService(
                             TIDB_SERVICE_NAME + "_1",
                             TIDB_PORT,
@@ -171,5 +181,40 @@ public class TiDBTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static File getRenderedDockerComposeFile(String templatePath) {
+        try {
+            Path path = Paths.get(templatePath);
+            String text = new String(Files.readAllBytes(path));
+            String addr = getLocalAddress().getHostAddress();
+            String t = new Formatter().format(text, addr, addr).toString();
+            File basePath = new File("src/test/resources/docker");
+            File f = File.createTempFile(".docker-compose-tmp", ".yml", basePath);
+            f.deleteOnExit();
+            FileWriter w = new FileWriter(f);
+            w.write(t);
+            w.flush();
+            w.close();
+            return f;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static InetAddress getLocalAddress() throws SocketException {
+        Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+        while (ifaces.hasMoreElements()) {
+            NetworkInterface iface = ifaces.nextElement();
+            Enumeration<InetAddress> addresses = iface.getInetAddresses();
+
+            while (addresses.hasMoreElements()) {
+                InetAddress addr = addresses.nextElement();
+                if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                    return addr;
+                }
+            }
+        }
+        return null;
     }
 }
