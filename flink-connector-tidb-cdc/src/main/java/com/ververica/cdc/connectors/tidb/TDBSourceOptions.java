@@ -72,8 +72,8 @@ public class TDBSourceOptions {
                             "Optional startup mode for TiDB CDC consumer, valid enumerations are "
                                     + "\"initial\", \"latest-offset\"");
 
-    public static final ConfigOption<String> TIKV_PD_ADDRESSES =
-            ConfigOptions.key(ConfigUtils.TIKV_PD_ADDRESSES)
+    public static final ConfigOption<String> PD_ADDRESSES =
+            ConfigOptions.key("pd-addresses")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("TiKV cluster's PD address");
@@ -114,15 +114,11 @@ public class TDBSourceOptions {
                     .noDefaultValue()
                     .withDescription("TiKV GRPC batch delete concurrency");
 
-    public static TiConfiguration getTiConfiguration(final Map<String, String> options) {
+    public static TiConfiguration getTiConfiguration(
+            final String pdAddrsStr, final Map<String, String> options) {
         final Configuration configuration = Configuration.fromMap(options);
 
-        final TiConfiguration tiConf =
-                configuration
-                        .getOptional(TIKV_PD_ADDRESSES)
-                        .map(TiConfiguration::createDefault)
-                        .orElseGet(TiConfiguration::createDefault);
-
+        final TiConfiguration tiConf = TiConfiguration.createDefault(pdAddrsStr);
         configuration.getOptional(TIKV_GRPC_TIMEOUT).ifPresent(tiConf::setTimeout);
         configuration.getOptional(TIKV_GRPC_SCAN_TIMEOUT).ifPresent(tiConf::setScanTimeout);
         configuration
