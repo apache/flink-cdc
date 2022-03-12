@@ -26,12 +26,15 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.PD_ADDRESSES;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_DELETE_CONCURRENCY;
@@ -40,7 +43,6 @@ import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_PUT_
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_SCAN_CONCURRENCY;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_SCAN_TIMEOUT;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_TIMEOUT;
-import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_PD_ADDRESSES;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.USERNAME;
 
 /** Factory for creating configured instance of {@link TiDBTableSource}. */
@@ -59,7 +61,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
-        String pdAddresses = config.get(TIKV_PD_ADDRESSES);
+        String pdAddresses = config.get(PD_ADDRESSES);
         StartupOptions startupOptions = getStartupOptions(config);
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
@@ -72,7 +74,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
                 password,
                 pdAddresses,
                 startupOptions,
-                context.getCatalogTable().getOptions());
+                TiKVOptions.getTiKVOptions(context.getCatalogTable().getOptions()));
     }
 
     @Override
@@ -88,7 +90,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(PASSWORD);
         options.add(DATABASE_NAME);
         options.add(TABLE_NAME);
-        options.add(TIKV_PD_ADDRESSES);
+        options.add(PD_ADDRESSES);
         return options;
     }
 
@@ -126,6 +128,33 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 modeString));
+        }
+    }
+
+    static class TiKVOptions {
+        private static final String TIKV_OPTIONS_PREFIX = "tikv.";
+
+        public static Map<String, String> getTiKVOptions(Map<String, String> properties) {
+            Map<String, String> tikvOptions = new HashMap<>();
+
+            if (hasTiKVOptions(properties)) {
+                properties.keySet().stream()
+                        .filter(key -> key.startsWith(TIKV_OPTIONS_PREFIX))
+                        .forEach(
+                                key -> {
+                                    final String value = properties.get(key);
+                                    tikvOptions.put(key, value);
+                                });
+            }
+            return tikvOptions;
+        }
+
+        /**
+         * Decides if the table options contains Debezium client properties that start with prefix
+         * 'debezium'.
+         */
+        private static boolean hasTiKVOptions(Map<String, String> options) {
+            return options.keySet().stream().anyMatch(k -> k.startsWith(TIKV_OPTIONS_PREFIX));
         }
     }
 }
