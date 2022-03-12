@@ -106,8 +106,7 @@ public class TiDBTableSource implements ScanTableSource {
             RowDataTiKVSnapshotEventDeserializationSchema snapshotEventDeserializationSchema =
                     new RowDataTiKVSnapshotEventDeserializationSchema(typeInfo, tableInfo);
             RowDataTiKVChangeEventDeserializationSchema changeEventDeserializationSchema =
-                    new RowDataTiKVChangeEventDeserializationSchema(
-                            typeInfo, tiConf, database, tableName);
+                    new RowDataTiKVChangeEventDeserializationSchema(typeInfo, tableInfo);
 
             TiDBSource.Builder<RowData> builder =
                     TiDBSource.<RowData>builder()
