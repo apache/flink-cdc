@@ -89,6 +89,8 @@ public final class MySqlRecordEmitter<T>
                 splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
             }
             if (includeSchemaChanges) {
+                BinlogOffset position = getBinlogPosition(element);
+                splitState.asBinlogSplitState().setStartingOffset(position);
                 emitElement(element, output);
             }
         } else if (isDataChangeRecord(element)) {

@@ -135,8 +135,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();
-        TypeInformation<RowData> typeInfo =
-                scanContext.createTypeInformation(physicalSchema.toPhysicalRowDataType());
+        TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 new MongoDBConnectorDeserializationSchema(
