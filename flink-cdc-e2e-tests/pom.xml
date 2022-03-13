@@ -86,6 +86,13 @@ under the License.
         </dependency>
         <dependency>
             <groupId>com.ververica</groupId>
+            <artifactId>flink-connector-tidb-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-connector-test-util</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -249,6 +256,16 @@ under the License.
                             <artifactId>flink-sql-connector-sqlserver-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>sqlserver-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ververica</groupId>
+                            <artifactId>flink-sql-connector-tidb-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>tidb-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
