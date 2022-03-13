@@ -175,6 +175,13 @@ under the License.
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>dns-cache-manipulator</artifactId>
+            <version>1.7.1</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
 
