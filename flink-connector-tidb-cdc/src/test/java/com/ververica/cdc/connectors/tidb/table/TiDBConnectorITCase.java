@@ -79,8 +79,8 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        getTIDBHost(),
-                        getPDHost() + ":" + getPDPort(),
+                        TIDB.getContainerIpAddress(),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -190,8 +190,8 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        getTIDBHost(),
-                        getPDHost() + ":" + getPDPort(),
+                        TIDB.getContainerIpAddress(),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -218,17 +218,14 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection("inventory");
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
 
             statement.execute("ALTER TABLE products DROP COLUMN description");
 
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
-            statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket',0.2);"); // 110
-            statement.execute(
-                    "INSERT INTO products VALUES (default,'scooter',5.18);"); // 111
-            statement.execute(
-                    "UPDATE products SET name='jacket2', weight='0.5' WHERE id=110;");
+            statement.execute("INSERT INTO products VALUES (default,'jacket',0.2);"); // 110
+            statement.execute("INSERT INTO products VALUES (default,'scooter',5.18);"); // 111
+            statement.execute("UPDATE products SET name='jacket2', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -278,8 +275,8 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        getTIDBHost(),
-                        getPDHost() + ":" + getPDPort(),
+                        TIDB.getContainerIpAddress(),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -306,7 +303,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection("inventory");
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
 
             statement.execute("ALTER TABLE products ADD COLUMN serialnum INTEGER");
 

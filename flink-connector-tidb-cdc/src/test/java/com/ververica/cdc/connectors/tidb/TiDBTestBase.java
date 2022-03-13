@@ -20,25 +20,22 @@ package com.ververica.cdc.connectors.tidb;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
+import com.alibaba.dcm.DnsCacheManipulator;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.DockerComposeContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.FixedHostPortGenericContainer;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -46,8 +43,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Enumeration;
-import java.util.Formatter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -62,65 +57,98 @@ public class TiDBTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
+    public static final String PD_SERVICE_NAME = "pd0";
+    public static final String TIKV_SERVICE_NAME = "tikv0";
+    public static final String TIDB_SERVICE_NAME = "tidb0";
+
     public static final String TIDB_USER = "root";
     public static final String TIDB_PASSWORD = "";
+
     public static final int TIDB_PORT = 4000;
+    public static final int TIKV_PORT = 20160;
     public static final int PD_PORT = 2379;
 
-    public static final String TIDB_SERVICE_NAME = "tidb";
-    public static final String TIKV_SERVICE_NAME = "tikv";
-    public static final String PD_SERVICE_NAME = "pd";
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
 
-    public static final DockerComposeContainer TIDB_DOCKER_COMPOSE =
-            new DockerComposeContainer(
-                            getRenderedDockerComposeFile(
-                                    "src/test/resources/docker/docker-compose.yml"))
-                    .withExposedService(
-                            TIDB_SERVICE_NAME + "_1",
-                            TIDB_PORT,
-                            Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(120)))
-                    .withExposedService(
-                            PD_SERVICE_NAME + "_1",
-                            PD_PORT,
-                            Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(120)))
-                    .withLocalCompose(true);
+    @ClassRule
+    public static final GenericContainer<?> PD =
+            new FixedHostPortGenericContainer<>("pingcap/pd:v5.3.1")
+                    .withFixedExposedPort(PD_PORT, PD_PORT)
+                    .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
+                    .withCommand(
+                            "--name=pd0",
+                            "--client-urls=http://0.0.0.0:2379",
+                            "--peer-urls=http://0.0.0.0:2380",
+                            "--advertise-client-urls=http://pd0:2379",
+                            "--advertise-peer-urls=http://pd0:2380",
+                            "--initial-cluster=pd0=http://pd0:2380",
+                            "--data-dir=/data/pd0",
+                            "--config=/pd.toml",
+                            "--log-file=/logs/pd0.log")
+                    .withNetwork(NETWORK)
+                    .withNetworkAliases(PD_SERVICE_NAME)
+                    .withStartupTimeout(Duration.ofSeconds(120))
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    @ClassRule
+    public static final GenericContainer<?> TIKV =
+            new FixedHostPortGenericContainer<>("pingcap/tikv:v5.3.1")
+                    .withFixedExposedPort(TIKV_PORT, TIKV_PORT)
+                    .withFileSystemBind("src/test/resources/config/tikv.toml", "/tikv.toml")
+                    .withCommand(
+                            "--addr=0.0.0.0:20160",
+                            "--advertise-addr=tikv0:20160",
+                            "--data-dir=/data/tikv0",
+                            "--pd=pd0:2379",
+                            "--config=/tikv.toml",
+                            "--log-file=/logs/tikv0.log")
+                    .withNetwork(NETWORK)
+                    .dependsOn(PD)
+                    .withNetworkAliases(TIKV_SERVICE_NAME)
+                    .withStartupTimeout(Duration.ofSeconds(120))
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    @ClassRule
+    public static final GenericContainer<?> TIDB =
+            new GenericContainer<>("pingcap/tidb:v5.3.1")
+                    .withExposedPorts(TIDB_PORT)
+                    .withFileSystemBind("src/test/resources/config/tidb.toml", "/tidb.toml")
+                    .withCommand(
+                            "--store=tikv",
+                            "--path=pd0:2379",
+                            "--config=/tidb.toml",
+                            "--advertise-address=tidb0")
+                    .withNetwork(NETWORK)
+                    .dependsOn(TIKV)
+                    .withNetworkAliases(TIDB_SERVICE_NAME)
+                    .withStartupTimeout(Duration.ofSeconds(120))
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass
     public static void startContainers() throws Exception {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(TIDB_DOCKER_COMPOSE)).join();
+        Startables.deepStart(Stream.of(PD, TIKV, TIDB)).join();
+        // Add jvm dns cache for flink to invoke pd interface.
+        DnsCacheManipulator.setDnsCache(PD_SERVICE_NAME, "127.0.0.1");
+        DnsCacheManipulator.setDnsCache(TIKV_SERVICE_NAME, "127.0.0.1");
         LOG.info("Containers are started.");
     }
 
     @AfterClass
     public static void stopContainers() {
-        if (TIDB_DOCKER_COMPOSE != null) {
-            TIDB_DOCKER_COMPOSE.stop();
-        }
-    }
-
-    public String getTIDBHost() {
-        return TIDB_DOCKER_COMPOSE.getServiceHost(TIDB_SERVICE_NAME, TIDB_PORT);
-    }
-
-    public Integer getTIDBPort() {
-        return TIDB_DOCKER_COMPOSE.getServicePort(TIDB_SERVICE_NAME, TIDB_PORT);
-    }
-
-    public String getPDHost() {
-        return TIDB_DOCKER_COMPOSE.getServiceHost(PD_SERVICE_NAME, PD_PORT);
-    }
-
-    public Integer getPDPort() {
-        return TIDB_DOCKER_COMPOSE.getServicePort(PD_SERVICE_NAME, PD_PORT);
+        Stream.of(TIKV, PD, TIDB).forEach(GenericContainer::stop);
     }
 
     public String getJdbcUrl(String databaseName) {
-        return "jdbc:mysql://" + getTIDBHost() + ":" + getTIDBPort() + "/" + databaseName;
+        return "jdbc:mysql://"
+                + TIDB.getContainerIpAddress()
+                + ":"
+                + TIDB.getMappedPort(TIDB_PORT)
+                + "/"
+                + databaseName;
     }
 
     protected Connection getJdbcConnection(String databaseName) throws SQLException {
-
         return DriverManager.getConnection(getJdbcUrl(databaseName), TIDB_USER, TIDB_PASSWORD);
     }
 
@@ -181,40 +209,5 @@ public class TiDBTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private static File getRenderedDockerComposeFile(String templatePath) {
-        try {
-            Path path = Paths.get(templatePath);
-            String text = new String(Files.readAllBytes(path));
-            String addr = getLocalAddress().getHostAddress();
-            String t = new Formatter().format(text, addr, addr).toString();
-            File basePath = new File("src/test/resources/docker");
-            File f = File.createTempFile(".docker-compose-tmp", ".yml", basePath);
-            f.deleteOnExit();
-            FileWriter w = new FileWriter(f);
-            w.write(t);
-            w.flush();
-            w.close();
-            return f;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public static InetAddress getLocalAddress() throws SocketException {
-        Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
-        while (ifaces.hasMoreElements()) {
-            NetworkInterface iface = ifaces.nextElement();
-            Enumeration<InetAddress> addresses = iface.getInetAddresses();
-
-            while (addresses.hasMoreElements()) {
-                InetAddress addr = addresses.nextElement();
-                if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
-                    return addr;
-                }
-            }
-        }
-        return null;
     }
 }
