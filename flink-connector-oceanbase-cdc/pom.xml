@@ -47,14 +47,14 @@ under the License.
         <dependency>
             <groupId>com.oceanbase.logclient</groupId>
             <artifactId>logproxy-client</artifactId>
-            <version>1.0.2</version>
+            <version>${oblogclient.version}</version>
         </dependency>
 
-        <!-- The recommended version of MySQL JDBC driver -->
+        <!-- The MySQL JDBC driver for reading snapshot-->
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>5.1.47</version>
+            <version>${mysql.connector.version}</version>
         </dependency>
 
         <!-- Logging API -->

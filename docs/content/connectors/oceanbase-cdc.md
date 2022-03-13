@@ -29,12 +29,20 @@ Setup OceanBase and LogProxy Server
 
 2. Create a user with password in `sys` tenant, this user is used in OceanBase LogProxy. See [user management doc](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.1/create-user-3).
 
+   ```shell
+   mysql -h${host} -P${port} -uroot
+   
+   mysql> SHOW TENANT;
+   mysql> CREATE USER ${sys_username} IDENTIFIED BY '${sys_password}';
+   mysql> GRANT ALL PRIVILEGES ON *.* TO ${sys_username} WITH GRANT OPTION;
+   ```
+
 3. Create a user in the tenant you want to monitor, this is used to read data for snapshot and change event.
 
 4. Get the `rootservice_list`. You can use the following command to get the value:
 
-    ```mysql
-    show parameters like 'rootservice_list';
+    ```shell
+    mysql> show parameters like 'rootservice_list';
     ```
 
 5. Setup OceanBase LogProxy following the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
@@ -293,23 +301,29 @@ The OceanBase CDC Connector using [oblogclient](https://github.com/oceanbase/obl
 The OceanBase CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
 
 ```java
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
+import com.ververica.cdc.connectors.oceanbase.table.OceanBaseTableSourceFactory;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+
 public class OceanBaseSourceExample {
 
   public static void main(String[] args) throws Exception {
     SourceFunction<String> oceanBaseSource =
         OceanBaseSource.<String>builder()
-            .rsList("127.0.0.1:2882:2881")
-            .startupMode(OceanBaseTableSourceFactory.StartupMode.INITIAL)
-            .username("user@test_tenant")
-            .password("pswd")
-            .tenantName("test_tenant")
-            .databaseName("test_db")
-            .tableName("test_table")
-            .hostname("127.0.0.1")
-            .port(2881)
-            .logProxyHost("127.0.0.1")
-            .logProxyPort(2983)
-            .deserializer(new JsonDebeziumDeserializationSchema())
+            .rsList("127.0.0.1:2882:2881")  // set root server list
+            .startupMode(OceanBaseTableSourceFactory.StartupMode.INITIAL) // set startup mode
+            .username("user@test_tenant")  // set cluster username
+            .password("pswd")  // set cluster password
+            .tenantName("test_tenant")  // set captured tenant name, do not support regex
+            .databaseName("test_db")  // set captured database, support regex
+            .tableName("test_table")  // set captured table, support regex
+            .hostname("127.0.0.1")  // set hostname of OceanBase server or proxy
+            .port(2881)  // set the sql port for OceanBase server or proxy
+            .logProxyHost("127.0.0.1")  // set the hostname of log proxy
+            .logProxyPort(2983)  // set the port of log proxy
+            .deserializer(new JsonDebeziumDeserializationSchema())  // converts SourceRecord to JSON String
             .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
