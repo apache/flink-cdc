@@ -84,6 +84,8 @@ jobs:
           module: mongodb
         sqlserver:
           module: sqlserver
+        tidb:
+          module: tidb
         e2e:
           module: e2e
         misc:
