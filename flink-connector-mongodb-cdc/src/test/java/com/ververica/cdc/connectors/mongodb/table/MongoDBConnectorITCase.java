@@ -146,6 +146,9 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                 Filters.eq("_id", new ObjectId("100000000000000000000111")),
                 Updates.set("weight", 5.17));
 
+        // Delay delete operations to avoid unstable tests.
+        waitForSinkSize("sink", 19);
+
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
         waitForSinkSize("sink", 20);
@@ -437,6 +440,9 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000111")),
                 Updates.set("weight", 5.17));
+
+        // Delay delete operations to avoid unstable tests.
+        waitForSinkSize("meta_sink", 15);
 
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
