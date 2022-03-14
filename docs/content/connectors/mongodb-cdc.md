@@ -318,24 +318,6 @@ The MongoDB CDC connector is a Flink Source connector which will read database s
 
 The config option `copy.existing` specifies whether do snapshot when MongoDB CDC consumer startup. <br>Defaults to `true`.
 
-### MongoDB Namespaces Filters
-
-The config option `copy.existing.namespace.regex` is a regular expression that matches the namespaces from which to copy data.<br>
-
-In the following example, matches namespaces `db0.coll0` and `db1.coll1` to snapshot.
-
-```
-'copy.existing.namespace.regex' = '^(db0\\.coll0|db1\\.coll1)$'
-```
-
-The config option `namespace.regex` is a regular expression that matches the namespaces from which to watch for changes.<br>
-
-In the following example, matches namespaces `db0.coll0` and `db1.coll1` to watch.
-
-```
-'namespace.regex' = '^(db0\\.coll0|db1\\.coll1)$'
-```
-
 ### Snapshot Data Filters
 
 The config option `copy.existing.pipeline` describing the filters when copying existing data.<br>
