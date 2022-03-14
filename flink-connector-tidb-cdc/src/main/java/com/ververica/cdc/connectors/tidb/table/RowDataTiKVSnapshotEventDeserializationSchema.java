@@ -37,6 +37,7 @@ import static org.tikv.common.codec.TableCodec.decodeObjects;
  * RowData}.
  */
 public class RowDataTiKVSnapshotEventDeserializationSchema
+        extends RowDataTiKVEventDeserializationSchemaBase
         implements TiKVSnapshotEventDeserializationSchema<RowData> {
 
     private static final long serialVersionUID = 1L;
@@ -48,7 +49,11 @@ public class RowDataTiKVSnapshotEventDeserializationSchema
     private final TiTableInfo tableInfo;
 
     public RowDataTiKVSnapshotEventDeserializationSchema(
-            TypeInformation<RowData> resultTypeInfo, TiTableInfo tableInfo) {
+            TypeInformation<RowData> resultTypeInfo,
+            TiTableInfo tableInfo,
+            TiKVMetadataConverter[] metadataConverters) {
+
+        super(metadataConverters);
         this.resultTypeInfo = resultTypeInfo;
         this.tableInfo = tableInfo;
     }
@@ -57,10 +62,12 @@ public class RowDataTiKVSnapshotEventDeserializationSchema
     public void deserialize(KvPair record, Collector<RowData> out) throws Exception {
         final RowKey rowKey = RowKey.decode(record.getKey().toByteArray());
         final long handle = rowKey.getHandle();
-        out.collect(
+
+        RowData rowData =
                 GenericRowData.ofKind(
                         RowKind.INSERT,
-                        getRowDataFields(record.getValue().toByteArray(), handle, tableInfo)));
+                        getRowDataFields(record.getValue().toByteArray(), handle, tableInfo));
+        emit(new TiKVMetadataConverter.TiKVRowValue(record), rowData, out);
     }
 
     private static Object[] getRowDataFields(byte[] value, Long handle, TiTableInfo tableInfo) {

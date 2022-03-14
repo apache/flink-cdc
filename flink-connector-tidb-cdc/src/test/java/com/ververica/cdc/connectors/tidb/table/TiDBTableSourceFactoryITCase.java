@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.tidb.table;
 
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
@@ -28,19 +29,30 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
+import org.apache.flink.table.connector.source.ScanTableSource;
+import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.DataType;
 
+import com.ververica.cdc.connectors.tidb.TiDBTestBase;
+import com.ververica.cdc.connectors.tidb.TiKVRichParallelSourceFunction;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for TiDB table source factory. */
-public class TiDBTableSourceFactoryTest {
+public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -53,12 +65,26 @@ public class TiDBTableSourceFactoryTest {
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
 
-    private static final String MY_HOSTNAME = "localhost:4000";
-    private static final String MY_USERNAME = "flinkuser";
-    private static final String MY_PASSWORD = "flinkpw";
-    private static final String MY_DATABASE = "myDB";
-    private static final String MY_TABLE = "myTable";
-    private static final String PD_ADDRESS = "pd:2379";
+    private static final ResolvedSchema SCHEMA_WITH_METADATA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("id", DataTypes.BIGINT().notNull()),
+                            Column.physical("name", DataTypes.STRING()),
+                            Column.physical("count", DataTypes.DECIMAL(38, 18)),
+                            Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
+                            Column.metadata(
+                                    "database_name", DataTypes.STRING(), "database_name", true),
+                            Column.metadata("table_name", DataTypes.STRING(), "table_name", true),
+                            Column.metadata("op_ts", DataTypes.TIMESTAMP(), "op_ts", true)),
+                    Collections.emptyList(),
+                    UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+
+    private static final String MY_HOSTNAME = "tidb0:4000";
+    private static final String MY_USERNAME = "root";
+    private static final String MY_PASSWORD = "";
+    private static final String MY_DATABASE = "inventory";
+    private static final String MY_TABLE = "products";
+    private static final String PD_ADDRESS = "pd0:2379";
     private static final Map<String, String> OPTIONS = new HashMap<>();
 
     @Test
@@ -114,6 +140,41 @@ public class TiDBTableSourceFactoryTest {
         assertEquals(expectedSource, actualSource);
     }
 
+    @Test
+    public void testMetadataColumns() {
+        Map<String, String> properties = getAllOptions();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        TiDBTableSource tidbTableSource = (TiDBTableSource) actualSource;
+        tidbTableSource.applyReadableMetadata(
+                Arrays.asList("op_ts", "database_name", "table_name"),
+                SCHEMA_WITH_METADATA.toSourceRowDataType());
+        actualSource = tidbTableSource.copy();
+        TiDBTableSource expectedSource =
+                new TiDBTableSource(
+                        SCHEMA_WITH_METADATA,
+                        MY_HOSTNAME,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        PD_ADDRESS,
+                        StartupOptions.latest(),
+                        OPTIONS);
+        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "table_name");
+
+        assertEquals(expectedSource, actualSource);
+
+        ScanTableSource.ScanRuntimeProvider provider =
+                tidbTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
+        TiKVRichParallelSourceFunction<RowData> sourceFunction =
+                (TiKVRichParallelSourceFunction<RowData>)
+                        ((SourceFunctionProvider) provider).createSourceFunction();
+        assertProducedTypeOfSourceFunction(sourceFunction, expectedSource.producedDataType);
+    }
+
     private Map<String, String> getAllOptions() {
         Map<String, String> options = new HashMap<>();
         options.put("connector", "tidb-cdc");
@@ -140,11 +201,21 @@ public class TiDBTableSourceFactoryTest {
                                 options),
                         schema),
                 new Configuration(),
-                TiDBTableSourceFactoryTest.class.getClassLoader(),
+                TiDBTableSourceFactoryITCase.class.getClassLoader(),
                 false);
     }
 
     private static DynamicTableSource createTableSource(Map<String, String> options) {
         return createTableSource(SCHEMA, options);
+    }
+
+    private static void assertProducedTypeOfSourceFunction(
+            TiKVRichParallelSourceFunction<RowData> sourceFunction, DataType expectedProducedType) {
+        TypeInformation<RowData> producedType = sourceFunction.getProducedType();
+        assertThat(producedType, instanceOf(InternalTypeInfo.class));
+        InternalTypeInfo<RowData> rowDataInternalTypeInfo =
+                (InternalTypeInfo<RowData>) producedType;
+        DataType producedDataType = rowDataInternalTypeInfo.getDataType();
+        assertEquals(expectedProducedType.toString(), producedDataType.toString());
     }
 }

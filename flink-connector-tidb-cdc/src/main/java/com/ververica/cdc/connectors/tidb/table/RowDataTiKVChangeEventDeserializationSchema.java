@@ -38,6 +38,7 @@ import static org.tikv.common.codec.TableCodec.decodeObjects;
  * RowData}.
  */
 public class RowDataTiKVChangeEventDeserializationSchema
+        extends RowDataTiKVEventDeserializationSchemaBase
         implements TiKVChangeEventDeserializationSchema<RowData> {
 
     private static final long serialVersionUID = 1L;
@@ -49,7 +50,11 @@ public class RowDataTiKVChangeEventDeserializationSchema
     private final TiTableInfo tableInfo;
 
     public RowDataTiKVChangeEventDeserializationSchema(
-            TypeInformation<RowData> resultTypeInfo, TiTableInfo tableInfo) {
+            TypeInformation<RowData> resultTypeInfo,
+            TiTableInfo tableInfo,
+            TiKVMetadataConverter[] metadataConverters) {
+
+        super(metadataConverters);
         this.resultTypeInfo = resultTypeInfo;
         this.tableInfo = tableInfo;
     }
@@ -60,23 +65,24 @@ public class RowDataTiKVChangeEventDeserializationSchema
         final long handle = rowKey.getHandle();
         switch (row.getOpType()) {
             case DELETE:
-                out.collect(
+                RowData rowDataDelete =
                         GenericRowData.ofKind(
                                 RowKind.DELETE,
                                 getObjectsWithDataTypes(
                                         decodeObjects(
                                                 row.getOldValue().toByteArray(), handle, tableInfo),
-                                        tableInfo)));
+                                        tableInfo));
+                emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataDelete, out);
                 break;
             case PUT:
                 try {
                     if (row.getOldValue() == null) {
-                        out.collect(
+                        RowData rowDataInsert =
                                 GenericRowData.ofKind(
                                         RowKind.INSERT,
                                         getRowDataFields(
-                                                row.getValue().toByteArray(), handle, tableInfo)));
-
+                                                row.getValue().toByteArray(), handle, tableInfo));
+                        emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataInsert, out);
                     } else {
                         // TODO TiKV cdc client doesn't return old value in PUT event
                         //                        if (!row.getOldValue().isEmpty()) {
@@ -89,11 +95,12 @@ public class RowDataTiKVChangeEventDeserializationSchema
                         //                                                    handle,
                         //                                                    tableInfo)));
                         //                        }
-                        out.collect(
+                        RowData rowDataUpdate =
                                 GenericRowData.ofKind(
                                         RowKind.UPDATE_AFTER,
                                         getRowDataFields(
-                                                row.getValue().toByteArray(), handle, tableInfo)));
+                                                row.getValue().toByteArray(), handle, tableInfo));
+                        emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataUpdate, out);
                     }
                     break;
                 } catch (final RuntimeException e) {
