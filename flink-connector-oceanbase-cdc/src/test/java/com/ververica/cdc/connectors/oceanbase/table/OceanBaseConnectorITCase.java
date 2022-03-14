@@ -27,17 +27,15 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
-import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 
+import com.ververica.cdc.connectors.oceanbase.OceanBaseTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
@@ -48,7 +46,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** Integration tests for OceanBase change stream event SQL source. */
-public class OceanBaseConnectorITCase extends AbstractTestBase {
+public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
     private static final int DEFAULT_PARALLELISM = 4;
 
@@ -80,17 +78,8 @@ public class OceanBaseConnectorITCase extends AbstractTestBase {
     }
 
     @Test
-    @Ignore("Test ignored because it need manually install OceanBase server and OceanBase LogProxy")
     public void testConsumingAllEvents() throws Exception {
-        String rootServerList = "127.0.0.1:2882:2881";
-        String jdbcUrl = "jdbc:mysql://127.0.0.1:2881/inventory?useSSL=false";
-
-        String username = "user@sys";
-        String password = "pswd";
-        String tenantName = "sys";
-
-        String obLogProxyHost = "127.0.0.1";
-        int obLogProxyPort = 2983;
+        initializeTidbTable("inventory");
 
         String sourceDDL =
                 String.format(
@@ -103,26 +92,27 @@ public class OceanBaseConnectorITCase extends AbstractTestBase {
                                 + ") WITH ("
                                 + " 'connector' = 'oceanbase-cdc',"
                                 + " 'scan.startup.mode' = 'initial',"
-                                + " 'scan.startup.timestamp' = '0',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
-                                + " 'tenant_name' = '%s',"
-                                + " 'database_name' = '%s',"
-                                + " 'table_name' = '%s',"
-                                + " 'rootserver_list' = '%s',"
-                                + " 'log_proxy.host' = '%s',"
-                                + " 'log_proxy.port' = '%s',"
-                                + " 'jdbc.url' = '%s'"
+                                + " 'tenant-name' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'rootserver-list' = '%s',"
+                                + " 'logproxy.host' = '%s',"
+                                + " 'logproxy.port' = '%s'"
                                 + ")",
-                        username,
-                        password,
-                        tenantName,
+                        OB_SYS_USERNAME,
+                        OB_SYS_PASSWORD,
+                        "sys",
                         "inventory",
                         "products",
-                        rootServerList,
-                        obLogProxyHost,
-                        obLogProxyPort,
-                        jdbcUrl);
+                        OB_SERVER.getContainerIpAddress(),
+                        OB_SERVER.getMappedPort(OB_SERVER_SQL_PORT),
+                        "127.0.0.1:2882:2881",
+                        OB_LOG_PROXY.getContainerIpAddress(),
+                        OB_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT));
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -145,19 +135,20 @@ public class OceanBaseConnectorITCase extends AbstractTestBase {
         // wait for snapshot finished
         waitForSinkSize("sink", 9);
 
-        Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
-
-        Statement statement = connection.createStatement();
-        statement.execute("UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
-        statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
-        statement.execute(
-                "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
-        statement.execute(
-                "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
-        statement.execute(
-                "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
-        statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
-        statement.execute("DELETE FROM products WHERE id=111;");
+        try (Connection connection = getJdbcConnection("inventory");
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM products WHERE id=111;");
+        }
 
         waitForSinkSize("sink", 16);
 
