@@ -24,6 +24,7 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
@@ -35,8 +36,12 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.meta.TiTableInfo;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -44,7 +49,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A {@link DynamicTableSource} that describes how to create a TiDB binlog from a logical
  * description.
  */
-public class TiDBTableSource implements ScanTableSource {
+public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
     private final String hostname;
@@ -62,6 +67,9 @@ public class TiDBTableSource implements ScanTableSource {
 
     /** Data type that describes the final output of the source. */
     protected DataType producedDataType;
+
+    /** Metadata that is appended at the end of a physical source row. */
+    protected List<String> metadataKeys;
 
     public TiDBTableSource(
             ResolvedSchema physicalSchema,
@@ -83,6 +91,7 @@ public class TiDBTableSource implements ScanTableSource {
         this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.options = options;
+        this.metadataKeys = Collections.emptyList();
     }
 
     @Override
@@ -103,10 +112,13 @@ public class TiDBTableSource implements ScanTableSource {
             final TiTableInfo tableInfo = session.getCatalog().getTable(database, tableName);
 
             TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
+            TiKVMetadataConverter[] metadataConverters = getMetadataConverters();
             RowDataTiKVSnapshotEventDeserializationSchema snapshotEventDeserializationSchema =
-                    new RowDataTiKVSnapshotEventDeserializationSchema(typeInfo, tableInfo);
+                    new RowDataTiKVSnapshotEventDeserializationSchema(
+                            typeInfo, tableInfo, metadataConverters);
             RowDataTiKVChangeEventDeserializationSchema changeEventDeserializationSchema =
-                    new RowDataTiKVChangeEventDeserializationSchema(typeInfo, tableInfo);
+                    new RowDataTiKVChangeEventDeserializationSchema(
+                            typeInfo, tableInfo, metadataConverters);
 
             TiDBSource.Builder<RowData> builder =
                     TiDBSource.<RowData>builder()
@@ -140,7 +152,26 @@ public class TiDBTableSource implements ScanTableSource {
                         startupOptions,
                         options);
         source.producedDataType = producedDataType;
+        source.metadataKeys = metadataKeys;
         return source;
+    }
+
+    private TiKVMetadataConverter[] getMetadataConverters() {
+        if (metadataKeys.isEmpty()) {
+            return new TiKVMetadataConverter[0];
+        }
+
+        return metadataKeys.stream()
+                .map(
+                        key ->
+                                Stream.of(
+                                                TiKVReadableMetadata.createTiKVReadableMetadata(
+                                                        database, tableName))
+                                        .filter(m -> m.getKey().equals(key))
+                                        .findFirst()
+                                        .orElseThrow(IllegalStateException::new))
+                .map(TiKVReadableMetadata::getConverter)
+                .toArray(TiKVMetadataConverter[]::new);
     }
 
     @Override
@@ -180,5 +211,19 @@ public class TiDBTableSource implements ScanTableSource {
     @Override
     public String asSummaryString() {
         return "TiDB-CDC";
+    }
+
+    @Override
+    public Map<String, DataType> listReadableMetadata() {
+        return Stream.of(TiKVReadableMetadata.createTiKVReadableMetadata(database, tableName))
+                .collect(
+                        Collectors.toMap(
+                                TiKVReadableMetadata::getKey, TiKVReadableMetadata::getDataType));
+    }
+
+    @Override
+    public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
+        this.metadataKeys = metadataKeys;
+        this.producedDataType = producedDataType;
     }
 }
