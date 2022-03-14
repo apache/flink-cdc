@@ -36,6 +36,7 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
+import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
@@ -180,6 +181,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         .getDbzConfiguration()
                         .edit()
                         .with("table.include.list", currentSnapshotSplit.getTableId().toString())
+                        // Disable heartbeat event in snapshot split reader
+                        .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
         // task to read binlog and backfill for current split
         return new MySqlBinlogSplitReadTask(

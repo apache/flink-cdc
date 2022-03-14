@@ -253,6 +253,13 @@ During a snapshot operation, the connector will query each included table to pro
           <td>The connection pool size.</td>
     </tr>
     <tr>
+          <td>heartbeat.interval</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">30s</td>
+          <td>Duration</td>
+          <td>The interval of sending heartbeat event for tracing the latest available binlog offsets.</td>
+    </tr>
+    <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -378,10 +385,7 @@ It's recommended to configure a DNS(Domain Name Service) or VIP(Virtual IP Addre
 #### MySQL Heartbeat Event Support
 
 If the table updates infrequently, the binlog file or GTID set may have been cleaned in its last committed binlog position.
-The CDC job restart fails in this case. So the heartbeat event will update binlog position. It's recommended to configure `debezium.heartbeat.interval.ms`.
-```
-debezium.heartbeat.interval.ms=3000
-```
+The CDC job restart fails in this case. So the heartbeat event will update binlog position. By default heartbeat event is enabled in MySQL CDC source and the interval is set to 30 seconds. You can specify the interval by using table option ```heartbeat.interval```, or set the option to 0 to disable heartbeat events.
 
 #### How Incremental Snapshot Reading works
 
