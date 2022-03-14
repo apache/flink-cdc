@@ -152,7 +152,7 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
 
     /** match single database and multiple collections: collection = ^db0\.coll_b\d?$ . */
     @Test
-    public void testMatchSingleDatabaseAndMultipleCollections() throws Exception {
+    public void testMatchSingleQualifiedCollectionPattern() throws Exception {
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
         String db0 = executeCommandFileInSeparateDatabase("ns_regex");
@@ -191,7 +191,7 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
 
     /** match single database and multiple collections: database = db0 collection = .*coll_b\d? . */
     @Test
-    public void testMatchSingleDatabaseAndMultipleCollections1() throws Exception {
+    public void testMatchSingleDatabaseWithCollectionPattern() throws Exception {
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
         String db0 = executeCommandFileInSeparateDatabase("ns_regex");

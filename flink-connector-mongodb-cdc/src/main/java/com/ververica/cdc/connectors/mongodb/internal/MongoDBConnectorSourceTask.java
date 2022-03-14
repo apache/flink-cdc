@@ -106,7 +106,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     @Override
     public void start(Map<String, String> props) {
-        init(props);
+        initCapturedCollections(props);
         target.start(props);
         isInSnapshotPhase = isCopying();
     }
@@ -257,7 +257,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         }
     }
 
-    private void init(Map<String, String> props) {
+    private void initCapturedCollections(Map<String, String> props) {
         ConnectionString connectionString =
                 new ConnectionString(props.get(MongoSourceConfig.CONNECTION_URI_CONFIG));
 
