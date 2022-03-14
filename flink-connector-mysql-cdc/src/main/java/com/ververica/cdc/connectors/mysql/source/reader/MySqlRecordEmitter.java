@@ -39,6 +39,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getFet
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getMessageTimestamp;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getWatermark;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isBinlogStartWatermarkEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
@@ -79,6 +80,9 @@ public final class MySqlRecordEmitter<T>
             BinlogOffset watermark = getWatermark(element);
             if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
                 splitState.asSnapshotSplitState().setHighWatermark(watermark);
+            }
+            if (isBinlogStartWatermarkEvent(element)) {
+                emitElement(element, output);
             }
         } else if (isSchemaChangeEvent(element) && splitState.isBinlogSplitState()) {
             HistoryRecord historyRecord = getHistoryRecord(element);

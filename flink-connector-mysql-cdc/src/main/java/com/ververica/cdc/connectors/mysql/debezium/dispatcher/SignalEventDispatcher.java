@@ -111,6 +111,7 @@ public class SignalEventDispatcher {
     public enum WatermarkKind {
         LOW,
         HIGH,
+        BINLOG_START,
         BINLOG_END;
 
         public WatermarkKind fromString(String kindString) {
@@ -118,6 +119,8 @@ public class SignalEventDispatcher {
                 return LOW;
             } else if (HIGH.name().equalsIgnoreCase(kindString)) {
                 return HIGH;
+            } else if (BINLOG_START.name().equalsIgnoreCase(kindString)) {
+                return BINLOG_START;
             } else {
                 return BINLOG_END;
             }
