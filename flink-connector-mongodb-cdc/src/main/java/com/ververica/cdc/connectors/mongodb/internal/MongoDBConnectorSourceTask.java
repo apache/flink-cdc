@@ -18,6 +18,11 @@
 
 package com.ververica.cdc.connectors.mongodb.internal;
 
+import com.mongodb.ConnectionString;
+import com.mongodb.MongoNamespace;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceTask;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.SnapshotRecord;
@@ -29,20 +34,44 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
 import org.apache.kafka.connect.source.SourceTaskContext;
+import org.bson.conversions.Bson;
 import org.bson.json.JsonReader;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static com.mongodb.client.model.Aggregates.match;
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.regex;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.ADD_NS_FIELD;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.ADD_NS_FIELD_NAME;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.bsonListToJson;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.collectionNames;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.collectionsFilter;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.completionPattern;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.databaseFilter;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.databaseNames;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.includeListAsPatterns;
+import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.isIncludeListExplicitlySpecified;
 
 /**
  * Source Task that proxies mongodb kafka connector's {@link MongoSourceTask} to adapt to {@link
  * com.ververica.cdc.debezium.internal.DebeziumChangeFetcher}.
  */
 public class MongoDBConnectorSourceTask extends SourceTask {
+
+    public static final String DATABASE_INCLUDE_LIST = "database.include.list";
+
+    public static final String COLLECTION_INCLUDE_LIST = "collection.include.list";
 
     private static final String TRUE = "true";
 
@@ -77,6 +106,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     @Override
     public void start(Map<String, String> props) {
+        initCapturedCollections(props);
         target.start(props);
         isInSnapshotPhase = isCopying();
     }
@@ -224,6 +254,105 @@ public class MongoDBConnectorSourceTask extends SourceTask {
             return ((AtomicBoolean) isCopyingField.get(target)).get();
         } catch (IllegalAccessException e) {
             throw new IllegalStateException("Cannot access isCopying field of SourceTask", e);
+        }
+    }
+
+    private void initCapturedCollections(Map<String, String> props) {
+        ConnectionString connectionString =
+                new ConnectionString(props.get(MongoSourceConfig.CONNECTION_URI_CONFIG));
+
+        String databaseIncludeList = props.get(DATABASE_INCLUDE_LIST);
+        String collectionIncludeList = props.get(COLLECTION_INCLUDE_LIST);
+
+        List<String> databaseList =
+                Optional.ofNullable(databaseIncludeList)
+                        .map(input -> Arrays.asList(input.split(",")))
+                        .orElse(null);
+
+        List<String> collectionList =
+                Optional.ofNullable(collectionIncludeList)
+                        .map(input -> Arrays.asList(input.split(",")))
+                        .orElse(null);
+
+        if (collectionList != null) {
+            // Watching collections changes
+            List<String> discoveredDatabases;
+            List<String> discoveredCollections;
+            try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+                discoveredDatabases = databaseNames(mongoClient, databaseFilter(databaseList));
+                discoveredCollections =
+                        collectionNames(
+                                mongoClient,
+                                discoveredDatabases,
+                                collectionsFilter(collectionList));
+            }
+
+            // case: database = db0, collection = coll1
+            if (isIncludeListExplicitlySpecified(collectionList, discoveredCollections)) {
+                MongoNamespace namespace = new MongoNamespace(discoveredCollections.get(0));
+                props.put(MongoSourceConfig.DATABASE_CONFIG, namespace.getDatabaseName());
+                props.put(MongoSourceConfig.COLLECTION_CONFIG, namespace.getCollectionName());
+            } else { // case: database = db0|db2, collection = (db0.coll[0-9])|(db1.coll[1-2])
+                String namespacesRegex =
+                        includeListAsPatterns(collectionList).stream()
+                                .map(Pattern::pattern)
+                                .collect(Collectors.joining("|"));
+
+                List<Bson> pipeline = new ArrayList<>();
+                pipeline.add(ADD_NS_FIELD);
+
+                Bson nsFilter = regex(ADD_NS_FIELD_NAME, namespacesRegex);
+                if (databaseList != null) {
+                    String databaseRegex =
+                            includeListAsPatterns(databaseList).stream()
+                                    .map(Pattern::pattern)
+                                    .collect(Collectors.joining("|"));
+                    Bson dbFilter = regex("ns.db", databaseRegex);
+                    nsFilter = and(dbFilter, nsFilter);
+                }
+                pipeline.add(match(nsFilter));
+
+                props.put(MongoSourceConfig.PIPELINE_CONFIG, bsonListToJson(pipeline));
+
+                String copyExistingNamespaceRegex =
+                        discoveredCollections.stream()
+                                .map(ns -> completionPattern(ns).pattern())
+                                .collect(Collectors.joining("|"));
+
+                props.put(
+                        MongoSourceConfig.COPY_EXISTING_NAMESPACE_REGEX_CONFIG,
+                        copyExistingNamespaceRegex);
+            }
+        } else if (databaseList != null) {
+            // Watching databases changes
+            List<String> discoveredDatabases;
+            try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+                discoveredDatabases = databaseNames(mongoClient, databaseFilter(databaseList));
+            }
+
+            if (isIncludeListExplicitlySpecified(databaseList, discoveredDatabases)) {
+                props.put(MongoSourceConfig.DATABASE_CONFIG, discoveredDatabases.get(0));
+            } else {
+                String databaseRegex =
+                        includeListAsPatterns(databaseList).stream()
+                                .map(Pattern::pattern)
+                                .collect(Collectors.joining("|"));
+
+                List<Bson> pipeline = new ArrayList<>();
+                pipeline.add(match(regex("ns.db", databaseRegex)));
+                props.put(MongoSourceConfig.PIPELINE_CONFIG, bsonListToJson(pipeline));
+
+                String copyExistingNamespaceRegex =
+                        discoveredDatabases.stream()
+                                .map(db -> completionPattern(db + "\\..*").pattern())
+                                .collect(Collectors.joining("|"));
+
+                props.put(
+                        MongoSourceConfig.COPY_EXISTING_NAMESPACE_REGEX_CONFIG,
+                        copyExistingNamespaceRegex);
+            }
+        } else {
+            // Watching all changes on the cluster by default, we do nothing here
         }
     }
 }

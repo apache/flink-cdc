@@ -382,8 +382,8 @@ public class MongoDBSourceTest extends MongoDBTestBase {
                 .hosts(MONGODB_CONTAINER.getHostAndPort())
                 .username(FLINK_USER)
                 .password(FLINK_USER_PASSWORD)
-                .database(database)
-                .collection("products")
+                .databaseList(database)
+                .collectionList(database + ".products")
                 .deserializer(new ForwardDeserializeSchema())
                 .build();
     }
