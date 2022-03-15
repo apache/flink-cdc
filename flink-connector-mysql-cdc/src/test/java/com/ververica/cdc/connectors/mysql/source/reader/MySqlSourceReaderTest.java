@@ -356,6 +356,9 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         public void markIdle() {}
 
         @Override
+        public void markActive() {}
+
+        @Override
         public SourceOutput<SourceRecord> createOutputForSplit(java.lang.String splitId) {
             return this;
         }
