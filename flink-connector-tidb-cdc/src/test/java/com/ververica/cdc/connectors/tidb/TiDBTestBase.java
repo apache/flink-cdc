@@ -66,8 +66,8 @@ public class TiDBTestBase extends AbstractTestBase {
 
     public static final int TIDB_PORT = 4000;
     public static final int TIKV_PORT = 20160;
-    public static final int PD_PORT_ORIGIN = 2379;
-    public static final int PD_PORT = 52379;
+    public static final int PD_PORT_ORIGIN = 12379;
+    public static final int PD_PORT = 12379;
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
@@ -75,19 +75,19 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final GenericContainer<?> PD =
             new FixedHostPortGenericContainer<>("pingcap/pd:v5.3.1")
                     .withFixedExposedPort(PD_PORT, PD_PORT_ORIGIN)
+                    .withAccessToHost(true)
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
                     .withCommand(
                             "--name=pd0",
-                            "--client-urls=http://0.0.0.0:52379,http://0.0.0.0:2379",
+                            "--client-urls=http://0.0.0.0:12379",
                             "--peer-urls=http://0.0.0.0:2380",
-                            "--advertise-client-urls=http://pd0:52379",
+                            "--advertise-client-urls=http://pd0:12379",
                             "--advertise-peer-urls=http://pd0:2380",
                             "--initial-cluster=pd0=http://pd0:2380",
                             "--data-dir=/data/pd0",
                             "--config=/pd.toml",
                             "--log-file=/logs/pd0.log")
                     .withNetwork(NETWORK)
-                    .withNetworkMode("bridge")
                     .withNetworkAliases(PD_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
@@ -96,16 +96,16 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final GenericContainer<?> TIKV =
             new FixedHostPortGenericContainer<>("pingcap/tikv:v5.3.1")
                     .withFixedExposedPort(TIKV_PORT, TIKV_PORT)
+                    .withAccessToHost(true)
                     .withFileSystemBind("src/test/resources/config/tikv.toml", "/tikv.toml")
                     .withCommand(
                             "--addr=0.0.0.0:20160",
                             "--advertise-addr=tikv0:20160",
                             "--data-dir=/data/tikv0",
-                            "--pd=pd0:2379",
+                            "--pd=pd0:12379",
                             "--config=/tikv.toml",
                             "--log-file=/logs/tikv0.log")
                     .withNetwork(NETWORK)
-                    .withNetworkMode("bridge")
                     .dependsOn(PD)
                     .withNetworkAliases(TIKV_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
@@ -118,11 +118,10 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withFileSystemBind("src/test/resources/config/tidb.toml", "/tidb.toml")
                     .withCommand(
                             "--store=tikv",
-                            "--path=pd0:2379",
+                            "--path=pd0:12379",
                             "--config=/tidb.toml",
                             "--advertise-address=tidb0")
                     .withNetwork(NETWORK)
-                    .withNetworkMode("bridge")
                     .dependsOn(TIKV)
                     .withNetworkAliases(TIDB_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
