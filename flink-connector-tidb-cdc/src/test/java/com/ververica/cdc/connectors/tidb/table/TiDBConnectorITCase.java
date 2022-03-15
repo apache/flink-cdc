@@ -80,7 +80,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'table-name' = '%s'"
                                 + ")",
                         TIDB.getContainerIpAddress(),
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -191,7 +191,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'table-name' = '%s'"
                                 + ")",
                         TIDB.getContainerIpAddress(),
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -276,7 +276,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'table-name' = '%s'"
                                 + ")",
                         TIDB.getContainerIpAddress(),
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -344,6 +344,41 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
+
+    /*    @Test
+    public void testMetadataColumns() {
+        Map<String, String> properties = getAllOptions();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        TiDBTableSource tidbTableSource = (TiDBTableSource) actualSource;
+        tidbTableSource.applyReadableMetadata(
+                Arrays.asList("op_ts", "database_name", "table_name"),
+                SCHEMA_WITH_METADATA.toSourceRowDataType());
+        actualSource = tidbTableSource.copy();
+        TiDBTableSource expectedSource =
+                new TiDBTableSource(
+                        SCHEMA_WITH_METADATA,
+                        MY_HOSTNAME,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        PD_ADDRESS,
+                        StartupOptions.latest(),
+                        OPTIONS);
+        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "table_name");
+
+        assertEquals(expectedSource, actualSource);
+
+        ScanTableSource.ScanRuntimeProvider provider =
+                tidbTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
+        TiKVRichParallelSourceFunction<RowData> sourceFunction =
+                (TiKVRichParallelSourceFunction<RowData>)
+                        ((SourceFunctionProvider) provider).createSourceFunction();
+        assertProducedTypeOfSourceFunction(sourceFunction, expectedSource.producedDataType);
+    }*/
 
     private static void waitForSinkSize(String sinkName, int expectedSize)
             throws InterruptedException {

@@ -29,15 +29,11 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.DataType;
 
-import com.ververica.cdc.connectors.tidb.TiDBTestBase;
 import com.ververica.cdc.connectors.tidb.TiKVRichParallelSourceFunction;
 import org.junit.Test;
 
@@ -52,7 +48,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for TiDB table source factory. */
-public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
+public class TiDBTableSourceFactoryITCase {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -138,41 +134,6 @@ public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
                         StartupOptions.latest(),
                         options);
         assertEquals(expectedSource, actualSource);
-    }
-
-    @Test
-    public void testMetadataColumns() {
-        Map<String, String> properties = getAllOptions();
-
-        // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
-        TiDBTableSource tidbTableSource = (TiDBTableSource) actualSource;
-        tidbTableSource.applyReadableMetadata(
-                Arrays.asList("op_ts", "database_name", "table_name"),
-                SCHEMA_WITH_METADATA.toSourceRowDataType());
-        actualSource = tidbTableSource.copy();
-        TiDBTableSource expectedSource =
-                new TiDBTableSource(
-                        SCHEMA_WITH_METADATA,
-                        MY_HOSTNAME,
-                        MY_DATABASE,
-                        MY_TABLE,
-                        MY_USERNAME,
-                        MY_PASSWORD,
-                        PD_ADDRESS,
-                        StartupOptions.latest(),
-                        OPTIONS);
-        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
-        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "table_name");
-
-        assertEquals(expectedSource, actualSource);
-
-        ScanTableSource.ScanRuntimeProvider provider =
-                tidbTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
-        TiKVRichParallelSourceFunction<RowData> sourceFunction =
-                (TiKVRichParallelSourceFunction<RowData>)
-                        ((SourceFunctionProvider) provider).createSourceFunction();
-        assertProducedTypeOfSourceFunction(sourceFunction, expectedSource.producedDataType);
     }
 
     private Map<String, String> getAllOptions() {
