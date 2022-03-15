@@ -30,7 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
-import com.ververica.cdc.connectors.mysql.source.MySqlSource;
+import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -66,7 +66,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-/** tests for {@link MySqlSource}. */
+/**
+ * Database Polardbx supported the mysql protocol, but there are some different features in ddl. So
+ * we added fallback in {@link MySqlSchema} when parsing ddl failed and provided these cases to
+ * test.
+ */
 public class PolardbxSourceTCase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PolardbxSourceTCase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -75,8 +79,9 @@ public class PolardbxSourceTCase extends AbstractTestBase {
     private static final String USER_NAME = "polardbx_root";
     private static final String PASSWORD = "123456";
     private static final String DATABASE = "polardbx_ddl_test";
+    private static final String IMAGE_VERSION = "2.0.1";
     private static final DockerImageName POLARDBX_IMAGE =
-            DockerImageName.parse("polardbx/polardb-x:latest");
+            DockerImageName.parse("polardbx/polardb-x:" + IMAGE_VERSION);
 
     public static final GenericContainer POLARDBX_CONTAINER =
             new GenericContainer<>(POLARDBX_IMAGE)
@@ -97,10 +102,10 @@ public class PolardbxSourceTCase extends AbstractTestBase {
             LOG.info("Polardbx connection is not valid, so try to start containers...");
             Startables.deepStart(Stream.of(POLARDBX_CONTAINER)).join();
             LOG.info("Containers are started.");
+            // here should wait 10s that make sure the polardbx is ready
+            Thread.sleep(10 * 1000);
         }
-        // here should wait 10s that make sure the polardbx is ready
-        Thread.sleep(10 * 1000);
-        initializePolarxTables(DATABASE);
+        initializePolardbxTables(DATABASE);
     }
 
     private static String getJdbcUrl() {
@@ -124,11 +129,9 @@ public class PolardbxSourceTCase extends AbstractTestBase {
         }
     }
 
-    /**
-     * Executes a JDBC statement using the default jdbc config without autocommitting the
-     * connection.
-     */
-    protected static void initializePolarxTables(String databaseName) throws InterruptedException {
+    /** initialize database and tables with ${databaseName}.sql for testing. */
+    protected static void initializePolardbxTables(String databaseName)
+            throws InterruptedException {
         final String ddlFile = String.format("ddl/%s.sql", databaseName);
         final URL ddlTestFile = PolardbxSourceTCase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
@@ -204,11 +207,11 @@ public class PolardbxSourceTCase extends AbstractTestBase {
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
                 new String[] {
-                    "+I[4, 1002, 2, 106, 2022-01-16T00:00]",
-                    "+I[5, 1003, 1, 107, 2022-01-16T00:00]",
+                    "+I[1, 1001, 1, 102, 2022-01-16T00:00]",
                     "+I[2, 1002, 2, 105, 2022-01-16T00:00]",
                     "+I[3, 1004, 3, 109, 2022-01-16T00:00]",
-                    "+I[1, 1001, 1, 102, 2022-01-16T00:00]",
+                    "+I[4, 1002, 2, 106, 2022-01-16T00:00]",
+                    "+I[5, 1003, 1, 107, 2022-01-16T00:00]",
                 };
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from orders_source");
@@ -238,6 +241,34 @@ public class PolardbxSourceTCase extends AbstractTestBase {
 
         waitForSinkSize("sink", realSnapshotData.size());
         assertEqualsInAnyOrder(expectedSnapshotData, TestValuesTableFactory.getRawResults("sink"));
+
+        // third step: check dml events
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("use " + DATABASE);
+            statement.execute("INSERT INTO orders VALUES (6, 1006,1006, 1006,'2022-01-17');");
+            statement.execute("INSERT INTO orders VALUES (7,1007, 1007,1007, '2022-01-17');");
+            statement.execute("UPDATE orders SET seller_id= 9999, order_id=9999 WHERE id=6;");
+            statement.execute("UPDATE orders SET seller_id= 9999, order_id=9999 WHERE id=7;");
+            statement.execute("DELETE FROM orders WHERE id=7;");
+        }
+
+        String[] expectedBinlog =
+                new String[] {
+                    "+I[6, 1006, 1006, 1006, 2022-01-17T00:00]",
+                    "+I[7, 1007, 1007, 1007, 2022-01-17T00:00]",
+                    "-D[6, 1006, 1006, 1006, 2022-01-17T00:00]",
+                    "+I[6, 9999, 9999, 1006, 2022-01-17T00:00]",
+                    "-D[7, 1007, 1007, 1007, 2022-01-17T00:00]",
+                    "+I[7, 9999, 9999, 1007, 2022-01-17T00:00]",
+                    "-D[7, 9999, 9999, 1007, 2022-01-17T00:00]"
+                };
+        List<String> expectedBinlogData = new ArrayList<>();
+        for (int i = 0; i < captureCustomerTables.length; i++) {
+            expectedBinlogData.addAll(Arrays.asList(expectedBinlog));
+        }
+        List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
+        assertEqualsInOrder(expectedBinlogData, realBinlog);
     }
 
     @Test
@@ -325,7 +356,26 @@ public class PolardbxSourceTCase extends AbstractTestBase {
         TableResult tableResult = tEnv.executeSql("select * from polardbx_full_types");
         CloseableIterator<Row> iterator = tableResult.collect();
         List<String> realSnapshotData = fetchRows(iterator, 1);
-        assertEquals(1, realSnapshotData.size());
+        realSnapshotData.forEach(System.out::println);
+        String[] expectedSnapshotData =
+                new String[] {
+                    "+I[100001, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, "
+                            + "9223372036854775807, 18446744073709551615, Hello World, abc, 123.102, 123.102, 404.4443, 123.4567,"
+                            + " 346, 34567892.1, false, true, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, "
+                            + "2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, [101, 26, -19, 8, 57, 15, 72, -109, -78, -15, 54,"
+                            + " -110, 62, 123, 116, 0], [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, "
+                            + "b], {\"key1\": \"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}, "
+                            + "{\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, "
+                            + "{\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0}, {\"coordinates\":[[[1,"
+                            + "1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, {\"coordinates\":[[1,1],[2,2]],"
+                            + "\"type\":\"MultiPoint\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],"
+                            + "\"type\":\"MultiLineString\",\"srid\":0}, {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],"
+                            + "[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0}, "
+                            + "{\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\","
+                            + "\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],"
+                            + "\"type\":\"GeometryCollection\",\"srid\":0}]",
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expectedSnapshotData), realSnapshotData);
     }
 
     @Test
@@ -371,11 +421,11 @@ public class PolardbxSourceTCase extends AbstractTestBase {
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
                 new String[] {
-                    "+I[4, 1002, 2, 106, 2022-01-16T00:00]",
-                    "+I[5, 1003, 1, 107, 2022-01-16T00:00]",
+                    "+I[1, 1001, 1, 102, 2022-01-16T00:00]",
                     "+I[2, 1002, 2, 105, 2022-01-16T00:00]",
                     "+I[3, 1004, 3, 109, 2022-01-16T00:00]",
-                    "+I[1, 1001, 1, 102, 2022-01-16T00:00]",
+                    "+I[4, 1002, 2, 106, 2022-01-16T00:00]",
+                    "+I[5, 1003, 1, 107, 2022-01-16T00:00]",
                 };
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from orders_with_multi_pks");
@@ -401,12 +451,40 @@ public class PolardbxSourceTCase extends AbstractTestBase {
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false'"
                         + ")");
-        TableResult sinkResult =
-                tEnv.executeSql("insert into multi_key_sink select * from orders_with_multi_pks");
+
+        tEnv.executeSql("insert into multi_key_sink select * from orders_with_multi_pks");
 
         waitForSinkSize("multi_key_sink", realSnapshotData.size());
         assertEqualsInAnyOrder(
                 expectedSnapshotData, TestValuesTableFactory.getRawResults("multi_key_sink"));
+
+        // third step: check dml events
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("use " + DATABASE);
+            statement.execute(
+                    "INSERT INTO orders_with_multi_pks VALUES (6, 1006,1006, 1006,'2022-01-17');");
+            statement.execute(
+                    "INSERT INTO orders_with_multi_pks VALUES (7,1007, 1007,1007, '2022-01-17');");
+            statement.execute(
+                    "UPDATE orders_with_multi_pks SET seller_id= 9999, order_id=9999 WHERE id=6;");
+            statement.execute(
+                    "UPDATE orders_with_multi_pks SET seller_id= 9999, order_id=9999 WHERE id=7;");
+            statement.execute("DELETE FROM orders_with_multi_pks WHERE id=7;");
+        }
+
+        String[] expectedBinlog =
+                new String[] {
+                    "+I[6, 1006, 1006, 1006, 2022-01-17T00:00]",
+                    "+I[7, 1007, 1007, 1007, 2022-01-17T00:00]",
+                    "-D[6, 1006, 1006, 1006, 2022-01-17T00:00]",
+                    "+I[6, 9999, 9999, 1006, 2022-01-17T00:00]",
+                    "-D[7, 1007, 1007, 1007, 2022-01-17T00:00]",
+                    "+I[7, 9999, 9999, 1007, 2022-01-17T00:00]",
+                    "-D[7, 9999, 9999, 1007, 2022-01-17T00:00]"
+                };
+        List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
+        assertEqualsInAnyOrder(Arrays.asList(expectedBinlog), realBinlog);
     }
 
     private static List<String> fetchRows(Iterator<Row> iter, int size) {

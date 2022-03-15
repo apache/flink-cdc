@@ -42,6 +42,9 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quo
 
 /** A component used to get schema by table path. */
 public class MySqlSchema {
+    private static final String SHOW_CREATE_TABLE = "SHOW CREATE TABLE ";
+    private static final String DESC_TABLE = "DESC ";
+
     private final MySqlConnectorConfig connectorConfig;
     private final MySqlDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
@@ -60,7 +63,7 @@ public class MySqlSchema {
         // read schema from cache first
         TableChange schema = schemasByTableId.get(tableId);
         if (schema == null) {
-            schema = readTableSchema(jdbc, tableId);
+            schema = buildTableSchema(jdbc, tableId);
             schemasByTableId.put(tableId, schema);
         }
         return schema;
@@ -70,12 +73,14 @@ public class MySqlSchema {
     // Helpers
     // ------------------------------------------------------------------------------------------
 
-    private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
+    private TableChange buildTableSchema(JdbcConnection jdbc, TableId tableId) {
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
-        String showCreateTable = readSchemaByShowCreateTable(jdbc, tableId, tableChangeMap);
+        String showCreateTable = SHOW_CREATE_TABLE + quote(tableId);
+        buildSchemaByShowCreateTable(jdbc, tableId, tableChangeMap);
         if (!tableChangeMap.containsKey(tableId)) {
             // fallback to desc table
-            String descTable = readSchemaByDescTable(jdbc, tableId, tableChangeMap);
+            String descTable = DESC_TABLE + quote(tableId);
+            buildSchemaByDescTable(jdbc, descTable, tableId, tableChangeMap);
             if (!tableChangeMap.containsKey(tableId)) {
                 throw new FlinkRuntimeException(
                         String.format(
@@ -86,9 +91,9 @@ public class MySqlSchema {
         return tableChangeMap.get(tableId);
     }
 
-    private String readSchemaByShowCreateTable(
+    private void buildSchemaByShowCreateTable(
             JdbcConnection jdbc, TableId tableId, Map<TableId, TableChange> tableChangeMap) {
-        final String sql = "SHOW CREATE TABLE " + quote(tableId);
+        final String sql = SHOW_CREATE_TABLE + quote(tableId);
         try {
             jdbc.query(
                     sql,
@@ -98,7 +103,6 @@ public class MySqlSchema {
                             parseSchemaByDdl(ddl, tableId, tableChangeMap);
                         }
                     });
-            return sql;
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     String.format("Failed to read schema for table %s by running %s", tableId, sql),
@@ -119,17 +123,19 @@ public class MySqlSchema {
         }
     }
 
-    private String readSchemaByDescTable(
-            JdbcConnection jdbc, TableId tableId, Map<TableId, TableChange> tableChangeMap) {
-        String descTable = "desc" + quote(tableId);
-        List<MySqlFieldDesc> fieldMetas = new ArrayList<>();
+    private void buildSchemaByDescTable(
+            JdbcConnection jdbc,
+            String descTable,
+            TableId tableId,
+            Map<TableId, TableChange> tableChangeMap) {
+        List<MySqlFieldDefine> fieldMetas = new ArrayList<>();
         List<String> primaryKeys = new ArrayList<>();
         try {
             jdbc.query(
                     descTable,
                     rs -> {
                         while (rs.next()) {
-                            MySqlFieldDesc meta = new MySqlFieldDesc();
+                            MySqlFieldDefine meta = new MySqlFieldDefine();
                             meta.setColumnName(rs.getString("Field"));
                             meta.setColumnType(rs.getString("Type"));
                             meta.setNullable(
@@ -145,10 +151,9 @@ public class MySqlSchema {
                         }
                     });
             parseSchemaByDdl(
-                    new MySqlTableDesc(tableId, fieldMetas, primaryKeys).toDdl(),
+                    new MySqlTableDefine(tableId, fieldMetas, primaryKeys).toDdl(),
                     tableId,
                     tableChangeMap);
-            return descTable;
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     String.format(

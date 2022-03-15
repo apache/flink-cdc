@@ -29,14 +29,14 @@ import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
-/** used to get table schema by desc table. */
-public class MySqlTableDesc {
+/** used to generate table define in ddl with "desc table". */
+public class MySqlTableDefine {
     TableId tableId;
-    List<MySqlFieldDesc> fieldMetas;
+    List<MySqlFieldDefine> fieldMetas;
     List<String> primaryKeys;
 
-    public MySqlTableDesc(
-            TableId tableId, List<MySqlFieldDesc> fieldMetas, List<String> primaryKeys) {
+    public MySqlTableDefine(
+            TableId tableId, List<MySqlFieldDefine> fieldMetas, List<String> primaryKeys) {
         this.tableId = tableId;
         this.fieldMetas = fieldMetas;
         this.primaryKeys = primaryKeys;
@@ -48,7 +48,9 @@ public class MySqlTableDesc {
     }
 
     private String fieldDefines() {
-        return fieldMetas.stream().map(MySqlFieldDesc::toDdl).collect(Collectors.joining(", \n\t"));
+        return fieldMetas.stream()
+                .map(MySqlFieldDefine::toDdl)
+                .collect(Collectors.joining(", \n\t"));
     }
 
     private String pkDefine() {
@@ -66,8 +68,8 @@ public class MySqlTableDesc {
     }
 }
 
-/** used to get filed info by desc table. */
-class MySqlFieldDesc {
+/** used to generate field define in ddl with "desc table". */
+class MySqlFieldDefine {
     private String columnName;
     private String columnType;
     private boolean nullable;
