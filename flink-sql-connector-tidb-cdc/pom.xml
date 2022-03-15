@@ -57,6 +57,8 @@ under the License.
                                     <include>org.tikv:tikv-client-java</include>
                                     <include>com.google.protobuf:*</include>
                                     <include>io.grpc:*</include>
+                                    <!--  Include fixed version 18.0-13.0 of flink shaded guava  -->
+                                    <include>org.apache.flink:flink-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
