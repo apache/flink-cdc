@@ -87,6 +87,7 @@ public class TiDBTestBase extends AbstractTestBase {
                             "--config=/pd.toml",
                             "--log-file=/logs/pd0.log")
                     .withNetwork(NETWORK)
+                    .withNetworkMode("bridge")
                     .withNetworkAliases(PD_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
@@ -104,6 +105,7 @@ public class TiDBTestBase extends AbstractTestBase {
                             "--config=/tikv.toml",
                             "--log-file=/logs/tikv0.log")
                     .withNetwork(NETWORK)
+                    .withNetworkMode("bridge")
                     .dependsOn(PD)
                     .withNetworkAliases(TIKV_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
@@ -120,6 +122,7 @@ public class TiDBTestBase extends AbstractTestBase {
                             "--config=/tidb.toml",
                             "--advertise-address=tidb0")
                     .withNetwork(NETWORK)
+                    .withNetworkMode("bridge")
                     .dependsOn(TIKV)
                     .withNetworkAliases(TIDB_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))

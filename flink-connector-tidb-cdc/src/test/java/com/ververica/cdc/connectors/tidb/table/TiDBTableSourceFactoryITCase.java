@@ -84,7 +84,6 @@ public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
     private static final String MY_PASSWORD = "";
     private static final String MY_DATABASE = "inventory";
     private static final String MY_TABLE = "products";
-    private static final String PD_ADDRESS = "pd0:2379";
     private static final Map<String, String> OPTIONS = new HashMap<>();
 
     @Test
@@ -101,7 +100,7 @@ public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
                         MY_TABLE,
                         MY_USERNAME,
                         MY_PASSWORD,
-                        PD_ADDRESS,
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         StartupOptions.latest(),
                         OPTIONS);
         assertEquals(expectedSource, actualSource);
@@ -134,7 +133,7 @@ public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
                         MY_TABLE,
                         MY_USERNAME,
                         MY_PASSWORD,
-                        PD_ADDRESS,
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         StartupOptions.latest(),
                         options);
         assertEquals(expectedSource, actualSource);
@@ -159,7 +158,7 @@ public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
                         MY_TABLE,
                         MY_USERNAME,
                         MY_PASSWORD,
-                        PD_ADDRESS,
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         StartupOptions.latest(),
                         OPTIONS);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
@@ -183,7 +182,9 @@ public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);
-        options.put("pd-addresses", PD_ADDRESS);
+        options.put(
+                "pd-addresses",
+                PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN));
         options.put("scan.startup.mode", "latest-offset");
         return options;
     }
