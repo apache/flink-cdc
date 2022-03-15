@@ -121,6 +121,8 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
+                        new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -161,6 +163,8 @@ public class MySqlTableSourceFactoryTest {
                         40.5d,
                         0.01d,
                         StartupOptions.initial(),
+                        false,
+                        new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -198,6 +202,8 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
+                        new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -233,6 +239,8 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
+                        false,
+                        new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -245,11 +253,14 @@ public class MySqlTableSourceFactoryTest {
         options.put("server-time-zone", "Asia/Shanghai");
         options.put("scan.newly-added-table.enabled", "true");
         options.put("debezium.snapshot.mode", "never");
+        options.put("jdbc.properties.useSSL", "false");
         options.put("heartbeat.interval", "15213ms");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "never");
+        Properties jdbcProperties = new Properties();
+        jdbcProperties.setProperty("useSSL", "false");
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -273,6 +284,7 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
                         true,
+                        jdbcProperties,
                         Duration.ofMillis(15213));
         assertEquals(expectedSource, actualSource);
     }
@@ -330,6 +342,8 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
+                        new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -396,6 +410,8 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
+                        false,
+                        new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -434,6 +450,8 @@ public class MySqlTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
+                        new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");

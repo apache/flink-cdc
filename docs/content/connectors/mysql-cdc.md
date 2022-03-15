@@ -253,6 +253,13 @@ During a snapshot operation, the connector will query each included table to pro
           <td>The connection pool size.</td>
     </tr>
     <tr>
+          <td>jdbc.properties.*</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">20</td>
+          <td>String</td>
+          <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
+    </tr>
+    <tr>
           <td>heartbeat.interval</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>

@@ -56,6 +56,7 @@ public class MySqlSourceConfig implements Serializable {
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
+    private final Properties jdbcProperties;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -84,7 +85,8 @@ public class MySqlSourceConfig implements Serializable {
             double distributionFactorLower,
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
-            Properties dbzProperties) {
+            Properties dbzProperties,
+            Properties jdbcProperties) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -107,6 +109,7 @@ public class MySqlSourceConfig implements Serializable {
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
+        this.jdbcProperties = jdbcProperties;
     }
 
     public String getHostname() {
@@ -200,5 +203,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public RelationalTableFilters getTableFilters() {
         return dbzMySqlConfig.getTableFilters();
+    }
+
+    public Properties getJdbcProperties() {
+        return jdbcProperties;
     }
 }
