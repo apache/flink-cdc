@@ -33,10 +33,10 @@ source ./tools/azure-pipelines/debug_files_utils.sh
 prepare_debug_files "$AGENT_JOBNAME"
 export FLINK_LOG_DIR="$DEBUG_FILES_OUTPUT_DIR/flink-logs"
 mkdir $FLINK_LOG_DIR || { echo "FAILURE: cannot create log directory '${FLINK_LOG_DIR}'." ; exit 1; }
-sudo apt-get install -y moreutils
+brew install moreutils coreutils
 
-REAL_START_SECONDS=$(date +"%s")
-REAL_END_SECONDS=$(date -d "$SYSTEM_PIPELINESTARTTIME + $SYSTEM_JOBTIMEOUT minutes" +"%s")
+REAL_START_SECONDS=$(gdate +"%s")
+REAL_END_SECONDS=$(gdate -d "$SYSTEM_PIPELINESTARTTIME + $SYSTEM_JOBTIMEOUT minutes" +"%s")
 REAL_TIMEOUT_SECONDS=$(($REAL_END_SECONDS - $REAL_START_SECONDS))
 KILL_SECONDS_BEFORE_TIMEOUT=$((2 * 60))
 
@@ -53,7 +53,7 @@ function timeout_watchdog() {
   print_stacktraces | tee "$DEBUG_FILES_OUTPUT_DIR/jps-traces.0"
 
   # final stack trace and kill processes 1 min before timeout
-  local secondsToKill=$(($REAL_END_SECONDS - $(date +"%s") - $KILL_SECONDS_BEFORE_TIMEOUT))
+  local secondsToKill=$(($REAL_END_SECONDS - $(gdate +"%s") - $KILL_SECONDS_BEFORE_TIMEOUT))
   if [[ $secondsToKill -lt 0 ]]; then
     secondsToKill=0
   fi

@@ -55,13 +55,13 @@ max_of() {
 # Returns the highest modification time out of $CMD_OUT (which is the command output file)
 # and any file(s) named "mvn-*.log" (which are logging files created by Flink's tests)
 mod_time () {
-	CMD_OUT_MOD_TIME=`stat -c "%Y" $CMD_OUT`
-	ADDITIONAL_FILES_MOD_TIMES=`stat -c "%Y" $WATCHDOG_ADDITIONAL_MONITORING_FILES 2> /dev/null`
+	CMD_OUT_MOD_TIME=`gdate +%s -r $CMD_OUT`
+	ADDITIONAL_FILES_MOD_TIMES=`gdate +%s -r $WATCHDOG_ADDITIONAL_MONITORING_FILES 2> /dev/null`
 	echo `max_of $CMD_OUT_MOD_TIME $ADDITIONAL_FILES_MOD_TIMES`
 }
 
 the_time() {
-	echo `date +%s`
+	echo `gdate +%s`
 }
 
 # watchdog process

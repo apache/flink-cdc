@@ -24,7 +24,7 @@ if ! [ -e $FLINK_ARTIFACT_DIR ]; then
 fi
 
 echo "Merging cache"
-cp -RT "$FLINK_ARTIFACT_DIR" "."
+cp -R "$FLINK_ARTIFACT_DIR/" "."
 
 echo "Adjusting timestamps"
 

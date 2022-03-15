@@ -89,6 +89,9 @@ jobs:
         misc:
           module: misc
     steps:
+      - script: ./tools/azure-pipelines/set_docker_environment.sh
+        displayName: Set docker environment
+
       # download artifact from compile stage
       - task: DownloadPipelineArtifact@2
         inputs:
@@ -112,7 +115,7 @@ jobs:
           echo "##vso[task.setvariable variable=PATH]$JAVA_HOME_${{parameters.jdk}}_X64/bin:$PATH"
         displayName: "Set JDK"
 
-      - script: sudo sysctl -w kernel.core_pattern=core.%p
+      - script: sudo sysctl -w kern.corefile=core.%P
         displayName: Set coredump pattern
 
       # Test

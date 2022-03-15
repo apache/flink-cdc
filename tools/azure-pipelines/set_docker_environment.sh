@@ -17,34 +17,11 @@
 # limitations under the License.
 ################################################################################
 
-print_system_info() {
+# This script is copied from https://github.com/docker/for-mac/issues/2359#issuecomment-991942550
+brew install --cask docker
+docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
+docker_app_path="${docker_app_path/#\~/$HOME}"
 
-    echo "Get kernel state"
-    sysctl -a
-
-    echo "Disk information"
-    df -hH
-
-    echo "Running build as"
-    whoami
-}
-
-print_stacktraces () {
-	echo "=============================================================================="
-	echo "The following Java processes are running (JPS)"
-	echo "=============================================================================="
-
-	JAVA_PROCESSES=`jps`
-	echo "$JAVA_PROCESSES"
-
-	local pids=( $(echo "$JAVA_PROCESSES" | awk '{print $1}') )
-
-	for pid in "${pids[@]}"; do
-		echo "=============================================================================="
-		echo "Printing stack trace of Java process ${pid}"
-		echo "=============================================================================="
-
-		jstack $pid
-	done
-}
-
+sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
+open -a "$docker_app_path" --args --unattended --accept-license
+while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done

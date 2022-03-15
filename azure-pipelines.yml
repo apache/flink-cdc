@@ -44,6 +44,6 @@ stages:
         parameters: # see template file for a definition of the parameters.
           stage_name: ci_build
           test_pool_definition:
-            vmImage: 'ubuntu-20.04'
+            vmImage: 'macOS-latest'
           run_end_to_end: false
           jdk: 8
