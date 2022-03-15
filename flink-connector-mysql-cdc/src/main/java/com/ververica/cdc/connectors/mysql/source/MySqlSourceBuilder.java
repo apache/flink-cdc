@@ -202,6 +202,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Custom properties that will overwrite the default JDBC connection URL. */
+    public MySqlSourceBuilder<T> jdbcProperties(Properties jdbcProperties) {
+        this.configFactory.jdbcProperties(jdbcProperties);
+        return this;
+    }
+
     /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
     public MySqlSourceBuilder<T> debeziumProperties(Properties properties) {
         this.configFactory.debeziumProperties(properties);
@@ -214,6 +220,12 @@ public class MySqlSourceBuilder<T> {
      */
     public MySqlSourceBuilder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
         this.deserializer = deserializer;
+        return this;
+    }
+
+    /** The interval of heartbeat event. */
+    public MySqlSourceBuilder<T> heartbeatInterval(Duration heartbeatInterval) {
+        this.configFactory.heartbeatInterval(heartbeatInterval);
         return this;
     }
 

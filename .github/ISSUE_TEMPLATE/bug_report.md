@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-**Describe the bug**
+**Describe the bug(Please use English)**
 A clear and concise description of what the bug is.
 
 **Environment :**

@@ -43,7 +43,7 @@ import static org.junit.Assert.assertTrue;
 /** Basic class for testing {@link MySqlSource}. */
 public abstract class MySqlSourceTestBase extends TestLogger {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
     protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
