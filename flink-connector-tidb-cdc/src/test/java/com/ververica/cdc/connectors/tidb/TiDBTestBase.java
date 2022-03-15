@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.tidb;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.alibaba.dcm.DnsCacheManipulator;
+import org.apache.commons.lang3.RandomUtils;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
@@ -65,21 +66,23 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final String TIDB_PASSWORD = "";
 
     public static final int TIDB_PORT = 4000;
-    public static final int TIKV_PORT = 20160;
-    public static final int PD_PORT = 2379;
+    public static final int TIKV_PORT_ORIGIN = 20160;
+    public static int tikvPort = TIKV_PORT_ORIGIN;
+    public static final int PD_PORT_ORIGIN = 2379;
+    public static int pdPort = PD_PORT_ORIGIN;
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @ClassRule
     public static final GenericContainer<?> PD =
             new FixedHostPortGenericContainer<>("pingcap/pd:v5.3.1")
-                    .withFixedExposedPort(PD_PORT, PD_PORT)
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
+                    .withFixedExposedPort(pdPort, PD_PORT_ORIGIN)
                     .withCommand(
                             "--name=pd0",
-                            "--client-urls=http://0.0.0.0:2379",
+                            "--client-urls=http://0.0.0.0:" + pdPort + ",http://0.0.0.0:2379",
                             "--peer-urls=http://0.0.0.0:2380",
-                            "--advertise-client-urls=http://pd0:2379",
+                            "--advertise-client-urls=http://pd0:" + pdPort + ",http://pd0:2379",
                             "--advertise-peer-urls=http://pd0:2380",
                             "--initial-cluster=pd0=http://pd0:2380",
                             "--data-dir=/data/pd0",
@@ -93,7 +96,7 @@ public class TiDBTestBase extends AbstractTestBase {
     @ClassRule
     public static final GenericContainer<?> TIKV =
             new FixedHostPortGenericContainer<>("pingcap/tikv:v5.3.1")
-                    .withFixedExposedPort(TIKV_PORT, TIKV_PORT)
+                    .withFixedExposedPort(tikvPort, TIKV_PORT_ORIGIN)
                     .withFileSystemBind("src/test/resources/config/tikv.toml", "/tikv.toml")
                     .withCommand(
                             "--addr=0.0.0.0:20160",
@@ -126,6 +129,8 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @BeforeClass
     public static void startContainers() throws Exception {
+        pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
+        tikvPort = TIKV_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(PD, TIKV, TIDB)).join();
         // Add jvm dns cache for flink to invoke pd interface.

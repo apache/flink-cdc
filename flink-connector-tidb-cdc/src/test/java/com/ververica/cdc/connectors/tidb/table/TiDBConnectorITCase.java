@@ -80,7 +80,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'table-name' = '%s'"
                                 + ")",
                         TIDB.getContainerIpAddress(),
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -191,7 +191,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'table-name' = '%s'"
                                 + ")",
                         TIDB.getContainerIpAddress(),
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
@@ -276,7 +276,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'table-name' = '%s'"
                                 + ")",
                         TIDB.getContainerIpAddress(),
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         TIDB_USER,
                         TIDB_PASSWORD,
                         "inventory",
