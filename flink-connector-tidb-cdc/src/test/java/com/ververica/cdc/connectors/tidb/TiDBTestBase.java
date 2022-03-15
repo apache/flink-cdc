@@ -66,20 +66,21 @@ public class TiDBTestBase extends AbstractTestBase {
 
     public static final int TIDB_PORT = 4000;
     public static final int TIKV_PORT = 20160;
-    public static final int PD_PORT = 2379;
+    public static final int PD_PORT_ORIGIN = 2379;
+    public static final int PD_PORT = 12379;
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @ClassRule
     public static final GenericContainer<?> PD =
             new FixedHostPortGenericContainer<>("pingcap/pd:v5.3.1")
-                    .withFixedExposedPort(PD_PORT, PD_PORT)
+                    .withFixedExposedPort(PD_PORT, PD_PORT_ORIGIN)
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
                     .withCommand(
                             "--name=pd0",
-                            "--client-urls=http://0.0.0.0:2379",
+                            "--client-urls=http://0.0.0.0:12379,http://0.0.0.0:2379",
                             "--peer-urls=http://0.0.0.0:2380",
-                            "--advertise-client-urls=http://pd0:2379",
+                            "--advertise-client-urls=http://pd0:12379",
                             "--advertise-peer-urls=http://pd0:2380",
                             "--initial-cluster=pd0=http://pd0:2380",
                             "--data-dir=/data/pd0",
