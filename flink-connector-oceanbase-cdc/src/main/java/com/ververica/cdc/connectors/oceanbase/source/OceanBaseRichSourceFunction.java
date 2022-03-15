@@ -34,9 +34,11 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import com.mysql.jdbc.ResultSetMetaData;
 import com.oceanbase.clogproxy.client.LogProxyClient;
+import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.exception.LogProxyClientException;
 import com.oceanbase.clogproxy.client.listener.RecordListener;
+import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import com.oceanbase.oms.logmessage.DataMessage;
 import com.oceanbase.oms.logmessage.LogMessage;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -269,12 +271,12 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     }
 
     protected void readChangeEvents() throws InterruptedException {
+        String tableWhiteList = String.format("%s.%s.%s", tenantName, databaseName, tableName);
         ObReaderConfig obReaderConfig = new ObReaderConfig();
         obReaderConfig.setRsList(rsList);
         obReaderConfig.setUsername(username);
         obReaderConfig.setPassword(password);
-        obReaderConfig.setTableWhiteList(
-                String.format("%s.%s.%s", tenantName, databaseName, tableName));
+        obReaderConfig.setTableWhiteList(tableWhiteList);
 
         if (resolvedTimestamp > 0) {
             obReaderConfig.setStartTimestamp(resolvedTimestamp);
@@ -286,6 +288,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
         final CountDownLatch latch = new CountDownLatch(1);
 
+        // avoid client id duplication when starting multiple connectors in one etl
+        ClientConf.USER_DEFINED_CLIENTID = ClientIdGenerator.generate() + tableWhiteList;
         logProxyClient = new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig);
 
         logProxyClient.addListener(
