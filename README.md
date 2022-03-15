@@ -128,9 +128,9 @@ The Flink CDC Connectors welcomes anyone that wants to help out in any way, whet
 * [DingTalk](https://www.dingtalk.com/) Chinese User Group
 
   You can search the group number [**33121212**] or scan the following QR code to join in the group.
-
+  
   <div align=center>
-     <img src="https://user-images.githubusercontent.com/9601882/158348975-39b8e5d3-478b-43b9-9d05-f9ba49df5e29.png" width=400 />
+     <img src="https://user-images.githubusercontent.com/9601882/158350201-a1de35e6-0399-4a91-b5b0-e2fd5d33e33c.png" width=400 />
    </div>
 
 ## Documents
