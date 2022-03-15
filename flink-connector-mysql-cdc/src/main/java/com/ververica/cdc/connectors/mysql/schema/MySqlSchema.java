@@ -156,16 +156,4 @@ public class MySqlSchema {
                     e);
         }
     }
-
-    public static String unescapeQuotaName(String name) {
-        if (name != null && name.length() > 2) {
-            char c0 = name.charAt(0);
-            char x0 = name.charAt(name.length() - 1);
-            if (c0 == '\'' && x0 == '\'') {
-                return name.substring(1, name.length() - 1);
-            }
-        }
-
-        return name;
-    }
 }
