@@ -66,8 +66,8 @@ public class TiDBTestBase extends AbstractTestBase {
 
     public static final int TIDB_PORT = 4000;
     public static final int TIKV_PORT = 20160;
-    public static final int PD_PORT_ORIGIN = 12379;
-    public static final int PD_PORT = 12379;
+    public static final int PD_PORT_ORIGIN = 12456;
+    public static final int PD_PORT = 12456;
 
     @ClassRule public static final Network NETWORK = Network.builder().driver("bridge").build();
 
@@ -79,9 +79,9 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
                     .withCommand(
                             "--name=pd0",
-                            "--client-urls=http://0.0.0.0:12379",
+                            "--client-urls=http://0.0.0.0:12456",
                             "--peer-urls=http://0.0.0.0:2380",
-                            "--advertise-client-urls=http://pd0:12379",
+                            "--advertise-client-urls=http://pd0:12456",
                             "--advertise-peer-urls=http://pd0:2380",
                             "--initial-cluster=pd0=http://pd0:2380",
                             "--data-dir=/data/pd0",
@@ -103,7 +103,7 @@ public class TiDBTestBase extends AbstractTestBase {
                             "--addr=0.0.0.0:20160",
                             "--advertise-addr=tikv0:20160",
                             "--data-dir=/data/tikv0",
-                            "--pd=pd0:12379",
+                            "--pd=pd0:12456",
                             "--config=/tikv.toml",
                             "--log-file=/logs/tikv0.log")
                     .withNetwork(NETWORK)
@@ -120,7 +120,7 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withFileSystemBind("src/test/resources/config/tidb.toml", "/tidb.toml")
                     .withCommand(
                             "--store=tikv",
-                            "--path=pd0:12379",
+                            "--path=pd0:12456",
                             "--config=/tidb.toml",
                             "--advertise-address=tidb0")
                     .withNetwork(NETWORK)
