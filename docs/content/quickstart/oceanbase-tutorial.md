@@ -1,10 +1,12 @@
-# 演示: OceanBase CDC 导入 Elasticsearch
+# Demo: Streaming ETL on Flink reading from OceanBase CE to ElasticSearch
 
-### 准备教程所需要的组件
+### Preparation
 
-#### 配置并启动容器
+#### Configure and start the components
 
-配置 `docker-compose.yml`。`oblogproxy`在连接`observer`时，需要在配置文件 `/usr/local/oblogproxy/conf/conf.json`中指定用户名和密码，配置方式参见[文档](https://github.com/oceanbase/oblogproxy#3-%E9%85%8D%E7%BD%AE%E7%B3%BB%E7%BB%9F%E7%A7%9F%E6%88%B7) ，两者也可以在首次启动时通过环境变量设置，如下所示。
+Create `docker-compose.yml`. 
+
+Note that when `oblogproxy` connect to `observer`, a pair of username and password in `sys` tenant id needed in `/usr/local/oblogproxy/conf/conf.json`, see the [doc](https://github.com/oceanbase/oblogproxy#3-%E9%85%8D%E7%BD%AE%E7%B3%BB%E7%BB%9F%E7%A7%9F%E6%88%B7) for more details.
 
 ```yaml
 version: '2.1'
@@ -47,47 +49,50 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock'
 ```
 
-在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
+Execute the following command in the directory where `docker-compose.yml` is located.
 
 ```shell
 docker-compose up -d
 ```
 
-#### 配置用户名和密码
+#### Create sys user
 
-配置`observer`，创建测试用的用户名和密码，此处以'user'和'pswd'为例。
+Create a pair of username and password in `sys` tenant, here use 'user' and 'pswd' for example.
 
 ```shell
-# 进入OceanBase命令行界面
+# Open the CLI
 docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot
-# 创建用户名和密码
+# Create user
 MySQL [(none)]> CREATE USER user IDENTIFIED BY 'pswd';
 MySQL [(none)]> GRANT ALL PRIVILEGES ON *.* TO user WITH GRANT OPTION;
 ```
 
-配置`oblogproxy`，如果上一步在启动容器时已经通过环境变量指定了用户名和密码，则不用进行操作。
+Set username and password in `oblogproxy`, skip this step if you set them by the environment variables in `docker-compose.yaml`.
 
 ```shell
-# 获取加密的用户名和密码
-## user 将会转换为 441AB4AC40CD3C2DAC19873CD04CC72C
+# Get encrypted username and password
+## 'user' will trans to '441AB4AC40CD3C2DAC19873CD04CC72C'
 docker-compose exec oblogproxy /usr/local/oblogproxy/bin/logproxy -x user
-## pswd 将会转换为 B5D4F8E0DBC9F0E57A13296DCD307B5D
+## 'pswd' will trans to 'B5D4F8E0DBC9F0E57A13296DCD307B5D'
 docker-compose exec oblogproxy /usr/local/oblogproxy/bin/logproxy -x pswd
 ```
-最后修改`/usr/local/oblogproxy/conf/conf.json`并重启
+
+Edit the `/usr/local/oblogproxy/conf/conf.json` in `oblogproxy` and restart the container.
 
 ```shell
 docker-compose exec oblogproxy vi /usr/local/oblogproxy/conf/conf.json
 docker restart oblogproxy
 ```
 
-### 准备数据：
+### Create data for reading snapshot
 
-使用新创建的用户名和密码进行登陆。
+Open the CLI:
 
 ```shell
 docker-compose exec observer obclient -h127.0.0.1 -P2881 -uuser -ppswd
 ```
+
+Insert data:
 
 ```sql
 CREATE DATABASE ob;
@@ -126,23 +131,23 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
        (default, '2020-07-30 12:00:30', 'Edward', 25.25, 106, false);
 ```
 
-### 下载所需要的依赖包
+### Download the libraries required
 
-```下载链接只在已发布的版本上可用```
+```Download links are only available for stable releases.```
 
 - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
 - [flink-sql-connector-oceanbase-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.2-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.2-SNAPSHOT.jar)
 
-### 在 Flink SQL CLI 中使用 Flink DDL 创建表
+### Use Flink DDL to create dynamic table in Flink SQL CLI
 
 ```sql
--- 设置间隔时间为3秒                       
+-- checkpoint every 3000 milliseconds                     
 Flink SQL> SET execution.checkpointing.interval = 3s;
 
--- 设置本地时区为 Asia/Shanghai
+-- set local time zone as Asia/Shanghai
 Flink SQL> SET table.local-time-zone = Asia/Shanghai;
 
--- 创建订单表
+-- create orders table
 Flink SQL> CREATE TABLE orders (
    order_id INT,
    order_date TIMESTAMP(0),
@@ -165,7 +170,7 @@ Flink SQL> CREATE TABLE orders (
     'logproxy.host' = 'localhost',
     'logproxy.port' = '2983');
 
--- 创建商品表 
+-- create products table
 Flink SQL> CREATE TABLE products (
     id INT,
     name STRING,
@@ -185,7 +190,7 @@ Flink SQL> CREATE TABLE products (
     'logproxy.host' = 'localhost',
     'logproxy.port' = '2983');
 
--- 创建关联后的订单数据表
+-- create flat table enriched_orders
 Flink SQL> CREATE TABLE enriched_orders (
    order_id INT,
    order_date TIMESTAMP(0),
@@ -201,7 +206,7 @@ Flink SQL> CREATE TABLE enriched_orders (
      'hosts' = 'http://localhost:9200',
      'index' = 'enriched_orders');
 
--- 执行读取和写入   
+-- Start the reading and writing job
 Flink SQL> INSERT INTO enriched_orders
   SELECT o.order_id,
     o.order_date,
@@ -215,13 +220,13 @@ Flink SQL> INSERT INTO enriched_orders
  LEFT JOIN products AS p ON o.product_id = p.id;
 ```
 
-### 在 Kibana 中查看数据
+### Check data on Kibana
 
-访问  [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern) 创建 index pattern `enriched_orders`，之后可以在 [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover) 看到写入的数据了。
+Open  [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern) and create index pattern `enriched_orders`, then go to [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover), and you will see the data of `enriched_orders`.
 
-### 修改监听表数据，查看增量数据变动
+### Check data changes
 
-在OceanBase中依次执行如下修改操作，每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新。
+Execute the following sql in OceanBase under `ob` database, you will find records in Kibana be updated after each step in real time.
 
 ```sql
 INSERT INTO orders VALUES (default, '2020-07-30 15:22:00', 'Jark', 29.71, 104, false);
@@ -229,15 +234,15 @@ UPDATE orders SET order_status = true WHERE order_id = 10004;
 DELETE FROM orders WHERE order_id = 10004;
 ```
 
-### 环境清理
+### Clean up
 
-在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：
+Execute the following command to stop all containers in the directory where `docker-compose.yml` is located.
 
 ```shell
 docker-compose down
 ```
 
-进入Flink的部署目录，停止 Flink 集群：
+Stop the flink cluster by following command.
 
 ```shell
 ./bin/stop-cluster.sh
