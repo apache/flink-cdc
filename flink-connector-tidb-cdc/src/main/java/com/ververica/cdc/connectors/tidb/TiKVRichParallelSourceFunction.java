@@ -221,7 +221,6 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
     @Override
     public void cancel() {
-        // TODO: abort pending transactions
         try {
             if (cdcClient != null) {
                 cdcClient.close();

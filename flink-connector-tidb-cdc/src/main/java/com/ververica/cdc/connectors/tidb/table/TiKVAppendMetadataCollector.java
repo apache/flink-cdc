@@ -27,6 +27,7 @@ import java.io.Serializable;
 
 /** Emits a row with physical fields and metadata fields. */
 public class TiKVAppendMetadataCollector implements Collector<RowData>, Serializable {
+
     private static final long serialVersionUID = 1L;
 
     private final TiKVMetadataConverter[] metadataConverters;

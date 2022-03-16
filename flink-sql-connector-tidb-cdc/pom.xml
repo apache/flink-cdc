@@ -56,7 +56,6 @@ under the License.
                                     <include>com.ververica:flink-connector-tidb-cdc</include>
                                     <include>org.tikv:tikv-client-java</include>
                                     <include>com.google.protobuf:*</include>
-                                    <!-- TODO shade grpc dependency with resources -->
                                     <include>io.grpc:*</include>
                                 </includes>
                             </artifactSet>
@@ -65,6 +64,12 @@ under the License.
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
                                         com.ververica.cdc.connectors.shaded.com.google
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>io.grpc</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.io.grpc
                                     </shadedPattern>
                                 </relocation>
                             </relocations>

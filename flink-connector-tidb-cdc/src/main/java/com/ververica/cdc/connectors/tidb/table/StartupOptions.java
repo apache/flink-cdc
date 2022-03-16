@@ -22,6 +22,7 @@ import java.util.Objects;
 
 /** TiDB CDC Source startup options. */
 public final class StartupOptions {
+
     public final StartupMode startupMode;
 
     /**

@@ -345,40 +345,83 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    /*    @Test
-    public void testMetadataColumns() {
-        Map<String, String> properties = getAllOptions();
+    @Test
+    public void testMetadataColumns() throws Exception {
+        initializeTidbTable("inventory");
 
-        // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
-        TiDBTableSource tidbTableSource = (TiDBTableSource) actualSource;
-        tidbTableSource.applyReadableMetadata(
-                Arrays.asList("op_ts", "database_name", "table_name"),
-                SCHEMA_WITH_METADATA.toSourceRowDataType());
-        actualSource = tidbTableSource.copy();
-        TiDBTableSource expectedSource =
-                new TiDBTableSource(
-                        SCHEMA_WITH_METADATA,
-                        MY_HOSTNAME,
-                        MY_DATABASE,
-                        MY_TABLE,
-                        MY_USERNAME,
-                        MY_PASSWORD,
-                        PD_ADDRESS,
-                        StartupOptions.latest(),
-                        OPTIONS);
-        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
-        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "table_name");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE tidb_source ("
+                                + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " table_name STRING METADATA VIRTUAL,"
+                                + " `id` INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(20, 10),"
+                                + " PRIMARY KEY (`id`) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'tidb-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
+                                + " 'pd-addresses' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        TIDB.getContainerIpAddress(),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB_USER,
+                        TIDB_PASSWORD,
+                        "inventory",
+                        "products");
 
-        assertEquals(expectedSource, actualSource);
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " database_name STRING,"
+                        + " table_name STRING,"
+                        + " `id` DECIMAL(20, 0) NOT NULL,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(20, 10),"
+                        + " primary key (database_name, table_name, id) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
 
-        ScanTableSource.ScanRuntimeProvider provider =
-                tidbTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
-        TiKVRichParallelSourceFunction<RowData> sourceFunction =
-                (TiKVRichParallelSourceFunction<RowData>)
-                        ((SourceFunctionProvider) provider).createSourceFunction();
-        assertProducedTypeOfSourceFunction(sourceFunction, expectedSource.producedDataType);
-    }*/
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", 9);
+
+        try (Connection connection = getJdbcConnection("inventory");
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+        }
+
+        waitForSinkSize("sink", 10);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I(inventory,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
+                        "+I(inventory,products,102,car battery,12V car battery,8.1000000000)",
+                        "+I(inventory,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                        "+I(inventory,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
+                        "+I(inventory,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
+                        "+I(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
+                        "+I(inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
+                        "+I(inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
+                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        assertEqualsInAnyOrder(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
 
     private static void waitForSinkSize(String sinkName, int expectedSize)
             throws InterruptedException {

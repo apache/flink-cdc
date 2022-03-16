@@ -29,21 +29,22 @@ import java.io.Serializable;
 @FunctionalInterface
 @Internal
 public interface TiKVMetadataConverter extends Serializable {
+
     Object read(TiKVRowValue row);
 
     /** TiKV Row Value. */
     class TiKVRowValue {
-        public boolean isKv;
+        public boolean isSnapshotRecord;
         public Kvrpcpb.KvPair kvPair;
         public Cdcpb.Event.Row row;
 
         public TiKVRowValue(Kvrpcpb.KvPair kvPair) {
-            this.isKv = true;
+            this.isSnapshotRecord = true;
             this.kvPair = kvPair;
         }
 
         public TiKVRowValue(Cdcpb.Event.Row row) {
-            this.isKv = false;
+            this.isSnapshotRecord = false;
             this.row = row;
         }
     }

@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.tidb.table;
 
 /**
- * Startup modes for the Oracle CDC Consumer.
+ * Startup modes for the TiDB CDC Consumer.
  *
  * @see StartupOptions
  */

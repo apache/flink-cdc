@@ -84,17 +84,6 @@ public class RowDataTiKVChangeEventDeserializationSchema
                                                 row.getValue().toByteArray(), handle, tableInfo));
                         emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataInsert, out);
                     } else {
-                        // TODO TiKV cdc client doesn't return old value in PUT event
-                        //                        if (!row.getOldValue().isEmpty()) {
-                        //                            out.collect(
-                        //                                    GenericRowData.ofKind(
-                        //                                            RowKind.UPDATE_BEFORE,
-                        //                                            getRowDataFields(
-                        //
-                        // row.getOldValue().toByteArray(),
-                        //                                                    handle,
-                        //                                                    tableInfo)));
-                        //                        }
                         RowData rowDataUpdate =
                                 GenericRowData.ofKind(
                                         RowKind.UPDATE_AFTER,

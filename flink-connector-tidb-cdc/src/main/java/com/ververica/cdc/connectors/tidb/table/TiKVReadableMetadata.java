@@ -92,9 +92,9 @@ public class TiKVReadableMetadata {
 
                     @Override
                     public Object read(TiKVRowValue row) {
-                        if (row.isKv) {
-                            // We cannot get ts from KvPair, use default value.
-                            return TimestampData.fromEpochMillis(0);
+                        if (row.isSnapshotRecord) {
+                            // Uses OL as the operation time of snapshot records.
+                            return TimestampData.fromEpochMillis(0L);
                         } else {
                             return TimestampData.fromEpochMillis(row.row.getStartTs());
                         }

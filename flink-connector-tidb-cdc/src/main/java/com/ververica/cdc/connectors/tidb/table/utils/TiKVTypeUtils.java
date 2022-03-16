@@ -256,7 +256,6 @@ public class TiKVTypeUtils {
                 break;
             case "BigDecimal":
                 BigDecimal bigDecimal = (BigDecimal) object;
-                // TODO improve the conversion code
                 int precision = ((DecimalType) dataType.getLogicalType()).getPrecision();
                 int scale = ((DecimalType) dataType.getLogicalType()).getScale();
                 result = DecimalData.fromBigDecimal(bigDecimal, precision, scale);

@@ -98,8 +98,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     public ChangelogMode getChangelogMode() {
         return ChangelogMode.newBuilder()
                 .addContainedKind(RowKind.INSERT)
-                // TODO TiKV cdc client doesn't return old value in PUT event
-                // .addContainedKind(RowKind.UPDATE_BEFORE)
                 .addContainedKind(RowKind.UPDATE_AFTER)
                 .addContainedKind(RowKind.DELETE)
                 .build();

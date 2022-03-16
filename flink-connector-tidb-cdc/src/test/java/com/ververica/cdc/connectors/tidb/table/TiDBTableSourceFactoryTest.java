@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.tidb.table;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
@@ -29,12 +28,8 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
-import org.apache.flink.table.types.DataType;
 
-import com.ververica.cdc.connectors.tidb.TiKVRichParallelSourceFunction;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -43,12 +38,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 
-/** Integration tests for TiDB table source factory. */
-public class TiDBTableSourceFactoryITCase {
+/** Unit tests for TiDB table source factory. */
+public class TiDBTableSourceFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -162,21 +155,11 @@ public class TiDBTableSourceFactoryITCase {
                                 options),
                         schema),
                 new Configuration(),
-                TiDBTableSourceFactoryITCase.class.getClassLoader(),
+                TiDBTableSourceFactoryTest.class.getClassLoader(),
                 false);
     }
 
     private static DynamicTableSource createTableSource(Map<String, String> options) {
         return createTableSource(SCHEMA, options);
-    }
-
-    private static void assertProducedTypeOfSourceFunction(
-            TiKVRichParallelSourceFunction<RowData> sourceFunction, DataType expectedProducedType) {
-        TypeInformation<RowData> producedType = sourceFunction.getProducedType();
-        assertThat(producedType, instanceOf(InternalTypeInfo.class));
-        InternalTypeInfo<RowData> rowDataInternalTypeInfo =
-                (InternalTypeInfo<RowData>) producedType;
-        DataType producedDataType = rowDataInternalTypeInfo.getDataType();
-        assertEquals(expectedProducedType.toString(), producedDataType.toString());
     }
 }
