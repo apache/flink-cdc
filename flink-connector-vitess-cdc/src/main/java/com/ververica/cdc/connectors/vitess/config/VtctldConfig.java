@@ -18,6 +18,8 @@
 
 package com.ververica.cdc.connectors.vitess.config;
 
+import java.util.Objects;
+
 /** VTCtld server configuration options. */
 public class VtctldConfig {
 
@@ -91,5 +93,42 @@ public class VtctldConfig {
             vtctldConfig.port = this.port;
             return vtctldConfig;
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        VtctldConfig that = (VtctldConfig) o;
+        return port == that.port
+                && Objects.equals(hostname, that.hostname)
+                && Objects.equals(username, that.username)
+                && Objects.equals(password, that.password);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(hostname, port, username, password);
+    }
+
+    @Override
+    public String toString() {
+        return "VtctldConfig{"
+                + "hostname='"
+                + hostname
+                + '\''
+                + ", port="
+                + port
+                + ", username='"
+                + username
+                + '\''
+                + ", password='"
+                + password
+                + '\''
+                + '}';
     }
 }

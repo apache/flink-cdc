@@ -13,4 +13,5 @@ postgres-cdc
 sqlserver-cdc
 tidb-cdc
 db2-cdc
+vitess-cdc
 ```

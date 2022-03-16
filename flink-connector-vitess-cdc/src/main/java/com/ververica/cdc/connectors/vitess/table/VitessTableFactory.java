@@ -100,7 +100,7 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
     private static final ConfigOption<String> TABLET_TYPE =
             ConfigOptions.key("tablet-type")
                     .stringType()
-                    .defaultValue(TabletType.REPLICA.name())
+                    .defaultValue(TabletType.RDONLY.name())
                     .withDescription(
                             "The type of Tablet (hence MySQL) from which to stream the changes:");
 
@@ -177,8 +177,6 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(HOSTNAME);
         options.add(KEYSPACE);
-        options.add(USERNAME);
-        options.add(PASSWORD);
         options.add(VTCTL_HOSTNAME);
         options.add(TABLE_NAME);
         return options;
@@ -189,6 +187,8 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
         options.add(VTCTL_PORT);
+        options.add(USERNAME);
+        options.add(PASSWORD);
         options.add(TABLET_TYPE);
         options.add(DECODING_PLUGIN_NAME);
         options.add(SLOT_NAME);

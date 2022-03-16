@@ -1,24 +1,26 @@
 # Overview
 
-CDC Connectors for Apache Flink<sup>®</sup> is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
-The CDC Connectors for Apache Flink<sup>®</sup> integrate Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
+CDC Connectors for Apache Flink<sup>®</sup> is a set of source connectors for <a href="https://flink.apache.org/">Apache
+Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
+The CDC Connectors for Apache Flink<sup>®</sup> integrate Debezium as the engine to capture data changes. So it can
+fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
 ![Flink_CDC](/_static/fig/flinkcdc.png "Flink CDC")
 
 ## Supported Connectors
 
-| Connector                                    | Database                                                                                                                                                                                                                                                                                                                                                                                             | Driver                  |
-|----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| [mongodb-cdc](connectors/mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                               | MongoDB Driver: 4.3.1   |
-| [mysql-cdc](connectors/mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27     |
-| [oceanbase-cdc](connectors/oceanbase-cdc.md) | <li> [OceanBase CE](https://open.oceanbase.com): 3.1.x <li> [OceanBase EE](https://www.oceanbase.com/product/oceanbase) (MySQL mode): 2.x, 3.x                                                                                                                                                                                                                                                       | JDBC Driver: 5.1.4x     |
-| [oracle-cdc](connectors/oracle-cdc.md)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19                                                                                                                                                                                                                                                                                                                                         | Oracle Driver: 19.3.0.0 |
-| [postgres-cdc](connectors/postgres-cdc.md)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12                                                                                                                                                                                                                                                                                                                                       | JDBC Driver: 42.2.12    |
-| [sqlserver-cdc](connectors/sqlserver-cdc.md) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2012, 2014, 2016, 2017, 2019                                                                                                                                                                                                                                                                                                                 | JDBC Driver: 7.2.2.jre8 | 
-| [tidb-cdc](connectors/tidb-cdc.md)           | <li> [TiDB](https://www.pingcap.com/): 5.1.x, 5.2.x, 5.3.x, 5.4.x, 6.0.0                                                                                                                                                                                                                                                                                                                             | JDBC Driver: 8.0.27     | 
-| [db2-cdc](connectors/db2-cdc.md)             | <li> [Db2](https://www.ibm.com/products/db2): 11.5                                                                                                                                                                                                                                                                                                                                                   | DB2 Driver: 11.5.0.0     | 
+| Connector                                    | Database                                                                                                                                                                                                                                                                                                                                                                                                 | Driver                    |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
+| [mongodb-cdc](connectors/mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                                   | MongoDB Driver: 4.3.1     |
+| [mysql-cdc](connectors/mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1   | JDBC Driver: 8.0.27       |
+| [oceanbase-cdc](connectors/oceanbase-cdc.md) | <li> [OceanBase CE](https://open.oceanbase.com): 3.1.x <li> [OceanBase EE](https://www.oceanbase.com/product/oceanbase) (MySQL mode): 2.x, 3.x                                                                                                                                                                                                                                                           | JDBC Driver: 5.1.4x       |
+| [oracle-cdc](connectors/oracle-cdc.md)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19                                                                                                                                                                                                                                                                                                                                             | Oracle Driver: 19.3.0.0   |
+| [postgres-cdc](connectors/postgres-cdc.md)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12                                                                                                                                                                                                                                                                                                                                           | JDBC Driver: 42.2.12      |
+| [sqlserver-cdc](connectors/sqlserver-cdc.md) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2012, 2014, 2016, 2017, 2019                                                                                                                                                                                                                                                                                                                     | JDBC Driver: 7.2.2.jre8   | 
+| [tidb-cdc](connectors/tidb-cdc.md)           | <li> [TiDB](https://www.pingcap.com/): 5.1.x, 5.2.x, 5.3.x, 5.4.x, 6.0.0                                                                                                                                                                                                                                                                                                                                 | JDBC Driver: 8.0.27       |
+| [db2-cdc](connectors/db2-cdc.md)             | <li> [Db2](https://www.ibm.com/products/db2): 11.5                                                                                                                                                                                                                                                                                                                                                   | DB2 Driver: 11.5.0.0     |
+| [Vitess-cdc](connectors/vitess-cdc.md)       | <li> [Vitess](https://vitess.io/): 8.0.x, 9.0.x                                                                                                                                                                                                                                                                                                                                                          | MySql JDBC Driver: 8.0.16 |
 
-## Supported Flink Versions 
 The following table shows the version mapping between Flink<sup>®</sup> CDC Connectors and Flink<sup>®</sup>:
 
 | Flink<sup>®</sup> CDC Version | Flink<sup>®</sup> Version |
@@ -35,8 +37,10 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Con
 
 ## Features
 
-1. Supports reading database snapshot and continues to read binlogs with **exactly-once processing** even failures happen.
-2. CDC connectors for DataStream API, users can consume changes on multiple databases and tables in a single job without Debezium and Kafka deployed.
+1. Supports reading database snapshot and continues to read binlogs with **exactly-once processing** even failures
+   happen.
+2. CDC connectors for DataStream API, users can consume changes on multiple databases and tables in a single job without
+   Debezium and Kafka deployed.
 3. CDC connectors for Table/SQL API, users can use SQL DDL to create a CDC source to monitor changes on a single table.
 
 ## Usage for Table/SQL API
@@ -48,7 +52,9 @@ We need several steps to setup a Flink cluster with the provided connector.
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.
 
-The example shows how to create a MySQL CDC source in [Flink SQL Client](https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/sqlClient.html) and execute queries on it.
+The example shows how to create a MySQL CDC source
+in [Flink SQL Client](https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/sqlClient.html) and execute
+queries on it.
 
 ```sql
 -- creates a mysql cdc table source
@@ -92,33 +98,35 @@ import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlBinlogSourceExample {
-  public static void main(String[] args) throws Exception {
-    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
-            .hostname("yourHostname")
-            .port(yourPort)
-            .databaseList("yourDatabaseName") // set captured database
-            .tableList("yourDatabaseName.yourTableName") // set captured table
-            .username("yourUsername")
-            .password("yourPassword")
-            .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
-            .build();
-    
-    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-    
-    // enable checkpoint
-    env.enableCheckpointing(3000);
-    
-    env
-      .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
-      // set 4 parallel source tasks
-      .setParallelism(4)
-      .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
-    
-    env.execute("Print MySQL Snapshot + Binlog");
-  }
+    public static void main(String[] args) throws Exception {
+        MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+                .hostname("yourHostname")
+                .port(yourPort)
+                .databaseList("yourDatabaseName") // set captured database
+                .tableList("yourDatabaseName.yourTableName") // set captured table
+                .username("yourUsername")
+                .password("yourPassword")
+                .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+                .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+        // enable checkpoint
+        env.enableCheckpointing(3000);
+
+        env
+                .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
+                // set 4 parallel source tasks
+                .setParallelism(4)
+                .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
+
+        env.execute("Print MySQL Snapshot + Binlog");
+    }
 }
 ```
+
 ### Deserialization
+
 The following JSON data show the change event in JSON format.
 
 ```json
@@ -135,16 +143,24 @@ The following JSON data show the change event in JSON format.
     "description": "Big 2-wheel scooter",
     "weight": 5.15
   },
-  "source": {...},
-  "op": "u",  // the operation type, "u" means this this is an update event 
-  "ts_ms": 1589362330904,  // the time at which the connector processed the event
+  "source": {
+    ...
+  },
+  "op": "u",
+  // the operation type, "u" means this this is an update event 
+  "ts_ms": 1589362330904,
+  // the time at which the connector processed the event
   "transaction": null
 }
 ```
-**Note:** Please refer [Debezium documentation](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-events
+
+**Note:** Please
+refer [Debezium documentation](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-events
 )  to know the meaning of each field.
 
-In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Constructor to enabled include schema in the message. Then the Debezium JSON message may look like this:
+In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Constructor to enabled include schema in the
+message. Then the Debezium JSON message may look like this:
+
 ```json
 {
   "schema": {
@@ -210,7 +226,9 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
       },
       {
         "type": "struct",
-        "fields": {...}, 
+        "fields": {
+          ...
+        },
         "optional": false,
         "name": "io.debezium.connector.mysql.Source",
         "field": "source"
@@ -242,28 +260,36 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
       "description": "Big 2-wheel scooter",
       "weight": 5.15
     },
-    "source": {...},
-    "op": "u",  // the operation type, "u" means this this is an update event
-    "ts_ms": 1589362330904,  // the time at which the connector processed the event
+    "source": {
+      ...
+    },
+    "op": "u",
+    // the operation type, "u" means this this is an update event
+    "ts_ms": 1589362330904,
+    // the time at which the connector processed the event
     "transaction": null
   }
 }
 ```
-Usually, it is recommended to exclude schema because schema fields makes the messages very verbose which reduces parsing performance.
 
-The `JsonDebeziumDeserializationSchema` can also accept custom configuration of `JsonConverter`, for example if you want to obtain numeric output for decimal data,
+Usually, it is recommended to exclude schema because schema fields makes the messages very verbose which reduces parsing
+performance.
+
+The `JsonDebeziumDeserializationSchema` can also accept custom configuration of `JsonConverter`, for example if you want
+to obtain numeric output for decimal data,
 you can construct `JsonDebeziumDeserializationSchema` as following:
 
 ```java
- Map<String, Object> customConverterConfigs = new HashMap<>();
- customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
- JsonDebeziumDeserializationSchema schema = 
-      new JsonDebeziumDeserializationSchema(true, customConverterConfigs);
+ Map<String, Object> customConverterConfigs=new HashMap<>();
+        customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG,"numeric");
+        JsonDebeziumDeserializationSchema schema=
+        new JsonDebeziumDeserializationSchema(true,customConverterConfigs);
 ```
 
 ## Building from source
 
 Prerequisites:
+
 - git
 - Maven
 - At least Java 8
@@ -278,4 +304,5 @@ The dependencies are now available in your local `.m2` repository.
 
 ## License
 
-The code in this repository is licensed under the [Apache Software License 2](https://github.com/ververica/flink-cdc-connectors/blob/master/LICENSE).
+The code in this repository is licensed under
+the [Apache Software License 2](https://github.com/ververica/flink-cdc-connectors/blob/master/LICENSE).

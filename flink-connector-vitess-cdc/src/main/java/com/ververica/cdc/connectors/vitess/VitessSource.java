@@ -50,7 +50,7 @@ public class VitessSource {
         private String username;
         private String password;
         private VtctldConfig vtctldConfig;
-        private TabletType tabletType = TabletType.REPLICA;
+        private TabletType tabletType = TabletType.RDONLY;
         private String[] tableIncludeList;
         private String[] tableExcludeList;
         private String[] columnIncludeList;
@@ -200,12 +200,17 @@ public class VitessSource {
             props.setProperty("database.server.name", "vitess_cdc_source");
             props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.port", String.valueOf(port));
-            props.setProperty("database.user", checkNotNull(username));
-            props.setProperty("database.password", checkNotNull(password));
             props.setProperty("vitess.keyspace", checkNotNull(keyspace));
             props.setProperty("vitess.tablet.type", tabletType.name());
             props.setProperty("vitess.vtctld.host", checkNotNull(vtctldConfig.getHostname()));
             props.setProperty("vitess.vtctld.port", String.valueOf(vtctldConfig.getPort()));
+
+            if (username != null) {
+                props.setProperty("user", username);
+            }
+            if (vtctldConfig.getPassword() != null) {
+                props.setProperty("password", password);
+            }
 
             if (vtctldConfig.getUsername() != null) {
                 props.setProperty("vitess.vtctld.user", vtctldConfig.getUsername());

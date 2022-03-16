@@ -48,9 +48,9 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class VitessTableSource implements ScanTableSource {
 
     private final TableSchema physicalSchema;
-    private String pluginName = "decoderbufs";
-    private String slotName = "flink";
-    private int port = 15991; // default 15991 port
+    private String pluginName;
+    private String slotName;
+    private int port;
     private String hostname;
     private String keyspace;
     private String username;
@@ -78,8 +78,10 @@ public class VitessTableSource implements ScanTableSource {
         this.hostname = checkNotNull(hostname);
         this.keyspace = checkNotNull(keyspace);
         this.tableName = checkNotNull(tableName);
-        this.username = checkNotNull(username);
-        this.password = checkNotNull(password);
+        this.username = username;
+        this.password = password;
+        this.vtctldConfig = checkNotNull(vtctldConfig);
+        this.tabletType = checkNotNull(tabletType);
         this.pluginName = checkNotNull(pluginName);
         this.slotName = slotName;
         this.dbzProperties = dbzProperties;
@@ -177,6 +179,43 @@ public class VitessTableSource implements ScanTableSource {
                 vtctldConfig,
                 tabletType,
                 dbzProperties);
+    }
+
+    @Override
+    public String toString() {
+        return "VitessTableSource{"
+                + "physicalSchema="
+                + physicalSchema
+                + ", pluginName='"
+                + pluginName
+                + '\''
+                + ", slotName='"
+                + slotName
+                + '\''
+                + ", port="
+                + port
+                + ", hostname='"
+                + hostname
+                + '\''
+                + ", keyspace='"
+                + keyspace
+                + '\''
+                + ", username='"
+                + username
+                + '\''
+                + ", password='"
+                + password
+                + '\''
+                + ", tableName='"
+                + tableName
+                + '\''
+                + ", vtctldConfig="
+                + vtctldConfig
+                + ", tabletType="
+                + tabletType
+                + ", dbzProperties="
+                + dbzProperties
+                + '}';
     }
 
     @Override
