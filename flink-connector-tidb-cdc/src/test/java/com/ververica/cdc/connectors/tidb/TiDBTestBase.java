@@ -67,7 +67,6 @@ public class TiDBTestBase extends AbstractTestBase {
 
     public static final int TIDB_PORT = 4000;
     public static final int TIKV_PORT_ORIGIN = 20160;
-    public static int tikvPort = TIKV_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
     public static final int PD_PORT_ORIGIN = 2379;
     public static int pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
 
@@ -96,7 +95,7 @@ public class TiDBTestBase extends AbstractTestBase {
     @ClassRule
     public static final GenericContainer<?> TIKV =
             new FixedHostPortGenericContainer<>("pingcap/tikv:v5.3.1")
-                    .withFixedExposedPort(tikvPort, TIKV_PORT_ORIGIN)
+                    .withFixedExposedPort(TIKV_PORT_ORIGIN, TIKV_PORT_ORIGIN)
                     .withFileSystemBind("src/test/resources/config/tikv.toml", "/tikv.toml")
                     .withCommand(
                             "--addr=0.0.0.0:20160",

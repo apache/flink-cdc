@@ -37,7 +37,6 @@ import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContex
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.DataType;
 
-import com.ververica.cdc.connectors.tidb.TiDBTestBase;
 import com.ververica.cdc.connectors.tidb.TiKVRichParallelSourceFunction;
 import org.junit.Test;
 
@@ -52,7 +51,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for TiDB table source factory. */
-public class TiDBTableSourceFactoryITCase extends TiDBTestBase {
+public class TiDBTableSourceFactoryITCase {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
