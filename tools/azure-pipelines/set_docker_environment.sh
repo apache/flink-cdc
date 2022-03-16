@@ -28,4 +28,4 @@
 
 brew install docker colima
 sudo ln -s /Users/"${USER}"/.colima/docker.sock /var/run/docker.sock
-colima start --arch x86_64 --cpu 2 --memory 14
+colima start --arch x86_64 --cpu 2 --memory 10 --disk 10

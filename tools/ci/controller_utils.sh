@@ -19,8 +19,11 @@
 
 print_system_info() {
 
-    echo "Get kernel state"
-    sysctl -a
+    echo "CPU information"
+    sysctl -a | grep machdep.cpu
+
+    echo "Memory information"
+    sysctl -a | grep mem
 
     echo "Disk information"
     df -hH
