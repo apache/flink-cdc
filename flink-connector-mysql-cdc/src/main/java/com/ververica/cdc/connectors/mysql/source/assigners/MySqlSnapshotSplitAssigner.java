@@ -44,7 +44,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -74,7 +73,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final Map<String, BinlogOffset> splitFinishedOffsets;
     private final MySqlSourceConfig sourceConfig;
     private final int currentParallelism;
-    private final LinkedList<TableId> remainingTables;
+    private final List<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
 
     private AssignerStatus assignerStatus;
@@ -139,7 +138,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.assignedSplits = assignedSplits;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
-        this.remainingTables = new LinkedList<>(remainingTables);
+        this.remainingTables = new CopyOnWriteArrayList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
     }
@@ -219,28 +218,28 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public Optional<MySqlSplit> getNext() {
-        if (!remainingSplits.isEmpty()) {
-            // return remaining splits firstly
-            Iterator<MySqlSnapshotSplit> iterator = remainingSplits.iterator();
-            MySqlSnapshotSplit split = iterator.next();
-            remainingSplits.remove(split);
-            assignedSplits.put(split.splitId(), split);
-            addAlreadyProcessedTablesIfNotExists(split.getTableId());
-            return Optional.of(split);
-        } else if (!remainingTables.isEmpty()) {
-            // wait for the asynchronous split to complete
-            synchronized (lock) {
+        synchronized (lock) {
+            if (!remainingSplits.isEmpty()) {
+                // return remaining splits firstly
+                Iterator<MySqlSnapshotSplit> iterator = remainingSplits.iterator();
+                MySqlSnapshotSplit split = iterator.next();
+                remainingSplits.remove(split);
+                assignedSplits.put(split.splitId(), split);
+                addAlreadyProcessedTablesIfNotExists(split.getTableId());
+                return Optional.of(split);
+            } else if (!remainingTables.isEmpty()) {
                 try {
+                    // wait for the asynchronous split to complete
                     lock.wait();
                 } catch (InterruptedException e) {
                     throw new FlinkRuntimeException(
                             "InterruptedException while waiting for asynchronously snapshot split");
                 }
+                return getNext();
+            } else {
+                closeExecutorService();
+                return Optional.empty();
             }
-            return getNext();
-        } else {
-            closeExecutorService();
-            return Optional.empty();
         }
     }
 
