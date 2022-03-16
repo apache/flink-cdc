@@ -36,7 +36,9 @@ public class MySqlTableDefinition {
     List<String> primaryKeys;
 
     public MySqlTableDefinition(
-        TableId tableId, List<MySqlFieldDefinition> fieldDefinitions, List<String> primaryKeys) {
+            TableId tableId,
+            List<MySqlFieldDefinition> fieldDefinitions,
+            List<String> primaryKeys) {
         this.tableId = tableId;
         this.fieldDefinitions = fieldDefinitions;
         this.primaryKeys = primaryKeys;
@@ -44,7 +46,8 @@ public class MySqlTableDefinition {
 
     String toDdl() {
         return String.format(
-                "CREATE TABLE %s (\n\t %s %s );", quote(tableId), fieldDefinitions(), pkDefinition());
+                "CREATE TABLE %s (\n\t %s %s );",
+                quote(tableId), fieldDefinitions(), pkDefinition());
     }
 
     private String fieldDefinitions() {
