@@ -128,14 +128,14 @@ public class MySqlSchema {
             String descTable,
             TableId tableId,
             Map<TableId, TableChange> tableChangeMap) {
-        List<MySqlFieldDefine> fieldMetas = new ArrayList<>();
+        List<MySqlFieldDefinition> fieldMetas = new ArrayList<>();
         List<String> primaryKeys = new ArrayList<>();
         try {
             jdbc.query(
                     descTable,
                     rs -> {
                         while (rs.next()) {
-                            MySqlFieldDefine meta = new MySqlFieldDefine();
+                            MySqlFieldDefinition meta = new MySqlFieldDefinition();
                             meta.setColumnName(rs.getString("Field"));
                             meta.setColumnType(rs.getString("Type"));
                             meta.setNullable(
@@ -151,7 +151,7 @@ public class MySqlSchema {
                         }
                     });
             parseSchemaByDdl(
-                    new MySqlTableDefine(tableId, fieldMetas, primaryKeys).toDdl(),
+                    new MySqlTableDefinition(tableId, fieldMetas, primaryKeys).toDdl(),
                     tableId,
                     tableChangeMap);
         } catch (SQLException e) {

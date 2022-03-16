@@ -29,47 +29,47 @@ import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
-/** used to generate table define in ddl with "desc table". */
-public class MySqlTableDefine {
+/** used to generate table definition in ddl with "desc table". */
+public class MySqlTableDefinition {
     TableId tableId;
-    List<MySqlFieldDefine> fieldMetas;
+    List<MySqlFieldDefinition> fieldDefinitions;
     List<String> primaryKeys;
 
-    public MySqlTableDefine(
-            TableId tableId, List<MySqlFieldDefine> fieldMetas, List<String> primaryKeys) {
+    public MySqlTableDefinition(
+        TableId tableId, List<MySqlFieldDefinition> fieldDefinitions, List<String> primaryKeys) {
         this.tableId = tableId;
-        this.fieldMetas = fieldMetas;
+        this.fieldDefinitions = fieldDefinitions;
         this.primaryKeys = primaryKeys;
     }
 
     String toDdl() {
         return String.format(
-                "CREATE TABLE %s (\n\t %s %s );", quote(tableId), fieldDefines(), pkDefine());
+                "CREATE TABLE %s (\n\t %s %s );", quote(tableId), fieldDefinitions(), pkDefinition());
     }
 
-    private String fieldDefines() {
-        return fieldMetas.stream()
-                .map(MySqlFieldDefine::toDdl)
+    private String fieldDefinitions() {
+        return fieldDefinitions.stream()
+                .map(MySqlFieldDefinition::toDdl)
                 .collect(Collectors.joining(", \n\t"));
     }
 
-    private String pkDefine() {
-        StringBuilder pkDefine = new StringBuilder();
+    private String pkDefinition() {
+        StringBuilder pkDefinition = new StringBuilder();
         if (!CollectionUtil.isNullOrEmpty(primaryKeys)) {
-            pkDefine.append(",");
-            pkDefine.append(
+            pkDefinition.append(",");
+            pkDefinition.append(
                     String.format(
                             "PRIMARY KEY ( %s )",
                             primaryKeys.stream()
                                     .map(StatementUtils::quote)
                                     .collect(Collectors.joining(","))));
         }
-        return pkDefine.toString();
+        return pkDefinition.toString();
     }
 }
 
-/** used to generate field define in ddl with "desc table". */
-class MySqlFieldDefine {
+/** used to generate field definition in ddl with "desc table". */
+class MySqlFieldDefinition {
     private String columnName;
     private String columnType;
     private boolean nullable;
