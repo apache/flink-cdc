@@ -164,6 +164,13 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "Optional timestamp used in case of \"timestamp\" startup mode");
 
+    public static final ConfigOption<Duration> HEARTBEAT_INTERVAL =
+            ConfigOptions.key("heartbeat.interval")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription(
+                            "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
+
     // ----------------------------------------------------------------------------
     // experimental options, won't add them to documentation
     // ----------------------------------------------------------------------------

@@ -72,14 +72,21 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
             ConfigOptions.key("database")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Name of the database to watch for changes.");
+                    .withDescription(
+                            "Name of the database to watch for changes."
+                                    + "The database also supports regular expression "
+                                    + "to monitor multiple databases matches the regular expression."
+                                    + "e.g. db[0-9] .");
 
     private static final ConfigOption<String> COLLECTION =
             ConfigOptions.key("collection")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "Name of the collection in the database to watch for changes.");
+                            "Name of the collection in the database to watch for changes."
+                                    + "The collection also supports regular expression "
+                                    + "to monitor multiple collections matches fully-qualified collection identifiers."
+                                    + "e.g. db0\\.coll[0-9] .");
 
     private static final ConfigOption<String> CONNECTION_OPTIONS =
             ConfigOptions.key("connection.options")
@@ -184,8 +191,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         String username = config.getOptional(USERNAME).orElse(null);
         String password = config.getOptional(PASSWORD).orElse(null);
 
-        String database = config.get(DATABASE);
-        String collection = config.get(COLLECTION);
+        String database = config.getOptional(DATABASE).orElse(null);
+        String collection = config.getOptional(COLLECTION).orElse(null);
 
         String errorsTolerance = config.get(ERRORS_TOLERANCE);
         Boolean errorsLogEnable = config.get(ERRORS_LOG_ENABLE);
@@ -246,8 +253,6 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(HOSTS);
-        options.add(DATABASE);
-        options.add(COLLECTION);
         return options;
     }
 
@@ -257,6 +262,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(CONNECTION_OPTIONS);
+        options.add(DATABASE);
+        options.add(COLLECTION);
         options.add(ERRORS_TOLERANCE);
         options.add(ERRORS_LOG_ENABLE);
         options.add(COPY_EXISTING);

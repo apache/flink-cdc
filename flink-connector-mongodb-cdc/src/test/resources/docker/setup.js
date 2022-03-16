@@ -15,34 +15,19 @@
 
 // In production you would almost certainly limit the replication user must be on the follower (slave) machine,
 // to prevent other clients accessing the log from other machines. For example, 'replicator'@'follower.acme.com'.
-// However, in this database we'll grant 2 users different privileges:
+// However, in this database we'll grant flink user with privileges:
 //
-// 1) 'flinkuser' - all privileges required by the snapshot reader AND oplog reader (used for testing)
-// 2) 'superuser' - all privileges
+// 'flinkuser' - all privileges required by the snapshot reader AND oplog reader (used for testing)
 //
 
 //use admin;
-if (db.system.users.find({user:'superuser'}).count() == 0) {
-  db.createUser(
-     {
-       user: 'superuser',
-       pwd: 'superpw',
-       roles: [ { role: 'root', db: 'admin' } ]
-     }
-  );
-}
-
-if (db.system.users.find({user:'flinkuser'}).count() == 0) {
-  db.createUser(
-   {
-     user: 'flinkuser',
-     pwd: 'a1?~!@#$%^&*(){}[]<>.,+_-=/|:;',
-     roles: [
-        { role: 'read', db: 'admin' },
-        { role: 'readAnyDatabase', db: 'admin' }
-     ]
-   }
-  );
-}
-
-rs.status()
+db.createUser(
+ {
+   user: 'flinkuser',
+   pwd: 'a1?~!@#$%^&*(){}[]<>.,+_-=/|:;',
+   roles: [
+      { role: 'read', db: 'admin' },
+      { role: 'readAnyDatabase', db: 'admin' }
+   ]
+ }
+);

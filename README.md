@@ -130,7 +130,7 @@ The Flink CDC Connectors welcomes anyone that wants to help out in any way, whet
   You can search the group number [**33121212**] or scan the following QR code to join in the group.
   
   <div align=center>
-     <img src="https://user-images.githubusercontent.com/5163645/128969750-6a6c9832-eab3-4c72-8c76-32dd66539dbd.png" width=400 />
+     <img src="https://user-images.githubusercontent.com/9601882/158350201-a1de35e6-0399-4a91-b5b0-e2fd5d33e33c.png" width=400 />
    </div>
 
 ## Documents
