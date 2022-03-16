@@ -67,9 +67,9 @@ public class TiDBTestBase extends AbstractTestBase {
 
     public static final int TIDB_PORT = 4000;
     public static final int TIKV_PORT_ORIGIN = 20160;
-    public static int tikvPort = TIKV_PORT_ORIGIN;
+    public static int tikvPort = TIKV_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
     public static final int PD_PORT_ORIGIN = 2379;
-    public static int pdPort = PD_PORT_ORIGIN;
+    public static int pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
@@ -129,8 +129,6 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @BeforeClass
     public static void startContainers() throws Exception {
-        pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
-        tikvPort = TIKV_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(PD, TIKV, TIDB)).join();
         // Add jvm dns cache for flink to invoke pd interface.
