@@ -28,9 +28,11 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.SchemaChangeEvent;
+import org.apache.commons.lang3.StringUtils;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,9 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quo
 
 /** A component used to get schema by table path. */
 public class MySqlSchema {
+    private static final String SHOW_CREATE_TABLE = "SHOW CREATE TABLE ";
+    private static final String DESC_TABLE = "DESC ";
+
     private final MySqlConnectorConfig connectorConfig;
     private final MySqlDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
@@ -58,7 +63,7 @@ public class MySqlSchema {
         // read schema from cache first
         TableChange schema = schemasByTableId.get(tableId);
         if (schema == null) {
-            schema = readTableSchema(jdbc, tableId);
+            schema = buildTableSchema(jdbc, tableId);
             schemasByTableId.put(tableId, schema);
         }
         return schema;
@@ -68,26 +73,34 @@ public class MySqlSchema {
     // Helpers
     // ------------------------------------------------------------------------------------------
 
-    private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
+    private TableChange buildTableSchema(JdbcConnection jdbc, TableId tableId) {
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
-        final String sql = "SHOW CREATE TABLE " + quote(tableId);
+        String showCreateTable = SHOW_CREATE_TABLE + quote(tableId);
+        buildSchemaByShowCreateTable(jdbc, tableId, tableChangeMap);
+        if (!tableChangeMap.containsKey(tableId)) {
+            // fallback to desc table
+            String descTable = DESC_TABLE + quote(tableId);
+            buildSchemaByDescTable(jdbc, descTable, tableId, tableChangeMap);
+            if (!tableChangeMap.containsKey(tableId)) {
+                throw new FlinkRuntimeException(
+                        String.format(
+                                "Can't obtain schema for table %s by running %s and %s ",
+                                tableId, showCreateTable, descTable));
+            }
+        }
+        return tableChangeMap.get(tableId);
+    }
+
+    private void buildSchemaByShowCreateTable(
+            JdbcConnection jdbc, TableId tableId, Map<TableId, TableChange> tableChangeMap) {
+        final String sql = SHOW_CREATE_TABLE + quote(tableId);
         try {
             jdbc.query(
                     sql,
                     rs -> {
                         if (rs.next()) {
                             final String ddl = rs.getString(2);
-                            final MySqlOffsetContext offsetContext =
-                                    MySqlOffsetContext.initial(connectorConfig);
-                            List<SchemaChangeEvent> schemaChangeEvents =
-                                    databaseSchema.parseSnapshotDdl(
-                                            ddl, tableId.catalog(), offsetContext, Instant.now());
-                            for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
-                                for (TableChange tableChange :
-                                        schemaChangeEvent.getTableChanges()) {
-                                    tableChangeMap.put(tableId, tableChange);
-                                }
-                            }
+                            parseSchemaByDdl(ddl, tableId, tableChangeMap);
                         }
                     });
         } catch (SQLException e) {
@@ -95,11 +108,57 @@ public class MySqlSchema {
                     String.format("Failed to read schema for table %s by running %s", tableId, sql),
                     e);
         }
-        if (!tableChangeMap.containsKey(tableId)) {
-            throw new FlinkRuntimeException(
-                    String.format("Can't obtain schema for table %s by running %s", tableId, sql));
-        }
+    }
 
-        return tableChangeMap.get(tableId);
+    private void parseSchemaByDdl(
+            String ddl, TableId tableId, Map<TableId, TableChange> tableChangeMap) {
+        final MySqlOffsetContext offsetContext = MySqlOffsetContext.initial(connectorConfig);
+        List<SchemaChangeEvent> schemaChangeEvents =
+                databaseSchema.parseSnapshotDdl(
+                        ddl, tableId.catalog(), offsetContext, Instant.now());
+        for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
+            for (TableChange tableChange : schemaChangeEvent.getTableChanges()) {
+                tableChangeMap.put(tableId, tableChange);
+            }
+        }
+    }
+
+    private void buildSchemaByDescTable(
+            JdbcConnection jdbc,
+            String descTable,
+            TableId tableId,
+            Map<TableId, TableChange> tableChangeMap) {
+        List<MySqlFieldDefinition> fieldMetas = new ArrayList<>();
+        List<String> primaryKeys = new ArrayList<>();
+        try {
+            jdbc.query(
+                    descTable,
+                    rs -> {
+                        while (rs.next()) {
+                            MySqlFieldDefinition meta = new MySqlFieldDefinition();
+                            meta.setColumnName(rs.getString("Field"));
+                            meta.setColumnType(rs.getString("Type"));
+                            meta.setNullable(
+                                    StringUtils.equalsIgnoreCase(rs.getString("Null"), "YES"));
+                            meta.setKey("PRI".equalsIgnoreCase(rs.getString("Key")));
+                            meta.setUnique("UNI".equalsIgnoreCase(rs.getString("Key")));
+                            meta.setDefaultValue(rs.getString("Default"));
+                            meta.setExtra(rs.getString("Extra"));
+                            if (meta.isKey()) {
+                                primaryKeys.add(meta.getColumnName());
+                            }
+                            fieldMetas.add(meta);
+                        }
+                    });
+            parseSchemaByDdl(
+                    new MySqlTableDefinition(tableId, fieldMetas, primaryKeys).toDdl(),
+                    tableId,
+                    tableChangeMap);
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "Failed to read schema for table %s by running %s", tableId, descTable),
+                    e);
+        }
     }
 }

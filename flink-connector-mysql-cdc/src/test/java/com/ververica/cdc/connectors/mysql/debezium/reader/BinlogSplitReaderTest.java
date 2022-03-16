@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.core.testutils.CommonTestUtils;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
@@ -35,11 +36,13 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -49,6 +52,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -56,6 +60,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
@@ -64,6 +70,8 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHigh
 
 /** Tests for {@link BinlogSplitReader}. */
 public class BinlogSplitReaderTest extends MySqlSourceTestBase {
+
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
@@ -279,56 +287,130 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual =
-                readBinlogSplitsFromLatestOffset(dataType, sourceConfig, expected.length);
+                readBinlogSplitsFromLatestOffset(
+                        createBinlogReader(sourceConfig), dataType, sourceConfig, expected.length);
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
-    private List<String> readBinlogSplitsFromLatestOffset(
-            DataType dataType, MySqlSourceConfig sourceConfig, int expectedSize) throws Exception {
-        final StatefulTaskContext statefulTaskContext =
-                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+    @Test
+    public void testHeartbeatEvent() throws Exception {
+        // Initialize database
+        customerDatabase.createAndInitialize();
 
-        // step-1: create binlog split
+        // Set heartbeat interval to 500ms
+        Duration heartbeatInterval = Duration.ofMillis(500);
+
+        // Set keep alive interval to 500ms in order to let MySQl send heartbeat event to debezium
+        // connector more frequently. Debezium MySQL connector only create heartbeat on receiving
+        // events from MySQL.
+        Properties dbzProps = new Properties();
+        dbzProps.setProperty(
+                MySqlConnectorConfig.KEEP_ALIVE_INTERVAL_MS.name(),
+                String.valueOf(heartbeatInterval.toMillis()));
+
+        // Create config and initializer client and connections
+        MySqlSourceConfig sourceConfig =
+                getConfigFactory(new String[] {"customers"})
+                        .startupOptions(StartupOptions.latest())
+                        .heartbeatInterval(heartbeatInterval)
+                        .debeziumProperties(dbzProps)
+                        .createConfig(0);
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+
+        // Create binlog reader and submit split
+        BinlogSplitReader binlogReader = createBinlogReader(sourceConfig);
+        MySqlBinlogSplit binlogSplit = createBinlogSplitFromLatestOffset(sourceConfig);
+        binlogReader.submitSplit(binlogSplit);
+
+        // Make some change on the table
+        makeCustomersBinlogEvents(
+                mySqlConnection,
+                binlogSplit.getTableSchemas().keySet().iterator().next().toString(),
+                false);
+
+        // Keep polling until we receive heartbeat. We don't validate offset of heartbeat here
+        // because it's hard to know the expected offset value.
+        List<SourceRecord> heartbeats = new ArrayList<>();
+        CommonTestUtils.waitUtil(
+                () -> {
+                    heartbeats.addAll(
+                            pollRecordsFromReader(binlogReader, RecordUtils::isHeartbeatEvent));
+                    return !heartbeats.isEmpty();
+                },
+                DEFAULT_TIMEOUT,
+                "Timeout waiting for heartbeat event");
+    }
+
+    private BinlogSplitReader createBinlogReader(MySqlSourceConfig sourceConfig) {
+        return new BinlogSplitReader(
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection), 0);
+    }
+
+    private MySqlBinlogSplit createBinlogSplitFromLatestOffset(MySqlSourceConfig sourceConfig)
+            throws Exception {
         MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
         binlogSplitAssigner.open();
-
-        MySqlSplit binlogSplit;
         try (MySqlConnection jdbc =
                 DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
-            binlogSplit =
-                    MySqlBinlogSplit.fillTableSchemas(
-                            binlogSplitAssigner.getNext().get().asBinlogSplit(), tableSchemas);
+            return MySqlBinlogSplit.fillTableSchemas(
+                    binlogSplitAssigner.getNext().get().asBinlogSplit(), tableSchemas);
         }
+    }
+
+    private List<SourceRecord> pollRecordsFromReader(
+            BinlogSplitReader reader, Predicate<SourceRecord> filter) {
+        List<SourceRecord> records = new ArrayList<>();
+        Iterator<SourceRecord> recordIterator;
+        try {
+            recordIterator = reader.pollSplitRecords();
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Polling action was interrupted", e);
+        }
+        if (recordIterator == null) {
+            return records;
+        }
+        while (recordIterator.hasNext()) {
+            SourceRecord record = recordIterator.next();
+            if (filter.test(record)) {
+                records.add(record);
+            }
+        }
+        LOG.debug("Records polled: {}", records);
+        return records;
+    }
+
+    private List<String> readBinlogSplitsFromLatestOffset(
+            BinlogSplitReader binlogReader,
+            DataType dataType,
+            MySqlSourceConfig sourceConfig,
+            int expectedSize)
+            throws Exception {
+
+        // step-1: create binlog split
+        MySqlBinlogSplit binlogSplit = createBinlogSplitFromLatestOffset(sourceConfig);
 
         // step-2: test read binlog split
-        BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
         binlogReader.submitSplit(binlogSplit);
 
         // step-3: make some binlog events
         TableId tableId = binlogSplit.getTableSchemas().keySet().iterator().next();
 
         if (tableId.table().contains("customers")) {
-            makeCustomersBinlogEvents(
-                    statefulTaskContext.getConnection(), tableId.toString(), false);
+            makeCustomersBinlogEvents(mySqlConnection, tableId.toString(), false);
         } else {
-            makeCustomerCardsBinlogEvents(statefulTaskContext.getConnection(), tableId.toString());
+            makeCustomerCardsBinlogEvents(mySqlConnection, tableId.toString());
         }
 
         // step-4: fetched all produced binlog data and format them
         List<String> actual = new ArrayList<>();
-        Iterator<SourceRecord> recordIterator;
-        List<SourceRecord> fetchedRecords = new ArrayList<>();
-        while ((recordIterator = binlogReader.pollSplitRecords()) != null) {
-            while (recordIterator.hasNext()) {
-                fetchedRecords.add(recordIterator.next());
-            }
-            actual.addAll(formatResult(fetchedRecords, dataType));
-            fetchedRecords.clear();
-            if (actual.size() >= expectedSize) {
-                break;
-            }
+        while (actual.size() < expectedSize) {
+            actual.addAll(
+                    formatResult(
+                            pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord),
+                            dataType));
         }
         return actual;
     }
@@ -347,7 +429,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 new SnapshotSplitReader(statefulTaskContext, 0);
 
         // step-1: read snapshot splits firstly
-        List<SourceRecord> fetchedRecords = new ArrayList<>();
+        List<SourceRecord> snapshotRecords = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
             MySqlSplit sqlSplit = sqlSplits.get(i);
             if (snapshotSplitReader.isFinished()) {
@@ -357,14 +439,14 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
             while ((res = snapshotSplitReader.pollSplitRecords()) != null) {
                 while (res.hasNext()) {
                     SourceRecord sourceRecord = res.next();
-                    fetchedRecords.add(sourceRecord);
+                    snapshotRecords.add(sourceRecord);
                 }
             }
         }
 
         // step-2: create binlog split according the finished snapshot splits
         List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
-                getFinishedSplitsInfo(sqlSplits, fetchedRecords);
+                getFinishedSplitsInfo(sqlSplits, snapshotRecords);
         BinlogOffset startingOffset = getStartingOffsetOfBinlogSplit(finishedSplitsInfo);
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
         for (MySqlSplit mySqlSplit : sqlSplits) {
@@ -395,17 +477,13 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         }
 
         // step-5: fetched all produced binlog data and format them
-        List<String> actual = new ArrayList<>();
-        Iterator<SourceRecord> recordIterator;
-        while ((recordIterator = binlogReader.pollSplitRecords()) != null) {
-            while (recordIterator.hasNext()) {
-                fetchedRecords.add(recordIterator.next());
-            }
-            actual.addAll(formatResult(fetchedRecords, dataType));
-            fetchedRecords.clear();
-            if (actual.size() >= expectedSize) {
-                break;
-            }
+        // Put snapshot records into final collection first
+        List<String> actual = new ArrayList<>(formatResult(snapshotRecords, dataType));
+        while (actual.size() < expectedSize) {
+            actual.addAll(
+                    formatResult(
+                            pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord),
+                            dataType));
         }
         return actual;
     }
@@ -557,25 +635,14 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     }
 
     private MySqlSourceConfig getConfig(StartupOptions startupOptions, String[] captureTables) {
-        String[] captureTableIds =
-                Arrays.stream(captureTables)
-                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
-                        .toArray(String[]::new);
-
-        return new MySqlSourceConfigFactory()
-                .startupOptions(startupOptions)
-                .databaseList(customerDatabase.getDatabaseName())
-                .tableList(captureTableIds)
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
-                .username(customerDatabase.getUsername())
-                .splitSize(10)
-                .fetchSize(2)
-                .password(customerDatabase.getPassword())
-                .createConfig(0);
+        return getConfigFactory(captureTables).startupOptions(startupOptions).createConfig(0);
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables) {
+        return getConfigFactory(captureTables).createConfig(0);
+    }
+
+    private MySqlSourceConfigFactory getConfigFactory(String[] captureTables) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
@@ -589,7 +656,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 .username(customerDatabase.getUsername())
                 .splitSize(4)
                 .fetchSize(2)
-                .password(customerDatabase.getPassword())
-                .createConfig(0);
+                .password(customerDatabase.getPassword());
     }
 }
