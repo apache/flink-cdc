@@ -84,7 +84,7 @@ public class OceanBaseTestBase extends AbstractTestBase {
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
                     .withStartupTimeout(Duration.ofSeconds(120))
-                    .withCommand("--privileged")
+                    .withPrivilegedMode(true)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
