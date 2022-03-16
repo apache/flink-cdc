@@ -83,8 +83,6 @@ public class OceanBaseTestBase extends AbstractTestBase {
                     .withNetworkMode(NETWORK_MODE)
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
-                    .withCommand(
-                            "echo 'fs.aio-max-nr=1048576' | sudo tee /etc/sysctl.conf && sysctl -p && _boot")
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
