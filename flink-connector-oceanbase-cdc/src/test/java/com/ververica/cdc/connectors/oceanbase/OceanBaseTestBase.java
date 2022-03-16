@@ -60,8 +60,8 @@ public class OceanBaseTestBase extends AbstractTestBase {
     private static final String SERVICE_ALIAS_OB_LOG_PROXY = "logproxy";
     private static final String SERVICE_ALIAS_OB_SERVER = "observer";
 
-    private static final long MEMORY_IN_BYTES = 10 * 1024 * 1024;
-    private static final long MEMORY_SWAP_IN_BYTES = 14 * 1024 * 1024;
+    private static final long MEMORY_IN_BYTES = 10L * 1024 * 1024 * 1024;
+    private static final long MEMORY_SWAP_IN_BYTES = 14L * 1024 * 1024 * 1024;
 
     private static final String NETWORK_MODE = "host";
 
