@@ -20,7 +20,6 @@ package com.ververica.cdc.connectors.tidb;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
-import com.alibaba.dcm.DnsCacheManipulator;
 import org.apache.commons.lang3.RandomUtils;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
@@ -130,9 +129,6 @@ public class TiDBTestBase extends AbstractTestBase {
     public static void startContainers() throws Exception {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(PD, TIKV, TIDB)).join();
-        // Add jvm dns cache for flink to invoke pd interface.
-        DnsCacheManipulator.setDnsCache(PD_SERVICE_NAME, "127.0.0.1");
-        DnsCacheManipulator.setDnsCache(TIKV_SERVICE_NAME, "127.0.0.1");
         LOG.info("Containers are started.");
     }
 

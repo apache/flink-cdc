@@ -25,6 +25,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
+import com.alibaba.dcm.DnsCacheManipulator;
 import com.ververica.cdc.connectors.tidb.TiDBTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -54,6 +55,9 @@ public class TiDBConnectorITCase extends TiDBTestBase {
 
     @Before
     public void before() {
+        // Add jvm dns cache for flink to invoke pd interface.
+        DnsCacheManipulator.setDnsCache(PD_SERVICE_NAME, "127.0.0.1");
+        DnsCacheManipulator.setDnsCache(TIKV_SERVICE_NAME, "127.0.0.1");
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
     }
