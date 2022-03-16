@@ -17,11 +17,14 @@
 # limitations under the License.
 ################################################################################
 
-# This script is copied from https://github.com/docker/for-mac/issues/2359#issuecomment-991942550
-brew install --cask docker
-docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
-docker_app_path="${docker_app_path/#\~/$HOME}"
+## This script is copied from https://github.com/docker/for-mac/issues/2359#issuecomment-991942550
+#brew install --cask docker
+#docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
+#docker_app_path="${docker_app_path/#\~/$HOME}"
+#
+#sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
+#open -a "$docker_app_path" --args --unattended --accept-license
+#while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
 
-sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
-open -a "$docker_app_path" --args --unattended --accept-license
-while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
+brew install docker colima
+colima start --cpu 2 --memory 12

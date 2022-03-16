@@ -84,12 +84,7 @@ public class OceanBaseTestBase extends AbstractTestBase {
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
                     .withStartupTimeout(Duration.ofSeconds(120))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG))
-                    .withCreateContainerCmdModifier(
-                            cmd ->
-                                    cmd.getHostConfig()
-                                            .withMemory(MEMORY_IN_BYTES)
-                                            .withMemorySwap(MEMORY_SWAP_IN_BYTES));
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
     public static final GenericContainer<?> OB_LOG_PROXY =
