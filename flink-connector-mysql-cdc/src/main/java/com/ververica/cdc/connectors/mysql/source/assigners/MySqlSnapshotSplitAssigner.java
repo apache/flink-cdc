@@ -162,7 +162,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             }
         }
         captureNewlyAddedTables();
-        asynchronouslySplitIfNeed();
+        startAsynchronouslySplit();
     }
 
     private void captureNewlyAddedTables() {
@@ -191,11 +191,11 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         }
     }
 
-    private void asynchronouslySplitIfNeed() {
+    private void startAsynchronouslySplit() {
         if (!remainingTables.isEmpty()) {
             if (executor == null) {
                 ThreadFactory threadFactory =
-                        new ThreadFactoryBuilder().setNameFormat("snapshot-split").build();
+                        new ThreadFactoryBuilder().setNameFormat("snapshot-splitting").build();
                 this.executor = Executors.newSingleThreadExecutor(threadFactory);
             }
 
@@ -233,18 +233,14 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 try {
                     lock.wait();
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    throw new FlinkRuntimeException(
+                            "InterruptedException while waiting for asynchronously snapshot split");
                 }
             }
             return getNext();
         } else {
+            closeExecutorService();
             return Optional.empty();
-        }
-    }
-
-    private void addAlreadyProcessedTablesIfNotExists(TableId tableId) {
-        if (!alreadyProcessedTables.contains(tableId)) {
-            alreadyProcessedTables.add(tableId);
         }
     }
 
@@ -364,8 +360,18 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void close() {
+        closeExecutorService();
+    }
+
+    private void closeExecutorService() {
         if (executor != null) {
             executor.shutdown();
+        }
+    }
+
+    private void addAlreadyProcessedTablesIfNotExists(TableId tableId) {
+        if (!alreadyProcessedTables.contains(tableId)) {
+            alreadyProcessedTables.add(tableId);
         }
     }
 
