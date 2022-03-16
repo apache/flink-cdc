@@ -5,6 +5,7 @@ The Flink CDC Connectors integrates Debezium as the engine to capture data chang
 
 This README is meant as a brief walkthrough on the core features with Flink CDC Connectors. For a fully detailed documentation, please see [Documentation](https://ververica.github.io/flink-cdc-connectors/master/).
 
+<<<<<<< HEAD
 ## Supported (Tested) Connectors
 
 | Database | Version |
@@ -15,6 +16,18 @@ This README is meant as a brief walkthrough on the core features with Flink CDC 
 | Oracle | Database: 11, 12, 19 <br/>Oracle Driver: 19.3.0.0|
 | Sqlserver | Database: 2017, 2019 <br/>JDBC Driver: 7.2.2.jre8|
 | OceanBase CE | Database: 3.1.0 or later <br/>JDBC Driver: MySQL Driver 5.1.4x |
+=======
+## Supported (Tested) Databases
+
+| Connector                                                 | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
+| [mysql-cdc](docs/content/connectors/mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.16     |
+| [postgres-cdc](docs/content/connectors/postgres-cdc.md)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12                                                                                                                                                                                                                                                                                                                                         | JDBC Driver: 42.2.12    |
+| [mongodb-cdc](docs/content/connectors/mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                                 | MongoDB Driver: 4.3.1   |
+| [oracle-cdc](docs/content/connectors/oracle-cdc.md)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19                                                                                                                                                                                                                                                                                                                                           | Oracle Driver: 19.3.0.0 |
+| [sqlserver-cdc](docs/content/connectors/sqlserver-cdc.md) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2017, 2019                                                                                                                                                                                                                                                                                                                                     | JDBC Driver: 7.2.2.jre8 |
+
+>>>>>>> master
 ## Features
 
 1. Supports reading database snapshot and continues to read transaction logs with **exactly-once processing** even failures happen.
