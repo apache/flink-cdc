@@ -28,7 +28,4 @@
 
 brew install docker colima
 sudo ln -s /Users/"${USER}"/.colima/docker.sock /var/run/docker.sock
-echo 'fs.aio-max-nr=1048576' | sudo tee /etc/sysctl.conf
-sysctl -p
-echo -e "root soft nofile 655350\nroot hard nofile 655350\n* soft nofile 655350\n* hard nofile 655350">> /etc/security/limits.conf
 colima start --arch x86_64 --cpu 2 --memory 14
