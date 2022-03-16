@@ -74,18 +74,18 @@ jobs:
       clean: all
     strategy:
       matrix:
-        mysql:
-          module: mysql
-        postgres:
-          module: postgres
-        oracle:
-          module: oracle
-        mongodb:
-          module: mongodb
-        sqlserver:
-          module: sqlserver
-        e2e:
-          module: e2e
+#        mysql:
+#          module: mysql
+#        postgres:
+#          module: postgres
+#        oracle:
+#          module: oracle
+#        mongodb:
+#          module: mongodb
+#        sqlserver:
+#          module: sqlserver
+#        e2e:
+#          module: e2e
         misc:
           module: misc
     steps:
