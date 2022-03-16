@@ -27,4 +27,5 @@
 #while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
 
 brew install docker colima
+sudo ln -s /Users/"${USER}"/.colima/docker.sock /var/run/docker.sock
 colima start --cpu 2 --memory 12
