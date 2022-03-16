@@ -74,6 +74,7 @@ jobs:
       clean: all
     strategy:
       matrix:
+<<<<<<< HEAD
 #        mysql:
 #          module: mysql
 #        postgres:

@@ -35,6 +35,7 @@ under the License.
     <modules>
         <module>flink-connector-debezium</module>
         <module>flink-connector-test-util</module>
+<<<<<<< HEAD
         <!--        <module>flink-connector-mysql-cdc</module>-->
         <!--        <module>flink-connector-postgres-cdc</module>-->
         <!--        <module>flink-connector-oracle-cdc</module>-->
@@ -72,6 +73,7 @@ under the License.
     <properties>
         <flink.version>1.13.5</flink.version>
         <debezium.version>1.5.4.Final</debezium.version>
+        <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
         <!-- OracleE2eITCase will report "container cannot be accessed" error when running in Azure Pipeline with 1.16.1 testconainters.
           This might be a conflicts with "wnameless/oracle-xe-11g-r2" and 1.16 testcontainers.
@@ -297,7 +299,6 @@ under the License.
                     </execution>
                 </executions>
             </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
