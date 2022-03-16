@@ -28,6 +28,11 @@ under the License.
     <artifactId>flink-connector-tidb-cdc</artifactId>
     <name>flink-connector-tidb-cdc</name>
     <packaging>jar</packaging>
+    
+    <properties>
+        <flink.forkCount>1</flink.forkCount>
+        <flink.reuseForks>false</flink.reuseForks>
+    </properties>
 
     <dependencies>
         <!-- Debezium dependencies -->
