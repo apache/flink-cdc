@@ -81,9 +81,8 @@ public class OceanBaseTestBase extends TestLogger {
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
                     .withStartupTimeout(Duration.ofSeconds(120))
-                    //                    .withFileSystemBind(
-                    //                            "/Users/runner/work/_temp/debug_files/obd",
-                    // "/root/.obd/log/obd")
+                    .withFileSystemBind(
+                            "/Users/runner/work/_temp/debug_files/obd", "/root/.obd/log/obd")
                     .withPrivilegedMode(true)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
