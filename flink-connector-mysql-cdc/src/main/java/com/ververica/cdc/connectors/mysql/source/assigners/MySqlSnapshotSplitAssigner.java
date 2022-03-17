@@ -208,7 +208,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                                     chunkSplitter.generateSplits(nextTable);
                             synchronized (lock) {
                                 remainingSplits.addAll(splits);
-                                iterator.remove();
+                                remainingTables.remove(nextTable);
                                 lock.notify();
                             }
                         }
