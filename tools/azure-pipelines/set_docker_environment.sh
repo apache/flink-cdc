@@ -37,7 +37,6 @@ docker_app_path="${docker_app_path/#\~/$HOME}"
 docker_settings=/Users/"${USER}"/Library/Group\ Containers/group.com.docker/settings.json
 
 function start_docker() {
-  sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
   open -a "$docker_app_path" --args --unattended --accept-license
   while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
 }
@@ -48,11 +47,11 @@ function stop_docker() {
 
 function replace_docker_settings() {
   jq -c '.memoryMiB = 10240' "$docker_settings" > settings.json
-  cat settings.json
   mv settings.json "$docker_settings"
 }
 
 echo "initial start docker"
+sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
 start_docker
 echo "set cpu 2, memory 10g"
 replace_docker_settings
