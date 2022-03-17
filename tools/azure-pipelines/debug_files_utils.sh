@@ -24,4 +24,5 @@ function prepare_debug_files {
 	echo "##vso[task.setvariable variable=DEBUG_FILES_OUTPUT_DIR]$DEBUG_FILES_OUTPUT_DIR"
 	echo "##vso[task.setvariable variable=DEBUG_FILES_NAME]$DEBUG_FILES_NAME"
 	mkdir -p $DEBUG_FILES_OUTPUT_DIR || { echo "FAILURE: cannot create debug files directory '${DEBUG_FILES_OUTPUT_DIR}'." ; exit 1; }
+	chmod -R 777 $DEBUG_FILES_OUTPUT_DIR
 }
