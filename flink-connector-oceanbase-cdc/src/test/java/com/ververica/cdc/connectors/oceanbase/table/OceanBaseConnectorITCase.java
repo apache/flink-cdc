@@ -51,7 +51,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
     private static final int DEFAULT_PARALLELISM = 2;
 
     private final StreamExecutionEnvironment env =
-            StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(DEFAULT_PARALLELISM);
+            StreamExecutionEnvironment.getExecutionEnvironment()
+                    .setParallelism(DEFAULT_PARALLELISM);
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env,
