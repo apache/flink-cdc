@@ -34,9 +34,9 @@ brew install --cask docker
 
 # change memory limit, should update when there is a fix to https://github.com/docker/roadmap/issues/172
 docker_settings=/Users/"${USER}"/Library/Group\ Containers/group.com.docker/settings.json
-jq -c '.memoryMiB = 10240' "$docker_settings" > settings.json
+sudo jq -c '.memoryMiB = 10240' "$docker_settings" > settings.json
 cat settings.json
-mv settings.json "$docker_settings"
+sudo mv settings.json "$docker_settings"
 
 # start docker
 docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
