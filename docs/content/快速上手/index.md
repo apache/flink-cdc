@@ -8,4 +8,5 @@ mongodb-tutorial-zh
 oracle-tutorial-zh
 build-real-time-data-lake-tutorial-zh
 sqlserver-tutorial-zh
+tidb-tutorial-zh
 ```

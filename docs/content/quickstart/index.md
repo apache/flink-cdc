@@ -8,4 +8,5 @@ mongodb-tutorial
 oracle-tutorial
 build-real-time-data-lake-tutorial
 sqlserver-tutorial
+tidb-tutorial
 ```
