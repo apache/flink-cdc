@@ -48,10 +48,10 @@ import static org.junit.Assert.assertTrue;
 /** Integration tests for OceanBase change stream event SQL source. */
 public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
-    private static final int DEFAULT_PARALLELISM = 4;
+    private static final int DEFAULT_PARALLELISM = 2;
 
     private final StreamExecutionEnvironment env =
-            StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(1);
+            StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(DEFAULT_PARALLELISM);
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env,
@@ -63,7 +63,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
     public final MiniClusterWithClientResource miniClusterResource =
             new MiniClusterWithClientResource(
                     new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(4)
+                            .setNumberTaskManagers(1)
                             .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
                             .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
                             .withHaLeadershipControl()
