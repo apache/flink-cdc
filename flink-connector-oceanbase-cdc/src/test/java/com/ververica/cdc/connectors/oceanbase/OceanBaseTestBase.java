@@ -82,7 +82,7 @@ public class OceanBaseTestBase extends TestLogger {
                     .withExtraHost("localhost", "127.0.0.1")
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
                     .withStartupTimeout(Duration.ofSeconds(120))
-                    .withFileSystemBind("/Users/runner/work/_temp/debug_files/", "/root/ob/log")
+                    // .withFileSystemBind("/Users/runner/work/_temp/debug_files/", "/root/ob/log")
                     .withPrivilegedMode(true)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
