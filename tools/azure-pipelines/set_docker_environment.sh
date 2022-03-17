@@ -42,7 +42,7 @@ function start_docker() {
 }
 
 function stop_docker() {
-  kill "$docker_app_path"
+  osascript -e 'quit app "Docker"'
 }
 
 function replace_docker_settings() {
