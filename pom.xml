@@ -35,7 +35,6 @@ under the License.
     <modules>
         <module>flink-connector-debezium</module>
         <module>flink-connector-test-util</module>
-<<<<<<< HEAD
         <!--        <module>flink-connector-mysql-cdc</module>-->
         <!--        <module>flink-connector-postgres-cdc</module>-->
         <!--        <module>flink-connector-oracle-cdc</module>-->
