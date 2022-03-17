@@ -30,15 +30,13 @@
 #sudo ln -s /Users/"${USER}"/.colima/docker.sock /var/run/docker.sock
 #colima start --arch x86_64 --cpu 2 --memory 10 --disk 10
 
-# should update it when there is a fix on https://github.com/docker/roadmap/issues/172
 brew install --cask docker
-brew install jq
 
-# change memory limit
-export DOCKER_CONFIG=~/Library/Group\ Containers/group.com.docker/settings.json
-jq -c '.memoryMiB = 10240' "$DOCKER_CONFIG" > settings.json
+# change memory limit, should update when there is a fix to https://github.com/docker/roadmap/issues/172
+docker_settings=/Users/"${USER}"/Library/Group\ Containers/group.com.docker/settings.json
+jq -c '.memoryMiB = 10240' "$docker_settings" > settings.json
 cat settings.json
-mv settings.json "$DOCKER_CONFIG"
+mv settings.json "$docker_settings"
 
 # start docker
 docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
