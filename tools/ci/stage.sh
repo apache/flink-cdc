@@ -86,7 +86,6 @@ function get_compile_modules_for_stage() {
 function get_test_modules_for_stage() {
     local stage=$1
 
-<<<<<<< HEAD
 #    local modules_mysql=$MODULES_MYSQL
 #    local modules_postgres=$MODULES_POSTGRES
 #    local modules_oracle=$MODULES_ORACLE
