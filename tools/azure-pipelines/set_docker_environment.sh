@@ -50,7 +50,7 @@ function replace_docker_settings() {
   mv settings.json "$docker_settings"
 }
 
-echo "initial start docker"
+echo "start docker"
 sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
 start_docker
 echo "set cpu 2, memory 10g"

@@ -84,7 +84,6 @@ public class OceanBaseTestBase extends TestLogger {
                     //                    .withFileSystemBind(
                     //                            "/Users/runner/work/_temp/debug_files/obd",
                     // "/root/.obd/log/obd")
-                    .withCommand("--memory=10g", "--kernel-memory=10g")
                     .withPrivilegedMode(true)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
