@@ -32,6 +32,7 @@ import org.junit.Test;
 
 import java.sql.Connection;
 import java.sql.Statement;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -535,6 +536,88 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                 Arrays.asList(
                         "+I(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\":\"value1\"})",
                         "+U(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\":\"value1\"})");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        assertEqualsInAnyOrder(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testTiDBServerInBerlin() throws Exception {
+        testTiDBServerTimezone("Europe/Berlin");
+    }
+
+    @Test
+    public void testTiDBServerInShanghai() throws Exception {
+        testTiDBServerTimezone("Asia/Shanghai");
+    }
+
+    public void testTiDBServerTimezone(String timezone) throws Exception {
+        try (Connection connection = getJdbcConnection("");
+                Statement statement = connection.createStatement()) {
+            statement.execute(String.format("SET GLOBAL time_zone = '%s';", timezone));
+        }
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of(timezone));
+        initializeTidbTable("column_type_test");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE tidb_source (\n"
+                                + "    `id` INT NOT NULL,\n"
+                                + "    date_c DATE,\n"
+                                + "    time_c TIME(0),\n"
+                                + "    datetime3_c TIMESTAMP(3),\n"
+                                + "    datetime6_c TIMESTAMP(6),\n"
+                                + "    timestamp_c TIMESTAMP_LTZ,\n"
+                                + "    primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'tidb-cdc',"
+                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
+                                + " 'pd-addresses' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        TIDB.getContainerIpAddress(),
+                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB_USER,
+                        TIDB_PASSWORD,
+                        "column_type_test",
+                        "full_types",
+                        timezone);
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + "    `id` INT NOT NULL,\n"
+                        + "    date_c DATE,\n"
+                        + "    time_c TIME(0),\n"
+                        + "    datetime3_c TIMESTAMP(3),\n"
+                        + "    datetime6_c TIMESTAMP(6),\n"
+                        + "    timestamp_c TIMESTAMP_LTZ,\n"
+                        + "    primary key (`id`) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", 1);
+
+        try (Connection connection = getJdbcConnection("column_type_test");
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+        }
+
+        waitForSinkSize("sink", 2);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I(2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-18T02:00:22",
+                        "+U(2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-18T02:33:22");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEqualsInAnyOrder(expected, actual);
