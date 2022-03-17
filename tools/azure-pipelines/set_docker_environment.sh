@@ -30,11 +30,19 @@
 #sudo ln -s /Users/"${USER}"/.colima/docker.sock /var/run/docker.sock
 #colima start --arch x86_64 --cpu 2 --memory 10 --disk 10
 
-brew install docker docker-machine
-# https://github.com/actions/virtual-environments/issues/4431#issuecomment-963247389
-cd $(brew --repo homebrew/cask)
-git checkout 8670a72380c57c606d6582b645421e31dad2eee2
-brew install --cask virtualbox
-docker-machine create --driver virtualbox --virtualbox-cpu-count 2 --virtualbox-memory 10240 default
-docker-machine env default
-docker info
+# should update it when there is a fix on https://github.com/docker/roadmap/issues/172
+brew install --cask docker
+brew install jq
+
+# change memory limit
+export DOCKER_CONFIG=~/Library/Group\ Containers/group.com.docker/settings.json
+jq -c '.memoryMiB = 10240' "$DOCKER_CONFIG" > settings.json
+cat settings.json
+mv settings.json "$DOCKER_CONFIG"
+
+# start docker
+docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
+docker_app_path="${docker_app_path/#\~/$HOME}"
+sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
+open -a "$docker_app_path" --args --unattended --accept-license
+while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
