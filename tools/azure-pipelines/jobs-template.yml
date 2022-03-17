@@ -32,8 +32,8 @@ jobs:
       # See also https://docs.microsoft.com/en-us/azure/devops/pipelines/process/phases?view=azure-devops&tabs=yaml#workspace
 
     steps:
-      - script: ./tools/azure-pipelines/set_docker_environment.sh
-        displayName: Set docker environment
+#      - script: ./tools/azure-pipelines/set_docker_environment.sh
+#        displayName: Set docker environment
       # The cache task is persisting the .m2 directory between builds, so that
       # we do not have to re-download all dependencies from maven central for
       # each build. The hope is that downloading the cache is faster than
