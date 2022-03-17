@@ -20,6 +20,9 @@ parameters:
   jdk: # the jdk version to use
 
 jobs:
+  - script: ./tools/azure-pipelines/set_docker_environment.sh
+    displayName: Set docker environment
+
   - job: compile_${{parameters.stage_name}}
     # succeeded() is needed to allow job cancellation
     condition: and(succeeded(), not(eq(variables['MODE'], 'e2e')))
