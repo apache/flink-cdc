@@ -78,22 +78,20 @@ public class OceanBaseTestBase extends TestLogger {
     public static final GenericContainer<?> OB_SERVER =
             new FixedHostPortGenericContainer<>("whhe/obce-mini")
                     .withNetwork(NETWORK)
-                    .withNetworkMode(NETWORK_MODE)
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
+                    .withExtraHost("localhost", "127.0.0.1")
                     .withFixedExposedPort(OB_SERVER_SQL_PORT, OB_SERVER_SQL_PORT)
                     .withFixedExposedPort(OB_SERVER_RPC_PORT, OB_SERVER_RPC_PORT)
-                    .withExtraHost("localhost", "127.0.0.1")
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withPrivilegedMode(true)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
     public static final GenericContainer<?> OB_LOG_PROXY =
-            new FixedHostPortGenericContainer<>("whhe/oblogproxy")
+            new GenericContainer<>("whhe/oblogproxy")
                     .withNetwork(NETWORK)
                     .withNetworkAliases(SERVICE_ALIAS_OB_LOG_PROXY)
-                    .withFixedExposedPort(OB_LOG_PROXY_PORT, OB_LOG_PROXY_PORT)
-                    .withExtraHost("localhost", "127.0.0.1")
+                    .withExposedPorts(OB_LOG_PROXY_PORT)
                     .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME_ENCRYPTED)
                     .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD_ENCRYPTED)
                     .dependsOn(OB_SERVER)
