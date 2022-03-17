@@ -26,6 +26,12 @@
 #open -a "$docker_app_path" --args --unattended --accept-license
 #while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
 
-brew install docker colima
-sudo ln -s /Users/"${USER}"/.colima/docker.sock /var/run/docker.sock
-colima start --arch x86_64 --cpu 2 --memory 10 --disk 10
+#brew install docker colima
+#sudo ln -s /Users/"${USER}"/.colima/docker.sock /var/run/docker.sock
+#colima start --arch x86_64 --cpu 2 --memory 10 --disk 10
+
+brew install docker docker-machine
+brew install --cask virtualbox
+docker-machine create --driver virtualbox --virtualbox-cpu-count 2 --virtualbox-memory 10240 default
+docker-machine env default
+docker info
