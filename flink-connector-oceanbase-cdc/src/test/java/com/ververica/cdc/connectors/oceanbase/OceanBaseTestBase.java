@@ -79,9 +79,9 @@ public class OceanBaseTestBase extends TestLogger {
                     .withNetwork(NETWORK)
                     .withNetworkMode(NETWORK_MODE)
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
-                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withFileSystemBind("/Users/runner/work/_temp/debug_files/", "/root/.obd/log/")
+                    .withFileSystemBind("/Users/runner/work/_temp/debug_files/", "/root/ob/log")
                     .withPrivilegedMode(true)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
@@ -89,7 +89,6 @@ public class OceanBaseTestBase extends TestLogger {
     public static final GenericContainer<?> OB_LOG_PROXY =
             new GenericContainer<>("whhe/oblogproxy")
                     .withNetwork(NETWORK)
-                    .withNetworkMode(NETWORK_MODE)
                     .withNetworkAliases(SERVICE_ALIAS_OB_LOG_PROXY)
                     .withExposedPorts(OB_LOG_PROXY_PORT)
                     .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME_ENCRYPTED)
