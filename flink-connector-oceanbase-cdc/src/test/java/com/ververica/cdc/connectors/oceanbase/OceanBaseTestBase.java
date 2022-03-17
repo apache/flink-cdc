@@ -27,6 +27,7 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -75,23 +76,23 @@ public class OceanBaseTestBase extends TestLogger {
 
     @ClassRule
     public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>("whhe/obce-mini")
+            new FixedHostPortGenericContainer<>("whhe/obce-mini")
                     .withNetwork(NETWORK)
                     .withNetworkMode(NETWORK_MODE)
-                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
-                    .withExtraHost("localhost", "127.0.0.1")
                     .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
+                    .withFixedExposedPort(OB_SERVER_SQL_PORT, OB_SERVER_SQL_PORT)
+                    .withFixedExposedPort(OB_SERVER_RPC_PORT, OB_SERVER_RPC_PORT)
+                    .withExtraHost("localhost", "127.0.0.1")
                     .withStartupTimeout(Duration.ofSeconds(120))
-                    // .withFileSystemBind("/Users/runner/work/_temp/debug_files/", "/root/ob/log")
                     .withPrivilegedMode(true)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
     public static final GenericContainer<?> OB_LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy")
+            new FixedHostPortGenericContainer<>("whhe/oblogproxy")
                     .withNetwork(NETWORK)
                     .withNetworkAliases(SERVICE_ALIAS_OB_LOG_PROXY)
-                    .withExposedPorts(OB_LOG_PROXY_PORT)
+                    .withFixedExposedPort(OB_LOG_PROXY_PORT, OB_LOG_PROXY_PORT)
                     .withExtraHost("localhost", "127.0.0.1")
                     .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME_ENCRYPTED)
                     .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD_ENCRYPTED)
