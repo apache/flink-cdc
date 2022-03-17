@@ -31,6 +31,9 @@
 #colima start --arch x86_64 --cpu 2 --memory 10 --disk 10
 
 brew install docker docker-machine
+# https://github.com/actions/virtual-environments/issues/4431#issuecomment-963247389
+cd $(brew --repo homebrew/cask)
+git checkout 8670a72380c57c606d6582b645421e31dad2eee2
 brew install --cask virtualbox
 docker-machine create --driver virtualbox --virtualbox-cpu-count 2 --virtualbox-memory 10240 default
 docker-machine env default
