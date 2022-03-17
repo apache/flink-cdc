@@ -55,7 +55,6 @@ function get_compile_modules_for_stage() {
     local stage=$1
 
     case ${stage} in
-<<<<<<< HEAD
 #        (${STAGE_MYSQL})
 #            echo "-pl $MODULES_MYSQL -am"
 #        ;;
@@ -76,31 +75,6 @@ function get_compile_modules_for_stage() {
 #            # the negation takes precedence, thus not all required modules would be built
 #            echo ""
 #        ;;
-=======
-        (${STAGE_MYSQL})
-            echo "-pl $MODULES_MYSQL -am"
-        ;;
-        (${STAGE_POSTGRES})
-            echo "-pl $MODULES_POSTGRES -am"
-        ;;
-        (${STAGE_ORACLE})
-            echo "-pl $MODULES_ORACLE -am"
-        ;;
-        (${STAGE_MONGODB})
-            echo "-pl $MODULES_MONGODB -am"
-        ;;
-        (${STAGE_SQLSERVER})
-            echo "-pl $MODULES_SQLSERVER -am"
-        ;;
-        (${STAGE_TIDB})
-            echo "-pl $MODULES_TIDB -am"
-        ;;
-        (${STAGE_E2E})
-            # compile everything; using the -am switch does not work with negated module lists!
-            # the negation takes precedence, thus not all required modules would be built
-            echo ""
-        ;;
->>>>>>> master
         (${STAGE_MISC})
             # compile everything; using the -am switch does not work with negated module lists!
             # the negation takes precedence, thus not all required modules would be built
@@ -143,43 +117,6 @@ function get_test_modules_for_stage() {
 #        (${STAGE_SQLSERVER})
 #            echo "-pl $modules_sqlserver"
 #        ;;
-=======
-    local modules_mysql=$MODULES_MYSQL
-    local modules_postgres=$MODULES_POSTGRES
-    local modules_oracle=$MODULES_ORACLE
-    local modules_mongodb=$MODULES_MONGODB
-    local modules_sqlserver=$MODULES_SQLSERVER
-    local modules_tidb=$MODULES_TIDB
-    local modules_e2e=$MODULES_E2E
-    local negated_mysql=\!${MODULES_MYSQL//,/,\!}
-    local negated_postgres=\!${MODULES_POSTGRES//,/,\!}
-    local negated_oracle=\!${MODULES_ORACLE//,/,\!}
-    local negated_mongodb=\!${MODULES_MONGODB//,/,\!}
-    local negated_sqlserver=\!${MODULES_SQLSERVER//,/,\!}
-    local negated_tidb=\!${MODULES_TIDB//,/,\!}
-    local negated_e2e=\!${MODULES_E2E//,/,\!}
-    local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_sqlserver,$negated_tidb,$negated_e2e"
-
-    case ${stage} in
-        (${STAGE_MYSQL})
-            echo "-pl $modules_mysql"
-        ;;
-        (${STAGE_POSTGRES})
-            echo "-pl $modules_postgres"
-        ;;
-        (${STAGE_ORACLE})
-            echo "-pl $modules_oracle"
-        ;;
-        (${STAGE_MONGODB})
-            echo "-pl $modules_mongodb"
-        ;;
-        (${STAGE_SQLSERVER})
-            echo "-pl $modules_sqlserver"
-        ;;
-        (${STAGE_TIDB})
-            echo "-pl $modules_tidb"
-        ;;
->>>>>>> master
         (${STAGE_E2E})
             echo "-pl $modules_e2e"
         ;;
