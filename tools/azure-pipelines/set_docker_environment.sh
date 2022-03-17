@@ -34,7 +34,8 @@ brew install --cask docker
 
 docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
 docker_app_path="${docker_app_path/#\~/$HOME}"
-docker_settings=/Users/"${USER}"/Library/Group\ Containers/group.com.docker/settings.json
+docker_settings_path=/Users/"${USER}"/Library/Group\ Containers/group.com.docker
+docker_settings="$docker_settings_path/settings.json"
 
 function start_docker() {
   open -a "$docker_app_path" --args --unattended --accept-license
@@ -52,6 +53,7 @@ function replace_docker_settings() {
 
 echo "start docker"
 sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
+ls "$docker_settings_path"
 start_docker
 echo "set cpu 2, memory 10g"
 replace_docker_settings
