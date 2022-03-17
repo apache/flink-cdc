@@ -32,15 +32,27 @@
 
 brew install --cask docker
 
-# change memory limit, should update when there is a fix to https://github.com/docker/roadmap/issues/172
-docker_settings=/Users/"${USER}"/Library/Group\ Containers/group.com.docker/settings.json
-settings='{"cpus":2, "memoryMiB":10240}'
-sudo echo "$settings" > "$docker_settings"
-
-# start docker
 docker_app_path=$(brew list --cask docker | grep '==> App' -A1 | tail -n 1 | awk '{ print $1 }')
 docker_app_path="${docker_app_path/#\~/$HOME}"
-sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
-open -a "$docker_app_path" --args --unattended --accept-license
-while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
-cat "$docker_settings"
+
+function start_docker() {
+  sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
+  open -a "$docker_app_path" --args --unattended --accept-license
+  while ! "$docker_app_path"/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
+}
+
+function stop_docker() {
+  kill "$docker_app_path"
+}
+
+function replace_docker_settings() {
+  docker_settings=/Users/"${USER}"/Library/Group\ Containers/group.com.docker/settings.json
+  jq -c '.memoryMiB = 10240' "$docker_settings" > settings.json
+  cat settings.json
+  mv settings.json "$docker_settings"
+}
+
+start_docker
+replace_docker_settings
+stop_docker
+start_docker
