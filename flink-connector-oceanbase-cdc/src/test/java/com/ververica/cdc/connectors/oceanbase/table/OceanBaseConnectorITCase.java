@@ -39,9 +39,7 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -80,7 +78,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
     @Test
     public void testConsumingAllEvents() throws Exception {
-        initializeTidbTable("inventory");
+        initializeTable("inventory");
 
         String sourceDDL =
                 String.format(
@@ -109,11 +107,11 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         "sys",
                         "inventory",
                         "products",
-                        OB_SERVER.getContainerIpAddress(),
-                        OB_SERVER.getMappedPort(OB_SERVER_SQL_PORT),
+                        OB_WITH_LOG_PROXY.getContainerIpAddress(),
+                        OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT),
                         "127.0.0.1:2882:2881",
-                        OB_LOG_PROXY.getContainerIpAddress(),
-                        OB_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT));
+                        OB_WITH_LOG_PROXY.getContainerIpAddress(),
+                        OB_WITH_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT));
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -194,7 +192,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
                         "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
-        assertEqualsInAnyOrder(expected, actual);
+        assertContainsInOrder(expected, actual);
 
         result.getJobClient().get().cancel().get();
     }
@@ -217,16 +215,12 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         }
     }
 
-    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
+    public static void assertContainsInOrder(List<String> expected, List<String> actual) {
         assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        assertTrue(actual.size() >= expected.size());
+        int dup = actual.size() - expected.size();
+        for (int i = 0; i < expected.size(); i++) {
+            assertEquals(expected.get(i), actual.get(i + dup));
+        }
     }
 }

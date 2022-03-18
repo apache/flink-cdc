@@ -27,10 +27,10 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
@@ -58,93 +58,53 @@ public class OceanBaseTestBase extends TestLogger {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    private static final String SERVICE_ALIAS_OB_LOG_PROXY = "logproxy";
-    private static final String SERVICE_ALIAS_OB_SERVER = "observer";
-
-    private static final String NETWORK_MODE = "host";
-
     public static final int OB_LOG_PROXY_PORT = 2983;
     public static final int OB_SERVER_SQL_PORT = 2881;
     public static final int OB_SERVER_RPC_PORT = 2882;
 
-    public static final String OB_SYS_USERNAME = "user";
-    public static final String OB_SYS_USERNAME_ENCRYPTED = "441AB4AC40CD3C2DAC19873CD04CC72C";
+    public static final String OB_SYS_USERNAME = "root";
     public static final String OB_SYS_PASSWORD = "pswd";
-    public static final String OB_SYS_PASSWORD_ENCRYPTED = "B5D4F8E0DBC9F0E57A13296DCD307B5D";
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @ClassRule
-    public static final GenericContainer<?> OB_SERVER =
-            new FixedHostPortGenericContainer<>("whhe/obce-mini")
+    public static final GenericContainer<?> OB_WITH_LOG_PROXY =
+            new GenericContainer<>("whhe/oblogproxy:obce_3.1.1")
                     .withNetwork(NETWORK)
-                    .withNetworkAliases(SERVICE_ALIAS_OB_SERVER)
                     .withExtraHost("localhost", "127.0.0.1")
-                    .withFixedExposedPort(OB_SERVER_SQL_PORT, OB_SERVER_SQL_PORT)
-                    .withFixedExposedPort(OB_SERVER_RPC_PORT, OB_SERVER_RPC_PORT)
-                    .withStartupTimeout(Duration.ofSeconds(120))
+                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT, OB_LOG_PROXY_PORT)
+                    .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
                     .withPrivilegedMode(true)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @ClassRule
-    public static final GenericContainer<?> OB_LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy")
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(SERVICE_ALIAS_OB_LOG_PROXY)
-                    .withExposedPorts(OB_LOG_PROXY_PORT)
-                    .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME_ENCRYPTED)
-                    .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD_ENCRYPTED)
-                    .dependsOn(OB_SERVER)
+                    .waitingFor(Wait.forListeningPort())
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass
     public static void startContainers() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(OB_SERVER, OB_LOG_PROXY)).join();
-        LOG.info("Containers are started.");
-        createSysUser();
-        LOG.info("Sys user {} created.", OB_SYS_USERNAME);
+        LOG.error("Starting containers...");
+        Startables.deepStart(Stream.of(OB_WITH_LOG_PROXY)).join();
+        LOG.error("Containers are started.");
     }
 
     @AfterClass
     public static void stopContainers() {
-        Stream.of(OB_SERVER, OB_LOG_PROXY).forEach(GenericContainer::stop);
+        LOG.error("Stopping containers...");
+        Stream.of(OB_WITH_LOG_PROXY).forEach(GenericContainer::stop);
+        LOG.error("Containers are stopped.");
     }
 
     public static String getJdbcUrl(String databaseName) {
         return "jdbc:mysql://"
-                + OB_SERVER.getContainerIpAddress()
+                + OB_WITH_LOG_PROXY.getContainerIpAddress()
                 + ":"
-                + OB_SERVER.getMappedPort(OB_SERVER_SQL_PORT)
+                + OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT)
                 + "/"
                 + databaseName;
-    }
-
-    protected static Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(getJdbcUrl(""), "root", "");
     }
 
     protected static Connection getJdbcConnection(String databaseName) throws SQLException {
         return DriverManager.getConnection(
                 getJdbcUrl(databaseName), OB_SYS_USERNAME, OB_SYS_PASSWORD);
-    }
-
-    /** Create a user with password in sys tenant. */
-    protected static void createSysUser() {
-        try (Connection connection = getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    String.format(
-                            "CREATE USER '%s' IDENTIFIED BY '%s'",
-                            OB_SYS_USERNAME, OB_SYS_PASSWORD));
-            statement.execute(
-                    String.format(
-                            "GRANT ALL PRIVILEGES ON *.* TO '%s' WITH GRANT OPTION",
-                            OB_SYS_USERNAME));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private static void dropTestDatabase(Connection connection, String databaseName) {
@@ -172,7 +132,7 @@ public class OceanBaseTestBase extends TestLogger {
         }
     }
 
-    protected void initializeTidbTable(String sqlFile) {
+    protected void initializeTable(String sqlFile) throws Exception {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = getClass().getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
