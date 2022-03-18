@@ -55,7 +55,7 @@ echo "start docker"
 sudo "$docker_app_path"/Contents/MacOS/Docker --unattended --install-privileged-components
 ls "$docker_settings_path"
 start_docker
-echo "set cpu 2, memory 10g"
+echo "set cpu 2, memory 12g"
 replace_docker_settings
 echo "stop docker"
 stop_docker
