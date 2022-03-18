@@ -39,15 +39,15 @@
       <div class="bg"></div>
       <div class="container position-relative">
         <div class="container py-xs-2 py-sm-3 py-md-4 py-xxl-5">
-          <div class="row py-3">
+          <div class="row py-5">
             <div class="col-xl-6 col-lg-8">
-              <h1 class="display-5 fw-bold lh-1 mb-3">Flink CDC</h1>
-              <h3>Embrace <span class="text-primary">Database Changes</span></h3>
+              <h1 class="display-5 fw-bold lh-1 mb-3" style="color: #336699;">Flink CDC</h1>
+              <h3 style="color: #336699;">Embrace Database Changes</h3>
               <p><a class="github-button" href="https://github.com/ververica/flink-cdc-connectors" data-icon="octicon-star" data-size="large" data-show-count="true" aria-label="Star ververica/flink-cdc-connectors on GitHub">Star</a></p>
-              <p class="lead">Flink CDC Connectors is a set of source connectors for Apache Flink, ingesting changes from different databases using change data capture. The Flink CDC Connectors integrates Debezium as the engine to capture data changes, fully leveraging its ability.</p>
+              <p class="lead">Flink CDC Connectors is a set of source connectors for Apache Flink, ingesting changes from different databases using change data capture.</p>
               <div class="d-grid gap-2 d-md-flex justify-content-md-start">
                 <a role="button" class="btn btn-primary btn-lg px-4 me-md-2" href="https://github.com/ververica/flink-cdc-connectors/releases/">Download</a>
-                <a role="button" class="btn btn-outline-secondary btn-lg px-4" href="https://ververica.github.io/flink-cdc-connectors/master/">Documentation</a>
+                <a role="button" class="btn btn-secondary btn-lg px-4" href="https://ververica.github.io/flink-cdc-connectors/master/">Documentation</a>
               </div>
             </div>
           </div>
@@ -62,24 +62,30 @@
         </div>
         <div class="row py-4">
           <div class="col-md-12 col-lg-4 px-4">
-            <div class="text-center text-primary">
-              <h1><i class="bi bi-calculator"></i></h1>
-              <h4>Exactly-once Processing</h4>
-            </div>
+            <a class="no-decoration-anchor" href="https://ververica.github.io/flink-cdc-connectors/master/content/about.html#features">
+              <div class="text-center text-primary">
+                <h1><i class="bi bi-calculator"></i></h1>
+                <h4>Exactly-once Semantics</h4>
+              </div>
+            </a>
             <div class="py-3">Flink CDC supports reading database snapshots and continues to read binlogs with exactly-once processing, even after failures.</div>
           </div>
           <div class="col-md-12 col-lg-4 px-4">
-            <div class="text-center text-primary">
-              <h1><i class="bi bi-hdd-network"></i></h1>
-              <h4>Table/SQL API</h4>
-            </div>
+            <a class="no-decoration-anchor" href="https://ververica.github.io/flink-cdc-connectors/master/content/about.html#usage-for-table-sql-api">
+              <div class="text-center text-primary">
+                <h1><i class="bi bi-hdd-network"></i></h1>
+                <h4>Table/SQL API</h4>
+              </div>
+            </a>
             <div class="py-3">Users can use SQL DDL to create a CDC source to monitor changes on a single table.</div>
           </div>
           <div class="col-md-12 col-lg-4 px-4">
-            <div class="text-center text-primary">
-              <h1><i class="bi bi-water"></i></h1>
-              <h4>Datastream API</h4>
-            </div>
+            <a class="no-decoration-anchor" href="https://ververica.github.io/flink-cdc-connectors/master/content/about.html#usage-for-datastream-api">
+              <div class="text-center text-primary">
+                <h1><i class="bi bi-water"></i></h1>
+                <h4>DataStream API</h4>
+              </div>
+            </a>
             <div class="py-3">Users can consume changes on multiple databases and tables in a single job without Debezium and Kafka deployed.</div>
           </div>
         </div>
@@ -92,7 +98,7 @@
           <div class="col-md-12 col-lg-5 mx-auto py-4 align-self-center">
             <div class="pb-4 text-center"><h2>Getting Started</h2></div>
             <div class="py-4" style="font-size: 20px">Flink CDC provides a series of quick start demos without any dependencies or java code,  only a Linux or MacOS computer with Docker installed is enough. With these demos, you can quickly feel the power and convenience of Flink CDC.</div>
-            <button type="button" class="btn btn-outline-light btn-lg px-4">Learn More</button>
+            <a role="button" class="btn btn-outline-primary btn-lg px-4" href="https://ververica.github.io/flink-cdc-connectors/master/content/quickstart/index.html">Learn More</a>
           </div>
           <div class="col-md-12 col-lg-6 mx-auto">
             <div class="termynal" data-termynal data-ty-typeDelay="20" data-ty-lineDelay="20">
@@ -145,7 +151,7 @@
               <img src="assets/dingtalk.png" width="100%" />
           </div>
           <div class="col-12 col-md-8 col-xl-6 p-3">
-            <a class="community-link" href="https://h5.dingtalk.com/circle/healthCheckin.html?dtaction=os&corpId=dinge369343b40eb68f87c231cb892228ad7&14ee9113-c3=cc3ed38a-82&cbdbhh=qwertyuiop">
+            <a class="no-decoration-anchor" href="https://h5.dingtalk.com/circle/healthCheckin.html?dtaction=os&corpId=dinge369343b40eb68f87c231cb892228ad7&14ee9113-c3=cc3ed38a-82&cbdbhh=qwertyuiop">
               <div class="card border-primary my-3">
                 <div class="card-body" style="background-color: #ddeeff">
                   <div class="row">
@@ -160,7 +166,7 @@
                 </div>
               </div>
             </a>
-            <a class="community-link" href="https://github.com/ververica/flink-cdc-connectors">
+            <a class="no-decoration-anchor" href="https://github.com/ververica/flink-cdc-connectors">
               <div class="card border-primary my-3">
                 <div class="card-body" style="background-color: #ddeeff">
                   <div class="row">
@@ -175,7 +181,7 @@
                 </div>
               </div>
             </a>
-            <a class="community-link" href="https://github.com/ververica/flink-cdc-connectors/issues">
+            <a class="no-decoration-anchor" href="https://github.com/ververica/flink-cdc-connectors/issues">
               <div class="card border-primary my-3">
                 <div class="card-body" style="background-color: #ddeeff">
                   <div class="row">
@@ -231,7 +237,7 @@
     }
   }
 
-  .community-link {
+  .no-decoration-anchor {
     text-decoration: inherit;
     color: inherit;
   }
