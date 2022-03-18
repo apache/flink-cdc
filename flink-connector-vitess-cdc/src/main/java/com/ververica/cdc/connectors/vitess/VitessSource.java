@@ -43,7 +43,7 @@ public class VitessSource {
     public static class Builder<T> {
 
         private String pluginName = "decoderbufs";
-        private String slotName = "flink";
+        private String name = "flink";
         private int port = 15991; // default 15991 port
         private String hostname;
         private String keyspace;
@@ -117,12 +117,11 @@ public class VitessSource {
         }
 
         /**
-         * The name of the Vitess logical decoding slot that was created for streaming changes from
-         * a particular plug-in for a particular database/schema. The server uses this slot to
-         * stream events to the connector that you are configuring. Default is "flink".
+         * Unique name for the connector. Attempting to register again with the same name will fail.
+         * This property is required by all Kafka Connect connectors. Default is "flink".
          */
-        public Builder<T> slotName(String slotName) {
-            this.slotName = slotName;
+        public Builder<T> name(String name) {
+            this.name = name;
             return this;
         }
 
@@ -191,7 +190,7 @@ public class VitessSource {
             Properties props = new Properties();
             props.setProperty("connector.class", VitessConnector.class.getCanonicalName());
             props.setProperty("plugin.name", pluginName);
-            props.setProperty("slot.name", slotName);
+            props.setProperty("name", name);
             // hard code server name, because we don't need to distinguish it, docs:
             // Logical name that identifies and provides a namespace for the particular Vitess
             // Vtgate server/cluster being monitored. The logical name should be unique across

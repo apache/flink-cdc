@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.vitess.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
@@ -47,21 +47,21 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class VitessTableSource implements ScanTableSource {
 
-    private final TableSchema physicalSchema;
-    private String pluginName;
-    private String slotName;
-    private int port;
-    private String hostname;
-    private String keyspace;
-    private String username;
-    private String password;
-    private String tableName;
-    private VtctldConfig vtctldConfig;
-    private TabletType tabletType;
-    private Properties dbzProperties;
+    private final ResolvedSchema physicalSchema;
+    private final String pluginName;
+    private final String name;
+    private final int port;
+    private final String hostname;
+    private final String keyspace;
+    private final String username;
+    private final String password;
+    private final String tableName;
+    private final VtctldConfig vtctldConfig;
+    private final TabletType tabletType;
+    private final Properties dbzProperties;
 
     public VitessTableSource(
-            TableSchema physicalSchema,
+            ResolvedSchema physicalSchema,
             int port,
             String hostname,
             String keyspace,
@@ -71,7 +71,7 @@ public class VitessTableSource implements ScanTableSource {
             VtctldConfig vtctldConfig,
             TabletType tabletType,
             String pluginName,
-            String slotName,
+            String name,
             Properties dbzProperties) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -83,7 +83,7 @@ public class VitessTableSource implements ScanTableSource {
         this.vtctldConfig = checkNotNull(vtctldConfig);
         this.tabletType = checkNotNull(tabletType);
         this.pluginName = checkNotNull(pluginName);
-        this.slotName = slotName;
+        this.name = name;
         this.dbzProperties = dbzProperties;
     }
 
@@ -102,7 +102,8 @@ public class VitessTableSource implements ScanTableSource {
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         TypeInformation<RowData> typeInfo =
-                scanContext.createTypeInformation(physicalSchema.toRowDataType());
+                scanContext.createTypeInformation(physicalSchema.toPhysicalRowDataType());
+
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
                         .setPhysicalRowType(physicalDataType)
@@ -121,7 +122,7 @@ public class VitessTableSource implements ScanTableSource {
                         .tabletType(tabletType)
                         .decodingPluginName(pluginName)
                         .vtctldConfig(vtctldConfig)
-                        .slotName(slotName)
+                        .name(name)
                         .debeziumProperties(dbzProperties)
                         .deserializer(deserializer)
                         .build();
@@ -141,7 +142,7 @@ public class VitessTableSource implements ScanTableSource {
                 vtctldConfig,
                 tabletType,
                 pluginName,
-                slotName,
+                name,
                 dbzProperties);
     }
 
@@ -157,7 +158,7 @@ public class VitessTableSource implements ScanTableSource {
         return port == that.port
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(pluginName, that.pluginName)
-                && Objects.equals(slotName, that.slotName)
+                && Objects.equals(name, that.name)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(keyspace, that.keyspace)
                 && Objects.equals(username, that.username)
@@ -173,7 +174,7 @@ public class VitessTableSource implements ScanTableSource {
         return Objects.hash(
                 physicalSchema,
                 pluginName,
-                slotName,
+                name,
                 port,
                 hostname,
                 keyspace,
@@ -193,8 +194,8 @@ public class VitessTableSource implements ScanTableSource {
                 + ", pluginName='"
                 + pluginName
                 + '\''
-                + ", slotName='"
-                + slotName
+                + ", name='"
+                + name
                 + '\''
                 + ", port="
                 + port

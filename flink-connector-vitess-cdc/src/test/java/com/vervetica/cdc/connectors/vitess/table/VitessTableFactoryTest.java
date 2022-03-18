@@ -30,7 +30,6 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.vitess.config.TabletType;
@@ -64,6 +63,7 @@ public class VitessTableFactoryTest {
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
 
+    private static final String MY_SCHEMA = "public";
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
@@ -79,7 +79,7 @@ public class VitessTableFactoryTest {
         DynamicTableSource actualSource = createTableSource(properties);
         VitessTableSource expectedSource =
                 new VitessTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         15991,
                         MY_LOCALHOST,
                         MY_KEYSPACE,
@@ -101,7 +101,7 @@ public class VitessTableFactoryTest {
         options.put("vtctl.port", "5445");
         options.put("decoding.plugin.name", "wal2json");
         options.put("debezium.snapshot.mode", "never");
-        options.put("slot.name", "flink");
+        options.put("name", "flink");
         options.put("tablet-type", "MASTER");
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);
@@ -111,7 +111,7 @@ public class VitessTableFactoryTest {
         dbzProperties.put("snapshot.mode", "never");
         VitessTableSource expectedSource =
                 new VitessTableSource(
-                        TableSchemaUtils.getPhysicalSchema(fromResolvedSchema(SCHEMA)),
+                        SCHEMA,
                         5444,
                         MY_LOCALHOST,
                         MY_KEYSPACE,

@@ -62,7 +62,7 @@ public class VitessConnectorITCase extends VitessTestBase {
     @Test
     public void testConsumingAllEvents()
             throws SQLException, ExecutionException, InterruptedException {
-        initializeMysqlTable("inventory");
+        initializeTable("inventory");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -152,9 +152,9 @@ public class VitessConnectorITCase extends VitessTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Test // TODO add DATE, TIMESTAMP, TIME type mapping
+    @Test
     public void testAllTypes() throws Throwable {
-        initializeMysqlTable("column_type_test");
+        initializeTable("column_type_test");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE full_types (\n"
@@ -174,12 +174,6 @@ public class VitessConnectorITCase extends VitessTestBase {
                                 + "    decimal_c DECIMAL(8, 4),\n"
                                 + "    numeric_c DECIMAL(6, 0),\n"
                                 + "    boolean_c BOOLEAN,\n"
-                                //                        + "    date_c DATE,\n"
-                                //                        + "    time_c TIME(0),\n"
-                                //                        + "    datetime3_c TIMESTAMP(3),\n"
-                                //                        + "    datetime6_c TIMESTAMP(6),\n"
-                                //                        + "    timestamp_c TIMESTAMP(0),\n"
-                                //                        + "    file_uuid BYTES,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'vitess-cdc',"

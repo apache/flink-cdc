@@ -21,12 +21,11 @@ package com.ververica.cdc.connectors.vitess.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.utils.TableSchemaUtils;
 
 import com.ververica.cdc.connectors.vitess.config.TabletType;
 import com.ververica.cdc.connectors.vitess.config.VtctldConfig;
@@ -117,14 +116,14 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The name of the Vitess logical decoding plug-in installed on the server.");
 
-    private static final ConfigOption<String> SLOT_NAME =
-            ConfigOptions.key("slot.name")
+    private static final ConfigOption<String> NAME =
+            ConfigOptions.key("name")
                     .stringType()
                     .defaultValue("flink")
                     .withDescription(
-                            "The name of the Vitess logical decoding slot that was created for streaming changes "
-                                    + "from a particular plug-in for a particular database/schema. The server uses this slot "
-                                    + "to stream events to the connector that you are configuring. Default is \"flink\".");
+                            "Unique name for the connector."
+                                    + " Attempting to register again with the same name will fail. "
+                                    + "This property is required by all Kafka Connect connectors. Default is flink.");
 
     @Override
     public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
@@ -148,9 +147,8 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
                         .build();
         TabletType tabletType = TabletType.valueOf(config.get(TABLET_TYPE));
         String pluginName = config.get(DECODING_PLUGIN_NAME);
-        String slotName = config.get(SLOT_NAME);
-        TableSchema physicalSchema =
-                TableSchemaUtils.getPhysicalSchema(context.getCatalogTable().getSchema());
+        String name = config.get(NAME);
+        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
         return new VitessTableSource(
                 physicalSchema,
@@ -163,7 +161,7 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
                 vtctldConfig,
                 tabletType,
                 pluginName,
-                slotName,
+                name,
                 getDebeziumProperties(context.getCatalogTable().getOptions()));
     }
 
@@ -191,7 +189,7 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
         options.add(PASSWORD);
         options.add(TABLET_TYPE);
         options.add(DECODING_PLUGIN_NAME);
-        options.add(SLOT_NAME);
+        options.add(NAME);
         return options;
     }
 }

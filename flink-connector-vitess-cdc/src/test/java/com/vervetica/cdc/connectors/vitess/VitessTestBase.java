@@ -76,7 +76,7 @@ public abstract class VitessTestBase extends AbstractTestBase {
      * Executes a JDBC statement using the default jdbc config without autocommitting the
      * connection.
      */
-    protected void initializeMysqlTable(String sqlFile) {
+    protected void initializeTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = VitessTestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);

@@ -61,7 +61,7 @@ public class VitessSourceTest extends VitessTestBase {
 
     @Before
     public void before() {
-        initializeMysqlTable("inventory");
+        initializeTable("inventory");
     }
 
     @Test
