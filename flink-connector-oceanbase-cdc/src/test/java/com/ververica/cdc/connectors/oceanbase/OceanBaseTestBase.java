@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.oceanbase;
 
 import org.apache.flink.util.TestLogger;
 
+import com.alibaba.dcm.DnsCacheManipulator;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
@@ -27,6 +28,7 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -62,6 +64,8 @@ public class OceanBaseTestBase extends TestLogger {
     public static final int OB_SERVER_SQL_PORT = 2881;
     public static final int OB_SERVER_RPC_PORT = 2882;
 
+    public static final String OB_LOG_PROXY_SERVICE_NAME = "oblog0";
+
     public static final String OB_SYS_USERNAME = "root";
     public static final String OB_SYS_PASSWORD = "pswd";
 
@@ -69,18 +73,21 @@ public class OceanBaseTestBase extends TestLogger {
 
     @ClassRule
     public static final GenericContainer<?> OB_WITH_LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy:obce_3.1.1")
-                    .withNetwork(NETWORK)
-                    .withExtraHost("localhost", "127.0.0.1")
-                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT, OB_LOG_PROXY_PORT)
+            new FixedHostPortGenericContainer<>("whhe/oblogproxy:obce_3.1.1")
+                    .withFixedExposedPort(OB_SERVER_SQL_PORT, OB_SERVER_SQL_PORT)
+                    .withFixedExposedPort(OB_SERVER_RPC_PORT, OB_SERVER_RPC_PORT)
+                    .withFixedExposedPort(OB_LOG_PROXY_PORT, OB_LOG_PROXY_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
-                    .withPrivilegedMode(true)
+                    .withNetwork(NETWORK)
+                    .withNetworkAliases(OB_LOG_PROXY_SERVICE_NAME)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass
     public static void startContainers() {
+        // Add jvm dns cache for flink to invoke ob interface.
+        DnsCacheManipulator.setDnsCache(OB_LOG_PROXY_SERVICE_NAME, "127.0.0.1");
         LOG.error("Starting containers...");
         Startables.deepStart(Stream.of(OB_WITH_LOG_PROXY)).join();
         LOG.error("Containers are started.");
@@ -88,6 +95,7 @@ public class OceanBaseTestBase extends TestLogger {
 
     @AfterClass
     public static void stopContainers() {
+        DnsCacheManipulator.removeDnsCache(OB_LOG_PROXY_SERVICE_NAME);
         LOG.error("Stopping containers...");
         Stream.of(OB_WITH_LOG_PROXY).forEach(GenericContainer::stop);
         LOG.error("Containers are stopped.");
