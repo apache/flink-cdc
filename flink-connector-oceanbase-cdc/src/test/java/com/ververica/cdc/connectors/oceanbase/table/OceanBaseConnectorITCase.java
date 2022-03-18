@@ -87,10 +87,10 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         "sys",
                         "inventory",
                         "products",
-                        OB_WITH_LOG_PROXY.getTestHostIpAddress(),
+                        OB_WITH_LOG_PROXY.getContainerIpAddress(),
                         OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT),
                         "127.0.0.1:2882:2881",
-                        OB_WITH_LOG_PROXY.getTestHostIpAddress(),
+                        OB_WITH_LOG_PROXY.getContainerIpAddress(),
                         OB_WITH_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT));
 
         String sinkDDL =

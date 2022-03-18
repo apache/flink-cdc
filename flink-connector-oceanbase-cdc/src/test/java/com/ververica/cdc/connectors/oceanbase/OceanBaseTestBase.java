@@ -98,7 +98,7 @@ public class OceanBaseTestBase extends TestLogger {
 
     public static String getJdbcUrl(String databaseName) {
         return "jdbc:mysql://"
-                + OB_WITH_LOG_PROXY.getTestHostIpAddress()
+                + OB_WITH_LOG_PROXY.getContainerIpAddress()
                 + ":"
                 + OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT)
                 + "/"
