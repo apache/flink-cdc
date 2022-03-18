@@ -27,7 +27,6 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -99,7 +98,7 @@ public class OceanBaseTestBase extends TestLogger {
 
     public static String getJdbcUrl(String databaseName) {
         return "jdbc:mysql://"
-                + DockerClientFactory.instance().dockerHostIpAddress()
+                + OB_WITH_LOG_PROXY.getTestHostIpAddress()
                 + ":"
                 + OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT)
                 + "/"
