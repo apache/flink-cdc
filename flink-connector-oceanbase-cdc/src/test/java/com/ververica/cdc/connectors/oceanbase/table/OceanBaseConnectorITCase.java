@@ -18,21 +18,16 @@
 
 package com.ververica.cdc.connectors.oceanbase.table;
 
-import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
-import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
-import org.apache.flink.test.util.MiniClusterWithClientResource;
 
 import com.ververica.cdc.connectors.oceanbase.OceanBaseTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
 
 import java.sql.Connection;
@@ -46,11 +41,8 @@ import static org.junit.Assert.assertTrue;
 /** Integration tests for OceanBase change stream event SQL source. */
 public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
-    private static final int DEFAULT_PARALLELISM = 2;
-
     private final StreamExecutionEnvironment env =
-            StreamExecutionEnvironment.getExecutionEnvironment()
-                    .setParallelism(DEFAULT_PARALLELISM);
+            StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(1);
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env,
@@ -58,22 +50,10 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
-
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.enableCheckpointing(1000);
-        env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.AT_LEAST_ONCE);
-        env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
+        env.setParallelism(1);
     }
 
     @Test
