@@ -80,9 +80,10 @@ public class OceanBaseTestBase extends TestLogger {
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass
-    public static void startContainers() {
+    public static void startContainers() throws Exception {
         LOG.error("Starting containers...");
         Startables.deepStart(Stream.of(OB_WITH_LOG_PROXY)).join();
+        Thread.sleep(60000);
         LOG.error("Containers are started.");
     }
 
