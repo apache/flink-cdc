@@ -29,6 +29,7 @@ import com.ververica.cdc.connectors.oceanbase.OceanBaseTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.testcontainers.DockerClientFactory;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -87,10 +88,10 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         "sys",
                         "inventory",
                         "products",
-                        OB_WITH_LOG_PROXY.getContainerIpAddress(),
+                        DockerClientFactory.instance().dockerHostIpAddress(),
                         OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT),
                         "127.0.0.1:2882:2881",
-                        OB_WITH_LOG_PROXY.getContainerIpAddress(),
+                        DockerClientFactory.instance().dockerHostIpAddress(),
                         OB_WITH_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT));
 
         String sinkDDL =

@@ -27,6 +27,7 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -83,7 +84,7 @@ public class OceanBaseTestBase extends TestLogger {
     public static void startContainers() throws Exception {
         LOG.error("Starting containers...");
         Startables.deepStart(Stream.of(OB_WITH_LOG_PROXY)).join();
-        Thread.sleep(60000);
+        //        Thread.sleep(60000);
         LOG.error("Containers are started.");
     }
 
@@ -96,7 +97,7 @@ public class OceanBaseTestBase extends TestLogger {
 
     public static String getJdbcUrl(String databaseName) {
         return "jdbc:mysql://"
-                + OB_WITH_LOG_PROXY.getContainerIpAddress()
+                + DockerClientFactory.instance().dockerHostIpAddress()
                 + ":"
                 + OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT)
                 + "/"
