@@ -256,6 +256,8 @@ under the License.
                         <exclude>docs/make.bat</exclude>
                         <exclude>docs/_templates/version.html</exclude>
                         <exclude>docs/_static/button.js</exclude>
+                        <!-- Site -->
+                        <exclude>docs/site/**</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                         <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
