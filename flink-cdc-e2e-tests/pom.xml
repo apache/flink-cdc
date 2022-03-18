@@ -30,8 +30,8 @@ under the License.
     <packaging>jar</packaging>
 
     <properties>
-        <flink-1.13>1.13.5</flink-1.13>
-        <flink-1.14>1.14.3</flink-1.14>
+        <flink-1.13>1.13.6</flink-1.13>
+        <flink-1.14>1.14.4</flink-1.14>
         <mysql.driver.version>8.0.27</mysql.driver.version>
     </properties>
 
