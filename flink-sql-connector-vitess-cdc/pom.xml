@@ -29,7 +29,7 @@ under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.vinted</groupId>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-connector-vitess-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>

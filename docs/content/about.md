@@ -9,6 +9,7 @@ fully leverage the ability of Debezium. See more about what is [Debezium](https:
 
 ## Supported Connectors
 
+
 | Connector                                    | Database                                                                                                                                                                                                                                                                                                                                                                                                 | Driver                    |
 |----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
 | [mongodb-cdc](connectors/mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                                   | MongoDB Driver: 4.3.1     |
@@ -21,6 +22,7 @@ fully leverage the ability of Debezium. See more about what is [Debezium](https:
 | [db2-cdc](connectors/db2-cdc.md)             | <li> [Db2](https://www.ibm.com/products/db2): 11.5                                                                                                                                                                                                                                                                                                                                                   | DB2 Driver: 11.5.0.0     |
 | [Vitess-cdc](connectors/vitess-cdc.md)       | <li> [Vitess](https://vitess.io/): 8.0.x, 9.0.x                                                                                                                                                                                                                                                                                                                                                          | MySql JDBC Driver: 8.0.16 |
 
+## Supported Flink Versions 
 The following table shows the version mapping between Flink<sup>®</sup> CDC Connectors and Flink<sup>®</sup>:
 
 | Flink<sup>®</sup> CDC Version | Flink<sup>®</sup> Version |
