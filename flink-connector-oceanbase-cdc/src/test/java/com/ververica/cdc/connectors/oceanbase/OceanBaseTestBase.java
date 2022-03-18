@@ -75,7 +75,7 @@ public class OceanBaseTestBase extends TestLogger {
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT, OB_LOG_PROXY_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
                     .withPrivilegedMode(true)
-                    .waitingFor(Wait.forLogMessage("boot success!", 1))
+                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
