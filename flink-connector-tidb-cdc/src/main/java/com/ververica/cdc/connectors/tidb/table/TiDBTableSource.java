@@ -28,13 +28,10 @@ import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.tidb.TDBSourceOptions;
 import com.ververica.cdc.connectors.tidb.TiDBSource;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.TiSession;
-import org.tikv.common.meta.TiTableInfo;
 
 import java.util.Collections;
 import java.util.List;
@@ -52,11 +49,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
-    private final String hostname;
     private final String database;
     private final String tableName;
-    private final String username;
-    private final String password;
     private final String pdAddresses;
     private final StartupOptions startupOptions;
     private final Map<String, String> options;
@@ -73,20 +67,14 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
 
     public TiDBTableSource(
             ResolvedSchema physicalSchema,
-            String hostname,
             String database,
             String tableName,
-            String username,
-            String password,
             String pdAddresses,
             StartupOptions startupOptions,
             Map<String, String> options) {
         this.physicalSchema = physicalSchema;
-        this.hostname = checkNotNull(hostname);
         this.database = checkNotNull(database);
         this.tableName = checkNotNull(tableName);
-        this.username = checkNotNull(username);
-        this.password = checkNotNull(password);
         this.pdAddresses = checkNotNull(pdAddresses);
         this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
@@ -106,49 +94,45 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
         final TiConfiguration tiConf = TDBSourceOptions.getTiConfiguration(pdAddresses, options);
-        try (final TiSession session = TiSession.create(tiConf)) {
-            final TiTableInfo tableInfo = session.getCatalog().getTable(database, tableName);
 
-            TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
-            TiKVMetadataConverter[] metadataConverters = getMetadataConverters();
-            RowDataTiKVSnapshotEventDeserializationSchema snapshotEventDeserializationSchema =
-                    new RowDataTiKVSnapshotEventDeserializationSchema(
-                            typeInfo, tableInfo, metadataConverters);
-            RowDataTiKVChangeEventDeserializationSchema changeEventDeserializationSchema =
-                    new RowDataTiKVChangeEventDeserializationSchema(
-                            typeInfo, tableInfo, metadataConverters);
+        TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
+        TiKVMetadataConverter[] metadataConverters = getMetadataConverters();
+        RowDataTiKVSnapshotEventDeserializationSchema snapshotEventDeserializationSchema =
+                new RowDataTiKVSnapshotEventDeserializationSchema(
+                        tiConf,
+                        database,
+                        tableName,
+                        typeInfo,
+                        metadataConverters,
+                        producedDataType);
+        RowDataTiKVChangeEventDeserializationSchema changeEventDeserializationSchema =
+                new RowDataTiKVChangeEventDeserializationSchema(
+                        tiConf,
+                        database,
+                        tableName,
+                        typeInfo,
+                        metadataConverters,
+                        producedDataType);
 
-            TiDBSource.Builder<RowData> builder =
-                    TiDBSource.<RowData>builder()
-                            .hostname(hostname)
-                            .database(database)
-                            .tableList(tableName)
-                            .username(username)
-                            .password(password)
-                            .startupOptions(startupOptions)
-                            .tiConf(tiConf)
-                            .tiTableInfo(tableInfo)
-                            .snapshotEventDeserializer(snapshotEventDeserializationSchema)
-                            .changeEventDeserializer(changeEventDeserializationSchema);
-            return SourceFunctionProvider.of(builder.build(), false);
-        } catch (final Exception e) {
-            throw new FlinkRuntimeException(e);
-        }
+        long tableId = snapshotEventDeserializationSchema.tableInfo.getId();
+
+        TiDBSource.Builder<RowData> builder =
+                TiDBSource.<RowData>builder()
+                        .database(database)
+                        .tableName(tableName)
+                        .startupOptions(startupOptions)
+                        .tiConf(tiConf)
+                        .tableId(tableId)
+                        .snapshotEventDeserializer(snapshotEventDeserializationSchema)
+                        .changeEventDeserializer(changeEventDeserializationSchema);
+        return SourceFunctionProvider.of(builder.build(), false);
     }
 
     @Override
     public DynamicTableSource copy() {
         TiDBTableSource source =
                 new TiDBTableSource(
-                        physicalSchema,
-                        hostname,
-                        database,
-                        tableName,
-                        username,
-                        password,
-                        pdAddresses,
-                        startupOptions,
-                        options);
+                        physicalSchema, database, tableName, pdAddresses, startupOptions, options);
         source.producedDataType = producedDataType;
         source.metadataKeys = metadataKeys;
         return source;
@@ -182,10 +166,7 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
         }
         TiDBTableSource that = (TiDBTableSource) o;
         return Objects.equals(physicalSchema, that.physicalSchema)
-                && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
-                && Objects.equals(username, that.username)
-                && Objects.equals(password, that.password)
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
@@ -195,15 +176,7 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     @Override
     public int hashCode() {
         return Objects.hash(
-                physicalSchema,
-                hostname,
-                database,
-                username,
-                password,
-                tableName,
-                startupOptions,
-                producedDataType,
-                options);
+                physicalSchema, database, tableName, startupOptions, producedDataType, options);
     }
 
     @Override

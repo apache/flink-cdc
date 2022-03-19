@@ -83,6 +83,10 @@ public class TiKVReadableMetadata {
                 });
     }
 
+    /**
+     * It indicates the time that the change was made in the database. If the record is read from
+     * snapshot of the table instead of the change stream, the value is always 0.
+     */
     public static TiKVReadableMetadata createOpTsMetadata() {
         return new TiKVReadableMetadata(
                 "op_ts",
