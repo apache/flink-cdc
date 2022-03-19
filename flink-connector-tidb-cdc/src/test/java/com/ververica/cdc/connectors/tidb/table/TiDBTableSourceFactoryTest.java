@@ -69,8 +69,6 @@ public class TiDBTableSourceFactoryTest {
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
     private static final String MY_HOSTNAME = "tidb0:4000";
-    private static final String MY_USERNAME = "root";
-    private static final String MY_PASSWORD = "";
     private static final String MY_DATABASE = "inventory";
     private static final String MY_TABLE = "products";
     private static final String PD_ADDRESS = "pd0:2379";
@@ -85,11 +83,8 @@ public class TiDBTableSourceFactoryTest {
         TiDBTableSource expectedSource =
                 new TiDBTableSource(
                         SCHEMA,
-                        MY_HOSTNAME,
                         MY_DATABASE,
                         MY_TABLE,
-                        MY_USERNAME,
-                        MY_PASSWORD,
                         PD_ADDRESS,
                         StartupOptions.latest(),
                         OPTIONS);
@@ -118,11 +113,8 @@ public class TiDBTableSourceFactoryTest {
         TiDBTableSource expectedSource =
                 new TiDBTableSource(
                         SCHEMA,
-                        MY_HOSTNAME,
                         MY_DATABASE,
                         MY_TABLE,
-                        MY_USERNAME,
-                        MY_PASSWORD,
                         PD_ADDRESS,
                         StartupOptions.latest(),
                         options);
@@ -135,8 +127,6 @@ public class TiDBTableSourceFactoryTest {
         options.put("hostname", MY_HOSTNAME);
         options.put("database-name", MY_DATABASE);
         options.put("table-name", MY_TABLE);
-        options.put("username", MY_USERNAME);
-        options.put("password", MY_PASSWORD);
         options.put("pd-addresses", PD_ADDRESS);
         options.put("scan.startup.mode", "latest-offset");
         return options;

@@ -69,4 +69,8 @@ public class TableKeyRangeUtils {
         Preconditions.checkArgument(idx >= 0 && idx < num, "Illegal value of idx");
         return getTableKeyRanges(tableId, num).get(idx);
     }
+
+    public static boolean isRecordKey(final byte[] key) {
+        return key[9] == '_' && key[10] == 'r';
+    }
 }

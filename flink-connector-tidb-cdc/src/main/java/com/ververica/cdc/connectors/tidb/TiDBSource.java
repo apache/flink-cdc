@@ -22,7 +22,6 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 
 import com.ververica.cdc.connectors.tidb.table.StartupOptions;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.meta.TiTableInfo;
 
 import java.util.Map;
 
@@ -35,23 +34,15 @@ public class TiDBSource {
 
     /** Builder class of {@link TiDBSource}. */
     public static class Builder<T> {
-        private String hostname;
         private String database;
-        private String[] tableList;
-        private String username;
-        private String password;
+        private String tableName;
+        private long tableId;
         private StartupOptions startupOptions = StartupOptions.initial();
         private Map<String, String> options;
         private TiConfiguration tiConf;
-        private TiTableInfo tableInfo;
 
         private TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema;
         private TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema;
-
-        public Builder<T> hostname(String hostname) {
-            this.hostname = hostname;
-            return this;
-        }
 
         /**
          * An optional list of regular expressions that match database names to be monitored; any
@@ -69,20 +60,8 @@ public class TiDBSource {
          * monitoring. Each identifier is of the form schemaName.tableName. By default the connector
          * will monitor every non-system table in each monitored database.
          */
-        public Builder<T> tableList(String... tableList) {
-            this.tableList = tableList;
-            return this;
-        }
-
-        /** Name of the TiDB database to use when connecting to the TiDB database server. */
-        public Builder<T> username(String username) {
-            this.username = username;
-            return this;
-        }
-
-        /** Password to use when connecting to the TiDB database server. */
-        public Builder<T> password(String password) {
-            this.password = password;
+        public Builder<T> tableName(String tableName) {
+            this.tableName = tableName;
             return this;
         }
 
@@ -106,13 +85,15 @@ public class TiDBSource {
             return this;
         }
 
+        /** TIDB config. */
         public Builder<T> tiConf(TiConfiguration tiConf) {
             this.tiConf = tiConf;
             return this;
         }
 
-        public Builder<T> tiTableInfo(TiTableInfo tableInfo) {
-            this.tableInfo = tableInfo;
+        /** Table id in TIDB. */
+        public Builder<T> tableId(long tableId) {
+            this.tableId = tableId;
             return this;
         }
 
@@ -122,8 +103,8 @@ public class TiDBSource {
                     snapshotEventDeserializationSchema,
                     changeEventDeserializationSchema,
                     tiConf,
-                    tableInfo,
-                    startupOptions.startupMode);
+                    startupOptions.startupMode,
+                    tableId);
         }
     }
 }

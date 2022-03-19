@@ -32,26 +32,6 @@ public class TDBSourceOptions {
 
     private TDBSourceOptions() {}
 
-    public static final ConfigOption<String> HOSTNAME =
-            ConfigOptions.key("hostname")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("IP address or hostname of the TiDB database server.");
-
-    public static final ConfigOption<String> USERNAME =
-            ConfigOptions.key("username")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Name of the TiDB database to use when connecting to the TiDB database server.");
-
-    public static final ConfigOption<String> PASSWORD =
-            ConfigOptions.key("password")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Password to use when connecting to the TiDB database server.");
-
     public static final ConfigOption<String> DATABASE_NAME =
             ConfigOptions.key("database-name")
                     .stringType()
@@ -96,23 +76,11 @@ public class TDBSourceOptions {
                     .noDefaultValue()
                     .withDescription("TiKV GRPC batch get concurrency");
 
-    public static final ConfigOption<Integer> TIKV_BATCH_PUT_CONCURRENCY =
-            ConfigOptions.key(ConfigUtils.TIKV_BATCH_PUT_CONCURRENCY)
-                    .intType()
-                    .noDefaultValue()
-                    .withDescription("TiKV GRPC batch put concurrency");
-
     public static final ConfigOption<Integer> TIKV_BATCH_SCAN_CONCURRENCY =
             ConfigOptions.key(ConfigUtils.TIKV_BATCH_SCAN_CONCURRENCY)
                     .intType()
                     .noDefaultValue()
                     .withDescription("TiKV GRPC batch scan concurrency");
-
-    public static final ConfigOption<Integer> TIKV_BATCH_DELETE_CONCURRENCY =
-            ConfigOptions.key(ConfigUtils.TIKV_BATCH_DELETE_CONCURRENCY)
-                    .intType()
-                    .noDefaultValue()
-                    .withDescription("TiKV GRPC batch delete concurrency");
 
     public static TiConfiguration getTiConfiguration(
             final String pdAddrsStr, final Map<String, String> options) {
@@ -124,15 +92,10 @@ public class TDBSourceOptions {
         configuration
                 .getOptional(TIKV_BATCH_GET_CONCURRENCY)
                 .ifPresent(tiConf::setBatchGetConcurrency);
-        configuration
-                .getOptional(TIKV_BATCH_PUT_CONCURRENCY)
-                .ifPresent(tiConf::setBatchPutConcurrency);
+
         configuration
                 .getOptional(TIKV_BATCH_SCAN_CONCURRENCY)
                 .ifPresent(tiConf::setBatchScanConcurrency);
-        configuration
-                .getOptional(TIKV_BATCH_DELETE_CONCURRENCY)
-                .ifPresent(tiConf::setBatchDeleteConcurrency);
         return tiConf;
     }
 }
