@@ -28,9 +28,7 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.lifecycle.Startables;
@@ -71,8 +69,8 @@ public class OceanBaseTestBase extends TestLogger {
 
     @ClassRule
     public static final GenericContainer<?> OB_WITH_LOG_PROXY =
-        new GenericContainer<>("whhe/oblogproxy:obce_3.1.1")
-            .withExposedPorts(OB_SERVER_SQL_PORT,  OB_SERVER_RPC_PORT , OB_LOG_PROXY_PORT)
+            new GenericContainer<>("whhe/oblogproxy:obce_3.1.1")
+                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT, OB_LOG_PROXY_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(Duration.ofSeconds(120))
