@@ -102,7 +102,9 @@ public class OceanBaseTestBase extends TestLogger {
                 + databaseName;
     }
 
-    protected static Connection getJdbcConnection(String databaseName) throws SQLException {
+    protected static Connection getJdbcConnection(String databaseName)
+            throws SQLException, InterruptedException {
+        Thread.sleep(120 * 1000);
         return DriverManager.getConnection(
                 getJdbcUrl(databaseName), OB_SYS_USERNAME, OB_SYS_PASSWORD);
     }
