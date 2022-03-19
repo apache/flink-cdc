@@ -69,17 +69,11 @@ public class OceanBaseTestBase extends TestLogger {
     public static final String OB_SYS_USERNAME = "root";
     public static final String OB_SYS_PASSWORD = "pswd";
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
-
     @ClassRule
     public static final GenericContainer<?> OB_WITH_LOG_PROXY =
-            new FixedHostPortGenericContainer<>("whhe/oblogproxy:obce_3.1.1")
-                    .withFixedExposedPort(OB_SERVER_SQL_PORT, OB_SERVER_SQL_PORT)
-                    .withFixedExposedPort(OB_SERVER_RPC_PORT, OB_SERVER_RPC_PORT)
-                    .withFixedExposedPort(OB_LOG_PROXY_PORT, OB_LOG_PROXY_PORT)
+        new GenericContainer<>("whhe/oblogproxy:obce_3.1.1")
+            .withExposedPorts(OB_SERVER_SQL_PORT,  OB_SERVER_RPC_PORT , OB_LOG_PROXY_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(OB_LOG_PROXY_SERVICE_NAME)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
