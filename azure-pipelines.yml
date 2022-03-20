@@ -44,6 +44,7 @@ stages:
         parameters: # see template file for a definition of the parameters.
           stage_name: ci_build
           test_pool_definition:
-            vmImage: 'macOS-latest'
+            name: Flink_CDC_CI
+            vmImage: 'ubuntu-20.04'
           run_end_to_end: false
           jdk: 8
