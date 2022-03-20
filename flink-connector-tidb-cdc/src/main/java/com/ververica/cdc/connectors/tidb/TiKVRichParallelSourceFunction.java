@@ -66,7 +66,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     private final TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema;
     private final TiConfiguration tiConf;
     private final StartupMode startupMode;
-    private final long tableId;
+    private final String database;
+    private final String tableName;
 
     // Task local variables
     private transient TiSession session = null;
@@ -86,18 +87,21 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema,
             TiConfiguration tiConf,
             StartupMode startupMode,
-            long tableId) {
+            String database,
+            String tableName) {
         this.snapshotEventDeserializationSchema = snapshotEventDeserializationSchema;
         this.changeEventDeserializationSchema = changeEventDeserializationSchema;
         this.tiConf = tiConf;
         this.startupMode = startupMode;
-        this.tableId = tableId;
+        this.database = database;
+        this.tableName = tableName;
     }
 
     @Override
     public void open(final Configuration config) throws Exception {
         super.open(config);
         session = TiSession.create(tiConf);
+        long tableId = session.getCatalog().getTable(database, tableName).getId();
         keyRange =
                 TableKeyRangeUtils.getTableKeyRange(
                         tableId,

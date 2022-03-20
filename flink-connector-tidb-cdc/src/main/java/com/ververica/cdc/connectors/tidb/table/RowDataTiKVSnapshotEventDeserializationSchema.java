@@ -20,7 +20,7 @@ package com.ververica.cdc.connectors.tidb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.connectors.tidb.TiKVSnapshotEventDeserializationSchema;
@@ -50,8 +50,8 @@ public class RowDataTiKVSnapshotEventDeserializationSchema
             String tableName,
             TypeInformation<RowData> resultTypeInfo,
             TiKVMetadataConverter[] metadataConverters,
-            DataType producedDataType) {
-        super(tiConf, database, tableName, metadataConverters, producedDataType);
+            RowType physicalDataType) {
+        super(tiConf, database, tableName, metadataConverters, physicalDataType);
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
     }
 
@@ -62,7 +62,9 @@ public class RowDataTiKVSnapshotEventDeserializationSchema
 
     @Override
     public void deserialize(KvPair record, Collector<RowData> out) throws Exception {
-
+        if (tableInfo == null) {
+            tableInfo = fetchTableInfo();
+        }
         Object[] tikvValues =
                 decodeObjects(
                         record.getValue().toByteArray(),

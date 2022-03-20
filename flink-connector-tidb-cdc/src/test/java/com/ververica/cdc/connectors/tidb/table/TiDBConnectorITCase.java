@@ -177,13 +177,11 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'hostname' = '%s',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        TIDB.getContainerIpAddress(),
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         "inventory",
                         "products");
@@ -258,13 +256,11 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'hostname' = '%s',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        TIDB.getContainerIpAddress(),
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         "inventory",
                         "products");
@@ -348,13 +344,11 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'hostname' = '%s',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        TIDB.getContainerIpAddress(),
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         "inventory",
                         "products");
@@ -408,6 +402,11 @@ public class TiDBConnectorITCase extends TiDBTestBase {
 
     @Test
     public void testAllDataTypes() throws Throwable {
+        try (Connection connection = getJdbcConnection("");
+                Statement statement = connection.createStatement()) {
+            statement.execute(String.format("SET GLOBAL time_zone = '%s';", "UTC"));
+        }
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of("UTC"));
         initializeTidbTable("column_type_test");
         String sourceDDL =
                 String.format(
@@ -439,7 +438,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + "    time_c TIME(0),\n"
                                 + "    datetime3_c TIMESTAMP(3),\n"
                                 + "    datetime6_c TIMESTAMP(6),\n"
-                                + "    timestamp_c TIMESTAMP(0),\n"
+                                + "    timestamp_c TIMESTAMP_LTZ,\n"
                                 + "    file_uuid BYTES,\n"
                                 + "    bit_c BINARY(8),\n"
                                 + "    text_c STRING,\n"
@@ -454,18 +453,12 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'hostname' = '%s',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        TIDB.getContainerIpAddress(),
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
-                        TIDB_USER,
-                        TIDB_PASSWORD,
                         "column_type_test",
                         "full_types");
 
@@ -498,7 +491,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         + "    time_c TIME(0),\n"
                         + "    datetime3_c TIMESTAMP(3),\n"
                         + "    datetime6_c TIMESTAMP(6),\n"
-                        + "    timestamp_c TIMESTAMP_LTZ,\n"
+                        + "    timestamp_c TIMESTAMP,\n"
                         + "    file_uuid BYTES,\n"
                         + "    bit_c BINARY(8),\n"
                         + "    text_c STRING,\n"
@@ -519,7 +512,9 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
         // async submit job
-        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT id, tiny_c, tiny_un_c, small_c, small_un_c, medium_c, medium_un_c, int_c, int_un_c, int11_c, big_c, big_un_c, varchar_c, char_c, real_c, float_c, double_c, decimal_c, numeric_c, big_decimal_c, bit1_c, tiny1_c, boolean_c, date_c, time_c, datetime3_c, datetime6_c, cast(timestamp_c as timestamp), file_uuid, bit_c, text_c, tiny_blob_c, blob_c, medium_blob_c, long_blob_c, year_c, enum_c, set_c, json_c FROM tidb_source");
 
         // wait for snapshot finished and begin binlog
         waitForSinkSize("sink", 1);
@@ -576,13 +571,9 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        TIDB.getContainerIpAddress(),
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
-                        TIDB_USER,
-                        TIDB_PASSWORD,
                         "column_type_test",
-                        "full_types",
-                        timezone);
+                        "full_types");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -591,7 +582,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         + "    time_c TIME(0),\n"
                         + "    datetime3_c TIMESTAMP(3),\n"
                         + "    datetime6_c TIMESTAMP(6),\n"
-                        + "    timestamp_c TIMESTAMP_LTZ,\n"
+                        + "    timestamp_c TIMESTAMP,\n"
                         + "    primary key (`id`) not enforced"
                         + ") WITH ("
                         + " 'connector' = 'values',"
@@ -601,7 +592,9 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
         // async submit job
-        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink select `id`, date_c, time_c,datetime3_c, datetime6_c, cast(timestamp_c as timestamp) FROM tidb_source t");
 
         // wait for snapshot finished and begin binlog
         waitForSinkSize("sink", 1);
@@ -616,8 +609,8 @@ public class TiDBConnectorITCase extends TiDBTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-18T02:00:22",
-                        "+U(2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-18T02:33:22");
+                        "+I(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22)",
+                        "+U(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22)");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEqualsInAnyOrder(expected, actual);
