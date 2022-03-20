@@ -26,6 +26,7 @@ import org.apache.flink.table.types.DataType;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -79,6 +80,25 @@ public enum MySqlReadableMetadata {
                     Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
+                }
+            }),
+
+    /** It indicates the time that fetch from cdc. */
+    FETCH_TS(
+            "fetch_ts",
+            DataTypes.TIMESTAMP_LTZ(3).notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Schema schema = record.valueSchema();
+                    Struct messageStruct = (Struct) record.value();
+                    if (schema.field(Envelope.FieldName.TIMESTAMP) == null) {
+                        return null;
+                    }
+                    return TimestampData.fromEpochMillis(
+                            messageStruct.getInt64(Envelope.FieldName.TIMESTAMP));
                 }
             });
 

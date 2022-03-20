@@ -82,6 +82,8 @@ public class MySqlTableSourceFactoryTest {
                             Column.physical("count", DataTypes.DECIMAL(38, 18)),
                             Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
                             Column.metadata(
+                                    "fetch_time", DataTypes.TIMESTAMP_LTZ(3), "fetch_ts", true),
+                            Column.metadata(
                                     "database_name", DataTypes.STRING(), "database_name", true)),
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
@@ -424,7 +426,7 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
         MySqlTableSource mySqlSource = (MySqlTableSource) actualSource;
         mySqlSource.applyReadableMetadata(
-                Arrays.asList("op_ts", "database_name"),
+                Arrays.asList("op_ts", "database_name", "fetch_ts"),
                 SCHEMA_WITH_METADATA.toSourceRowDataType());
         actualSource = mySqlSource.copy();
 
@@ -454,7 +456,7 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
-        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "fetch_ts");
 
         assertEquals(expectedSource, actualSource);
     }
