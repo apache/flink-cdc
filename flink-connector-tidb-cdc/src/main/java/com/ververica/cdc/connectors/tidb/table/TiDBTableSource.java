@@ -27,6 +27,7 @@ import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.tidb.TDBSourceOptions;
@@ -94,9 +95,11 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
         final TiConfiguration tiConf = TDBSourceOptions.getTiConfiguration(pdAddresses, options);
-
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
         TiKVMetadataConverter[] metadataConverters = getMetadataConverters();
+
         RowDataTiKVSnapshotEventDeserializationSchema snapshotEventDeserializationSchema =
                 new RowDataTiKVSnapshotEventDeserializationSchema(
                         tiConf,
@@ -104,7 +107,8 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
                         tableName,
                         typeInfo,
                         metadataConverters,
-                        producedDataType);
+                        physicalDataType);
+
         RowDataTiKVChangeEventDeserializationSchema changeEventDeserializationSchema =
                 new RowDataTiKVChangeEventDeserializationSchema(
                         tiConf,
@@ -112,9 +116,7 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
                         tableName,
                         typeInfo,
                         metadataConverters,
-                        producedDataType);
-
-        long tableId = snapshotEventDeserializationSchema.tableInfo.getId();
+                        physicalDataType);
 
         TiDBSource.Builder<RowData> builder =
                 TiDBSource.<RowData>builder()
@@ -122,7 +124,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
                         .tableName(tableName)
                         .startupOptions(startupOptions)
                         .tiConf(tiConf)
-                        .tableId(tableId)
                         .snapshotEventDeserializer(snapshotEventDeserializationSchema)
                         .changeEventDeserializer(changeEventDeserializationSchema);
         return SourceFunctionProvider.of(builder.build(), false);

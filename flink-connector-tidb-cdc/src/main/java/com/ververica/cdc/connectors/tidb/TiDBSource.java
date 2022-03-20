@@ -23,8 +23,6 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 import com.ververica.cdc.connectors.tidb.table.StartupOptions;
 import org.tikv.common.TiConfiguration;
 
-import java.util.Map;
-
 /** A builder to build a SourceFunction which can read snapshot and continue to read CDC events. */
 public class TiDBSource {
 
@@ -36,30 +34,19 @@ public class TiDBSource {
     public static class Builder<T> {
         private String database;
         private String tableName;
-        private long tableId;
         private StartupOptions startupOptions = StartupOptions.initial();
-        private Map<String, String> options;
         private TiConfiguration tiConf;
 
         private TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema;
         private TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema;
 
-        /**
-         * An optional list of regular expressions that match database names to be monitored; any
-         * database name not included in the whitelist will be excluded from monitoring. By default
-         * all databases will be monitored.
-         */
+        /** Database name to be monitored. */
         public Builder<T> database(String database) {
             this.database = database;
             return this;
         }
 
-        /**
-         * An optional list of regular expressions that match fully-qualified table identifiers for
-         * tables to be monitored; any table not included in the list will be excluded from
-         * monitoring. Each identifier is of the form schemaName.tableName. By default the connector
-         * will monitor every non-system table in each monitored database.
-         */
+        /** TableName name to be monitored. */
         public Builder<T> tableName(String tableName) {
             this.tableName = tableName;
             return this;
@@ -91,12 +78,6 @@ public class TiDBSource {
             return this;
         }
 
-        /** Table id in TIDB. */
-        public Builder<T> tableId(long tableId) {
-            this.tableId = tableId;
-            return this;
-        }
-
         public RichParallelSourceFunction<T> build() {
 
             return new TiKVRichParallelSourceFunction<>(
@@ -104,7 +85,8 @@ public class TiDBSource {
                     changeEventDeserializationSchema,
                     tiConf,
                     startupOptions.startupMode,
-                    tableId);
+                    database,
+                    tableName);
         }
     }
 }

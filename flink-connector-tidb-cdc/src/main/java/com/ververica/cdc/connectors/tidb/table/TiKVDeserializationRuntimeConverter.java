@@ -24,10 +24,10 @@ import org.tikv.common.types.DataType;
 import java.io.Serializable;
 
 /**
- * Runtime converter that converts objects of Debezium into objects of Flink Table & SQL internal
- * data structures.
+ * Runtime converter that converts objects of TiKV into objects of Flink Table & SQL internal data
+ * structures.
  */
 @FunctionalInterface
-public interface TidbDeserializationRuntimeConverter extends Serializable {
+public interface TiKVDeserializationRuntimeConverter extends Serializable {
     Object convert(Object object, TiTableInfo tableInfo, DataType dataType) throws Exception;
 }

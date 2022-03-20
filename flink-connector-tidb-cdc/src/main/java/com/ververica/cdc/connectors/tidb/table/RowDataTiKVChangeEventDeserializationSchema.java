@@ -20,7 +20,7 @@ package com.ververica.cdc.connectors.tidb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -30,6 +30,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.key.RowKey;
 import org.tikv.kvproto.Cdcpb.Event.Row;
 
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.tikv.common.codec.TableCodec.decodeObjects;
 
 /**
@@ -51,13 +52,16 @@ public class RowDataTiKVChangeEventDeserializationSchema
             String tableName,
             TypeInformation<RowData> resultTypeInfo,
             TiKVMetadataConverter[] metadataConverters,
-            DataType producedDataType) {
-        super(tiConf, database, tableName, metadataConverters, producedDataType);
-        this.resultTypeInfo = resultTypeInfo;
+            RowType physicalDataType) {
+        super(tiConf, database, tableName, metadataConverters, physicalDataType);
+        this.resultTypeInfo = checkNotNull(resultTypeInfo);
     }
 
     @Override
     public void deserialize(Row row, Collector<RowData> out) throws Exception {
+        if (tableInfo == null) {
+            tableInfo = fetchTableInfo();
+        }
         final RowKey rowKey = RowKey.decode(row.getKey().toByteArray());
         final long handle = rowKey.getHandle();
         Object[] tikvValues;
@@ -80,7 +84,7 @@ public class RowDataTiKVChangeEventDeserializationSchema
                     if (row.getOldValue() == null) {
                         RowData rowDataUpdateBefore =
                                 (RowData) physicalConverter.convert(tikvValues, tableInfo, null);
-                        rowDataUpdateBefore.setRowKind(RowKind.UPDATE_BEFORE);
+                        rowDataUpdateBefore.setRowKind(RowKind.INSERT);
                         emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataUpdateBefore, out);
                     } else {
                         RowData rowDataUpdateAfter =

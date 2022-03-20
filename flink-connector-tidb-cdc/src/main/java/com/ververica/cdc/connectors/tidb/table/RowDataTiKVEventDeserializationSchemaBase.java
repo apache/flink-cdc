@@ -24,7 +24,6 @@ import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
-import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
@@ -42,9 +41,6 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -59,7 +55,11 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
     private final boolean hasMetadata;
 
     /** Information of the TiKV table. * */
-    protected final TiTableInfo tableInfo;
+    protected TiTableInfo tableInfo;
+
+    private final TiConfiguration tiConf;
+    private final String database;
+    private final String tableName;
 
     /**
      * A wrapped output collector which is used to append metadata columns after physical columns.
@@ -70,21 +70,23 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
      * Runtime converter that converts Tikv {@link Kvrpcpb.KvPair}s into {@link RowData} consisted
      * of physical column values.
      */
-    protected final TidbDeserializationRuntimeConverter physicalConverter;
+    protected final TiKVDeserializationRuntimeConverter physicalConverter;
 
     public RowDataTiKVEventDeserializationSchemaBase(
             TiConfiguration tiConf,
             String database,
             String tableName,
             TiKVMetadataConverter[] metadataConverters,
-            DataType producedDataType) {
-        this.tableInfo = fetchTableInfo(tiConf, database, tableName);
+            RowType physicalDataType) {
+        this.tiConf = checkNotNull(tiConf);
+        this.database = checkNotNull(database);
+        this.tableName = checkNotNull(tableName);
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new TiKVAppendMetadataCollector(metadataConverters);
-        this.physicalConverter = createConverter(checkNotNull(producedDataType.getLogicalType()));
+        this.physicalConverter = createConverter(checkNotNull(physicalDataType));
     }
 
-    private TiTableInfo fetchTableInfo(TiConfiguration tiConf, String database, String tableName) {
+    protected TiTableInfo fetchTableInfo() {
         try (final TiSession session = TiSession.create(tiConf)) {
             return session.getCatalog().getTable(database, tableName);
         } catch (final Exception e) {
@@ -111,7 +113,7 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
     // -------------------------------------------------------------------------------------
 
     /** Creates a runtime converter which is null safe. */
-    protected static TidbDeserializationRuntimeConverter createConverter(LogicalType type) {
+    protected static TiKVDeserializationRuntimeConverter createConverter(LogicalType type) {
         return wrapIntoNullableConverter(createNotNullConverter(type));
     }
 
@@ -122,12 +124,12 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
     // --------------------------------------------------------------------------------
 
     /** Creates a runtime converter which assuming input object is not null. */
-    public static TidbDeserializationRuntimeConverter createNotNullConverter(LogicalType type) {
+    public static TiKVDeserializationRuntimeConverter createNotNullConverter(LogicalType type) {
 
         // if no matched user defined converter, fallback to the default converter
         switch (type.getTypeRoot()) {
             case NULL:
-                return new TidbDeserializationRuntimeConverter() {
+                return new TiKVDeserializationRuntimeConverter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -142,7 +144,7 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
             case BOOLEAN:
                 return convertToBoolean();
             case TINYINT:
-                return new TidbDeserializationRuntimeConverter() {
+                return new TiKVDeserializationRuntimeConverter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -156,7 +158,7 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
                     }
                 };
             case SMALLINT:
-                return new TidbDeserializationRuntimeConverter() {
+                return new TiKVDeserializationRuntimeConverter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -197,7 +199,7 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
             case ROW:
                 return createRowConverter((RowType) type);
             case ARRAY:
-                return new TidbDeserializationRuntimeConverter() {
+                return new TiKVDeserializationRuntimeConverter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -223,8 +225,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         }
     }
 
-    private static TidbDeserializationRuntimeConverter convertToBoolean() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToBoolean() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -246,8 +248,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToInt() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToInt() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -267,8 +269,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToLong() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToLong() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -286,8 +288,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToDouble() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToDouble() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -305,8 +307,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToFloat() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToFloat() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -324,8 +326,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToDate() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToDate() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -337,8 +339,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToTime() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToTime() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -353,8 +355,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToTimestamp() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToTimestamp() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -367,11 +369,13 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
                         if (object instanceof Timestamp) {
                             return TimestampData.fromInstant(((Timestamp) object).toInstant());
                         }
+                        break;
                     case TypeDatetime:
                         if (object instanceof Timestamp) {
                             return TimestampData.fromLocalDateTime(
                                     ((Timestamp) object).toLocalDateTime());
                         }
+                        break;
                     default:
                         throw new IllegalArgumentException(
                                 "Unable to convert to TimestampData from unexpected value '"
@@ -379,24 +383,21 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
                                         + "' of type "
                                         + object.getClass().getName());
                 }
+                return object;
             }
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToLocalTimeZoneTimestamp() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToLocalTimeZoneTimestamp() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
             @Override
             public Object convert(
                     Object object, TiTableInfo schema, org.tikv.common.types.DataType dataType) {
-                if (object instanceof String) {
-                    String str = (String) object;
-                    // TIMESTAMP_LTZ type is encoded in string type
-                    Instant instant = Instant.parse(str);
-                    return TimestampData.fromLocalDateTime(
-                            LocalDateTime.ofInstant(instant, ZoneId.of("UTC")));
+                if (object instanceof Timestamp) {
+                    return TimestampData.fromInstant(((Timestamp) object).toInstant());
                 }
                 throw new IllegalArgumentException(
                         "Unable to convert to TimestampData from unexpected value '"
@@ -407,8 +408,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToString() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToString() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -423,8 +424,8 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter convertToBinary() {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter convertToBinary() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -451,15 +452,17 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
     /** Deal with unsigned column's value. */
     public static Object dealUnsignedColumnValue(
             org.tikv.common.types.DataType dataType, Object object) {
+        // For more information about numeric columns with unsigned, please refer link
+        // https://docs.pingcap.com/tidb/stable/data-type-numeric.
         switch (dataType.getType()) {
             case TypeTiny:
-                return Short.valueOf((short) Byte.toUnsignedInt(((Long) object).byteValue()));
+                return (short) Byte.toUnsignedInt(((Long) object).byteValue());
             case TypeShort:
-                return Integer.valueOf(Short.toUnsignedInt(((Long) object).shortValue()));
+                return Short.toUnsignedInt(((Long) object).shortValue());
             case TypeInt24:
-                return Integer.valueOf((((Long) object).intValue()) & 0xffffff);
+                return (((Long) object).intValue()) & 0xffffff;
             case TypeLong:
-                return Long.valueOf(Integer.toUnsignedLong(((Long) object).intValue()));
+                return Integer.toUnsignedLong(((Long) object).intValue());
             case TypeLonglong:
                 return new BigDecimal(Long.toUnsignedString(((Long) object)));
             default:
@@ -467,11 +470,11 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         }
     }
 
-    private static TidbDeserializationRuntimeConverter createDecimalConverter(
+    private static TiKVDeserializationRuntimeConverter createDecimalConverter(
             DecimalType decimalType) {
         final int precision = decimalType.getPrecision();
         final int scale = decimalType.getScale();
-        return new TidbDeserializationRuntimeConverter() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -499,15 +502,15 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         };
     }
 
-    private static TidbDeserializationRuntimeConverter createRowConverter(RowType rowType) {
-        final TidbDeserializationRuntimeConverter[] fieldConverters =
+    private static TiKVDeserializationRuntimeConverter createRowConverter(RowType rowType) {
+        final TiKVDeserializationRuntimeConverter[] fieldConverters =
                 rowType.getFields().stream()
                         .map(RowType.RowField::getType)
                         .map(logicType -> createConverter(logicType))
-                        .toArray(TidbDeserializationRuntimeConverter[]::new);
+                        .toArray(TiKVDeserializationRuntimeConverter[]::new);
         final String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
 
-        return new TidbDeserializationRuntimeConverter() {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
@@ -537,7 +540,6 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
                                         type,
                                         ((Object[]) object)[offset]);
                         row.setField(i, convertedField);
-                        System.out.println(fieldName + "----" + i + "----" + convertedField);
                     }
                 }
                 return row;
@@ -546,7 +548,7 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
     }
 
     private static Object convertField(
-            TidbDeserializationRuntimeConverter fieldConverter,
+            TiKVDeserializationRuntimeConverter fieldConverter,
             TiTableInfo tableInfo,
             org.tikv.common.types.DataType dataType,
             Object fieldValue)
@@ -558,9 +560,9 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         }
     }
 
-    private static TidbDeserializationRuntimeConverter wrapIntoNullableConverter(
-            TidbDeserializationRuntimeConverter converter) {
-        return new TidbDeserializationRuntimeConverter() {
+    private static TiKVDeserializationRuntimeConverter wrapIntoNullableConverter(
+            TiKVDeserializationRuntimeConverter converter) {
+        return new TiKVDeserializationRuntimeConverter() {
 
             private static final long serialVersionUID = 1L;
 
