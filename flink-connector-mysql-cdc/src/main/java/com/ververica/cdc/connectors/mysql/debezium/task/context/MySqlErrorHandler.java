@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
  */
 public class MySqlErrorHandler extends ErrorHandler {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlErrorHandler.class);
-    private static final Pattern pattern =
+    private static final Pattern NOT_FOUND_TABLE_MSG_PATTERN =
             Pattern.compile(
                     "Encountered change event for table (.+)\\.(.+) whose schema isn't known to this connector");
 
@@ -58,7 +58,7 @@ public class MySqlErrorHandler extends ErrorHandler {
         if (producerThrowable.getCause() instanceof DebeziumException) {
             DebeziumException e = (DebeziumException) producerThrowable.getCause();
             String detailMessage = e.getMessage();
-            Matcher matcher = pattern.matcher(detailMessage);
+            Matcher matcher = NOT_FOUND_TABLE_MSG_PATTERN.matcher(detailMessage);
             if (matcher.find()) {
                 String databaseName = matcher.group(1);
                 String tableName = matcher.group(2);
