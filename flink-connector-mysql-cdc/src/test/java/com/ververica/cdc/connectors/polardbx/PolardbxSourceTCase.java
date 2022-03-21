@@ -356,7 +356,6 @@ public class PolardbxSourceTCase extends AbstractTestBase {
         TableResult tableResult = tEnv.executeSql("select * from polardbx_full_types");
         CloseableIterator<Row> iterator = tableResult.collect();
         List<String> realSnapshotData = fetchRows(iterator, 1);
-        realSnapshotData.forEach(System.out::println);
         String[] expectedSnapshotData =
                 new String[] {
                     "+I[100001, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, "
