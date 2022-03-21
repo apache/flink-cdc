@@ -165,6 +165,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
         if (taskManager != null) {
             taskManager.stop();
         }
+        mysqlInventoryDatabase.dropDatabase();
     }
 
     /**
