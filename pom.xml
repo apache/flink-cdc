@@ -39,12 +39,14 @@ under the License.
         <module>flink-connector-postgres-cdc</module>
         <module>flink-connector-oracle-cdc</module>
         <module>flink-connector-mongodb-cdc</module>
+        <module>flink-connector-oceanbase-cdc</module>
         <module>flink-connector-sqlserver-cdc</module>
         <module>flink-connector-tidb-cdc</module>
         <module>flink-sql-connector-mysql-cdc</module>
         <module>flink-sql-connector-postgres-cdc</module>
         <module>flink-sql-connector-mongodb-cdc</module>
         <module>flink-sql-connector-oracle-cdc</module>
+        <module>flink-sql-connector-oceanbase-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
         <module>flink-sql-connector-tidb-cdc</module>
         <module>flink-cdc-e2e-tests</module>
@@ -88,6 +90,7 @@ under the License.
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <spotless.version>2.4.2</spotless.version>
+        <oblogclient.version>1.0.2</oblogclient.version>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>
