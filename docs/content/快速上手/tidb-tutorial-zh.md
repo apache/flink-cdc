@@ -1,6 +1,6 @@
-# 演示: TIDB CDC 导入 Elasticsearch
+# 演示: TiDB CDC 导入 Elasticsearch
 
-**首先我们得通过 docker 来启动 TIDB 集群。**
+**首先我们得通过 docker 来启动 TiDB 集群。**
 
 ```shell
 $ git clone https://github.com/pingcap/tidb-docker-compose.git
@@ -93,7 +93,7 @@ services:
        
 ``` 
 该 Docker Compose 中包含的容器有：
-- TIDB 集群: tikv、pd、tidb。
+- TiDB 集群: tikv、pd、tidb。
 - Elasticsearch：`orders` 表将和 `products` 表进行 join，join 的结果写入 Elasticsearch 中。
 - Kibana：可视化 Elasticsearch 中的数据。
 
@@ -120,12 +120,12 @@ docker-compose down
 - [flink-sql-connector-tidb-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-tidb-cdc/2.2-SNAPSHOT/flink-sql-connector-tidb-cdc-2.2-SNAPSHOT.jar)
 
 
-**在 TIDB 数据库中准备数据**
+**在 TiDB 数据库中准备数据**
 
 创建数据库和表 `products`，`orders`，并插入数据：
 
  ```sql
--- TIDB
+-- TiDB
 CREATE DATABASE mydb;
 USE mydb;
 CREATE TABLE products (
@@ -173,30 +173,24 @@ Flink SQL> CREATE TABLE products (
     PRIMARY KEY (id) NOT ENFORCED
   ) WITH (
     'connector' = 'tidb-cdc',
-    'hostname' = '127.0.0.1',
     'tikv.grpc.timeout_in_ms' = '20000',
     'pd-addresses' = '127.0.0.1:2379',
-    'username' = 'root',
-    'password' = '',
     'database-name' = 'mydb',
     'table-name' = 'products'
   );
 
 Flink SQL> CREATE TABLE orders (
-    order_id INT,
-    order_date TIMESTAMP(0),
-    customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY (order_id) NOT ENFORCED
+   order_id INT,
+   order_date TIMESTAMP(3),
+   customer_name STRING,
+   price DECIMAL(10, 5),
+   product_id INT,
+   order_status BOOLEAN,
+   PRIMARY KEY (order_id) NOT ENFORCED
  ) WITH (
     'connector' = 'tidb-cdc',
-    'hostname' = '127.0.0.1',
     'tikv.grpc.timeout_in_ms' = '20000',
     'pd-addresses' = '127.0.0.1:2379',
-    'username' = 'root',
-    'password' = '',
     'database-name' = 'mydb',
     'table-name' = 'orders'
 );
@@ -205,6 +199,7 @@ Flink SQL> CREATE TABLE enriched_orders (
    order_id INT,
    order_date DATE,
    customer_name STRING,
+   order_status BOOLEAN,
    product_name STRING,
    product_description STRING,
    PRIMARY KEY (order_id) NOT ENFORCED
@@ -215,7 +210,7 @@ Flink SQL> CREATE TABLE enriched_orders (
  );
 
 Flink SQL> INSERT INTO enriched_orders
-  SELECT o.order_id,o.order_date,o.customer_name, p.name, p.description
+  SELECT o.order_id, o.order_date, o.customer_name, o.order_status, p.name, p.description
   FROM orders AS o
   LEFT JOIN products AS p ON o.product_id = p.id;
 ```
@@ -224,9 +219,9 @@ Flink SQL> INSERT INTO enriched_orders
 
 检查最终的结果是否写入 ElasticSearch 中，可以在 [Kibana](http://localhost:5601/) 看到 ElasticSearch 中的数据。
 
-**在 TIDB 制造一些变更，观察 ElasticSearch 中的结果**
+**在 TiDB 制造一些变更，观察 ElasticSearch 中的结果**
 
-通过如下的 SQL 语句对 TIDB 数据库进行一些修改，然后就可以看到每执行一条 SQL 语句，Elasticsearch 中的数据都会实时更新。
+通过如下的 SQL 语句对 TiDB 数据库进行一些修改，然后就可以看到每执行一条 SQL 语句，Elasticsearch 中的数据都会实时更新。
 
 ```sql
 INSERT INTO orders
@@ -236,3 +231,4 @@ UPDATE orders SET order_status = true WHERE order_id = 10004;
 
 DELETE FROM orders WHERE order_id = 10004;
 ```
+
