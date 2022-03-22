@@ -9,4 +9,5 @@ mongodb-cdc
 oceanbase-cdc
 oracle-cdc
 sqlserver-cdc
+tidb-cdc
 ```
