@@ -52,6 +52,7 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
@@ -69,7 +70,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
+import static java.lang.String.format;
+import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -142,6 +146,64 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         List<String> restRecords = consumeRecords(restartReader, dataType, 3);
         assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
+    }
+
+    @Test
+    public void testRemoveSplitAccordingToNewFilter() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        List<String> tableNames =
+                Arrays.asList(
+                        inventoryDatabase.getDatabaseName() + ".products",
+                        inventoryDatabase.getDatabaseName() + ".customers");
+        final MySqlSourceConfig sourceConfig =
+                new MySqlSourceConfigFactory()
+                        .startupOptions(StartupOptions.initial())
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(getTableNameRegex(tableNames.toArray(new String[0])))
+                        .includeSchemaChanges(false)
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .username(customerDatabase.getUsername())
+                        .password(customerDatabase.getPassword())
+                        .serverTimeZone(ZoneId.of("UTC").toString())
+                        .createConfig(0);
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        tableNames.stream().map(TableId::parse).collect(Collectors.toList()),
+                        false);
+        assigner.open();
+        List<MySqlSplit> splits = new ArrayList<>();
+        MySqlSnapshotSplit split = (MySqlSnapshotSplit) assigner.getNext().get();
+        splits.add(split);
+
+        // should contain only one split
+        split = (MySqlSnapshotSplit) assigner.getNext().get();
+        assertFalse(assigner.getNext().isPresent());
+        splits.add(split);
+
+        // create source config for reader but only with one table
+        final MySqlSourceConfig sourceConfig4Reader =
+                new MySqlSourceConfigFactory()
+                        .startupOptions(StartupOptions.initial())
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(
+                                getTableNameRegex(tableNames.subList(0, 1).toArray(new String[0])))
+                        .includeSchemaChanges(false)
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .username(customerDatabase.getUsername())
+                        .password(customerDatabase.getPassword())
+                        .serverTimeZone(ZoneId.of("UTC").toString())
+                        .createConfig(0);
+        TestingReaderContext testingReaderContext = new TestingReaderContext();
+        MySqlSourceReader<SourceRecord> reader =
+                createReader(sourceConfig4Reader, testingReaderContext);
+        reader.start();
+        reader.addSplits(splits);
+        List<MySqlSplit> mySqlSplits = reader.snapshotState(1L);
+        assertEquals(1, mySqlSplits.size());
     }
 
     @Test
@@ -377,6 +439,16 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         @Override
         public TypeInformation<SourceRecord> getProducedType() {
             return TypeInformation.of(SourceRecord.class);
+        }
+    }
+
+    private String getTableNameRegex(String[] captureCustomerTables) {
+        checkState(captureCustomerTables.length > 0);
+        if (captureCustomerTables.length == 1) {
+            return captureCustomerTables[0];
+        } else {
+            // pattern that matches multiple tables
+            return format("(%s)", StringUtils.join(captureCustomerTables, "|"));
         }
     }
 }

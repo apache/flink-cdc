@@ -179,6 +179,11 @@ public class MySqlSourceReader<T>
                         .dataCollectionFilter()
                         .isIncluded(split.asSnapshotSplit().getTableId())) {
                     unfinishedSplits.add(split);
+                } else {
+                    LOG.debug(
+                            "The subtask {} is skipping split {} because it does not match new table filter.",
+                            subtaskId,
+                            split.splitId());
                 }
             } else {
                 MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
