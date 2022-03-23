@@ -117,7 +117,11 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void addReader(int subtaskId) {
-        // do nothing
+        // send SuspendBinlogReaderEvent to source reader if the assigner's status is
+        // suspended
+        if (isSuspended(splitAssigner.getAssignerStatus())) {
+            context.sendEventToSourceReader(subtaskId, new SuspendBinlogReaderEvent());
+        }
     }
 
     @Override
