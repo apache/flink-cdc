@@ -1,4 +1,4 @@
-# Demo: Streaming ETL on Flink reading from OceanBase CE to ElasticSearch
+# Demo: OceanBase CDC to ElasticSearch
 
 ### Preparation
 
