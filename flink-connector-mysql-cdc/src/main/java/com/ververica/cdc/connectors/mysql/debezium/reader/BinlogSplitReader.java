@@ -32,7 +32,6 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
-import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
@@ -94,25 +93,25 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         this.capturedTableFilter =
                 statefulTaskContext.getConnectorConfig().getTableFilters().dataCollectionFilter();
         this.queue = statefulTaskContext.getQueue();
-        final MySqlOffsetContext mySqlOffsetContext = statefulTaskContext.getOffsetContext();
         this.binlogSplitReadTask =
                 new MySqlBinlogSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
-                        mySqlOffsetContext,
                         statefulTaskContext.getConnection(),
                         statefulTaskContext.getDispatcher(),
+                        statefulTaskContext.getSignalEventDispatcher(),
                         statefulTaskContext.getErrorHandler(),
                         StatefulTaskContext.getClock(),
                         statefulTaskContext.getTaskContext(),
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                        statefulTaskContext.getTopicSelector().getPrimaryTopic(),
                         currentBinlogSplit);
 
         executor.submit(
                 () -> {
                     try {
-                        binlogSplitReadTask.execute(new BinlogSplitChangeEventSourceContextImpl());
+                        binlogSplitReadTask.execute(
+                                new BinlogSplitChangeEventSourceContextImpl(),
+                                statefulTaskContext.getOffsetContext());
                     } catch (Exception e) {
                         currentTaskRunning = false;
                         LOG.error(

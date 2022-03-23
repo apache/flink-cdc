@@ -134,8 +134,16 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         if (snapshotResult.isCompletedOrSkipped()) {
                             final MySqlBinlogSplitReadTask backfillBinlogReadTask =
                                     createBackfillBinlogReadTask(backfillBinlogSplit);
+                            final MySqlOffsetContext.Loader loader =
+                                    new MySqlOffsetContext.Loader(
+                                            statefulTaskContext.getConnectorConfig());
+                            final MySqlOffsetContext mySqlOffsetContext =
+                                    loader.load(
+                                            backfillBinlogSplit.getStartingOffset().getOffset());
+
                             backfillBinlogReadTask.execute(
-                                    new SnapshotBinlogSplitChangeEventSourceContextImpl());
+                                    new SnapshotBinlogSplitChangeEventSourceContextImpl(),
+                                    mySqlOffsetContext);
                         } else {
                             readException =
                                     new IllegalStateException(
@@ -168,11 +176,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(
             MySqlBinlogSplit backfillBinlogSplit) {
-        final MySqlOffsetContext.Loader loader =
-                new MySqlOffsetContext.Loader(statefulTaskContext.getConnectorConfig());
-        final MySqlOffsetContext mySqlOffsetContext =
-                (MySqlOffsetContext)
-                        loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
         // we should only capture events for the current table,
         // otherwise, we may can't find corresponding schema
         Configuration dezConf =
@@ -187,15 +190,14 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         // task to read binlog and backfill for current split
         return new MySqlBinlogSplitReadTask(
                 new MySqlConnectorConfig(dezConf),
-                mySqlOffsetContext,
                 statefulTaskContext.getConnection(),
                 statefulTaskContext.getDispatcher(),
+                statefulTaskContext.getSignalEventDispatcher(),
                 statefulTaskContext.getErrorHandler(),
                 StatefulTaskContext.getClock(),
                 statefulTaskContext.getTaskContext(),
                 (MySqlStreamingChangeEventSourceMetrics)
                         statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                statefulTaskContext.getTopicSelector().getPrimaryTopic(),
                 backfillBinlogSplit);
     }
 

@@ -48,7 +48,6 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
     private final MySqlBinlogSplit binlogSplit;
-    private final MySqlOffsetContext offsetContext;
     private final EventDispatcherImpl<TableId> eventDispatcher;
     private final SignalEventDispatcher signalEventDispatcher;
     private final ErrorHandler errorHandler;
@@ -56,42 +55,31 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
     public MySqlBinlogSplitReadTask(
             MySqlConnectorConfig connectorConfig,
-            MySqlOffsetContext offsetContext,
             MySqlConnection connection,
             EventDispatcherImpl<TableId> dispatcher,
+            SignalEventDispatcher signalEventDispatcher,
             ErrorHandler errorHandler,
             Clock clock,
             MySqlTaskContext taskContext,
             MySqlStreamingChangeEventSourceMetrics metrics,
-            String topic,
             MySqlBinlogSplit binlogSplit) {
-        super(
-                connectorConfig,
-                offsetContext,
-                connection,
-                dispatcher,
-                errorHandler,
-                clock,
-                taskContext,
-                metrics);
+        super(connectorConfig, connection, dispatcher, errorHandler, clock, taskContext, metrics);
         this.binlogSplit = binlogSplit;
         this.eventDispatcher = dispatcher;
-        this.offsetContext = offsetContext;
         this.errorHandler = errorHandler;
-        this.signalEventDispatcher =
-                new SignalEventDispatcher(
-                        offsetContext.getPartition(), topic, eventDispatcher.getQueue());
+        this.signalEventDispatcher = signalEventDispatcher;
     }
 
     @Override
-    public void execute(ChangeEventSourceContext context) throws InterruptedException {
+    public void execute(ChangeEventSourceContext context, MySqlOffsetContext offsetContext)
+            throws InterruptedException {
         this.context = context;
-        super.execute(context);
+        super.execute(context, offsetContext);
     }
 
     @Override
-    protected void handleEvent(Event event) {
-        super.handleEvent(event);
+    protected void handleEvent(MySqlOffsetContext offsetContext, Event event) {
+        super.handleEvent(offsetContext, event);
         // check do we need to stop for read binlog for snapshot split.
         if (isBoundedRead()) {
             final BinlogOffset currentBinlogOffset = getBinlogPosition(offsetContext.getOffset());
