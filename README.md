@@ -9,7 +9,7 @@ This README is meant as a brief walkthrough on the core features with Flink CDC 
 
 | Database | Version |
 | --- | --- |
-| MySQL | Database: 5.7, 8.0.x <br/>JDBC Driver: 8.0.16 |
+| MySQL | Database: 5.7, 8.0.x <br/>JDBC Driver: 8.0.21 |
 | PostgreSQL | Database: 9.6, 10, 11, 12 <br/>JDBC Driver: 42.2.12|
 | MongoDB | Database: 4.0, 4.2, 5.0 <br/> MongoDB Driver: 4.3.1 |
 | Oracle | Database: 11, 12, 19 <br/>Oracle Driver: 19.3.0.0|
