@@ -1,9 +1,9 @@
-# Flink CDC Connectors
+# Apache Flink<sup>®</sup> CDC Connectors
 
-Flink CDC Connectors is a set of source connectors for Apache Flink, ingesting changes from different databases using change data capture (CDC).
-The Flink CDC Connectors integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
+Apache Flink<sup>®</sup> CDC is a set of source connectors for Apache Flink<sup>®</sup>, ingesting changes from different databases using change data capture (CDC).
+The Apache Flink<sup>®</sup> CDC integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
-This README is meant as a brief walkthrough on the core features with Flink CDC Connectors. For a fully detailed documentation, please see [Documentation](https://ververica.github.io/flink-cdc-connectors/master/).
+This README is meant as a brief walkthrough on the core features with Flink<sup>®</sup> CDC Connectors. For a fully detailed documentation, please see [Documentation](https://ververica.github.io/flink-cdc-connectors/master/).
 
 ## Supported (Tested) Databases
 
@@ -116,7 +116,7 @@ cd flink-cdc-connectors
 mvn clean install -DskipTests
 ```
 
-Flink CDC Connectors is now available at your local `.m2` repository.
+Apache Flink<sup>®</sup> CDC Connectors is now available at your local `.m2` repository.
 
 ## License
 
@@ -124,7 +124,7 @@ The code in this repository is licensed under the [Apache Software License 2](ht
 
 ## Contributing
 
-The Flink CDC Connectors welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/ververica/flink-cdc-connectors/issues).
+The Apache Flink<sup>®</sup> CDC Connectors welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/ververica/flink-cdc-connectors/issues).
 
 ## Community
 

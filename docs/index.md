@@ -1,4 +1,4 @@
-# Welcome to Flink CDC
+# Welcome to Apache Flink<sup>®</sup> CDC
 
 ```{toctree}
 :maxdepth: 2
