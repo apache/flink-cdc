@@ -31,8 +31,8 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlValueConverters;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
-import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.relational.Column;
@@ -76,18 +76,18 @@ public class MySqlSnapshotSplitReadTask
     private final Clock clock;
     private final MySqlSnapshotSplit snapshotSplit;
     private final TopicSelector<TableId> topicSelector;
-    private final SnapshotProgressListener snapshotProgressListener;
+    private final SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
 
     public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
-            SnapshotProgressListener snapshotProgressListener,
+            SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics,
             MySqlDatabaseSchema databaseSchema,
             MySqlConnection jdbcConnection,
             EventDispatcherImpl<TableId> dispatcher,
             TopicSelector<TableId> topicSelector,
             Clock clock,
             MySqlSnapshotSplit snapshotSplit) {
-        super(connectorConfig, snapshotProgressListener);
+        super(connectorConfig, snapshotChangeEventSourceMetrics);
         this.connectorConfig = connectorConfig;
         this.databaseSchema = databaseSchema;
         this.jdbcConnection = jdbcConnection;
@@ -95,7 +95,7 @@ public class MySqlSnapshotSplitReadTask
         this.clock = clock;
         this.snapshotSplit = snapshotSplit;
         this.topicSelector = topicSelector;
-        this.snapshotProgressListener = snapshotProgressListener;
+        this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
     }
 
     @Override
@@ -249,7 +249,7 @@ public class MySqlSnapshotSplitReadTask
                             rows,
                             snapshotSplit.splitId(),
                             Strings.duration(stop - exportStart));
-                    snapshotProgressListener.rowsScanned(table.id(), rows);
+                    snapshotChangeEventSourceMetrics.rowsScanned(table.id(), rows);
                     logTimer = getTableScanLogTimer();
                 }
                 dispatcher.dispatchSnapshotEvent(

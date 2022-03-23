@@ -98,7 +98,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         this.splitSnapshotReadTask =
                 new MySqlSnapshotSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
-                        statefulTaskContext.getOffsetContext(),
                         statefulTaskContext.getSnapshotChangeEventSourceMetrics(),
                         statefulTaskContext.getDatabaseSchema(),
                         statefulTaskContext.getConnection(),
@@ -114,7 +113,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         final SnapshotSplitChangeEventSourceContextImpl sourceContext =
                                 new SnapshotSplitChangeEventSourceContextImpl();
                         SnapshotResult snapshotResult =
-                                splitSnapshotReadTask.execute(sourceContext);
+                                splitSnapshotReadTask.execute(
+                                        sourceContext, statefulTaskContext.getOffsetContext());
 
                         final MySqlBinlogSplit backfillBinlogSplit =
                                 createBackfillBinlogSplit(sourceContext);
