@@ -22,6 +22,7 @@ import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
+import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -82,6 +83,7 @@ public class StatefulTaskContext {
     private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
+    private SignalEventDispatcher signalEventDispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
 
@@ -114,6 +116,7 @@ public class StatefulTaskContext {
 
         this.taskContext =
                 new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
+
         final int queueSize =
                 mySqlSplit.isSnapshotSplit()
                         ? Integer.MAX_VALUE
@@ -141,6 +144,10 @@ public class StatefulTaskContext {
                         DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster);
+
+        this.signalEventDispatcher =
+                new SignalEventDispatcher(
+                        offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
@@ -289,6 +296,10 @@ public class StatefulTaskContext {
 
     public EventDispatcherImpl<TableId> getDispatcher() {
         return dispatcher;
+    }
+
+    public SignalEventDispatcher getSignalEventDispatcher() {
+        return signalEventDispatcher;
     }
 
     public ChangeEventQueue<DataChangeEvent> getQueue() {
