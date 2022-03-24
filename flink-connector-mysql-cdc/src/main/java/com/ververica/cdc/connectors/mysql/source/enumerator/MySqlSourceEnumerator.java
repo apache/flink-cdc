@@ -56,6 +56,8 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.NEWLY_ADDED_ASSIGNING;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.NEWLY_ADDED_ASSIGNING_FINISHED;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
 
@@ -85,12 +87,17 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
+        if (splitAssigner.getAssignerStatus() == NEWLY_ADDED_ASSIGNING
+                || splitAssigner.getAssignerStatus() == NEWLY_ADDED_ASSIGNING_FINISHED) {
+            binlogReaderIsSuspended = true;
+        }
     }
 
     @Override
     public void start() {
         splitAssigner.open();
         suspendBinlogReaderIfNeed();
+        wakeupBinlogReaderIfNeed();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
@@ -198,6 +205,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 LOG.info("Assign split {} to subtask {}", mySqlSplit, nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
+                wakeupBinlogReaderIfNeed();
                 break;
             }
         }
