@@ -90,7 +90,7 @@ under the License.
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <spotless.version>2.4.2</spotless.version>
-        <oblogclient.version>1.0.2</oblogclient.version>
+        <oblogclient.version>1.0.3</oblogclient.version>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>

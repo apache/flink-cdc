@@ -64,12 +64,9 @@ under the License.
                                     <include>commons-codec:commons-codec</include>
                                     <include>org.lz4:lz4-java</include>
                                     <include>org.apache.avro:avro</include>
-                                    <include>org.apache.commons:*</include>
+                                    <include>org.apache.commons:commons-lang3</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>com.fasterxml.*:*</include>
-                                    <include>com.google.guava:*</include>
-                                    <!--  Include fixed version 18.0-13.0 of flink shaded guava  -->
-                                    <include>org.apache.flink:flink-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <filters>
