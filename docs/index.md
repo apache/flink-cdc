@@ -1,4 +1,4 @@
-# Welcome to Apache Flink<sup>®</sup> CDC
+# CDC Connectors for Apache Flink<sup>®</sup>
 
 ```{toctree}
 :maxdepth: 2

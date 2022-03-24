@@ -1,7 +1,7 @@
-# What's Apache Flink<sup>®</sup> CDC
+# Overview
 
-Apache Flink<sup>®</sup> CDC is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
-The Apache Flink<sup>®</sup> CDC Connectors integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
+CDC Connectors for Apache Flink<sup>®</sup> is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
+The CDC Connectors for Apache Flink<sup>®</sup> integrate Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
 ![Flink_CDC](/_static/fig/flinkcdc.png "Flink CDC")
 
@@ -272,7 +272,7 @@ cd flink-cdc-connectors
 mvn clean install -DskipTests
 ```
 
-Apache Flink CDC Connectors is now available at your local `.m2` repository.
+The dependencies are now available in your local `.m2` repository.
 
 ## License
 
