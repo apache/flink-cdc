@@ -33,6 +33,8 @@ under the License.
     <packaging>pom</packaging>
 
     <modules>
+        <module>flink-cdc-base</module>
+        <module>flink-cdc-e2e-tests</module>
         <module>flink-connector-debezium</module>
         <module>flink-connector-test-util</module>
         <module>flink-connector-mysql-cdc</module>
@@ -49,9 +51,6 @@ under the License.
         <module>flink-sql-connector-oceanbase-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
         <module>flink-sql-connector-tidb-cdc</module>
-        <module>flink-cdc-e2e-tests</module>
-        <module>flink-connector-base</module>
-        <module>flink-connector-mysql-cdc-new</module>
     </modules>
 
     <licenses>
