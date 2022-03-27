@@ -19,7 +19,6 @@
 package com.ververica.cdc.connectors.base.relational.connection;
 
 import org.apache.flink.annotation.Experimental;
-import org.apache.flink.annotation.Internal;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 

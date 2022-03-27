@@ -16,21 +16,27 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.experimental;
+package com.ververica.cdc.connectors.base.testutils;
 
-import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfigFactory;
-import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffsetFactory;
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+/** MySql version enum. */
+public enum MySqlVersion {
+    V5_5("5.5"),
+    V5_6("5.6"),
+    V5_7("5.7"),
+    V8_0("8.0");
 
-/** A MySql CDC Connector Source. */
-public class MySqlIncrementalSource<T> extends JdbcIncrementalSource<T> {
+    private String version;
 
-    public MySqlIncrementalSource(
-            MySqlSourceConfigFactory configFactory,
-            DebeziumDeserializationSchema<T> deserializationSchema,
-            BinlogOffsetFactory offsetFactory,
-            MySqlDialect dataSourceDialect) {
-        super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+    MySqlVersion(String version) {
+        this.version = version;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    @Override
+    public String toString() {
+        return "MySqlVersion{" + "version='" + version + '\'' + '}';
     }
 }

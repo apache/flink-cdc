@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.experimental;
+package com.ververica.cdc.connectors.base;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
@@ -24,9 +24,11 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 
-import com.ververica.cdc.connectors.base.experimental.testutils.MySqlContainer;
-import com.ververica.cdc.connectors.base.experimental.testutils.MySqlVersion;
-import com.ververica.cdc.connectors.base.experimental.testutils.UniqueDatabase;
+import com.ververica.cdc.connectors.base.experimental.MySqlSourceBuilder;
+import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.base.testutils.MySqlVersion;
+import com.ververica.cdc.connectors.base.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -39,9 +41,7 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.util.stream.Stream;
 
-/**
- * Example Tests for {@link com.ververica.cdc.connectors.base.experimental.MySqlIncrementalSource}.
- */
+/** Example Tests for {@link JdbcIncrementalSource}. */
 public class MySqlChangeEventSourceExampleTest {
 
     private static final Logger LOG =
@@ -71,10 +71,10 @@ public class MySqlChangeEventSourceExampleTest {
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
 
     @Test
-    //    @Ignore("Test ignored because it won't stop and is used for manual test")
+    @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingAllEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
-        MySqlIncrementalSource<String> mySqlChangeEventSource =
+        JdbcIncrementalSource<String> mySqlChangeEventSource =
                 new MySqlSourceBuilder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())

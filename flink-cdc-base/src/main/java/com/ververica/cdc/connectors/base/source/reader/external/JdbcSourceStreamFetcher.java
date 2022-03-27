@@ -112,10 +112,8 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
                     sourceRecords.add(event.getRecord());
                 }
             }
-            return sourceRecords.iterator();
-        } else {
-            return null;
         }
+        return sourceRecords.iterator();
     }
 
     private void checkReadException() {

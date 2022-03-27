@@ -481,7 +481,7 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
-    MySqlSource<String> mySqlChangeEventSource = MySqlSource.<String>builder()
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
         .databaseList("yourDatabaseName") // set captured database
@@ -497,7 +497,7 @@ public class MySqlSourceExample {
     env.enableCheckpointing(3000);
 
     env
-      .fromSource(mySqlChangeEventSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
+      .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
       // set 4 parallel source tasks
       .setParallelism(4)
       .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering

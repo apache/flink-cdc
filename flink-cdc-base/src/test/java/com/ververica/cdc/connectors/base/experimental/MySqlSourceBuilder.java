@@ -18,11 +18,12 @@
 
 package com.ververica.cdc.connectors.base.experimental;
 
-import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.annotation.Experimental;
 
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffsetFactory;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
 import java.time.Duration;
@@ -51,7 +52,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * <p>Check the Java docs of each individual method to learn more about the settings to build a
  * {@link MySqlIncrementalSource}.
  */
-@PublicEvolving
+@Experimental
 public class MySqlSourceBuilder<T> {
     private final MySqlSourceConfigFactory configFactory = new MySqlSourceConfigFactory();
     private BinlogOffsetFactory offsetFactory;
@@ -224,5 +225,17 @@ public class MySqlSourceBuilder<T> {
         this.dialect = new MySqlDialect(configFactory);
         return new MySqlIncrementalSource<>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
+    }
+
+    /** The {@link JdbcIncrementalSource} implementation for MySQL. */
+    public static class MySqlIncrementalSource<T> extends JdbcIncrementalSource<T> {
+
+        public MySqlIncrementalSource(
+                MySqlSourceConfigFactory configFactory,
+                DebeziumDeserializationSchema<T> deserializationSchema,
+                BinlogOffsetFactory offsetFactory,
+                MySqlDialect dataSourceDialect) {
+            super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+        }
     }
 }

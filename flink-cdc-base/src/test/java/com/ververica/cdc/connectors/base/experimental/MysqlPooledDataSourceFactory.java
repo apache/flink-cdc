@@ -18,10 +18,13 @@
 
 package com.ververica.cdc.connectors.base.experimental;
 
+import org.apache.flink.annotation.Experimental;
+
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 
-/** A Mysql datasource factory. */
+/** A MySQL datasource factory. */
+@Experimental
 public class MysqlPooledDataSourceFactory extends JdbcConnectionPoolFactory {
 
     public static final String JDBC_URL_PATTERN =

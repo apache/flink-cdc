@@ -18,125 +18,140 @@
 
 package com.ververica.cdc.connectors.base.experimental;
 
-import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.annotation.Experimental;
+import org.apache.flink.util.FlinkRuntimeException;
 
+import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
+import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfigFactory;
-import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import com.ververica.cdc.connectors.base.experimental.fetch.MySqlScanFetchTask;
+import com.ververica.cdc.connectors.base.experimental.fetch.MySqlSourceFetchTaskContext;
+import com.ververica.cdc.connectors.base.experimental.fetch.MySqlStreamFetchTask;
+import com.ververica.cdc.connectors.base.experimental.utils.MySqlSchema;
+import com.ververica.cdc.connectors.base.experimental.utils.TableDiscoveryUtils;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.pipeline.spi.OffsetContext;
-import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.base.experimental.utils.MySqlConnectionUtils.createBinaryClient;
+import static com.ververica.cdc.connectors.base.experimental.utils.MySqlConnectionUtils.createMySqlConnection;
+import static com.ververica.cdc.connectors.base.experimental.utils.MySqlConnectionUtils.currentBinlogOffset;
+import static com.ververica.cdc.connectors.base.experimental.utils.MySqlConnectionUtils.isTableIdCaseSensitive;
+
 /** The {@link JdbcDataSourceDialect} implementation for MySQL datasource. */
+@Experimental
 public class MySqlDialect implements JdbcDataSourceDialect {
 
+    private static final long serialVersionUID = 1L;
     private final MySqlSourceConfigFactory configFactory;
+    private final MySqlSourceConfig sourceConfig;
+    private transient MySqlSchema mySqlSchema;
 
     public MySqlDialect(MySqlSourceConfigFactory configFactory) {
         this.configFactory = configFactory;
+        this.sourceConfig = configFactory.create(0);
     }
 
     @Override
     public String getName() {
-        return null;
+        return "MySQL";
     }
 
     @Override
     public Offset displayCurrentOffset(JdbcSourceConfig sourceConfig) {
-        return null;
+        try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
+            return currentBinlogOffset(jdbcConnection);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Read the binlog offset error", e);
+        }
     }
 
     @Override
     public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
-        return false;
+        try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
+            return isTableIdCaseSensitive(jdbcConnection);
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException("Error reading MySQL variables: " + e.getMessage(), e);
+        }
     }
 
     @Override
-    public ChunkSplitter createChunkSplitter(JdbcSourceConfig sourceConfig) {
-        return null;
+    public ChunkSplitter<TableId> createChunkSplitter(JdbcSourceConfig sourceConfig) {
+        return new MySqlChunkSplitter(sourceConfig, this);
     }
 
     @Override
     public JdbcConnectionPoolFactory getPooledDataSourceFactory() {
-        return null;
+        return new MysqlPooledDataSourceFactory();
     }
 
     @Override
     public List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig) {
-        return null;
+        MySqlSourceConfig mySqlSourceConfig = (MySqlSourceConfig) sourceConfig;
+        try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
+            return TableDiscoveryUtils.listTables(
+                    jdbcConnection, mySqlSourceConfig.getTableFilters());
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
+        }
     }
 
     @Override
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
-        return null;
-    }
+        final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
-    @Override
-    public OffsetContext getOffsetContext(
-            JdbcSourceConfig sourceConfig, SourceSplitBase splitBase) {
-        return null;
-    }
-
-    @Override
-    public JdbcSourceEventDispatcher getEventDispatcher(
-            JdbcSourceConfig sourceConfig, SourceSplitBase splitBase) {
-        return null;
-    }
-
-    @Override
-    public String buildSplitScanQuery(
-            TableId tableId, RowType splitKeyType, boolean isFirstSplit, boolean isLastSplit) {
-        return null;
-    }
-
-    @Override
-    public Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
-            throws SQLException {
-        return new Object[0];
-    }
-
-    @Override
-    public Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
-            throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Object queryNextChunkMax(
-            JdbcConnection jdbc,
-            TableId tableId,
-            String columnName,
-            int chunkSize,
-            Object includedLowerBound)
-            throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId) throws SQLException {
-        return null;
+        try (MySqlConnection jdbc = createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+            // fetch table schemas
+            Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
+            for (TableId tableId : capturedTableIds) {
+                TableChanges.TableChange tableSchema = queryTableSchema(jdbc, tableId);
+                tableSchemas.put(tableId, tableSchema);
+            }
+            return tableSchemas;
+        } catch (Exception e) {
+            throw new FlinkRuntimeException(
+                    "Error to discover table schemas: " + e.getMessage(), e);
+        }
     }
 
     @Override
     public TableChange queryTableSchema(JdbcConnection jdbc, TableId tableId) {
-        return null;
+        if (mySqlSchema == null) {
+            mySqlSchema =
+                    new MySqlSchema(sourceConfig, isDataCollectionIdCaseSensitive(sourceConfig));
+        }
+        return mySqlSchema.getTableSchema(jdbc, tableId);
     }
 
     @Override
-    public DataType fromDbzColumn(Column splitColumn) {
-        return null;
+    public MySqlSourceFetchTaskContext createFetchTaskContext(SourceSplitBase sourceSplitBase) {
+        final MySqlConnection jdbcConnection =
+                createMySqlConnection(sourceConfig.getDbzConfiguration());
+        final BinaryLogClient binaryLogClient =
+                createBinaryClient(sourceConfig.getDbzConfiguration());
+        return new MySqlSourceFetchTaskContext(sourceConfig, this, jdbcConnection, binaryLogClient);
+    }
+
+    @Override
+    public FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase) {
+        if (sourceSplitBase.isSnapshotSplit()) {
+            return new MySqlScanFetchTask(sourceSplitBase.asSnapshotSplit());
+        } else {
+            return new MySqlStreamFetchTask(sourceSplitBase.asStreamSplit());
+        }
     }
 }

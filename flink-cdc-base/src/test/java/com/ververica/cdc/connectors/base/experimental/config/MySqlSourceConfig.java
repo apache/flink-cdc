@@ -36,7 +36,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
 
     private static final long serialVersionUID = 1L;
 
-    private final MySqlConnectorConfig dbzMySqlConfig;
+    private transient MySqlConnectorConfig dbzMySqlConfig;
 
     public MySqlSourceConfig(
             StartupOptions startupOptions,
@@ -80,15 +80,14 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize);
-        this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
     }
 
     @Override
     public MySqlConnectorConfig getDbzConnectorConfig() {
-        return dbzMySqlConfig;
+        return new MySqlConnectorConfig(getDbzConfiguration());
     }
 
     public RelationalTableFilters getTableFilters() {
-        return dbzMySqlConfig.getTableFilters();
+        return getDbzConnectorConfig().getTableFilters();
     }
 }

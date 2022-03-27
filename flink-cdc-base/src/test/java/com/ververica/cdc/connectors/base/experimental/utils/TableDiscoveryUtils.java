@@ -28,7 +28,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.ververica.cdc.connectors.base.experimental.utils.StatementUtils.quote;
+import static com.ververica.cdc.connectors.base.experimental.utils.MySqlUtils.quote;
 
 /** Utilities to discovery matched tables. */
 public class TableDiscoveryUtils {
