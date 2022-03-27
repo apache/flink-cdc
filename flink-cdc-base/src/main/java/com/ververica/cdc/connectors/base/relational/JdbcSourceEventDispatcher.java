@@ -157,7 +157,7 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
             TableId dataCollectionId, SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
         if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
-            if (historizedSchema == null || historizedSchema.storeOnlyMonitoredTables()) {
+            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
                 LOG.trace("Filtering schema change event for {}", dataCollectionId);
                 return;
             }
@@ -182,7 +182,7 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
             }
         }
         if (!anyNonfilteredEvent) {
-            if (historizedSchema == null || historizedSchema.storeOnlyMonitoredTables()) {
+            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
                 LOG.trace("Filtering schema change event for {}", dataCollectionIds);
                 return;
             }
