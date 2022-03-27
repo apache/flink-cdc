@@ -14,7 +14,7 @@ In order to setup the TiDB CDC connector, the following table provides dependenc
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-tidb-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.2-SNAPSHOT</version>
+  <version>2.2.0</version>
 </dependency>
 ```
 
@@ -22,7 +22,7 @@ In order to setup the TiDB CDC connector, the following table provides dependenc
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-tidb-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-tidb-cdc/2.2-SNAPSHOT/flink-sql-connector-tidb-cdc-2.2-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-tidb-cdc-2.2.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-tidb-cdc/2.2.0/flink-sql-connector-tidb-cdc-2.2.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 How to create a TiDB CDC table
 ----------------
