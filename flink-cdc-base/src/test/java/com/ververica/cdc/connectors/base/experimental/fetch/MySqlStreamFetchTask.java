@@ -69,7 +69,8 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                         split);
         BinlogSplitChangeEventSourceContext changeEventSourceContext =
                 new BinlogSplitChangeEventSourceContext();
-        binlogSplitReadTask.execute(changeEventSourceContext);
+        binlogSplitReadTask.execute(
+                changeEventSourceContext, sourceFetchContext.getOffsetContext());
     }
 
     @Override
@@ -106,7 +107,6 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                 StreamSplit binlogSplit) {
             super(
                     connectorConfig,
-                    offsetContext,
                     connection,
                     dispatcher,
                     errorHandler,
@@ -120,14 +120,15 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public void execute(ChangeEventSourceContext context) throws InterruptedException {
+        public void execute(ChangeEventSourceContext context, MySqlOffsetContext offsetContext)
+                throws InterruptedException {
             this.context = context;
-            super.execute(context);
+            super.execute(context, offsetContext);
         }
 
         @Override
-        protected void handleEvent(Event event) {
-            super.handleEvent(event);
+        protected void handleEvent(MySqlOffsetContext offsetContext, Event event) {
+            super.handleEvent(offsetContext, event);
             // check do we need to stop for fetch binlog for snapshot split.
             if (isBoundedRead()) {
                 final BinlogOffset currentBinlogOffset =

@@ -96,6 +96,8 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         " 'password' = '" + ORACLE_TEST_PASSWORD + "',",
                         " 'database-name' = 'XE',",
                         " 'schema-name' = 'debezium',",
+                        " 'debezium.log.mining.strategy' = 'online_catalog',",
+                        " 'debezium.log.mining.continuous.mine' = 'true',",
                         " 'table-name' = 'products'",
                         ");",
                         "CREATE TABLE products_sink (",
@@ -169,7 +171,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                60000L);
+                150000L);
     }
 
     private Connection getOracleJdbcConnection() throws SQLException {
