@@ -18,24 +18,42 @@
 
 package com.ververica.cdc.connectors.base.experimental.utils;
 
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
+import io.debezium.connector.mysql.MySqlDatabaseSchema;
+import io.debezium.connector.mysql.MySqlTopicSelector;
+import io.debezium.connector.mysql.MySqlValueConverters;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.jdbc.JdbcValueConverters;
+import io.debezium.jdbc.TemporalPrecisionMode;
+import io.debezium.relational.Column;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.schema.TopicSelector;
+import io.debezium.util.SchemaNameAdjuster;
+import org.apache.kafka.connect.source.SourceRecord;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.rowToArray;
+import static org.apache.flink.table.api.DataTypes.FIELD;
+import static org.apache.flink.table.api.DataTypes.ROW;
 
-/** Utils to prepare SQL statement. */
-public class StatementUtils {
+/** Utils to prepare MySQL SQL statement. */
+public class MySqlUtils {
 
-    private StatementUtils() {}
+    private MySqlUtils() {}
 
     public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
             throws SQLException {
@@ -223,6 +241,91 @@ public class StatementUtils {
         } catch (Exception e) {
             throw new RuntimeException("Failed to build the split data read statement.", e);
         }
+    }
+
+    public static RowType getSplitType(Table table) {
+        List<Column> primaryKeys = table.primaryKeyColumns();
+        if (primaryKeys.isEmpty()) {
+            throw new ValidationException(
+                    String.format(
+                            "Incremental snapshot for tables requires primary key,"
+                                    + " but table %s doesn't have primary key.",
+                            table.id()));
+        }
+
+        // use first field in primary key as the split key
+        return getSplitType(primaryKeys.get(0));
+    }
+
+    /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
+    public static MySqlDatabaseSchema createMySqlDatabaseSchema(
+            MySqlConnectorConfig dbzMySqlConfig, boolean isTableIdCaseSensitive) {
+        TopicSelector<TableId> topicSelector = MySqlTopicSelector.defaultSelector(dbzMySqlConfig);
+        SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
+        MySqlValueConverters valueConverters = getValueConverters(dbzMySqlConfig);
+        return new MySqlDatabaseSchema(
+                dbzMySqlConfig,
+                valueConverters,
+                topicSelector,
+                schemaNameAdjuster,
+                isTableIdCaseSensitive);
+    }
+
+    private static MySqlValueConverters getValueConverters(MySqlConnectorConfig dbzMySqlConfig) {
+        TemporalPrecisionMode timePrecisionMode = dbzMySqlConfig.getTemporalPrecisionMode();
+        JdbcValueConverters.DecimalMode decimalMode = dbzMySqlConfig.getDecimalMode();
+        String bigIntUnsignedHandlingModeStr =
+                dbzMySqlConfig
+                        .getConfig()
+                        .getString(MySqlConnectorConfig.BIGINT_UNSIGNED_HANDLING_MODE);
+        MySqlConnectorConfig.BigIntUnsignedHandlingMode bigIntUnsignedHandlingMode =
+                MySqlConnectorConfig.BigIntUnsignedHandlingMode.parse(
+                        bigIntUnsignedHandlingModeStr);
+        JdbcValueConverters.BigIntUnsignedMode bigIntUnsignedMode =
+                bigIntUnsignedHandlingMode.asBigIntUnsignedMode();
+
+        boolean timeAdjusterEnabled =
+                dbzMySqlConfig.getConfig().getBoolean(MySqlConnectorConfig.ENABLE_TIME_ADJUSTER);
+        return new MySqlValueConverters(
+                decimalMode,
+                timePrecisionMode,
+                bigIntUnsignedMode,
+                dbzMySqlConfig.binaryHandlingMode(),
+                timeAdjusterEnabled ? MySqlValueConverters::adjustTemporal : x -> x,
+                MySqlValueConverters::defaultParsingErrorHandler);
+    }
+
+    public static BinlogOffset getBinlogPosition(SourceRecord dataRecord) {
+        return getBinlogPosition(dataRecord.sourceOffset());
+    }
+
+    public static BinlogOffset getBinlogPosition(Map<String, ?> offset) {
+        Map<String, String> offsetStrMap = new HashMap<>();
+        for (Map.Entry<String, ?> entry : offset.entrySet()) {
+            offsetStrMap.put(
+                    entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
+        }
+        return new BinlogOffset(offsetStrMap);
+    }
+
+    public static RowType getSplitType(Column splitColumn) {
+        return (RowType)
+                ROW(FIELD(splitColumn.name(), MySqlTypeUtils.fromDbzColumn(splitColumn)))
+                        .getLogicalType();
+    }
+
+    public static Column getSplitColumn(Table table) {
+        List<Column> primaryKeys = table.primaryKeyColumns();
+        if (primaryKeys.isEmpty()) {
+            throw new ValidationException(
+                    String.format(
+                            "Incremental snapshot for tables requires primary key,"
+                                    + " but table %s doesn't have primary key.",
+                            table.id()));
+        }
+
+        // use first field in primary key as the split key
+        return primaryKeys.get(0);
     }
 
     public static String quote(String dbOrTableName) {

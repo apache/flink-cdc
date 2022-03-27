@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.experimental.testutils;
+package com.ververica.cdc.connectors.base.testutils;
 
 import java.net.URL;
 import java.nio.file.Files;

@@ -101,7 +101,7 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
     }
 
     protected void checkSplitOrStartNext() throws IOException {
-        // the binlog reader should keep alive
+        // the binlog fetcher should keep alive
         if (currenFetcher instanceof JdbcSourceStreamFetcher) {
             return;
         }

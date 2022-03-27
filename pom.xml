@@ -34,7 +34,6 @@ under the License.
 
     <modules>
         <module>flink-cdc-base</module>
-        <module>flink-cdc-e2e-tests</module>
         <module>flink-connector-debezium</module>
         <module>flink-connector-test-util</module>
         <module>flink-connector-mysql-cdc</module>
@@ -51,6 +50,7 @@ under the License.
         <module>flink-sql-connector-oceanbase-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
         <module>flink-sql-connector-tidb-cdc</module>
+        <module>flink-cdc-e2e-tests</module>
     </modules>
 
     <licenses>
@@ -265,7 +265,6 @@ under the License.
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                         <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
-                        <exclude>flink-connector-mysql-cdc-new/src/test/resources/file/*.json</exclude>
                     </excludes>
                 </configuration>
             </plugin>

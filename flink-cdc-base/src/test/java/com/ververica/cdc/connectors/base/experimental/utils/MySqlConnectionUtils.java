@@ -35,17 +35,13 @@ import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Utilities related to Debezium. */
+/** MySQL connection Utilities. */
 public class MySqlConnectionUtils {
-
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlConnectionUtils.class);
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
     public static MySqlConnection createMySqlConnection(Configuration dbzConfiguration) {

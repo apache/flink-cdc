@@ -19,7 +19,6 @@
 package com.ververica.cdc.connectors.base.dialect;
 
 import org.apache.flink.annotation.Experimental;
-import org.apache.flink.annotation.Internal;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;

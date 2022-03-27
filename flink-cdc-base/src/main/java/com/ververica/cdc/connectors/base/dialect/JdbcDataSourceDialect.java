@@ -19,7 +19,6 @@
 package com.ververica.cdc.connectors.base.dialect;
 
 import org.apache.flink.annotation.Experimental;
-import org.apache.flink.annotation.Internal;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;

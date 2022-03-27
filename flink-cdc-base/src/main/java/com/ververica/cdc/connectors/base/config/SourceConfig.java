@@ -24,7 +24,7 @@ import com.ververica.cdc.connectors.base.options.StartupOptions;
 
 import java.io.Serializable;
 
-/** The Source configuration which offers configuration. */
+/** The source configuration which offers basic source configuration. */
 @Experimental
 public interface SourceConfig extends Serializable {
 
