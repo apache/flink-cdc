@@ -13,7 +13,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
-  <!-- the dependency is available only for stable releases. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
   <version>2.2-SNAPSHOT</version>
 </dependency>
 ```

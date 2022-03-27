@@ -13,7 +13,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mongodb-cdc</artifactId>
-  <!-- the dependency is available only for stable releases. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
   <version>2.2-SNAPSHOT</version>
 </dependency>
 ```
