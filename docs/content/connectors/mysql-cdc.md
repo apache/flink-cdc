@@ -63,9 +63,9 @@ Notes
 
 ### Set a different SERVER ID for each reader
 
-Every MySQL database client for reading binlog should have an unique id, called server id. MySQL server will use this id to maintain network connection and the binlog position. Therefore, if different jobs share a same server id, it may result to read from wrong binlog position. 
-Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html), 
-e.g.  assuming the source parallelism is 4, then we can use `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` to assign unique server id for each of the 4 source readers. 
+Every MySQL database client for reading binlog should have an unique id, called server id. MySQL server will use this id to maintain network connection and the binlog position. Therefore, if different jobs share a same server id, it may result to read from wrong binlog position.
+Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html),
+e.g.  assuming the source parallelism is 4, then we can use `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` to assign unique server id for each of the 4 source readers.
 
 
 ### Setting up MySQL session timeouts
@@ -352,7 +352,7 @@ Incremental snapshot reading is a new mechanism to read snapshot of a table. Com
 * (2) MySQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
 * (3) MySQL CDC Source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading
 
-If you would like the source run in parallel, each parallel reader should have an unique server id, so the 'server-id' must be a range like '5400-6400', 
+If you would like the source run in parallel, each parallel reader should have an unique server id, so the 'server-id' must be a range like '5400-6400',
 and the range must be larger than the parallelism.
 
 During the incremental snapshot reading, the MySQL CDC Source firstly splits snapshot chunks (splits) by primary key of table,
@@ -435,7 +435,7 @@ and the table option `scan.incremental.snapshot.chunk.size` value is `25`, the t
  [100, +∞)
 ```
 
-For other primary key column type, MySQL CDC Source executes the statement in the form of `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' limit 25)` to get the low and high value for each chunk, 
+For other primary key column type, MySQL CDC Source executes the statement in the form of `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' limit 25)` to get the low and high value for each chunk,
 the splitting chunks set would be like:
 
  ```
@@ -448,24 +448,24 @@ the splitting chunks set would be like:
 
 ##### Chunk Reading Algorithm
 
-For above example `MyTable`, if the MySQL CDC Source parallelism was set to 4, MySQL CDC Source would run 4 readers which each executes **Offset Signal Algorithm** to 
+For above example `MyTable`, if the MySQL CDC Source parallelism was set to 4, MySQL CDC Source would run 4 readers which each executes **Offset Signal Algorithm** to
 get a final consistent output of the snapshot chunk. The **Offset Signal Algorithm** simply describes as following:
 
- * (1) Record current binlog position as `LOW` offset
- * (2) Read and buffer the snapshot chunk records by executing statement `SELECT * FROM MyTable WHERE id > chunk_low AND id <= chunk_high`
- * (3) Record current binlog position as `HIGH` offset
- * (4) Read the binlog records that belong to the snapshot chunk from `LOW` offset to `HIGH` offset
- * (5) Upsert the read binlog records into the buffered chunk records, and emit all records in the buffer as final output (all as INSERT records) of the snapshot chunk
- * (6) Continue to read and emit binlog records belong to the chunk after the `HIGH` offset in *single binlog reader*.
+* (1) Record current binlog position as `LOW` offset
+* (2) Read and buffer the snapshot chunk records by executing statement `SELECT * FROM MyTable WHERE id > chunk_low AND id <= chunk_high`
+* (3) Record current binlog position as `HIGH` offset
+* (4) Read the binlog records that belong to the snapshot chunk from `LOW` offset to `HIGH` offset
+* (5) Upsert the read binlog records into the buffered chunk records, and emit all records in the buffer as final output (all as INSERT records) of the snapshot chunk
+* (6) Continue to read and emit binlog records belong to the chunk after the `HIGH` offset in *single binlog reader*.
 
 The algorithm is inspired by [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf), please refer it for more detail.
- 
+
 **Note:** If the actual values for the primary key are not uniformly distributed across its range, this may lead to unbalanced tasks when incremental snapshot read.
 
 ### Exactly-Once Processing
 
-The MySQL CDC connector is a Flink Source connector which will read table snapshot chunks first and then continues to read binlog, 
-both snapshot phase and binlog phase, MySQL CDC connector read with **exactly-once processing** even failures happen. 
+The MySQL CDC connector is a Flink Source connector which will read table snapshot chunks first and then continues to read binlog,
+both snapshot phase and binlog phase, MySQL CDC connector read with **exactly-once processing** even failures happen.
 
 ### Startup Reading Position
 
@@ -473,10 +473,63 @@ The config option `scan.startup.mode` specifies the startup mode for MySQL CDC c
 
 - `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
 - `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
-the end of the binlog which means only have the changes since the connector was started.
+  the end of the binlog which means only have the changes since the connector was started.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not using them together. If you speicifying both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 
+### Add New Tables To An Existing Flink CDC Job (version 2.2.0+)
+
+Sometimes, a Flink CDC job may only read `[product, user, address]`, but after some days we would like the job can also read `[order, custom]` but don't want to lose the savepoint of the job. For example, update the `tableList()` value of the job to include `order` and `custom` and restore the job from previous savepoint.
+
+This is a feature like Debezium's `snapshot.new.tables` feature.
+
+An existing Flink CDC job following:
+```java
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .databaseList("db") // set captured database
+        .tableList("db.product, db.user, db.address") // set captured tables [product, user, address]
+        .username("yourUsername")
+        .password("yourPassword")
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+```
+
+If we would like to add new tables `[order, custom]` to an existing Flink CDC job，update the `tableList()` value of the job to include `[order, custom]` and set `scanNewlyAddedTableEnabled(true)`, and restore the job from previous savepoint.
+
+
+**Step 1**: Stop the existing Flink CDC job.
+```shell
+$ ./bin/flink stop $Existing_Flink_CDC_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+**Step 2**: Upgrade the existing Flink CDC job .
+1. update `tableList()` value.
+2. using `scanNewlyAddedTableEnabled(true)`.
+```java
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .databaseList("db") // set captured database db
+        .tableList("db.product, db.user, db.address, db.order, db.address") // set captured tables [product, user, address ,order, address]
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true) // set scan the newly added tables
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+```
+**Step 3**: Starting the `Upgraded` Flink CDC job from savepoint.
+```shell
+$ ./bin/flink run \
+      --detached \ 
+      --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+_Note: How to [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/deployment/cli/#command-line-interface), please refer it for more details._
 
 ### DataStream Source
 
