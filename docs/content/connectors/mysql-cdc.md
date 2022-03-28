@@ -477,7 +477,6 @@ the end of the binlog which means only have the changes since the connector was 
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not using them together. If you speicifying both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 
-
 ### DataStream Source
 
 ```java
@@ -515,6 +514,63 @@ public class MySqlSourceExample {
 ```
 
 **Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.
+
+### Scan Newly Added Tables
+
+Scan Newly Added Tables feature enables you add new tables to monitor for existing running pipeline, the newly added tables will read theirs snapshot data firstly and then read their changelog automatically.
+ 
+Imaging this scenario: At the beginning, a Flink job monitor tables `[product, user, address]`, but after some days we would like the job can also monitor tables `[order, custom]` which contains history data, and we need the job can still reuse existing state of the job, this feature can resolve this case gracefully.
+
+The following operations show how to enable this feature to resolve above scenario. An existing Flink job which uses CDC Source like:
+
+```java
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .scanNewlyAddedTableEnabled(true) // eanbel scan the newly added tables fature
+        .databaseList("db") // set captured database
+        .tableList("db.product, db.user, db.address") // set captured tables [product, user, address]
+        .username("yourUsername")
+        .password("yourPassword")
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+
+If we would like to add new tables `[order, custom]` to an existing Flink job，just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
+
+_Step 1_: Stop the existing Flink job with savepoint.
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: Update the table list option for the existing Flink job .
+1. update `tableList()` value.
+2. build the jar of updated job.
+```java
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .scanNewlyAddedTableEnabled(true) 
+        .databaseList("db") 
+        .tableList("db.product, db.user, db.address, db.order, db.custom") // set captured tables [product, user, address ,order, custom]
+        .username("yourUsername")
+        .password("yourPassword")
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+_Step 3_: Restore the updated Flink job from savepoint.
+```shell
+$ ./bin/flink run \
+      --detached \ 
+      --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/deployment/cli/#command-line-interface) for more details.
 
 Data Type Mapping
 ----------------
