@@ -31,6 +31,8 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 
 Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
+**Note:** XXX snapshot version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as flink-sql-connector-mysql-cdc-2.2.0.jar, the released version will be available in the Maven central warehouse.
+
 Setup MySQL server
 ----------------
 
@@ -491,7 +493,7 @@ public class MySqlSourceExample {
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .databaseList("yourDatabaseName") // set captured database
+        .databaseList("yourDatabaseName") // set captured database, If you need to synchronize the whole database, just comment out the tableList.
         .tableList("yourDatabaseName.yourTableName") // set captured table
         .username("yourUsername")
         .password("yourPassword")

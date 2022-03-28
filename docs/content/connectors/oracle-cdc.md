@@ -205,8 +205,8 @@ Flink SQL> CREATE TABLE products (
      'port' = '1521',
      'username' = 'flinkuser',
      'password' = 'flinkpw',
-     'database-name' = 'XE',
-     'schema-name' = 'inventory',
+     'database-name' = 'XE',  -- XE is oracle SID
+     'schema-name' = 'inventory',  -- inventory is oracle user
      'table-name' = 'products');
   
 -- read snapshot and binlogs from products table
