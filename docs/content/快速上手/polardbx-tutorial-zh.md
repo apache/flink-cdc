@@ -109,7 +109,7 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.13.2/lib/` 下
 
 ```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
-- 用于订阅PolarDB-X Binlog: [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar)
+- 用于订阅PolarDB-X Binlog: [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.2.0/flink-sql-connector-mysql-cdc-2.2.0.jar)
 - 用于写入Elasticsearch: [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
 3. 启动flink服务:
 ```shell
