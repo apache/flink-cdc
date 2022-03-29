@@ -20,7 +20,6 @@ package com.ververica.cdc.connectors.oceanbase;
 
 import org.apache.flink.util.TestLogger;
 
-import com.alibaba.dcm.DnsCacheManipulator;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
@@ -29,7 +28,6 @@ import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
@@ -60,8 +58,6 @@ public class OceanBaseTestBase extends TestLogger {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    public static final String OB_LOG_PROXY_SERVICE_NAME = "oblogproxy";
-
     // Should be deprecated after official images are released.
     public static final String DOCKER_IMAGE_NAME = "whhe/oblogproxy:obce_3.1.1";
 
@@ -75,13 +71,9 @@ public class OceanBaseTestBase extends TestLogger {
     public static final String OB_SYS_USERNAME = "root";
     public static final String OB_SYS_PASSWORD = "pswd";
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
-
     @ClassRule
     public static final GenericContainer<?> OB_WITH_LOG_PROXY =
             new GenericContainer<>(DOCKER_IMAGE_NAME)
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(OB_LOG_PROXY_SERVICE_NAME)
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT, OB_LOG_PROXY_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(
@@ -93,8 +85,6 @@ public class OceanBaseTestBase extends TestLogger {
 
     @BeforeClass
     public static void startContainers() {
-        // Add jvm dns cache for flink to invoke ob interface.
-        DnsCacheManipulator.setDnsCache(OB_LOG_PROXY_SERVICE_NAME, "127.0.0.1");
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(OB_WITH_LOG_PROXY)).join();
         LOG.info("Containers are started.");
@@ -102,7 +92,6 @@ public class OceanBaseTestBase extends TestLogger {
 
     @AfterClass
     public static void stopContainers() {
-        DnsCacheManipulator.removeDnsCache(OB_LOG_PROXY_SERVICE_NAME);
         LOG.info("Stopping containers...");
         Stream.of(OB_WITH_LOG_PROXY).forEach(GenericContainer::stop);
         LOG.info("Containers are stopped.");
