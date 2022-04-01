@@ -1,0 +1,8 @@
+Flink CDC Site
+Copyright 2022 Ververica Inc.
+
+This project bundles the following dependencies under the MIT license.
+See bundled license files for details.
+
+- termynal (https://github.com/ines/termynal)
+  -> in lib directory

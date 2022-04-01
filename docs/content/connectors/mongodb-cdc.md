@@ -151,17 +151,19 @@ Connector Options
     </tr>
     <tr>
       <td>database</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the database to watch for changes.</td>
+      <td>Name of the database to watch for changes. If not set then all databases will be captured. <br>
+          The database also supports regular expressions to monitor multiple databases matching the regular expression.</td>
     </tr>
     <tr>
       <td>collection</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the collection in the database to watch for changes.</td>
+      <td>Name of the collection in the database to watch for changes. If not set then all collections will be captured.<br>
+          The collection also supports regular expressions to monitor multiple collections matching fully-qualified collection identifiers.</td>
     </tr>
     <tr>
       <td>connection.options</td>
@@ -324,7 +326,7 @@ This can filter only required data and improve the use of indexes by the copying
 In the following example, the `$match` aggregation operator ensures that only documents in which the closed field is set to false are copied.
 
 ```
-copy.existing.pipeline=[ { "$match": { "closed": "false" } } ]
+'copy.existing.pipeline' = '[ { "$match": { "closed": "false" } } ]'
 ```
 
 ### Change Streams

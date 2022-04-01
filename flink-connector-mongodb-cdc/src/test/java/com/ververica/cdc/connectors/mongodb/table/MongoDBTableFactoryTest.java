@@ -28,9 +28,14 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
+import org.apache.flink.table.connector.source.ScanTableSource;
+import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -43,6 +48,7 @@ import java.util.Map;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_ALL;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
+import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -185,6 +191,13 @@ public class MongoDBTableFactoryTest {
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
         assertEquals(expectedSource, actualSource);
+
+        ScanTableSource.ScanRuntimeProvider provider =
+                mongoDBSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
+        DebeziumSourceFunction<RowData> debeziumSourceFunction =
+                (DebeziumSourceFunction<RowData>)
+                        ((SourceFunctionProvider) provider).createSourceFunction();
+        assertProducedTypeOfSourceFunction(debeziumSourceFunction, expectedSource.producedDataType);
     }
 
     @Test

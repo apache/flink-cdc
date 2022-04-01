@@ -40,6 +40,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getHis
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getMessageTimestamp;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getWatermark;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHeartbeatEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isTransactionMetadataRecord;
@@ -93,16 +94,16 @@ public final class MySqlRecordEmitter<T>
                 splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
             }
             if (includeSchemaChanges) {
+                BinlogOffset position = getBinlogPosition(element);
+                splitState.asBinlogSplitState().setStartingOffset(position);
                 emitElement(element, output);
             }
         } else if (isDataChangeRecord(element)) {
-            if (splitState.isBinlogSplitState()) {
-                BinlogOffset position = getBinlogPosition(element);
-                splitState.asBinlogSplitState().setStartingOffset(position);
-            }
+            updateStartingOffsetForSplit(splitState, element);
             reportMetrics(element);
             emitElement(element, output);
-            // Do we need to add splitState.isBinlogSplitState() check here ?
+        } else if (isHeartbeatEvent(element)) {
+            updateStartingOffsetForSplit(splitState, element);
         } else if (isTransactionMetadataRecord(element)) {
             if (includeTransactionMetadata) {
                 emitElement(element, output);
@@ -110,6 +111,13 @@ public final class MySqlRecordEmitter<T>
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
+        }
+    }
+
+    private void updateStartingOffsetForSplit(MySqlSplitState splitState, SourceRecord element) {
+        if (splitState.isBinlogSplitState()) {
+            BinlogOffset position = getBinlogPosition(element);
+            splitState.asBinlogSplitState().setStartingOffset(position);
         }
     }
 

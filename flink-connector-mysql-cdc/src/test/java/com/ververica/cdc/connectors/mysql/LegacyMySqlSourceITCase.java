@@ -30,6 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 import com.alibaba.fastjson.JSONObject;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -40,8 +41,10 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.junit.Assert.assertTrue;
@@ -62,8 +65,25 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         testConsumingAllEventsWithJsonFormat(false);
     }
 
-    private void testConsumingAllEventsWithJsonFormat(Boolean includeSchema) throws Exception {
+    @Test
+    public void testConsumingAllEventsWithJsonFormatWithNumericDecimal() throws Exception {
+        Map<String, Object> customConverterConfigs = new HashMap<>();
+        customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
+        testConsumingAllEventsWithJsonFormat(
+                false,
+                customConverterConfigs,
+                "file/debezium-data-schema-exclude-with-numeric-decimal.json");
+    }
+
+    private void testConsumingAllEventsWithJsonFormat(
+            Boolean includeSchema, Map<String, Object> customConverterConfigs, String expectedFile)
+            throws Exception {
         fullTypesDatabase.createAndInitialize();
+        JsonDebeziumDeserializationSchema schema =
+                customConverterConfigs == null
+                        ? new JsonDebeziumDeserializationSchema(includeSchema)
+                        : new JsonDebeziumDeserializationSchema(
+                                includeSchema, customConverterConfigs);
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
@@ -72,7 +92,7 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                         .databaseList(fullTypesDatabase.getDatabaseName())
                         .username(fullTypesDatabase.getUsername())
                         .password(fullTypesDatabase.getPassword())
-                        .deserializer(new JsonDebeziumDeserializationSchema(includeSchema))
+                        .deserializer(schema)
                         .build();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
@@ -83,10 +103,6 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                                 .useBlinkPlanner()
                                 .inStreamingMode()
                                 .build());
-        final String expectedFile =
-                includeSchema
-                        ? "file/debezium-data-schema-include.json"
-                        : "file/debezium-data-schema-exclude.json";
         final JSONObject expected =
                 JSONObject.parseObject(readLines(expectedFile), JSONObject.class);
         JSONObject expectSnapshot = expected.getJSONObject("expected_snapshot");
@@ -114,6 +130,14 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                 dataInJsonIsEquals(
                         fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
         result.getJobClient().get().cancel().get();
+    }
+
+    private void testConsumingAllEventsWithJsonFormat(Boolean includeSchema) throws Exception {
+        String expectedFile =
+                includeSchema
+                        ? "file/debezium-data-schema-include.json"
+                        : "file/debezium-data-schema-exclude.json";
+        testConsumingAllEventsWithJsonFormat(includeSchema, null, expectedFile);
     }
 
     private static List<Object> fetchRows(Iterator<Row> iter, int size) {

@@ -7,19 +7,13 @@ The Flink CDC Connectors integrates Debezium as the engine to capture data chang
 
 ## Supported Connectors
 
-| Database | Version |
-| --- | --- |
-| MySQL | Database: 5.7, 8.0.x <br/>JDBC Driver: 8.0.16 |
-| PostgreSQL | Database: 9.6, 10, 11, 12 <br/>JDBC Driver: 42.2.12|
-| MongoDB | Database: 3.6, 4.x, 5.0 <br/>MongoDB Driver: 4.3.1|
-| Oracle | Database: 11, 12, 19 <br/>Oracle Driver: 19.3.0.0|
-| Sqlserver | Database: 2017, 2019 <br/>JDBC Driver: 7.2.2.jre8|
-
-## Supported Formats
-
-| Format | Supported Connector | Flink Version |
-| --- | --- | --- |
-| <a href="https://github.com/ververica/flink-cdc-connectors/wiki/Changelog-JSON-Format">Changelog Json</a> | <a href="https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/connectors/kafka.html">Apache Kafka</a> | 1.11+ |
+| Connector                                                 | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
+| [mysql-cdc](connectors/mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.16     |
+| [postgres-cdc](connectors/postgres-cdc.md)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12                                                                                                                                                                                                                                                                                                                                         | JDBC Driver: 42.2.12    |
+| [mongodb-cdc](connectors/mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                                 | MongoDB Driver: 4.3.1   |
+| [oracle-cdc](connectors/oracle-cdc.md)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19                                                                                                                                                                                                                                                                                                                                           | Oracle Driver: 19.3.0.0 |
+| [sqlserver-cdc](connectors/sqlserver-cdc.md) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2017, 2019                                                                                                                                                                                                                                                                                                                                     | JDBC Driver: 7.2.2.jre8 | 
 
 ## Supported Flink Versions 
 The following table shows the version mapping between Flink CDC Connectors and Flink:
@@ -252,6 +246,16 @@ In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Const
 }
 ```
 Usually, it is recommended to exclude schema because schema fields makes the messages very verbose which reduces parsing performance.
+
+The `JsonDebeziumDeserializationSchema` can also accept custom configuration of `JsonConverter`, for example if you want to obtain numeric output for decimal data,
+you can construct `JsonDebeziumDeserializationSchema` as following:
+
+```java
+ Map<String, Object> customConverterConfigs = new HashMap<>();
+ customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
+ JsonDebeziumDeserializationSchema schema = 
+      new JsonDebeziumDeserializationSchema(true, customConverterConfigs);
+```
 
 ## Building from source
 

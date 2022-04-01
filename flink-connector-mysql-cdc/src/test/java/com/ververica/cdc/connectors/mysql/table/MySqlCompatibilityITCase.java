@@ -125,7 +125,7 @@ public class MySqlCompatibilityITCase {
                 (MySqlContainer)
                         new MySqlContainer(version)
                                 .withConfigurationOverride(
-                                        buildMySqlConfigWithTimezone(version, enableGtid))
+                                        buildCustomMySqlConfig(version, enableGtid))
                                 .withSetupSQL("docker/setup.sql")
                                 .withDatabaseName("flink-test")
                                 .withUsername("flinkuser")
@@ -239,7 +239,7 @@ public class MySqlCompatibilityITCase {
         return rows;
     }
 
-    private String buildMySqlConfigWithTimezone(MySqlVersion version, boolean enableGtid) {
+    private String buildCustomMySqlConfig(MySqlVersion version, boolean enableGtid) {
         try {
             File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
             Path cnf = Files.createFile(Paths.get(folder.getPath(), "my.cnf"));

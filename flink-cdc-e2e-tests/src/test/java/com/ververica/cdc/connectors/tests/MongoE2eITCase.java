@@ -30,6 +30,7 @@ import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.After;
@@ -82,14 +83,12 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         // please check your '/etc/hosts' file contains the line 'internet_ip(not 127.0.0.1)
         // hostname' e.g: '30.225.0.87   leonard.machine'
         mongodb =
-                new MongoDBContainer()
-                        .withNetwork(NETWORK)
+                new MongoDBContainer(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
 
         Startables.deepStart(Stream.of(mongodb)).join();
 
-        executeCommandFileInMongoDB("mongo_setup", "admin");
         MongoClientSettings settings =
                 MongoClientSettings.builder()
                         .applyConnectionString(
@@ -225,7 +224,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
             String command1 =
                     Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
                             .map(String::trim)
-                            .filter(x -> !x.startsWith("//") && !x.isEmpty())
+                            .filter(x -> StringUtils.isNotBlank(x) && !x.trim().startsWith("//"))
                             .map(
                                     x -> {
                                         final Matcher m = COMMENT_PATTERN.matcher(x);

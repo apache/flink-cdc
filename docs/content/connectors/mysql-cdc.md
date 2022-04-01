@@ -253,6 +253,20 @@ During a snapshot operation, the connector will query each included table to pro
           <td>The connection pool size.</td>
     </tr>
     <tr>
+          <td>jdbc.properties.*</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">20</td>
+          <td>String</td>
+          <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
+    </tr>
+    <tr>
+          <td>heartbeat.interval</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">30s</td>
+          <td>Duration</td>
+          <td>The interval of sending heartbeat event for tracing the latest available binlog offsets.</td>
+    </tr>
+    <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -374,6 +388,11 @@ log-slave-updates = 1
 After the server you monitored fails in MySQL cluster, you only need to change the monitored server address to other available server and then restart the job from the latest checkpoint/savepoint, the job will restore from the checkpoint/savepoint and won't miss any records.
 
 It's recommended to configure a DNS(Domain Name Service) or VIP(Virtual IP Address) for your MySQL cluster, using the DNS or VIP address for ```mysql-cdc``` connector, the DNS or VIP would automatically route the network request to the active MySQL server. In this way, you don't need to modify the address and restart your pipeline anymore.
+
+#### MySQL Heartbeat Event Support
+
+If the table updates infrequently, the binlog file or GTID set may have been cleaned in its last committed binlog position.
+The CDC job may restart fails in this case. So the heartbeat event will help update binlog position. By default heartbeat event is enabled in MySQL CDC source and the interval is set to 30 seconds. You can specify the interval by using table option ```heartbeat.interval```, or set the option to `0s` to disable heartbeat events.
 
 #### How Incremental Snapshot Reading works
 

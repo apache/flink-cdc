@@ -45,6 +45,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkSize;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -143,6 +145,9 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000111")),
                 Updates.set("weight", 5.17));
+
+        // Delay delete operations to avoid unstable tests.
+        waitForSinkSize("sink", 19);
 
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
@@ -436,6 +441,9 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
                 Filters.eq("_id", new ObjectId("100000000000000000000111")),
                 Updates.set("weight", 5.17));
 
+        // Delay delete operations to avoid unstable tests.
+        waitForSinkSize("meta_sink", 15);
+
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
         waitForSinkSize("meta_sink", 16);
@@ -466,30 +474,6 @@ public class MongoDBConnectorITCase extends MongoDBTestBase {
         Collections.sort(actual);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 
     private Document productDocOf(String id, String name, String description, Double weight) {
