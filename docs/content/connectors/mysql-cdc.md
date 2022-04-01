@@ -492,8 +492,8 @@ public class MySqlSourceExample {
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .databaseList("yourDatabaseName") // set captured database
-        .tableList("yourDatabaseName.yourTableName") // set captured table, If you need to synchronize the whole database, Please set tableList to ".*".
+        .databaseList("yourDatabaseName") // set captured database, If you need to synchronize the whole database, Please set tableList to ".*".
+        .tableList("yourDatabaseName.yourTableName") // set captured table
         .username("yourUsername")
         .password("yourPassword")
         .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
