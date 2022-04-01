@@ -123,7 +123,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.13.5", "1.14.3");
+        return Arrays.asList("1.13.6", "1.14.4");
     }
 
     @Before
@@ -165,6 +165,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
         if (taskManager != null) {
             taskManager.stop();
         }
+        mysqlInventoryDatabase.dropDatabase();
     }
 
     /**

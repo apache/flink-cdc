@@ -47,3 +47,10 @@ stages:
             vmImage: 'ubuntu-20.04'
           run_end_to_end: false
           jdk: 8
+      - template: tools/azure-pipelines/jobs-template-for-self-hosted-agent.yml
+        parameters: # see template file for a definition of the parameters.
+          stage_name: ci_build_on_self_hosted_agent
+          test_pool_definition:
+            name: Flink_CDC_CI
+          run_end_to_end: false
+          jdk: 8

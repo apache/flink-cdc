@@ -21,7 +21,7 @@ under the License.
     <parent>
         <artifactId>flink-cdc-connectors</artifactId>
         <groupId>com.ververica</groupId>
-        <version>2.2-SNAPSHOT</version>
+        <version>2.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -30,8 +30,8 @@ under the License.
     <packaging>jar</packaging>
 
     <properties>
-        <flink-1.13>1.13.5</flink-1.13>
-        <flink-1.14>1.14.3</flink-1.14>
+        <flink-1.13>1.13.6</flink-1.13>
+        <flink-1.14>1.14.4</flink-1.14>
         <mysql.driver.version>8.0.27</mysql.driver.version>
     </properties>
 
@@ -80,6 +80,13 @@ under the License.
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-connector-sqlserver-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-connector-tidb-cdc</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
@@ -249,6 +256,16 @@ under the License.
                             <artifactId>flink-sql-connector-sqlserver-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>sqlserver-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ververica</groupId>
+                            <artifactId>flink-sql-connector-tidb-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>tidb-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
