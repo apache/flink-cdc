@@ -57,6 +57,7 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
     private final Properties jdbcProperties;
+    private final boolean includeTransactionMetadata;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -86,7 +87,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
             Properties dbzProperties,
-            Properties jdbcProperties) {
+            Properties jdbcProperties,
+            boolean includeTransactionMetadata) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -106,6 +108,7 @@ public class MySqlSourceConfig implements Serializable {
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.includeTransactionMetadata = includeTransactionMetadata;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
@@ -187,6 +190,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isScanNewlyAddedTableEnabled() {
         return scanNewlyAddedTableEnabled;
+    }
+
+    public boolean isIncludeTransactionMetadata() {
+        return includeTransactionMetadata;
     }
 
     public Properties getDbzProperties() {

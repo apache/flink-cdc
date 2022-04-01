@@ -196,6 +196,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should output transaction metadata or not. */
+    public MySqlSourceBuilder<T> includeTransactionMetadata(boolean includeTransactionMetadata) {
+        this.configFactory.includeTransactionMetadata(includeTransactionMetadata);
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);

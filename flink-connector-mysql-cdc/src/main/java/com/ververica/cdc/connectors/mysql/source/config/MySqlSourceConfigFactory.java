@@ -72,6 +72,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean scanNewlyAddedTableEnabled = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
+    private boolean includeTransactionMetadata = false;
     private Properties dbzProperties;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
@@ -211,6 +212,12 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should output transaction metadata or not. */
+    public MySqlSourceConfigFactory includeTransactionMetadata(boolean includeTransactionMetadata) {
+        this.includeTransactionMetadata = includeTransactionMetadata;
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should scan the newly added tables or not. */
     public MySqlSourceConfigFactory scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
@@ -286,6 +293,8 @@ public class MySqlSourceConfigFactory implements Serializable {
         // but it'll cause lose of precise when the value is larger than 2^63,
         // so use "precise" mode to avoid it.
         props.put("bigint.unsigned.handling.mode", "precise");
+        props.setProperty(
+                "provide.transaction.metadata", String.valueOf(includeTransactionMetadata));
 
         if (serverIdRange != null) {
             int serverId = serverIdRange.getServerId(subtaskId);
@@ -331,6 +340,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 includeSchemaChanges,
                 scanNewlyAddedTableEnabled,
                 props,
-                jdbcProperties);
+                jdbcProperties,
+                includeTransactionMetadata);
     }
 }
