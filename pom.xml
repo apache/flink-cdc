@@ -71,6 +71,18 @@ under the License.
         </repository>
     </distributionManagement>
 
+    <repositories>
+        <repository>
+            <id>confluent</id>
+            <name>Confluent</name>
+            <url>https://packages.confluent.io/maven/</url>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <properties>
         <flink.version>1.13.5</flink.version>
         <debezium.version>1.5.4.Final</debezium.version>

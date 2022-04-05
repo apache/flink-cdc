@@ -76,7 +76,29 @@ under the License.
         </dependency>
 
         <!-- test dependencies on Debezium -->
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-connect-avro-converter</artifactId>
+            <version>6.0.2</version>
+            <scope>test</scope>
+        </dependency>
+        
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-connector-mysql</artifactId>
+            <version>${debezium.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-embedded</artifactId>
+            <version>${debezium.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-connector-test-util</artifactId>
@@ -96,6 +118,13 @@ under the License.
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
             <version>1.2.78</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.easytesting</groupId>
+            <artifactId>fest-assert</artifactId>
+            <version>1.4</version>
             <scope>test</scope>
         </dependency>
 
