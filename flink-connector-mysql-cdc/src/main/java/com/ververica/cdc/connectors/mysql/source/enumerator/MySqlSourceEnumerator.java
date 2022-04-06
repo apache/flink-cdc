@@ -56,8 +56,7 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.NEWLY_ADDED_ASSIGNING;
-import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.NEWLY_ADDED_ASSIGNING_FINISHED;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigning;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
 
@@ -87,8 +86,12 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
-        if (splitAssigner.getAssignerStatus() == NEWLY_ADDED_ASSIGNING
-                || splitAssigner.getAssignerStatus() == NEWLY_ADDED_ASSIGNING_FINISHED) {
+
+        // when restored from state, if the split assigner is assigning snapshot
+        // splits or has already assigned all splits, send wakeup event to
+        // SourceReader, SourceReader can omit the event based on its own status.
+        if (isAssigning(splitAssigner.getAssignerStatus())
+                || isAssigningFinished(splitAssigner.getAssignerStatus())) {
             binlogReaderIsSuspended = true;
         }
     }
