@@ -69,11 +69,13 @@ public class SqlServerValidator implements Validator {
 
     private void checkVersion(Connection connection) throws SQLException {
         DatabaseMetaData metaData = connection.getMetaData();
-        if (metaData.getDatabaseMajorVersion() != 14 && metaData.getDatabaseMajorVersion() != 15) {
+        // For more information on sqlserver version, please refer to
+        // https://docs.microsoft.com/en-us/troubleshoot/sql/general/determine-version-edition-update-level.
+        if (metaData.getDatabaseMajorVersion() < 11) {
             throw new ValidationException(
                     String.format(
                             "Currently Flink SqlServer CDC connector only supports SqlServer "
-                                    + "whose version is either 14 or 15, but actual is %d.",
+                                    + "whose version is larger or equal to 11, but actual is %d.",
                             metaData.getDatabaseMajorVersion()));
         }
     }
