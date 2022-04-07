@@ -455,9 +455,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             }
 
             // trigger failover after some snapshot data read finished
-            if (failoverPhase == FailoverPhase.SNAPSHOT
-                    && TestValuesTableFactory.getRawResults("sink").size()
-                            > fetchedDataList.size()) {
+            if (failoverPhase == FailoverPhase.SNAPSHOT) {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),

@@ -188,6 +188,11 @@ public enum AssignerStatus {
         return assignerStatus == INITIAL_ASSIGNING || assignerStatus == NEWLY_ADDED_ASSIGNING;
     }
 
+    /** Returns whether the split assigner is assigning newly added snapshot splits. */
+    public static boolean isNewlyAddedAssigning(AssignerStatus assignerStatus) {
+        return assignerStatus == NEWLY_ADDED_ASSIGNING;
+    }
+
     /** Returns whether the split assigner has finished its initial tables assignment. */
     public static boolean isInitialAssigningFinished(AssignerStatus assignerStatus) {
         return assignerStatus == INITIAL_ASSIGNING_FINISHED;
