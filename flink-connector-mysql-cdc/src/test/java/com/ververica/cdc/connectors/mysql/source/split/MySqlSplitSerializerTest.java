@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
@@ -101,6 +102,9 @@ public class MySqlSplitSerializerTest {
                         databaseHistory,
                         finishedSplitsInfo.size());
         assertEquals(split, serializeAndDeserializeSplit(split));
+
+        final MySqlSplit suspendedBinlogSplit = toSuspendedBinlogSplit(split.asBinlogSplit());
+        assertEquals(suspendedBinlogSplit, serializeAndDeserializeSplit(suspendedBinlogSplit));
 
         final MySqlSplit unCompletedBinlogSplit =
                 new MySqlBinlogSplit(
