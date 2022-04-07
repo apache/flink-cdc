@@ -76,26 +76,17 @@ public class SourceRecordUtils {
 
     public static boolean isLowWatermarkEvent(SourceRecord record) {
         Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        if (watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.LOW) {
-            return true;
-        }
-        return false;
+        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.LOW;
     }
 
     public static boolean isHighWatermarkEvent(SourceRecord record) {
         Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        if (watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.HIGH) {
-            return true;
-        }
-        return false;
+        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.HIGH;
     }
 
     public static boolean isEndWatermarkEvent(SourceRecord record) {
         Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        if (watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.BINLOG_END) {
-            return true;
-        }
-        return false;
+        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.BINLOG_END;
     }
 
     /**
@@ -134,10 +125,7 @@ public class SourceRecordUtils {
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
-        if (keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name())) {
-            return true;
-        }
-        return false;
+        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {

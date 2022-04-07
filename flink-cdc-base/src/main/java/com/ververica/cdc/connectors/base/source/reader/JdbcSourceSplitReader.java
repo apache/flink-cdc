@@ -52,7 +52,7 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
 
     @Nullable private Fetcher<SourceRecord, SourceSplitBase> currenFetcher;
     @Nullable private String currentSplitId;
-    private JdbcDataSourceDialect dataSourceDialect;
+    private final JdbcDataSourceDialect dataSourceDialect;
 
     public JdbcSourceSplitReader(int subtaskId, JdbcDataSourceDialect dataSourceDialect) {
         this.subtaskId = subtaskId;

@@ -66,7 +66,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
 
     @Nullable private Long checkpointIdToFinish;
     private final DataSourceDialect dialect;
-    private OffsetFactory offsetFactory;
+    private final OffsetFactory offsetFactory;
 
     public SnapshotSplitAssigner(
             SourceConfig sourceConfig,

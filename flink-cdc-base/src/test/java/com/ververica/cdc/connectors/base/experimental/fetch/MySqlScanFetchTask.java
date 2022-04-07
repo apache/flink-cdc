@@ -150,8 +150,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(
             StreamSplit backfillBinlogSplit, MySqlSourceFetchTaskContext context) {
         final MySqlOffsetContext.Loader loader =
-                new MySqlOffsetContext.Loader(
-                        (MySqlConnectorConfig) context.getSourceConfig().getDbzConnectorConfig());
+                new MySqlOffsetContext.Loader(context.getSourceConfig().getDbzConnectorConfig());
         final MySqlOffsetContext mySqlOffsetContext =
                 (MySqlOffsetContext)
                         loader.load(backfillBinlogSplit.getStartingOffset().getOffset());

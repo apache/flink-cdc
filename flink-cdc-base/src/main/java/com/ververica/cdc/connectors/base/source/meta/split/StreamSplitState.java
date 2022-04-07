@@ -66,6 +66,7 @@ public class StreamSplitState extends SourceSplitState {
         this.tableSchemas.put(tableId, latestTableChange);
     }
 
+    @Override
     public StreamSplit toSourceSplit() {
         final StreamSplit binlogSplit = split.asStreamSplit();
         return new StreamSplit(

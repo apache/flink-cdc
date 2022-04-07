@@ -62,7 +62,7 @@ public class ServerIdRange implements Serializable {
                                     + "please adjust the server id range to "
                                     + "make the number of server id larger than "
                                     + "the source parallelism.",
-                            subTaskId, this.toString()));
+                            subTaskId, this));
         }
         return startServerId + subTaskId;
     }

@@ -41,6 +41,7 @@ public class SnapshotSplitState extends SourceSplitState {
         this.highWatermark = highWatermark;
     }
 
+    @Override
     public SnapshotSplit toSourceSplit() {
         final SnapshotSplit snapshotSplit = split.asSnapshotSplit();
         return new SnapshotSplit(
