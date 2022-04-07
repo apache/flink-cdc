@@ -32,6 +32,7 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
@@ -42,6 +43,7 @@ import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
@@ -81,6 +83,7 @@ public class StatefulTaskContext {
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
     private MySqlOffsetContext offsetContext;
+    private MySqlPartition mySqlPartition;
     private TopicSelector<TableId> topicSelector;
     private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
@@ -113,6 +116,10 @@ public class StatefulTaskContext {
                 mySqlSplit.getTableSchemas().values());
         this.databaseSchema =
                 DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
+
+        this.mySqlPartition =
+                new MySqlPartition.Provider(connectorConfig).getPartitions().iterator().next();
+
         this.offsetContext =
                 loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
@@ -152,7 +159,7 @@ public class StatefulTaskContext {
 
         this.signalEventDispatcher =
                 new SignalEventDispatcher(
-                        offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
+                        offsetContext.getOffset(), topicSelector.getPrimaryTopic(), queue);
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
@@ -164,15 +171,14 @@ public class StatefulTaskContext {
         this.streamingChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
-        this.errorHandler =
-                new MySqlErrorHandler(
-                        connectorConfig.getLogicalName(), queue, taskContext, sourceConfig);
+        this.errorHandler = new MySqlErrorHandler(
+                        connectorConfig, queue, taskContext, sourceConfig);
     }
 
     private void validateAndLoadDatabaseHistory(
             MySqlOffsetContext offset, MySqlDatabaseSchema schema) {
         schema.initializeStorage();
-        schema.recover(offset);
+        schema.recover(Offsets.of(mySqlPartition, offset));
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
@@ -379,17 +385,19 @@ public class StatefulTaskContext {
         return offsetContext;
     }
 
+    public MySqlPartition getMySqlPartition() {
+        return mySqlPartition;
+    }
+
     public TopicSelector<TableId> getTopicSelector() {
         return topicSelector;
     }
 
     public SnapshotChangeEventSourceMetrics getSnapshotChangeEventSourceMetrics() {
-        snapshotChangeEventSourceMetrics.reset();
         return snapshotChangeEventSourceMetrics;
     }
 
     public StreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
-        streamingChangeEventSourceMetrics.reset();
         return streamingChangeEventSourceMetrics;
     }
 

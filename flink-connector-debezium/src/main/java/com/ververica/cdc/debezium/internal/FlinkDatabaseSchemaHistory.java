@@ -149,6 +149,19 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
     }
 
     @Override
+    public void recover(
+            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
+        listener.recoveryStarted();
+        for (SchemaRecord record : latestTables.values()) {
+            TableChange tableChange =
+                    FlinkJsonTableChangeSerializer.fromDocument(
+                            record.getTableChangeDoc(), useCatalogBeforeSchema);
+            schema.overwriteTable(tableChange.getTable());
+        }
+        listener.recoveryStopped();
+    }
+
+    @Override
     public void stop() {
         if (instanceName != null) {
             removeHistory(instanceName);

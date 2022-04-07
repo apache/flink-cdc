@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.debezium.dispatcher;
 
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
@@ -57,7 +58,8 @@ import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulT
  *     this is useful for downstream to deserialize the {@link HistoryRecord} back.
  * </pre>
  */
-public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispatcher<T> {
+public class EventDispatcherImpl<T extends DataCollectionId>
+        extends EventDispatcher<MySqlPartition, T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(EventDispatcherImpl.class);
 
@@ -123,19 +125,6 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
 
     public ChangeEventQueue<DataChangeEvent> getQueue() {
         return queue;
-    }
-
-    @Override
-    public void dispatchSchemaChangeEvent(
-            T dataCollectionId, SchemaChangeEventEmitter schemaChangeEventEmitter)
-            throws InterruptedException {
-        if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
-            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
-                LOG.trace("Filtering schema change event for {}", dataCollectionId);
-                return;
-            }
-        }
-        schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
     }
 
     @Override
