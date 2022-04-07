@@ -47,6 +47,7 @@ import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
@@ -829,7 +830,13 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         binlogSplitAssigner.open();
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
-                    TableDiscoveryUtils.discoverSchemaForCapturedTables(sourceConfig, jdbc);
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                            new MySqlPartition.Provider(sourceConfig.getMySqlConnectorConfig())
+                                    .getPartitions()
+                                    .iterator()
+                                    .next(),
+                            sourceConfig,
+                            jdbc);
             return MySqlBinlogSplit.fillTableSchemas(
                     binlogSplitAssigner.getNext().get().asBinlogSplit(), tableSchemas);
         }

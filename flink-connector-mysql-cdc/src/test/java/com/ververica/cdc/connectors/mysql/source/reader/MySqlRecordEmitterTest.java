@@ -28,6 +28,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.heartbeat.Heartbeat;
+import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
@@ -42,7 +43,12 @@ public class MySqlRecordEmitterTest {
 
     @Test
     public void testHeartbeatEventHandling() throws Exception {
-        Heartbeat heartbeat = Heartbeat.create(Duration.ofMillis(100), "fake-topic", "fake-key");
+        Heartbeat heartbeat =
+                Heartbeat.create(
+                        Duration.ofMillis(100),
+                        "fake-topic",
+                        "fake-key",
+                        SchemaNameAdjuster.create());
         BinlogOffset fakeOffset = BinlogOffset.ofBinlogFilePosition("fake-file", 15213L);
         MySqlRecordEmitter<Void> recordEmitter = createRecordEmitter();
         MySqlBinlogSplitState splitState = createBinlogSplitState();

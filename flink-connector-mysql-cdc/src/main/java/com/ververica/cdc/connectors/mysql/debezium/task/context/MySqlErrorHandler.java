@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import io.debezium.DebeziumException;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlConnector;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlTaskContext;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.relational.TableId;
@@ -47,11 +48,11 @@ public class MySqlErrorHandler extends ErrorHandler {
     private final MySqlSourceConfig sourceConfig;
 
     public MySqlErrorHandler(
-            String logicalName,
+            MySqlConnectorConfig mySqlConnectorConfig,
             ChangeEventQueue<?> queue,
             MySqlTaskContext context,
             MySqlSourceConfig sourceConfig) {
-        super(MySqlConnector.class, logicalName, queue);
+        super(MySqlConnector.class, mySqlConnectorConfig, queue);
         this.context = context;
         this.sourceConfig = sourceConfig;
     }

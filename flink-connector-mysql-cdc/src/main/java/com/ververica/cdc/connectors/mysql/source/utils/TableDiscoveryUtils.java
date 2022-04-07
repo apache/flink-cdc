@@ -21,6 +21,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -96,7 +97,7 @@ public class TableDiscoveryUtils {
     }
 
     public static Map<TableId, TableChange> discoverSchemaForCapturedTables(
-            MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
+            MySqlPartition partition, MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
         final List<TableId> capturedTableIds;
         try {
             capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
@@ -134,7 +135,8 @@ public class TableDiscoveryUtils {
         MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive());
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
         for (TableId tableId : capturedTableIds) {
-            TableChange tableSchema = mySqlSchema.getTableSchema(jdbc, tableId);
+            TableChange tableSchema =
+                    mySqlSchema.getTableSchema(partition, jdbc, tableId);
             tableSchemas.put(tableId, tableSchema);
         }
         return tableSchemas;

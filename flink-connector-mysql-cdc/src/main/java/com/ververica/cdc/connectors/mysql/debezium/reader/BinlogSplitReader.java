@@ -125,6 +125,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     try {
                         binlogSplitReadTask.execute(
                                 new BinlogSplitChangeEventSourceContextImpl(),
+                                statefulTaskContext.getMySqlPartition(),
                                 statefulTaskContext.getOffsetContext());
                     } catch (Exception e) {
                         currentTaskRunning = false;

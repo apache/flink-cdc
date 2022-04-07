@@ -48,6 +48,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;

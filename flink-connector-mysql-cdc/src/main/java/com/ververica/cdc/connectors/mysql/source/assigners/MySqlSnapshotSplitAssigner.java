@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -538,8 +539,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
             // split the remaining tables
             for (TableId nextTable : remainingTables) {
-                splitTable(nextTable);
-            }
+                splitTable(
+                                new MySqlPartition.Provider(sourceConfig.getMySqlConnectorConfig())
+                                        .getPartitions()
+                                        .iterator()
+                                        .next(),
+                                nextTable);
+                }
         } catch (Throwable e) {
             synchronized (lock) {
                 if (uncaughtSplitterException == null) {

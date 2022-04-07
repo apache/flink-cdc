@@ -29,6 +29,7 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
@@ -58,8 +59,10 @@ public class DebeziumUtils {
     public static JdbcConnection openJdbcConnection(MySqlSourceConfig sourceConfig) {
         JdbcConnection jdbc =
                 new JdbcConnection(
-                        sourceConfig.getDbzConfiguration(),
-                        new JdbcConnectionFactory(sourceConfig));
+                        JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
+                        new JdbcConnectionFactory(sourceConfig),
+                        "`",
+                        "`");
         try {
             jdbc.connect();
         } catch (Exception e) {

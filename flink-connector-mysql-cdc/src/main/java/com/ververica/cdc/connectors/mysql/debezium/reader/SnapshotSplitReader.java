@@ -106,6 +106,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         this.reachEnd = new AtomicBoolean(false);
     }
 
+    @Override
     public void submitSplit(MySqlSplit mySqlSplit) {
         this.currentSnapshotSplit = mySqlSplit.asSnapshotSplit();
         statefulTaskContext.configure(currentSnapshotSplit);
@@ -133,7 +134,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                                 new SnapshotSplitChangeEventSourceContextImpl();
                         SnapshotResult snapshotResult =
                                 splitSnapshotReadTask.execute(
-                                        sourceContext, statefulTaskContext.getOffsetContext());
+                                        sourceContext,
+                                        statefulTaskContext.getMySqlPartition(),
+                                        statefulTaskContext.getOffsetContext());
 
                         final MySqlBinlogSplit backfillBinlogSplit =
                                 createBackfillBinlogSplit(sourceContext);
@@ -162,6 +165,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
                             backfillBinlogReadTask.execute(
                                     new SnapshotBinlogSplitChangeEventSourceContextImpl(),
+                                    statefulTaskContext.getMySqlPartition(),
                                     mySqlOffsetContext);
                         } else {
                             setReadException(
@@ -219,7 +223,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             throws InterruptedException {
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
-                        statefulTaskContext.getOffsetContext().getPartition(),
+                        statefulTaskContext.getOffsetContext().getOffset(),
                         statefulTaskContext.getTopicSelector().getPrimaryTopic(),
                         statefulTaskContext.getDispatcher().getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(

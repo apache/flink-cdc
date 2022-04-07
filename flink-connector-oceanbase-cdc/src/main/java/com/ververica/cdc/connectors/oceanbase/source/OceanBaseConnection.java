@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.oceanbase.source;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.config.Configuration;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 
 import java.sql.DatabaseMetaData;
@@ -54,7 +55,9 @@ public class OceanBaseConnection extends JdbcConnection {
             ClassLoader classLoader) {
         super(
                 config(hostname, port, user, password, timeout),
-                factory(jdbcDriver, jdbcProperties, classLoader));
+                factory(jdbcDriver, jdbcProperties, classLoader),
+                "`",
+                "`");
         this.compatibleMode = compatibleMode;
     }
 

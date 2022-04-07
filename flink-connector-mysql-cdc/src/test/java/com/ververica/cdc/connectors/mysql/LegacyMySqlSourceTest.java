@@ -1117,6 +1117,11 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         private MockedTable() {}
 
         @Override
+        public String comment() {
+            return "";
+        }
+
+        @Override
         public TableId id() {
             return TableId.parse("Test");
         }
