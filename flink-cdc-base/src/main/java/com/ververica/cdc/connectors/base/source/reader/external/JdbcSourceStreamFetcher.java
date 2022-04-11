@@ -75,6 +75,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
     }
 
+    @Override
     public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
         this.streamFetchTask = fetchTask;
         this.currentStreamSplit = fetchTask.getSplit().asStreamSplit();

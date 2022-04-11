@@ -64,7 +64,7 @@ public class JdbcSourceRecordEmitter<T>
     private final SourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
-    private OffsetFactory offsetFactory;
+    private final OffsetFactory offsetFactory;
 
     public JdbcSourceRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,

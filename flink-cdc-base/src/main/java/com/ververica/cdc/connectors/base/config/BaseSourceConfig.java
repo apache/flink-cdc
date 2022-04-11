@@ -61,26 +61,32 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.dbzConfiguration = dbzConfiguration;
     }
 
+    @Override
     public StartupOptions getStartupOptions() {
         return startupOptions;
     }
 
+    @Override
     public int getSplitSize() {
         return splitSize;
     }
 
+    @Override
     public int getSplitMetaGroupSize() {
         return splitMetaGroupSize;
     }
 
+    @Override
     public double getDistributionFactorUpper() {
         return distributionFactorUpper;
     }
 
+    @Override
     public double getDistributionFactorLower() {
         return distributionFactorLower;
     }
 
+    @Override
     public boolean isIncludeSchemaChanges() {
         return includeSchemaChanges;
     }

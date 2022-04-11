@@ -67,8 +67,7 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         // database history
         props.setProperty(
                 "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty(
-                "database.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
+        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));

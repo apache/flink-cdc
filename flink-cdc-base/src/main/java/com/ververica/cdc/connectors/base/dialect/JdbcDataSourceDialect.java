@@ -41,9 +41,11 @@ public interface JdbcDataSourceDialect
         extends DataSourceDialect<TableId, TableChange, JdbcSourceConfig> {
 
     /** Discovers the list of table to capture. */
+    @Override
     List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig);
 
     /** Discovers the captured tables' schema by {@link SourceConfig}. */
+    @Override
     Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig);
 
     /**

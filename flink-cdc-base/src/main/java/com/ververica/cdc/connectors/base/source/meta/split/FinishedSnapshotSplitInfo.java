@@ -45,7 +45,7 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
     private final Object[] splitEnd;
     private final Offset highWatermark;
 
-    private OffsetFactory offsetFactory;
+    private final OffsetFactory offsetFactory;
 
     public FinishedSnapshotSplitInfo(
             TableId tableId,

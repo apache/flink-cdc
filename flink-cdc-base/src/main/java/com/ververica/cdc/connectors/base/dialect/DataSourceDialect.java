@@ -61,7 +61,7 @@ public interface DataSourceDialect<ID extends DataCollectionId, S, C extends Sou
      */
     Offset displayCurrentOffset(C sourceConfig);
 
-    /** Check if the CollectionId is case sensitive or not. */
+    /** Check if the CollectionId is case-sensitive or not. */
     boolean isDataCollectionIdCaseSensitive(C sourceConfig);
 
     /** Returns the {@link ChunkSplitter} which used to split collection to splits. */
