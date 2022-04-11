@@ -57,6 +57,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -225,11 +226,7 @@ public class OracleSourceTest extends AbstractTestBase {
             assertFalse(state.contains("row"));
             assertFalse(state.contains("server_id"));
             assertFalse(state.contains("event"));
-            // int pos = JsonPath.read(state, "$.sourceOffset.pos");
-            // assertTrue(pos > prevPos);
-            // prevPos = pos;
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -282,7 +279,6 @@ public class OracleSourceTest extends AbstractTestBase {
             }
 
             // cancel the source
-            source2.cancel();
             source2.close();
             runThread2.sync();
         }
@@ -293,6 +289,15 @@ public class OracleSourceTest extends AbstractTestBase {
             // ---------------------------------------------------------------------------
             final DebeziumSourceFunction<SourceRecord> source3 = createOracleLogminerSource();
             final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
+
+            String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+            String ss =
+                    "{\"sourcePartition\":{\"server\":\"oracle_logminer\"},\"sourceOffset\":{\"commit_scn\":\""
+                            + JsonPath.read(state, "$.sourceOffset.commit_scn")
+                            + "\",\"transaction_id\":null,\"scn\":\""
+                            + JsonPath.read(state, "$.sourceOffset.commit_scn")
+                            + "\"}}";
+            offsetState.list.set(0, ss.getBytes());
             setupSource(source3, true, offsetState, historyState, true, 0, 1);
 
             // restart the source
@@ -330,10 +335,9 @@ public class OracleSourceTest extends AbstractTestBase {
             }
             assertHistoryState(historyState); // assert the DDL is stored in the history state
             assertEquals(1, offsetState.list.size());
-            String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
+            state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
             assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
 
-            source3.cancel();
             source3.close();
             runThread3.sync();
         }
@@ -371,7 +375,6 @@ public class OracleSourceTest extends AbstractTestBase {
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
             assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
 
-            source4.cancel();
             source4.close();
             runThread4.sync();
         }
@@ -408,13 +411,6 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertEquals(0, offsetState.list.size());
                 assertEquals(0, historyState.list.size());
 
-                // create temporary tables which are not in the whitelist
-                statement.execute(
-                        "CREATE TABLE debezium.tp_001_ogt_products as (select * from debezium.products WHERE 1=2)");
-                // do some renames
-                statement.execute("ALTER TABLE DEBEZIUM.PRODUCTS RENAME TO tp_001_del_products");
-
-                statement.execute("ALTER TABLE debezium.tp_001_ogt_products RENAME TO PRODUCTS");
                 statement.execute(
                         "INSERT INTO debezium.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT) VALUES (110,'robot','Toy robot',1.304)"); // 110
                 statement.execute(
@@ -430,11 +426,9 @@ public class OracleSourceTest extends AbstractTestBase {
                     // trigger checkpoint-1
                     source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
                 }
-
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
-                source.cancel();
                 source.close();
                 runThread.sync();
             }
@@ -465,7 +459,6 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertEquals(1, records.size());
                 assertInsert(records.get(0), "ID", 113);
 
-                source2.cancel();
                 source2.close();
                 runThread2.sync();
             }
@@ -580,7 +573,9 @@ public class OracleSourceTest extends AbstractTestBase {
     }
 
     private OracleSource.Builder<SourceRecord> basicSourceBuilder(OracleContainer oracleContainer) {
-
+        Properties debeziumProperties = new Properties();
+        debeziumProperties.setProperty("debezium.log.mining.strategy", "online_catalog");
+        debeziumProperties.setProperty("debezium.log.mining.continuous.mine", "true");
         return OracleSource.<SourceRecord>builder()
                 .hostname(oracleContainer.getHost())
                 .port(oracleContainer.getOraclePort())
@@ -588,6 +583,7 @@ public class OracleSourceTest extends AbstractTestBase {
                 .tableList("debezium" + "." + "products") // monitor table "products"
                 .username(oracleContainer.getUsername())
                 .password(oracleContainer.getPassword())
+                .debeziumProperties(debeziumProperties)
                 .deserializer(new ForwardDeserializeSchema());
     }
 
@@ -596,7 +592,7 @@ public class OracleSourceTest extends AbstractTestBase {
         List<T> allRecords = new ArrayList<>();
         LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
         while (allRecords.size() < expectedRecordCount) {
-            StreamRecord<T> record = queue.poll(100, TimeUnit.SECONDS);
+            StreamRecord<T> record = queue.poll(200, TimeUnit.SECONDS);
             if (record != null) {
                 allRecords.add(record.getValue());
             } else {
