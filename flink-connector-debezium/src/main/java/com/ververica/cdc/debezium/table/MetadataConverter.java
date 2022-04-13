@@ -19,6 +19,7 @@
 package com.ververica.cdc.debezium.table;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.data.RowData;
 
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -28,5 +29,5 @@ import java.io.Serializable;
 @FunctionalInterface
 @Internal
 public interface MetadataConverter extends Serializable {
-    Object read(SourceRecord record);
+    Object read(SourceRecord record, RowData rowData);
 }

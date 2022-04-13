@@ -19,6 +19,7 @@
 package com.ververica.cdc.connectors.mongodb.table;
 
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
@@ -41,7 +42,7 @@ public enum MongoDBReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct value = (Struct) record.value();
                     Struct to = value.getStruct(MongoDBEnvelope.NAMESPACE_FIELD);
                     return StringData.fromString(
@@ -57,7 +58,7 @@ public enum MongoDBReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct value = (Struct) record.value();
                     Struct to = value.getStruct(MongoDBEnvelope.NAMESPACE_FIELD);
                     return StringData.fromString(
@@ -76,11 +77,23 @@ public enum MongoDBReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct value = (Struct) record.value();
                     Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                     return TimestampData.fromEpochMillis(
                             (Long) source.get(AbstractSourceInfo.TIMESTAMP_KEY));
+                }
+            }),
+    /** It indicates the change type was made in the database. */
+    OP(
+            "op",
+            DataTypes.STRING().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record, RowData rowData) {
+                    return StringData.fromString(rowData.getRowKind().shortString());
                 }
             });
 

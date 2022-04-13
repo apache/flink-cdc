@@ -19,6 +19,7 @@
 package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
@@ -39,7 +40,7 @@ public enum MySqlReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct messageStruct = (Struct) record.value();
                     Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
                     return StringData.fromString(
@@ -55,7 +56,7 @@ public enum MySqlReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct messageStruct = (Struct) record.value();
                     Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
                     return StringData.fromString(
@@ -74,11 +75,24 @@ public enum MySqlReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct messageStruct = (Struct) record.value();
                     Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
+                }
+            }),
+
+    /** It indicates the change type was made in the database. */
+    OP(
+            "op",
+            DataTypes.STRING().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record, RowData rowData) {
+                    return StringData.fromString(rowData.getRowKind().shortString());
                 }
             });
 
