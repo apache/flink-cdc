@@ -2,6 +2,13 @@
 
 The MySQL CDC connector allows for reading snapshot data and incremental data from MySQL database. This document describes how to setup the MySQL CDC connector to run SQL queries against MySQL databases.
 
+
+## Supported Databases
+
+| Connector                                                | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
+| [mysql-cdc](mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.21     |
+
 Dependencies
 ------------
 
@@ -13,8 +20,8 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <!-- the dependency is available only for stable releases. -->
-  <version>2.2-SNAPSHOT</version>
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <version>2.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -22,7 +29,9 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-mysql-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.2-SNAPSHOT/flink-sql-connector-mysql-cdc-2.2-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+
+**Note:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mysql-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mysql-cdc), the released version will be available in the Maven central warehouse. 
 
 Setup MySQL server
 ----------------
@@ -253,6 +262,20 @@ During a snapshot operation, the connector will query each included table to pro
           <td>The connection pool size.</td>
     </tr>
     <tr>
+          <td>jdbc.properties.*</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">20</td>
+          <td>String</td>
+          <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
+    </tr>
+    <tr>
+          <td>heartbeat.interval</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">30s</td>
+          <td>Duration</td>
+          <td>The interval of sending heartbeat event for tracing the latest available binlog offsets.</td>
+    </tr>
+    <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -375,6 +398,11 @@ After the server you monitored fails in MySQL cluster, you only need to change t
 
 It's recommended to configure a DNS(Domain Name Service) or VIP(Virtual IP Address) for your MySQL cluster, using the DNS or VIP address for ```mysql-cdc``` connector, the DNS or VIP would automatically route the network request to the active MySQL server. In this way, you don't need to modify the address and restart your pipeline anymore.
 
+#### MySQL Heartbeat Event Support
+
+If the table updates infrequently, the binlog file or GTID set may have been cleaned in its last committed binlog position.
+The CDC job may restart fails in this case. So the heartbeat event will help update binlog position. By default heartbeat event is enabled in MySQL CDC source and the interval is set to 30 seconds. You can specify the interval by using table option ```heartbeat.interval```, or set the option to `0s` to disable heartbeat events.
+
 #### How Incremental Snapshot Reading works
 
 When the MySQL CDC source is started, it reads snapshot of table parallelly and then reads binlog of table with single parallelism.
@@ -451,7 +479,6 @@ the end of the binlog which means only have the changes since the connector was 
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not using them together. If you speicifying both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 
-
 ### DataStream Source
 
 ```java
@@ -465,7 +492,7 @@ public class MySqlSourceExample {
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .databaseList("yourDatabaseName") // set captured database
+        .databaseList("yourDatabaseName") // set captured database, If you need to synchronize the whole database, Please set tableList to ".*".
         .tableList("yourDatabaseName.yourTableName") // set captured table
         .username("yourUsername")
         .password("yourPassword")
@@ -489,6 +516,63 @@ public class MySqlSourceExample {
 ```
 
 **Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.
+
+### Scan Newly Added Tables
+
+Scan Newly Added Tables feature enables you add new tables to monitor for existing running pipeline, the newly added tables will read theirs snapshot data firstly and then read their changelog automatically.
+ 
+Imaging this scenario: At the beginning, a Flink job monitor tables `[product, user, address]`, but after some days we would like the job can also monitor tables `[order, custom]` which contains history data, and we need the job can still reuse existing state of the job, this feature can resolve this case gracefully.
+
+The following operations show how to enable this feature to resolve above scenario. An existing Flink job which uses CDC Source like:
+
+```java
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .scanNewlyAddedTableEnabled(true) // eanbel scan the newly added tables fature
+        .databaseList("db") // set captured database
+        .tableList("db.product, db.user, db.address") // set captured tables [product, user, address]
+        .username("yourUsername")
+        .password("yourPassword")
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+
+If we would like to add new tables `[order, custom]` to an existing Flink job，just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
+
+_Step 1_: Stop the existing Flink job with savepoint.
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: Update the table list option for the existing Flink job .
+1. update `tableList()` value.
+2. build the jar of updated job.
+```java
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .scanNewlyAddedTableEnabled(true) 
+        .databaseList("db") 
+        .tableList("db.product, db.user, db.address, db.order, db.custom") // set captured tables [product, user, address ,order, custom]
+        .username("yourUsername")
+        .password("yourPassword")
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+_Step 3_: Restore the updated Flink job from savepoint.
+```shell
+$ ./bin/flink run \
+      --detached \ 
+      --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/deployment/cli/#command-line-interface) for more details.
 
 Data Type Mapping
 ----------------

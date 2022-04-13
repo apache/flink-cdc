@@ -79,6 +79,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
     private final boolean scanNewlyAddedTableEnabled;
+    private final Properties jdbcProperties;
+    private final Duration heartbeatInterval;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -110,7 +112,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             int connectionPoolSize,
             double distributionFactorUpper,
             double distributionFactorLower,
-            StartupOptions startupOptions) {
+            StartupOptions startupOptions,
+            Duration heartbeatInterval) {
         this(
                 physicalSchema,
                 port,
@@ -132,7 +135,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 distributionFactorUpper,
                 distributionFactorLower,
                 startupOptions,
-                false);
+                false,
+                new Properties(),
+                heartbeatInterval);
     }
 
     public MySqlTableSource(
@@ -156,7 +161,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorUpper,
             double distributionFactorLower,
             StartupOptions startupOptions,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean scanNewlyAddedTableEnabled,
+            Properties jdbcProperties,
+            Duration heartbeatInterval) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -178,9 +185,11 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.jdbcProperties = jdbcProperties;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
+        this.heartbeatInterval = heartbeatInterval;
     }
 
     @Override
@@ -233,6 +242,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .jdbcProperties(jdbcProperties)
+                            .heartbeatInterval(heartbeatInterval)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -309,7 +320,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         distributionFactorUpper,
                         distributionFactorLower,
                         startupOptions,
-                        scanNewlyAddedTableEnabled);
+                        scanNewlyAddedTableEnabled,
+                        jdbcProperties,
+                        heartbeatInterval);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -346,7 +359,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
-                && Objects.equals(metadataKeys, that.metadataKeys);
+                && Objects.equals(metadataKeys, that.metadataKeys)
+                && Objects.equals(jdbcProperties, that.jdbcProperties);
     }
 
     @Override
@@ -374,7 +388,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 startupOptions,
                 producedDataType,
                 metadataKeys,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                jdbcProperties);
     }
 
     @Override

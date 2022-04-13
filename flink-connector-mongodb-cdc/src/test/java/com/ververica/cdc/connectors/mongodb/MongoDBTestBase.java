@@ -26,9 +26,12 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
 import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
@@ -41,6 +44,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_PASSWORD;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_USER;
 import static org.junit.Assert.assertNotNull;
 
 /**
@@ -54,11 +59,10 @@ public class MongoDBTestBase extends AbstractTestBase {
     protected static final String FLINK_USER = "flinkuser";
     protected static final String FLINK_USER_PASSWORD = "a1?~!@#$%^&*(){}[]<>.,+_-=/|:;";
 
-    protected static final String MONGO_SUPER_USER = "superuser";
-    protected static final String MONGO_SUPER_PASSWORD = "superpw";
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     protected static final MongoDBContainer MONGODB_CONTAINER =
-            new MongoDBContainer().withLogConsumer(new Slf4jLogConsumer(LOG));
+            new MongoDBContainer(NETWORK).withLogConsumer(new Slf4jLogConsumer(LOG));
 
     protected static MongoClient mongodbClient;
 
@@ -66,7 +70,6 @@ public class MongoDBTestBase extends AbstractTestBase {
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MONGODB_CONTAINER)).join();
-        executeCommandFileInDatabase("setup", "admin");
         initialClient();
         LOG.info("Containers are started.");
     }
@@ -111,8 +114,7 @@ public class MongoDBTestBase extends AbstractTestBase {
             String command0 = String.format("db = db.getSiblingDB('%s');\n", dbName);
             String command1 =
                     Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                            .map(String::trim)
-                            .filter(x -> !x.startsWith("//") && !x.isEmpty())
+                            .filter(x -> StringUtils.isNotBlank(x) && !x.trim().startsWith("//"))
                             .map(
                                     x -> {
                                         final Matcher m = COMMENT_PATTERN.matcher(x);

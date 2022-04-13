@@ -1,19 +1,22 @@
-# Flink CDC Connectors
+# CDC Connectors for Apache Flink<sup>®</sup>
 
-Flink CDC Connectors is a set of source connectors for Apache Flink, ingesting changes from different databases using change data capture (CDC).
-The Flink CDC Connectors integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
+CDC Connectors for Apache Flink<sup>®</sup> is a set of source connectors for Apache Flink<sup>®</sup>, ingesting changes from different databases using change data capture (CDC).
+CDC Connectors for Apache Flink<sup>®</sup> integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
-This README is meant as a brief walkthrough on the core features with Flink CDC Connectors. For a fully detailed documentation, please see [Documentation](https://ververica.github.io/flink-cdc-connectors/master/).
+This README is meant as a brief walkthrough on the core features of CDC Connectors for Apache Flink<sup>®</sup>. For a fully detailed documentation, please see [Documentation](https://ververica.github.io/flink-cdc-connectors/master/).
 
-## Supported (Tested) Connectors
+## Supported (Tested) Databases
 
-| Database | Version |
-| --- | --- |
-| MySQL | Database: 5.7, 8.0.x <br/>JDBC Driver: 8.0.16 |
-| PostgreSQL | Database: 9.6, 10, 11, 12 <br/>JDBC Driver: 42.2.12|
-| MongoDB | Database: 3.6, 4.x, 5.0 <br/>MongoDB Driver: 4.3.1|
-| Oracle | Database: 11, 12, 19 <br/>Oracle Driver: 19.3.0.0|
-| Sqlserver | Database: 2017, 2019 <br/>JDBC Driver: 7.2.2.jre8|
+| Connector                                                 | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
+| [mongodb-cdc](docs/content/connectors/mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                                 | MongoDB Driver: 4.3.1   |
+| [mysql-cdc](docs/content/connectors/mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.21     |
+| [oceanbase-cdc](/docs/content/connectors/oceanbase-cdc.md) | <li> [OceanBase CE](https://open.oceanbase.com): 3.1.x                                                                                                                                                                                                                                                                                                                                                | JDBC Driver: 5.7.4x     |
+| [oracle-cdc](docs/content/connectors/oracle-cdc.md)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19                                                                                                                                                                                                                                                                                                                                           | Oracle Driver: 19.3.0.0 |
+| [postgres-cdc](docs/content/connectors/postgres-cdc.md)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12                                                                                                                                                                                                                                                                                                                                         | JDBC Driver: 42.2.12    |
+| [sqlserver-cdc](docs/content/connectors/sqlserver-cdc.md) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2012, 2014, 2016, 2017, 2019                                                                                                                                                                                                                                                                                                                   | JDBC Driver: 7.2.2.jre8 |
+| [tidb-cdc](docs/content/connectors/tidb-cdc.md)           | <li> [TiDB](https://www.pingcap.com): 5.1.x, 5.2.x, 5.3.x, 5.4.x, 6.0.0                                                                                                                                                                                                                                                                                                                                | JDBC Driver: 8.0.27     |
+
 ## Features
 
 1. Supports reading database snapshot and continues to read transaction logs with **exactly-once processing** even failures happen.
@@ -61,8 +64,8 @@ Include following Maven dependency (available through Maven Central):
   <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <!-- the dependency is available only for stable releases. -->
-  <version>2.2-SNAPSHOT</version>
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <version>2.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -113,7 +116,7 @@ cd flink-cdc-connectors
 mvn clean install -DskipTests
 ```
 
-Flink CDC Connectors is now available at your local `.m2` repository.
+The dependencies are now available in your local `.m2` repository.
 
 ## License
 
@@ -121,7 +124,7 @@ The code in this repository is licensed under the [Apache Software License 2](ht
 
 ## Contributing
 
-The Flink CDC Connectors welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/ververica/flink-cdc-connectors/issues).
+CDC Connectors for Apache Flink<sup>®</sup> welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/ververica/flink-cdc-connectors/issues).
 
 ## Community
 
@@ -130,7 +133,7 @@ The Flink CDC Connectors welcomes anyone that wants to help out in any way, whet
   You can search the group number [**33121212**] or scan the following QR code to join in the group.
   
   <div align=center>
-     <img src="https://user-images.githubusercontent.com/5163645/128969750-6a6c9832-eab3-4c72-8c76-32dd66539dbd.png" width=400 />
+     <img src="https://user-images.githubusercontent.com/9601882/158350201-a1de35e6-0399-4a91-b5b0-e2fd5d33e33c.png" width=400 />
    </div>
 
 ## Documents

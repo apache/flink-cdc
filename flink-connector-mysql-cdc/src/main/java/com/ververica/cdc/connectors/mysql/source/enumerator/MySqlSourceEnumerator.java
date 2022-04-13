@@ -56,6 +56,7 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigning;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
 
@@ -85,12 +86,21 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
+
+        // when restored from state, if the split assigner is assigning snapshot
+        // splits or has already assigned all splits, send wakeup event to
+        // SourceReader, SourceReader can omit the event based on its own status.
+        if (isAssigning(splitAssigner.getAssignerStatus())
+                || isAssigningFinished(splitAssigner.getAssignerStatus())) {
+            binlogReaderIsSuspended = true;
+        }
     }
 
     @Override
     public void start() {
         splitAssigner.open();
         suspendBinlogReaderIfNeed();
+        wakeupBinlogReaderIfNeed();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
@@ -117,7 +127,11 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void addReader(int subtaskId) {
-        // do nothing
+        // send SuspendBinlogReaderEvent to source reader if the assigner's status is
+        // suspended
+        if (isSuspended(splitAssigner.getAssignerStatus())) {
+            context.sendEventToSourceReader(subtaskId, new SuspendBinlogReaderEvent());
+        }
     }
 
     @Override
@@ -194,6 +208,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 LOG.info("Assign split {} to subtask {}", mySqlSplit, nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
+                wakeupBinlogReaderIfNeed();
                 break;
             }
         }

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+
+    <!-- Termynal CSS -->
+    <link rel="stylesheet" href="lib/termynal.css">
+
+    <!-- Favicon of website  -->
+    <link rel="icon" type="image/x-icon" href="assets/favicon.png">
+
+    <title>CDC Connectors for Apache Flink&reg;</title>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark px-4 py-2" style="background: #336699">
+      <a class="navbar-brand" href="#">CDC Connectors for Apache Flink&reg;</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse justify-content-end" id="navbarContent">
+        <ul class="navbar-nav">
+          <li class="nav-item active">
+            <a class="nav-link" href="https://github.com/ververica/flink-cdc-connectors/releases/">Download</a>
+          </li>
+          <li class="nav-item active">
+            <a class="nav-link" href="https://ververica.github.io/flink-cdc-connectors/master/">Documentation</a>
+          </li>
+          <li class="nav-item active">
+            <a class="nav-link" href="https://github.com/ververica/flink-cdc-connectors/">Source</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <section class="hero-banner position-relative">
+      <div class="bg"></div>
+      <div class="container position-relative">
+        <div class="container py-xs-2 py-sm-3 py-md-4 py-xxl-5">
+          <div class="row py-5">
+            <div class="col-xl-6 col-lg-8">
+              <h1 class="display-5 fw-bold lh-1 mb-3" style="color: #336699;">CDC Connectors for Apache Flink&reg;</h1>
+              <h3 style="color: #336699;">Embrace Database Changes</h3>
+              <p><a class="github-button" href="https://github.com/ververica/flink-cdc-connectors" data-icon="octicon-star" data-size="large" data-show-count="true" aria-label="Star ververica/flink-cdc-connectors on GitHub">Star</a></p>
+              <p class="lead">This project provides a set of source connectors for Apache Flink&reg; directly ingesting changes coming from different databases using Change Data Capture(CDC).</p>
+              <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                <a role="button" class="btn btn-primary btn-lg px-4 me-md-2" href="https://github.com/ververica/flink-cdc-connectors/releases/">Download</a>
+                <a role="button" class="btn btn-secondary btn-lg px-4" href="https://ververica.github.io/flink-cdc-connectors/master/">Documentation</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white">
+      <div class="container py-4">
+        <div class="row py-3">
+          <div class="col-12 text-center"><h1>Key Features</h1></div>
+        </div>
+        <div class="row py-4">
+          <div class="col-md-12 col-lg-4 px-4">
+            <a class="no-decoration-anchor" href="https://ververica.github.io/flink-cdc-connectors/master/content/about.html#features">
+              <div class="text-center text-primary">
+                <h1><i class="bi bi-calculator"></i></h1>
+                <h4>Exactly-once Semantics</h4>
+              </div>
+            </a>
+            <div class="py-3">CDC Connectors for Apache Flink&reg; supports reading database snapshots and continues to read binlogs with exactly-once processing, even after failures.</div>
+          </div>
+          <div class="col-md-12 col-lg-4 px-4">
+            <a class="no-decoration-anchor" href="https://ververica.github.io/flink-cdc-connectors/master/content/about.html#usage-for-table-sql-api">
+              <div class="text-center text-primary">
+                <h1><i class="bi bi-hdd-network"></i></h1>
+                <h4>Table/SQL API</h4>
+              </div>
+            </a>
+            <div class="py-3">Users can use SQL DDL to create a CDC source to monitor changes on a single table.</div>
+          </div>
+          <div class="col-md-12 col-lg-4 px-4">
+            <a class="no-decoration-anchor" href="https://ververica.github.io/flink-cdc-connectors/master/content/about.html#usage-for-datastream-api">
+              <div class="text-center text-primary">
+                <h1><i class="bi bi-water"></i></h1>
+                <h4>DataStream API</h4>
+              </div>
+            </a>
+            <div class="py-3">Users can consume changes on multiple databases and tables in a single job without Debezium and Apache Kafka&reg; deployed.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-dark text-light">
+      <div class="container py-4">
+        <div class="row py-4">
+          <div class="col-md-12 col-lg-5 mx-auto py-4 align-self-center">
+            <div class="pb-4 text-center"><h2>Getting Started</h2></div>
+            <div class="py-4" style="font-size: 20px">CDC Connectors for Apache Flink&reg; provides a series of quick start demos without any dependencies or java code,  only a Linux or MacOS computer with Docker installed is enough. With these demos, you can quickly feel the power and convenience of Apache Flink&reg; CDC.</div>
+            <a role="button" class="btn btn-outline-primary btn-lg px-4" href="https://ververica.github.io/flink-cdc-connectors/master/content/quickstart/index.html">Learn More</a>
+          </div>
+          <div class="col-md-12 col-lg-6 mx-auto">
+            <div class="termynal" data-termynal data-ty-typeDelay="20" data-ty-lineDelay="20">
+              <span data-ty="input" data-ty-prompt="Flink SQL>">-- creates a mysql cdc table source</span>
+              <span data-ty="input" data-ty-prompt="Flink SQL>">CREATE TABLE mysql_binlog (</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;id INT NOT NULL,</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;name STRING,</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;description STRING,</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;weight DECIMAL(10,3),</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;PRIMARY KEY(id) NOT ENFORCED</span>
+              <span data-ty="input" data-ty-prompt="">) WITH (</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;'connector' = 'mysql-cdc',</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;'hostname' = 'localhost',</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;'port' = '3306',</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;'username' = 'flinkuser',</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;'password' = 'flinkpw',</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;'database-name' = 'inventory',</span>
+              <span data-ty="input" data-ty-prompt="">&nbsp;&nbsp;'table-name' = 'products'</span>
+              <span data-ty="input" data-ty-prompt="">);</span>
+              <span data-ty="input" data-ty-prompt=""></span>
+              <span data-ty="input" data-ty-prompt="Flink SQL>">-- read snapshot and binlog data from mysql</span>
+              <span data-ty="input" data-ty-prompt="Flink SQL>">-- and do some transformation</span>
+              <span data-ty="input" data-ty-prompt="Flink SQL>">-- and show on the client</span>
+              <span data-ty="input" data-ty-prompt="Flink SQL>">SELECT id, UPPER(name), description, weight FROM mysql_binlog;</span>
+          </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white">
+      <div class="container py-4">
+        <div class="row py-4">
+          <div class="col-md-12 col-lg-7 text-center mx-auto" style="color: #2a3a4a;">
+            <div class="pb-4"><h2>Connect to Your Favorite Database</h2></div>
+            <div style="font-size: 20px;">CDC Connectors for Apache Flink&reg; supports ingesting snapshot data and real time changes from databases to Flink&reg; and then transform and sink to various downstream systems.</div>
+          </div>
+          <div class="col-md-12 col-lg-10 text-center mx-auto"><img src="assets/cdc-flow.png" width="100%" /></div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background-color: #ddeeff;">
+      <div class="container py-4">
+        <div class="row py-3">
+          <div class="col-12 text-center"><h2>Join the Community</h2></div>
+        </div>
+        <div class="row py-4 justify-content-center">
+          <div class="col-12 col-md-4 col-xl-3 px-4 align-self-center">
+              <img src="assets/dingtalk.png" width="100%" />
+          </div>
+          <div class="col-12 col-md-8 col-xl-6 p-3">
+            <a class="no-decoration-anchor" href="https://h5.dingtalk.com/circle/healthCheckin.html?dtaction=os&corpId=dinge369343b40eb68f87c231cb892228ad7&14ee9113-c3=cc3ed38a-82&cbdbhh=qwertyuiop">
+              <div class="card border-primary my-3">
+                <div class="card-body" style="background-color: #ddeeff">
+                  <div class="row">
+                    <div class="col-2 align-self-center text-center text-primary">
+                      <h1><i class="bi bi-envelope-paper"></i></h1>
+                    </div>
+                    <div class="col-10">
+                      <h4 class="card-title text-primary">DingTalk Group</h4>
+                      <p class="card-text">Discussion and help from your fellow users.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </a>
+            <a class="no-decoration-anchor" href="https://github.com/ververica/flink-cdc-connectors">
+              <div class="card border-primary my-3">
+                <div class="card-body" style="background-color: #ddeeff">
+                  <div class="row">
+                    <div class="col-2 align-self-center text-center text-primary">
+                      <h1><i class="bi bi-github"></i></h1>
+                    </div>
+                    <div class="col-10">
+                      <h4 class="card-title text-primary">Github</h4>
+                      <p class="card-text">Development takes place here!</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </a>
+            <a class="no-decoration-anchor" href="https://github.com/ververica/flink-cdc-connectors/issues">
+              <div class="card border-primary my-3">
+                <div class="card-body" style="background-color: #ddeeff">
+                  <div class="row">
+                    <div class="col-2 align-self-center text-center text-primary">
+                      <h1><i class="bi bi-clipboard-check"></i></h1>
+                    </div>
+                    <div class="col-10">
+                      <h4 class="card-title text-primary">Issue Tracking</h4>
+                      <p class="card-text">Report here if you find any issue.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Copyright -->
+<div class="text-center p-3  bg-dark text-light">Apache Flink, Flink&reg;, Apache&reg;, the squirrel logo, and the Apache feather logo are either registered trademarks or trademarks of The Apache Software Foundation. Copyright &copy; 2022 Ververica, Licensed under the <a href="https://www.apache.org/licenses/">Apache License, Version 2.0</a>.</div>
+    <!-- Copyright -->
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+
+    <!-- Termynal JS -->
+    <script src="lib/termynal.js" data-termynal-container=".termynal"></script>
+
+    <!-- Github Buttons JS -->
+    <script async defer src="https://buttons.github.io/buttons.js"></script>
+  </body>
+
+  <style>
+  .hero-banner {
+    height: 475px;
+  }
+
+  .hero-banner > .bg {
+    background: no-repeat right center;
+    background-image: linear-gradient(to left, rgba(219, 219, 221, 0.7) 0%, rgba(219, 219, 221, 0.7) 20%, rgba(219, 219, 221, 0.7) 40%), url(assets/squirrel.jpg);
+    background-color: #dbdbdd;
+    height: 475px;
+    top: 0;
+    position: absolute;
+    right: 0;
+    width: 100%;
+  }
+
+  @media (min-width: 992px) {
+    .hero-banner > .bg {
+      background-image: linear-gradient(to left, rgba(219, 219, 221, 0) 0%, rgba(219, 219, 221, 0) 20%, rgba(219, 219, 221, 0.5) 40%), url(assets/squirrel.jpg);
+    }
+  }
+
+  .no-decoration-anchor {
+    text-decoration: inherit;
+    color: inherit;
+  }
+  </style>
+</html>

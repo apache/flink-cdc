@@ -107,10 +107,10 @@ db.customers.insertMany([
 
 3. 下载以下 jar 包到 `<FLINK_HOME>/lib/`:
 
-```下载链接只在已发布的版本上可用```
+```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 
  - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
- - [flink-sql-connector-mongodb-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.2-SNAPSHOT/flink-sql-connector-postgres-cdc-2.2-SNAPSHOT.jar)
+ - [flink-sql-connector-mongodb-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.3-SNAPSHOT/flink-sql-connector-mongodb-cdc-2.3-SNAPSHOT.jar)
 
 4. 然后启动 Flink 集群，再启动 SQL CLI.
 

@@ -24,7 +24,7 @@ jobs:
     # succeeded() is needed to allow job cancellation
     condition: and(succeeded(), not(eq(variables['MODE'], 'e2e')))
     pool: ${{parameters.test_pool_definition}}
-    timeoutInMinutes: 240
+    timeoutInMinutes: 40
     cancelTimeoutInMinutes: 1
     workspace:
       clean: all # this cleans the entire workspace directory before running a new job
@@ -68,7 +68,7 @@ jobs:
     dependsOn: compile_${{parameters.stage_name}}
     condition: and(succeeded(), not(eq(variables['MODE'], 'e2e')))
     pool: ${{parameters.test_pool_definition}}
-    timeoutInMinutes: 240
+    timeoutInMinutes: 40
     cancelTimeoutInMinutes: 1
     workspace:
       clean: all
@@ -84,6 +84,8 @@ jobs:
           module: mongodb
         sqlserver:
           module: sqlserver
+        tidb:
+          module: tidb
         e2e:
           module: e2e
         misc:

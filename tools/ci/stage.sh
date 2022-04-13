@@ -21,6 +21,8 @@ STAGE_POSTGRES="postgres"
 STAGE_ORACLE="oracle"
 STAGE_MONGODB="mongodb"
 STAGE_SQLSERVER="sqlserver"
+STAGE_TIDB="tidb"
+STAGE_OCEANBASE="oceanbase"
 STAGE_E2E="e2e"
 STAGE_MISC="misc"
 
@@ -44,6 +46,14 @@ MODULES_SQLSERVER="\
 flink-connector-sqlserver-cdc,\
 flink-sql-connector-sqlserver-cdc"
 
+MODULES_TIDB="\
+flink-connector-tidb-cdc,\
+flink-sql-connector-tidb-cdc"
+
+MODULES_OCEANBASE="\
+flink-connector-oceanbase-cdc,\
+flink-sql-connector-oceanbase-cdc"
+
 MODULES_E2E="\
 flink-cdc-e2e-tests"
 
@@ -66,6 +76,12 @@ function get_compile_modules_for_stage() {
         (${STAGE_SQLSERVER})
             echo "-pl $MODULES_SQLSERVER -am"
         ;;
+        (${STAGE_TIDB})
+            echo "-pl $MODULES_TIDB -am"
+        ;;
+        (${STAGE_OCEANBASE})
+            echo "-pl $MODULES_OCEANBASE -am"
+        ;;
         (${STAGE_E2E})
             # compile everything; using the -am switch does not work with negated module lists!
             # the negation takes precedence, thus not all required modules would be built
@@ -87,14 +103,18 @@ function get_test_modules_for_stage() {
     local modules_oracle=$MODULES_ORACLE
     local modules_mongodb=$MODULES_MONGODB
     local modules_sqlserver=$MODULES_SQLSERVER
+    local modules_tidb=$MODULES_TIDB
+    local modules_oceanbase=$MODULES_OCEANBASE
     local modules_e2e=$MODULES_E2E
     local negated_mysql=\!${MODULES_MYSQL//,/,\!}
     local negated_postgres=\!${MODULES_POSTGRES//,/,\!}
     local negated_oracle=\!${MODULES_ORACLE//,/,\!}
     local negated_mongodb=\!${MODULES_MONGODB//,/,\!}
     local negated_sqlserver=\!${MODULES_SQLSERVER//,/,\!}
+    local negated_tidb=\!${MODULES_TIDB//,/,\!}
+    local negated_oceanbase=\!${MODULES_OCEANBASE//,/,\!}
     local negated_e2e=\!${MODULES_E2E//,/,\!}
-    local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_sqlserver,$negated_e2e"
+    local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_sqlserver,$negated_tidb,$negated_oceanbase,$negated_e2e"
 
     case ${stage} in
         (${STAGE_MYSQL})
@@ -111,6 +131,12 @@ function get_test_modules_for_stage() {
         ;;
         (${STAGE_SQLSERVER})
             echo "-pl $modules_sqlserver"
+        ;;
+        (${STAGE_TIDB})
+            echo "-pl $modules_tidb"
+        ;;
+        (${STAGE_OCEANBASE})
+            echo "-pl $modules_oceanbase"
         ;;
         (${STAGE_E2E})
             echo "-pl $modules_e2e"
