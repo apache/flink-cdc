@@ -50,6 +50,7 @@ import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 
@@ -198,25 +199,28 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 this.executor = Executors.newSingleThreadExecutor(threadFactory);
             }
 
-            executor.submit(
-                    () -> {
-                        try {
-                            Iterator<TableId> iterator = remainingTables.iterator();
-                            while (iterator.hasNext()) {
-                                TableId nextTable = iterator.next();
-                                // split the given table into chunks (snapshot splits)
-                                Collection<MySqlSnapshotSplit> splits =
-                                        chunkSplitter.generateSplits(nextTable);
-                                synchronized (lock) {
-                                    remainingSplits.addAll(splits);
-                                    remainingTables.remove(nextTable);
-                                    lock.notify();
+            Future<?> future =
+                    executor.submit(
+                            () -> {
+                                Iterator<TableId> iterator = remainingTables.iterator();
+                                while (iterator.hasNext()) {
+                                    TableId nextTable = iterator.next();
+                                    // split the given table into chunks (snapshot splits)
+                                    Collection<MySqlSnapshotSplit> splits =
+                                            chunkSplitter.generateSplits(nextTable);
+                                    synchronized (lock) {
+                                        remainingSplits.addAll(splits);
+                                        remainingTables.remove(nextTable);
+                                        lock.notify();
+                                    }
                                 }
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    });
+                            });
+
+            try {
+                future.get();
+            } catch (Exception e) {
+                throw new FlinkRuntimeException(e.getCause());
+            }
         }
     }
 
