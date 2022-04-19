@@ -200,17 +200,21 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
             executor.submit(
                     () -> {
-                        Iterator<TableId> iterator = remainingTables.iterator();
-                        while (iterator.hasNext()) {
-                            TableId nextTable = iterator.next();
-                            // split the given table into chunks (snapshot splits)
-                            Collection<MySqlSnapshotSplit> splits =
-                                    chunkSplitter.generateSplits(nextTable);
-                            synchronized (lock) {
-                                remainingSplits.addAll(splits);
-                                remainingTables.remove(nextTable);
-                                lock.notify();
+                        try {
+                            Iterator<TableId> iterator = remainingTables.iterator();
+                            while (iterator.hasNext()) {
+                                TableId nextTable = iterator.next();
+                                // split the given table into chunks (snapshot splits)
+                                Collection<MySqlSnapshotSplit> splits =
+                                        chunkSplitter.generateSplits(nextTable);
+                                synchronized (lock) {
+                                    remainingSplits.addAll(splits);
+                                    remainingTables.remove(nextTable);
+                                    lock.notify();
+                                }
                             }
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     });
         }
