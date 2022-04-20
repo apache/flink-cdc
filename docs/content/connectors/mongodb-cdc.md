@@ -369,8 +369,8 @@ public class MongoDBSourceExample {
                 .hosts("localhost:27017")
                 .username("flink")
                 .password("flinkpw")
-                .database("inventory")
-                .collection("products")
+                .databaseList("inventory") // set captured database, support regex
+                .collectionList("inventory.products", "inventory.orders") //set captured collections, support regex
                 .deserializer(new JsonDebeziumDeserializationSchema())
                 .build();
 
@@ -383,6 +383,8 @@ public class MongoDBSourceExample {
     }
 }
 ```
+
+**Note:** If database regex is used, `readAnyDatabase` role is required.
 
 
 Data Type Mapping
