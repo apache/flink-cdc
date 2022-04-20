@@ -36,6 +36,7 @@ import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContex
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -169,7 +170,7 @@ public class MongoDBTableFactoryTest {
 
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
-                        SCHEMA_WITH_METADATA,
+                        ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
                         MY_HOSTS,
                         USER,
                         PASSWORD,
