@@ -39,6 +39,7 @@ import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_GET_
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_SCAN_CONCURRENCY;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_SCAN_TIMEOUT;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_TIMEOUT;
+import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 
 /** Factory for creating configured instance of {@link TiDBTableSource}. */
 public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
@@ -55,7 +56,8 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
         String tableName = config.get(TABLE_NAME);
         String pdAddresses = config.get(PD_ADDRESSES);
         StartupOptions startupOptions = getStartupOptions(config);
-        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
+        ResolvedSchema physicalSchema =
+                getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
         return new TiDBTableSource(
                 physicalSchema,
