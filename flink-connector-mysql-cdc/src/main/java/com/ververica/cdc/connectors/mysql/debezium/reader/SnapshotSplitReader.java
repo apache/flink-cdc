@@ -232,6 +232,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             boolean reachBinlogEnd = false;
             final List<SourceRecord> sourceRecords = new ArrayList<>();
             while (!reachBinlogEnd) {
+                checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
                 for (DataChangeEvent event : batch) {
                     sourceRecords.add(event.getRecord());
