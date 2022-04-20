@@ -38,6 +38,7 @@ import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContex
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -150,7 +151,7 @@ public class PostgreSQLTableFactoryTest {
         actualSource = postgreSQLTableSource.copy();
         PostgreSQLTableSource expectedSource =
                 new PostgreSQLTableSource(
-                        SCHEMA_WITH_METADATA,
+                        ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
                         5432,
                         MY_LOCALHOST,
                         MY_DATABASE,

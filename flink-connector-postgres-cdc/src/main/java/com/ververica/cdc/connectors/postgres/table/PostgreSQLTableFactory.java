@@ -32,6 +32,7 @@ import java.util.Set;
 
 import static com.ververica.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 
 /** Factory for creating configured instance of {@link PostgreSQLTableSource}. */
 public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
@@ -116,7 +117,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         int port = config.get(PORT);
         String pluginName = config.get(DECODING_PLUGIN_NAME);
         String slotName = config.get(SLOT_NAME);
-        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
+        ResolvedSchema physicalSchema =
+                getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
         return new PostgreSQLTableSource(
                 physicalSchema,

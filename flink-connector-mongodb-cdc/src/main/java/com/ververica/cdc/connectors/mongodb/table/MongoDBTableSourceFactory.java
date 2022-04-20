@@ -35,6 +35,7 @@ import java.util.Set;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_NONE;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
+import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** Factory for creating configured instance of {@link MongoDBTableSource}. */
@@ -214,7 +215,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                         ? ZoneId.systemDefault()
                         : ZoneId.of(zoneId);
 
-        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
+        ResolvedSchema physicalSchema =
+                getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
         checkPrimaryKey(physicalSchema.getPrimaryKey().get(), "Primary key must be _id field");
 

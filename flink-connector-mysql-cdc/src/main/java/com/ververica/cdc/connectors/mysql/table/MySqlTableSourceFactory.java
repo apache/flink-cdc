@@ -62,6 +62,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
@@ -90,7 +91,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
 
-        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
+        ResolvedSchema physicalSchema =
+                getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         String serverId = validateAndGetServerId(config);
         StartupOptions startupOptions = getStartupOptions(config);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
