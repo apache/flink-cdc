@@ -179,7 +179,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testThrowRuntimeExceptionInSnapshotScan() throws Exception {
         MySqlSourceConfig sourceConfig =
-                getConfig(new String[] {"customer_card", "customer_card_single_line"}, 10);
+                getConfig(new String[] {"customer_card", "customers_1"}, 10);
 
         DataType dataType =
                 DataTypes.ROW(
@@ -190,8 +190,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
 
         // DROP one table to mock snapshot scan error
-        String tableToDrop =
-                String.format("%s.customer_card_single_line", customerDatabase.getDatabaseName());
+        String tableToDrop = String.format("%s.customers_1", customerDatabase.getDatabaseName());
         mySqlConnection.execute("DROP TABLE IF EXISTS " + tableToDrop);
         mySqlConnection.commit();
 
