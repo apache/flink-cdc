@@ -26,13 +26,13 @@ public class ObjectUtils {
 
     /**
      * Returns a number {@code Object} whose value is {@code (number + augend)}, Note: This method
-     * does not consider number overflow because we don't want to change the object type.
+     * will throw {@link ArithmeticException} if number overflows.
      */
     public static Object plus(Object number, int augend) {
         if (number instanceof Integer) {
-            return (int) number + augend;
+            return Math.addExact((Integer) number, augend);
         } else if (number instanceof Long) {
-            return (long) number + augend;
+            return Math.addExact((Long) number, augend);
         } else if (number instanceof BigInteger) {
             return ((BigInteger) number).add(BigInteger.valueOf(augend));
         } else if (number instanceof BigDecimal) {
