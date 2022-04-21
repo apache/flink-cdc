@@ -168,7 +168,6 @@ public class OracleSourceTest extends AbstractTestBase {
     }
 
     @Test
-    @Ignore("Enable the test once DBZ-4997 fixed")
     public void testCheckpointAndRestore() throws Exception {
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
@@ -574,7 +573,8 @@ public class OracleSourceTest extends AbstractTestBase {
 
     private OracleSource.Builder<SourceRecord> basicSourceBuilder(OracleContainer oracleContainer) {
         Properties debeziumProperties = new Properties();
-        debeziumProperties.setProperty("database.history.store.only.monitored.tables.ddl", "false");
+        debeziumProperties.setProperty("debezium.log.mining.strategy", "online_catalog");
+        debeziumProperties.setProperty("debezium.log.mining.continuous.mine", "true");
         return OracleSource.<SourceRecord>builder()
                 .hostname(oracleContainer.getHost())
                 .port(oracleContainer.getOraclePort())
@@ -591,8 +591,7 @@ public class OracleSourceTest extends AbstractTestBase {
         List<T> allRecords = new ArrayList<>();
         LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
         while (allRecords.size() < expectedRecordCount) {
-            StreamRecord<T> record = queue.poll(100, TimeUnit.SECONDS);
-            System.out.println(record);
+            StreamRecord<T> record = queue.poll(200, TimeUnit.SECONDS);
             if (record != null) {
                 allRecords.add(record.getValue());
             } else {
