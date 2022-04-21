@@ -81,7 +81,7 @@ public class RowDataTiKVChangeEventDeserializationSchema
                                     row.getValue().toByteArray(),
                                     RowKey.decode(row.getKey().toByteArray()).getHandle(),
                                     tableInfo);
-                    if (row.getOldValue() == null) {
+                    if (row.getOldValue() == null || row.getOldValue().isEmpty()) {
                         RowData rowDataUpdateBefore =
                                 (RowData) physicalConverter.convert(tikvValues, tableInfo, null);
                         rowDataUpdateBefore.setRowKind(RowKind.INSERT);
