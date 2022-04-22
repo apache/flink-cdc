@@ -330,6 +330,26 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         }
     }
 
+    @Test
+    public void testTableWithoutPrimaryKey() {
+        String tableWithoutPrimaryKey = customerDatabase.getDatabaseName() + ".customers_no_pk";
+        try {
+            getTestAssignSnapshotSplits(
+                    4,
+                    SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                    SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                    new String[] {tableWithoutPrimaryKey});
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    String.format(
+                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
+                                            tableWithoutPrimaryKey))
+                            .isPresent());
+        }
+    }
+
     private List<String> getTestAssignSnapshotSplits(
             int splitSize,
             double distributionFactorUpper,
