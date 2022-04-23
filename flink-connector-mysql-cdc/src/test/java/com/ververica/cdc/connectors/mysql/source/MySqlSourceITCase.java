@@ -59,6 +59,7 @@ import java.util.concurrent.ExecutionException;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MySqlSource}. */
 public class MySqlSourceITCase extends MySqlSourceTestBase {
@@ -246,6 +247,22 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 false,
                 "address_hangzhou",
                 "address_beijing");
+    }
+
+    @Test
+    public void testConsumingTableWithoutPrimaryKey() {
+        try {
+            testMySqlParallelSource(
+                    1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers_no_pk"});
+        } catch (Exception e) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    e,
+                                    String.format(
+                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
+                                            customDatabase.getDatabaseName() + ".customers_no_pk"))
+                            .isPresent());
+        }
     }
 
     private void testMySqlParallelSource(
