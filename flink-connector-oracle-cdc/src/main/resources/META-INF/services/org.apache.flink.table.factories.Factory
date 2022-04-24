@@ -12,3 +12,4 @@
 # limitations under the License.
 
 com.ververica.cdc.connectors.oracle.table.OracleTableSourceFactory
+com.ververica.cdc.connectors.oracle.source.table.OracleTableSourceFactory

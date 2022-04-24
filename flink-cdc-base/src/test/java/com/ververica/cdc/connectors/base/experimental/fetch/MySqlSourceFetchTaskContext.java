@@ -46,6 +46,7 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -223,6 +224,11 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     @Override
     public Offset getStreamOffset(SourceRecord sourceRecord) {
         return MySqlUtils.getBinlogPosition(sourceRecord);
+    }
+
+    @Override
+    public RelationalTableFilters getRelationalTableFilters() {
+        return getDbzConnectorConfig().getTableFilters();
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
