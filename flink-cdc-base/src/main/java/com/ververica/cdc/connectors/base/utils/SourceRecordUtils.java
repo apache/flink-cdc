@@ -107,17 +107,9 @@ public class SourceRecordUtils {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String dbName = source.getString(DATABASE_NAME_KEY);
-        // Oracle need schemaName
-        String schemaName = getSchemaName(source);
+        String schemaName = source.getString(SCHEMA_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
         return new TableId(dbName, schemaName, tableName);
-    }
-
-    public static String getSchemaName(Struct source) {
-        if (source.schema().fields().stream().anyMatch(r -> SCHEMA_NAME_KEY.equals(r.name()))) {
-            return source.getString(SCHEMA_NAME_KEY);
-        }
-        return null;
     }
 
     public static Object[] getSplitKey(

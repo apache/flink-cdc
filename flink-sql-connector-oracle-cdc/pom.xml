@@ -56,6 +56,7 @@ under the License.
                                     <incldue>io.debezium:debezium-ddl-parser</incldue>
                                     <include>io.debezium:debezium-connector-oracle</include>
                                     <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-cdc-base</include>
                                     <include>com.ververica:flink-connector-oracle-cdc</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>com.github.jsqlparser:jsqlparser</include>
