@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -176,6 +177,10 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, Offset position) {
+        if (Objects.isNull(maxSplitHighWatermarkMap)) {
+            return true;
+        }
+
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
