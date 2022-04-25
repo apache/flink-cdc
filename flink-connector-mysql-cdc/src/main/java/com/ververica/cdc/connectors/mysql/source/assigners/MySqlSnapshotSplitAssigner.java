@@ -322,7 +322,6 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                                 assignedSplits.remove(k);
                             });
         }
-        LOG.info("The assignedSplits is {}.", assignedSplits.size());
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,

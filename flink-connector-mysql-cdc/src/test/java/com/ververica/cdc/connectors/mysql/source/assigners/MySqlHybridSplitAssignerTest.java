@@ -137,29 +137,14 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         Optional<MySqlSplit> binlogSplit = assigner.getNext();
         MySqlBinlogSplit mySqlBinlogSplit = binlogSplit.get().asBinlogSplit();
 
-        final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        final List<MySqlSnapshotSplit> assignedSnapshotSplit =
-                assignedSplits.values().stream()
-                        .sorted(Comparator.comparing(MySqlSplit::splitId))
-                        .collect(Collectors.toList());
-        for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
-            finishedSnapshotSplitInfos.add(
-                    new FinishedSnapshotSplitInfo(
-                            split.getTableId(),
-                            split.splitId(),
-                            split.getSplitStart(),
-                            split.getSplitEnd(),
-                            split.getHighWatermark()));
-        }
-
         MySqlBinlogSplit expected =
                 new MySqlBinlogSplit(
                         "binlog-split",
                         new BinlogOffset("mysql-bin.00001", 1),
                         BinlogOffset.NO_STOPPING_OFFSET,
-                        finishedSnapshotSplitInfos,
+                        new ArrayList<>(),
                         new HashMap<>(),
-                        finishedSnapshotSplitInfos.size());
+                        0);
         assertEquals(expected, mySqlBinlogSplit);
     }
 
