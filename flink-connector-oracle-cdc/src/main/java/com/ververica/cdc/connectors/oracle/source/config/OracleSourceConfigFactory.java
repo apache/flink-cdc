@@ -18,11 +18,15 @@
 
 package com.ververica.cdc.connectors.oracle.source.config;
 
+import org.apache.flink.util.FlinkRuntimeException;
+
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.oracle.source.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnector;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -33,6 +37,25 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private static final String DATABASE_SERVER_NAME = "oracle_logminer";
     private static final String DRIVER_ClASS_NAME = "oracle.jdbc.OracleDriver";
+
+    protected List<String> schemaList;
+
+    public JdbcSourceConfigFactory schemaList(String... schemaList) {
+        this.schemaList = Arrays.asList(schemaList);
+        return this;
+    }
+
+    public JdbcSourceConfigFactory database(String database) {
+        this.databaseList = Arrays.asList(database);
+        return this;
+    }
+
+    @Deprecated
+    public JdbcSourceConfigFactory databaseList(String... databaseList) {
+        throw new FlinkRuntimeException(
+                "not supported 'databaseList' method, please use 'database' method");
+    }
+
     /** Creates a new {@link OracleSourceConfig} for the given subtask {@code subtaskId}. */
     public OracleSourceConfig create(int subtaskId) {
         Properties props = new Properties();
@@ -61,6 +84,10 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         // disable tombstones
         props.setProperty("tombstones.on.delete", String.valueOf(false));
 
+        if (schemaList != null) {
+            props.setProperty("schema.whitelist", String.join(",", schemaList));
+        }
+
         if (tableList != null) {
             props.setProperty("table.include.list", String.join(",", tableList));
         }
@@ -71,10 +98,10 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         }
 
         Configuration dbzConfiguration = Configuration.from(props);
-
         return new OracleSourceConfig(
                 startupOptions,
                 databaseList,
+                schemaList,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,

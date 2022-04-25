@@ -61,8 +61,31 @@ public class OracleSourceBuilder<T> {
      * An required list of regular expressions that match database names to be monitored; any
      * database name not included in the whitelist will be excluded from monitoring.
      */
+    @Deprecated
     public OracleSourceBuilder<T> databaseList(String... databaseList) {
         this.configFactory.databaseList(databaseList);
+        return this;
+    }
+
+    /**
+     * oracle database
+     *
+     * @param database
+     * @return
+     */
+    public OracleSourceBuilder<T> database(String database) {
+        this.configFactory.database(database);
+        return this;
+    }
+
+    /**
+     * oracle schema
+     *
+     * @param schemaList
+     * @return
+     */
+    public OracleSourceBuilder<T> schemaList(String... schemaList) {
+        this.configFactory.schemaList(schemaList);
         return this;
     }
 

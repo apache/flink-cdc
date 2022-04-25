@@ -38,9 +38,12 @@ public class OracleSourceConfig extends JdbcSourceConfig {
 
     private transient OracleConnectorConfig dbzOracleConfig;
 
+    private List<String> schemaList;
+
     public OracleSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
+            List<String> schemaList,
             List<String> tableList,
             int splitSize,
             int splitMetaGroupSize,
@@ -80,6 +83,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize);
+        this.schemaList = schemaList;
     }
 
     @Override

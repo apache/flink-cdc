@@ -80,6 +80,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
     public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
         this.streamFetchTask = fetchTask;
         this.currentStreamSplit = fetchTask.getSplit().asStreamSplit();
+        configureFilter();
         taskContext.configure(currentStreamSplit);
         this.queue = taskContext.getQueue();
         executor.submit(
@@ -177,10 +178,6 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, Offset position) {
-        if (Objects.isNull(maxSplitHighWatermarkMap)) {
-            return true;
-        }
-
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
