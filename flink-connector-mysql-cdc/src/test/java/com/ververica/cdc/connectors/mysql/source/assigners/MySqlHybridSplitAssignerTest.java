@@ -48,6 +48,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
@@ -78,6 +80,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         List<MySqlSnapshotSplit> remainingSplits = new ArrayList<>();
 
         Map<String, MySqlSnapshotSplit> assignedSplits = new HashMap<>();
+        Set<BinlogOffset> maximumBinlogOffset = new TreeSet<>();
         Map<String, BinlogOffset> splitFinishedOffsets = new HashMap<>();
 
         for (int i = 0; i < 5; i++) {
@@ -97,13 +100,29 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                             tableSchemas);
             assignedSplits.put(splitId, sqlSnapshotSplit);
             splitFinishedOffsets.put(splitId, highWatermark);
+            splitFinishedOffsets
+                    .keySet()
+                    .forEach(
+                            k -> {
+                                BinlogOffset minBinlogOffset = splitFinishedOffsets.get(k);
+                                if (maximumBinlogOffset.isEmpty()) {
+                                    maximumBinlogOffset.add(minBinlogOffset);
+                                } else if (maximumBinlogOffset.stream()
+                                        .findFirst()
+                                        .get()
+                                        .isAfter(minBinlogOffset)) {
+                                    maximumBinlogOffset.clear();
+                                    maximumBinlogOffset.add(minBinlogOffset);
+                                }
+                                assignedSplits.remove(k);
+                            });
         }
-
         SnapshotPendingSplitsState snapshotPendingSplitsState =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
                         remainingSplits,
                         assignedSplits,
+                        maximumBinlogOffset,
                         splitFinishedOffsets,
                         AssignerStatus.INITIAL_ASSIGNING_FINISHED,
                         new ArrayList<>(),

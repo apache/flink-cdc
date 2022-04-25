@@ -211,7 +211,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             binlogOffset));
         }*/
         BinlogOffset minBinlogOffset =
-                snapshotSplitAssigner.minimumBinlogOffset.stream().findFirst().get();
+                snapshotSplitAssigner.maximumBinlogOffset.stream().findFirst().get();
         // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
         // then transfer them
 

@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
@@ -119,11 +120,13 @@ public class PendingSplitsStateSerializerTest {
                         getTestSplitInfo(tableId1, 1),
                         getTestSplitInfo(tableId0, 2))
                 .forEach(finishedOffsets::putAll);
-
+        TreeSet<BinlogOffset> maximumBinlogOffset = new TreeSet<>();
+        maximumBinlogOffset.add(BinlogOffset.NO_STOPPING_OFFSET);
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSplits,
                 assignedSnapshotSplits,
+                maximumBinlogOffset,
                 finishedOffsets,
                 AssignerStatus.INITIAL_ASSIGNING,
                 remainingTables,

@@ -34,6 +34,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
@@ -151,6 +153,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeTableIds(state.getAlreadyProcessedTables(), out);
         writeMySqlSplits(state.getRemainingSplits(), out);
         writeAssignedSnapshotSplits(state.getAssignedSplits(), out);
+        writeMaximumBinlogOffset(state.getMaximumBinlogOffset(), out);
         writeFinishedOffsets(state.getSplitFinishedOffsets(), out);
         out.writeInt(state.getSnapshotAssignerStatus().getStatusCode());
         writeTableIds(state.getRemainingTables(), out);
@@ -179,6 +182,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, BinlogOffset> finishedOffsets = readFinishedOffsets(splitVersion, in);
+        Set<BinlogOffset> maximumBinlogOffset = readMaximumBinlogOffset(splitVersion, in);
         AssignerStatus assignerStatus;
         boolean isAssignerFinished = in.readBoolean();
         if (isAssignerFinished) {
@@ -191,6 +195,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 alreadyProcessedTables,
                 remainingSplits,
                 assignedSnapshotSplits,
+                maximumBinlogOffset,
                 finishedOffsets,
                 assignerStatus,
                 new ArrayList<>(),
@@ -213,6 +218,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, BinlogOffset> finishedOffsets = readFinishedOffsets(splitVersion, in);
+        Set<BinlogOffset> maximumBinlogOffset = readMaximumBinlogOffset(splitVersion, in);
         AssignerStatus assignerStatus;
         if (splitVersion < 4) {
             boolean isAssignerFinished = in.readBoolean();
@@ -230,6 +236,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 alreadyProcessedTables,
                 remainingSplits,
                 assignedSnapshotSplits,
+                maximumBinlogOffset,
                 finishedOffsets,
                 assignerStatus,
                 remainingTableIds,
@@ -299,6 +306,19 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             assignedSplits.put(splitId, mySqlSplit);
         }
         return assignedSplits;
+    }
+
+    private void writeMaximumBinlogOffset(Set<BinlogOffset> splitsInfo, DataOutputSerializer out)
+            throws IOException {
+        writeBinlogPosition(splitsInfo.stream().findFirst().get(), out);
+    }
+
+    private Set<BinlogOffset> readMaximumBinlogOffset(int offsetVersion, DataInputDeserializer in)
+            throws IOException {
+        Set<BinlogOffset> maximumBinlogOffset = new TreeSet<>();
+        BinlogOffset binlogOffset = readBinlogPosition(offsetVersion, in);
+        maximumBinlogOffset.add(binlogOffset);
+        return maximumBinlogOffset;
     }
 
     private <T extends MySqlSplit> void writeMySqlSplits(

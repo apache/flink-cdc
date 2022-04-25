@@ -73,7 +73,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final List<MySqlSnapshotSplit> remainingSplits;
     private final Map<String, MySqlSnapshotSplit> assignedSplits;
     private final Map<String, BinlogOffset> splitFinishedOffsets;
-    public final Set<BinlogOffset> minimumBinlogOffset;
+    public final Set<BinlogOffset> maximumBinlogOffset;
     private final MySqlSourceConfig sourceConfig;
     private final int currentParallelism;
     private final List<TableId> remainingTables;
@@ -100,6 +100,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 new ArrayList<>(),
                 new ArrayList<>(),
                 new HashMap<>(),
+                new TreeSet<>(),
                 new HashMap<>(),
                 AssignerStatus.INITIAL_ASSIGNING,
                 remainingTables,
@@ -117,6 +118,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 checkpoint.getAlreadyProcessedTables(),
                 checkpoint.getRemainingSplits(),
                 checkpoint.getAssignedSplits(),
+                checkpoint.getMaximumBinlogOffset(),
                 checkpoint.getSplitFinishedOffsets(),
                 checkpoint.getSnapshotAssignerStatus(),
                 checkpoint.getRemainingTables(),
@@ -130,6 +132,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             List<TableId> alreadyProcessedTables,
             List<MySqlSnapshotSplit> remainingSplits,
             Map<String, MySqlSnapshotSplit> assignedSplits,
+            Set<BinlogOffset> maximumBinlogOffset,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
@@ -140,12 +143,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
         this.assignedSplits = assignedSplits;
+        this.maximumBinlogOffset = maximumBinlogOffset;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
         this.remainingTables = new CopyOnWriteArrayList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
-        this.minimumBinlogOffset = new TreeSet<>();
     }
 
     @Override
@@ -307,14 +310,14 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     .forEach(
                             k -> {
                                 BinlogOffset minBinlogOffset = splitFinishedOffsets.get(k);
-                                if (minimumBinlogOffset.isEmpty()) {
-                                    minimumBinlogOffset.add(minBinlogOffset);
-                                } else if (minimumBinlogOffset.stream()
+                                if (maximumBinlogOffset.isEmpty()) {
+                                    maximumBinlogOffset.add(minBinlogOffset);
+                                } else if (maximumBinlogOffset.stream()
                                         .findFirst()
                                         .get()
-                                        .isBefore(minBinlogOffset)) {
-                                    minimumBinlogOffset.clear();
-                                    minimumBinlogOffset.add(minBinlogOffset);
+                                        .isAfter(minBinlogOffset)) {
+                                    maximumBinlogOffset.clear();
+                                    maximumBinlogOffset.add(minBinlogOffset);
                                 }
                                 assignedSplits.remove(k);
                             });
@@ -325,6 +328,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         alreadyProcessedTables,
                         remainingSplits,
                         assignedSplits,
+                        maximumBinlogOffset,
                         splitFinishedOffsets,
                         assignerStatus,
                         remainingTables,

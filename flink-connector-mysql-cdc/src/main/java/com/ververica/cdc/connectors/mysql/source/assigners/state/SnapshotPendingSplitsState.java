@@ -28,6 +28,7 @@ import io.debezium.relational.TableId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** A {@link PendingSplitsState} for pending snapshot splits. */
 public class SnapshotPendingSplitsState extends PendingSplitsState {
@@ -50,6 +51,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      */
     private final Map<String, MySqlSnapshotSplit> assignedSplits;
 
+    private final Set<BinlogOffset> maximumBinlogOffset;
+
     /**
      * The offsets of finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received
      * from {@link MySqlSplitReader}s.
@@ -69,6 +72,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             List<TableId> alreadyProcessedTables,
             List<MySqlSnapshotSplit> remainingSplits,
             Map<String, MySqlSnapshotSplit> assignedSplits,
+            Set<BinlogOffset> maximumBinlogOffset,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
@@ -78,6 +82,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
         this.splitFinishedOffsets = splitFinishedOffsets;
+        this.maximumBinlogOffset = maximumBinlogOffset;
         this.assignerStatus = assignerStatus;
         this.remainingTables = remainingTables;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
@@ -98,6 +103,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     public Map<String, BinlogOffset> getSplitFinishedOffsets() {
         return splitFinishedOffsets;
+    }
+
+    public Set<BinlogOffset> getMaximumBinlogOffset() {
+        return maximumBinlogOffset;
     }
 
     public AssignerStatus getSnapshotAssignerStatus() {
@@ -132,6 +141,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
+                && Objects.equals(maximumBinlogOffset, that.maximumBinlogOffset)
                 && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets);
     }
 
@@ -142,6 +152,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 alreadyProcessedTables,
                 remainingSplits,
                 assignedSplits,
+                maximumBinlogOffset,
                 splitFinishedOffsets,
                 assignerStatus,
                 isTableIdCaseSensitive,
@@ -159,6 +170,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + remainingSplits
                 + ", assignedSplits="
                 + assignedSplits
+                + ", maximumBinlogOffset="
+                + maximumBinlogOffset
                 + ", splitFinishedOffsets="
                 + splitFinishedOffsets
                 + ", assignerStatus="
