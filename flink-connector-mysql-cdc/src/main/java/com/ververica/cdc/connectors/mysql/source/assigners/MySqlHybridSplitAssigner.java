@@ -24,7 +24,6 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.relational.TableId;
 import org.slf4j.Logger;
@@ -32,12 +31,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isInitialAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningFinished;
@@ -189,7 +186,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     // --------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {
-        final List<MySqlSnapshotSplit> assignedSnapshotSplit =
+        /*final List<MySqlSnapshotSplit> assignedSnapshotSplit =
                 snapshotSplitAssigner.getAssignedSplits().values().stream()
                         .sorted(Comparator.comparing(MySqlSplit::splitId))
                         .collect(Collectors.toList());
@@ -212,18 +209,19 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             split.getSplitStart(),
                             split.getSplitEnd(),
                             binlogOffset));
-        }
-
+        }*/
+        BinlogOffset minBinlogOffset =
+                snapshotSplitAssigner.minimumBinlogOffset.stream().findFirst().get();
         // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
         // then transfer them
 
-        boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
+        // boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new MySqlBinlogSplit(
                 BINLOG_SPLIT_ID,
-                minBinlogOffset == null ? BinlogOffset.INITIAL_OFFSET : minBinlogOffset,
+                minBinlogOffset,
                 BinlogOffset.NO_STOPPING_OFFSET,
-                divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
+                new ArrayList<>(),
                 new HashMap<>(),
-                finishedSnapshotSplitInfos.size());
+                0);
     }
 }

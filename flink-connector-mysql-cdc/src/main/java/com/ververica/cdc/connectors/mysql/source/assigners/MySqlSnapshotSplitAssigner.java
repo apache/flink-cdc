@@ -47,6 +47,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -71,6 +73,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final List<MySqlSnapshotSplit> remainingSplits;
     private final Map<String, MySqlSnapshotSplit> assignedSplits;
     private final Map<String, BinlogOffset> splitFinishedOffsets;
+    public final Set<BinlogOffset> minimumBinlogOffset;
     private final MySqlSourceConfig sourceConfig;
     private final int currentParallelism;
     private final List<TableId> remainingTables;
@@ -82,6 +85,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private ChunkSplitter chunkSplitter;
     private boolean isTableIdCaseSensitive;
     private ExecutorService executor;
+    private int assignedSplitsSize = 0;
 
     @Nullable private Long checkpointIdToFinish;
 
@@ -141,6 +145,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.remainingTables = new CopyOnWriteArrayList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
+        this.minimumBinlogOffset = new TreeSet<>();
     }
 
     @Override
@@ -290,6 +295,31 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public SnapshotPendingSplitsState snapshotState(long checkpointId) {
+        // we need a complete checkpoint before mark this assigner to be finished, to wait for all
+        // records of snapshot splits are completely processed
+        if (checkpointIdToFinish == null
+                && !isAssigningFinished(assignerStatus)
+                && allSplitsFinished()) {
+            checkpointIdToFinish = checkpointId;
+            assignedSplitsSize = assignedSplits.size();
+            splitFinishedOffsets
+                    .keySet()
+                    .forEach(
+                            k -> {
+                                BinlogOffset minBinlogOffset = splitFinishedOffsets.get(k);
+                                if (minimumBinlogOffset.isEmpty()) {
+                                    minimumBinlogOffset.add(minBinlogOffset);
+                                } else if (minimumBinlogOffset.stream()
+                                        .findFirst()
+                                        .get()
+                                        .isBefore(minBinlogOffset)) {
+                                    minimumBinlogOffset.clear();
+                                    minimumBinlogOffset.add(minBinlogOffset);
+                                }
+                                assignedSplits.remove(k);
+                            });
+        }
+        LOG.info("The assignedSplits is {}.", assignedSplits.size());
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
@@ -300,13 +330,6 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         remainingTables,
                         isTableIdCaseSensitive,
                         true);
-        // we need a complete checkpoint before mark this assigner to be finished, to wait for all
-        // records of snapshot splits are completely processed
-        if (checkpointIdToFinish == null
-                && !isAssigningFinished(assignerStatus)
-                && allSplitsFinished()) {
-            checkpointIdToFinish = checkpointId;
-        }
         return state;
     }
 
@@ -380,7 +403,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
      * are finished.
      */
     private boolean allSplitsFinished() {
-        return noMoreSplits() && assignedSplits.size() == splitFinishedOffsets.size();
+        return noMoreSplits();
     }
 
     private void splitChunksForRemainingTables() {
