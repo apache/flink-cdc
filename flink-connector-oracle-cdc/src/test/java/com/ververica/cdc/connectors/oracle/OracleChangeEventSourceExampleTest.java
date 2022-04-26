@@ -89,6 +89,7 @@ public class OracleChangeEventSourceExampleTest {
         Properties debeziumProperties = new Properties();
         debeziumProperties.setProperty("debezium.log.mining.strategy", "online_catalog");
         debeziumProperties.setProperty("debezium.log.mining.continuous.mine", "true");
+
         JdbcIncrementalSource<String> oracleChangeEventSource =
                 new OracleSourceBuilder()
                         .hostname(oracleContainer.getHost())

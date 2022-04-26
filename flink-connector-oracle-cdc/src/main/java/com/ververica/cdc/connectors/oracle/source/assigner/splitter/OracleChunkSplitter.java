@@ -18,7 +18,6 @@
 
 package com.ververica.cdc.connectors.oracle.source.assigner.splitter;
 
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -36,11 +35,13 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
+import oracle.sql.ROWID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -49,7 +50,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static java.math.BigDecimal.ROUND_CEILING;
 
 /** The {@code ChunkSplitter} used to split table into a set of chunks for JDBC data source. */
@@ -175,27 +175,29 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         final double distributionFactorUpper = sourceConfig.getDistributionFactorUpper();
         final double distributionFactorLower = sourceConfig.getDistributionFactorLower();
 
-        if (isEvenlySplitColumn(splitColumn)) {
-            long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
-            double distributionFactor =
-                    calculateDistributionFactor(tableId, min, max, approximateRowCnt);
-
-            boolean dataIsEvenlyDistributed =
-                    doubleCompare(distributionFactor, distributionFactorLower) >= 0
-                            && doubleCompare(distributionFactor, distributionFactorUpper) <= 0;
-
-            if (dataIsEvenlyDistributed) {
-                // the minimum dynamic chunk size is at least 1
-                final int dynamicChunkSize = Math.max((int) (distributionFactor * chunkSize), 1);
-                return splitEvenlySizedChunks(
-                        tableId, min, max, approximateRowCnt, dynamicChunkSize);
-            } else {
-                return splitUnevenlySizedChunks(
-                        jdbc, tableId, splitColumnName, min, max, chunkSize);
-            }
-        } else {
-            return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
-        }
+        //        if (isEvenlySplitColumn(splitColumn)) {
+        //            long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
+        //            double distributionFactor =
+        //                    calculateDistributionFactor(tableId, min, max, approximateRowCnt);
+        //
+        //            boolean dataIsEvenlyDistributed =
+        //                    doubleCompare(distributionFactor, distributionFactorLower) >= 0
+        //                            && doubleCompare(distributionFactor, distributionFactorUpper)
+        // <= 0;
+        //
+        //            if (dataIsEvenlyDistributed) {
+        //                // the minimum dynamic chunk size is at least 1
+        //                final int dynamicChunkSize = Math.max((int) (distributionFactor *
+        // chunkSize), 1);
+        //                return splitEvenlySizedChunks(
+        //                        tableId, min, max, approximateRowCnt, dynamicChunkSize);
+        //            } else {
+        //                return splitUnevenlySizedChunks(
+        //                        jdbc, tableId, splitColumnName, min, max, chunkSize);
+        //            }
+        //        } else {
+        return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
+        //        }
     }
 
     /**
@@ -242,7 +244,10 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         Object chunkStart = null;
         Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize);
         int count = 0;
-        while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
+        while (chunkEnd != null
+                && ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes())
+                        <= 0) {
+            //            while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             // may sleep a while to avoid DDOS on MySQL server
@@ -271,7 +276,8 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
+        if (ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes()) >= 0) {
+            //        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
             return null;
         } else {
             return chunkEnd;
@@ -346,7 +352,7 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
     }
 
     public static Column getSplitColumn(Table table) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
+        /*  List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty()) {
             throw new ValidationException(
                     String.format(
@@ -356,6 +362,8 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         }
 
         // use first field in primary key as the split key
-        return primaryKeys.get(0);
+        return primaryKeys.get(0);*/
+
+        return Column.editor().jdbcType(Types.VARCHAR).name("ROWID").create();
     }
 }

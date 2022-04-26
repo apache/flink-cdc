@@ -131,8 +131,8 @@ public class OracleUtils {
         String query =
                 String.format(
                         "SELECT MAX(%s) FROM ("
-                                + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC LIMIT %s"
-                                + ") AS T",
+                                + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC "
+                                + ") WHERE ROWNUM <= %s",
                         quotedColumn,
                         quotedColumn,
                         quoteSchemaAndTable(tableId),
