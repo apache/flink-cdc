@@ -360,7 +360,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
-                && Objects.equals(jdbcProperties, that.jdbcProperties);
+                && Objects.equals(jdbcProperties, that.jdbcProperties)
+                && Objects.equals(heartbeatInterval, that.heartbeatInterval);
     }
 
     @Override
@@ -389,7 +390,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 producedDataType,
                 metadataKeys,
                 scanNewlyAddedTableEnabled,
-                jdbcProperties);
+                jdbcProperties,
+                heartbeatInterval);
     }
 
     @Override
