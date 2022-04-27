@@ -26,7 +26,11 @@ import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.relational.*;
+import io.debezium.relational.Column;
+import io.debezium.relational.RelationalTableFilters;
+import io.debezium.relational.TableEditor;
+import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import oracle.jdbc.OracleTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +49,7 @@ public class OracleConnectionUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleConnectionUtils.class);
 
-    /** Returned by column metadata in Oracle if no scale is set; */
+    /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
 
     /** Creates a new {@link OracleConnection}, but not open the connection. */
@@ -120,7 +124,7 @@ public class OracleConnectionUtils {
     }
 
     /**
-     * overwrite table catalog in database schema
+     * overwrite table catalog in database schema.
      *
      * @param databaseSchema
      * @param connectorConfig
