@@ -54,9 +54,7 @@ import java.util.stream.Collectors;
 
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.buildDataDictionary;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.checkSupplementalLogging;
-import static io.debezium.connector.oracle.logminer.LogMinerHelper.createFlushTable;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.endMining;
-import static io.debezium.connector.oracle.logminer.LogMinerHelper.flushLogWriter;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.getCurrentRedoLogFiles;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.getEndScn;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.getFirstOnlineLogScn;
@@ -142,7 +140,6 @@ public class LogMinerStreamingChangeEventSource
                         connectorConfig, schema, clock, errorHandler, streamingMetrics)) {
             try {
                 startScn = offsetContext.getScn();
-                createFlushTable(jdbcConnection);
 
                 if (!isContinuousMining
                         && startScn.compareTo(
@@ -233,8 +230,6 @@ public class LogMinerStreamingChangeEventSource
                                 pauseBetweenMiningSessions();
                                 continue;
                             }
-
-                            flushLogWriter(jdbcConnection, jdbcConfiguration, isRac, racHosts);
 
                             if (hasLogSwitchOccurred()) {
                                 // This is the way to mitigate PGA leaks.
