@@ -37,7 +37,7 @@ public class RedoLogOffsetFactory extends OffsetFactory {
 
     @Override
     public Offset newOffset(String filename, Long position) {
-        return new RedoLogOffset(filename, position);
+        throw new FlinkRuntimeException("not supported create new Offset by filename and position.");
     }
 
     @Override

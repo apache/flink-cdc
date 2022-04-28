@@ -142,10 +142,11 @@ public class OracleDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public OracleSourceFetchTaskContext createFetchTaskContext(SourceSplitBase sourceSplitBase) {
+    public OracleSourceFetchTaskContext createFetchTaskContext(
+            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         final OracleConnection jdbcConnection =
-                createOracleConnection(sourceConfig.getDbzConfiguration());
-        return new OracleSourceFetchTaskContext(sourceConfig, this, jdbcConnection);
+                createOracleConnection(taskSourceConfig.getDbzConfiguration());
+        return new OracleSourceFetchTaskContext(taskSourceConfig, this, jdbcConnection);
     }
 
     @Override

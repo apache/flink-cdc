@@ -19,105 +19,92 @@
 package com.ververica.cdc.connectors.oracle.source.meta.offset;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import org.apache.kafka.connect.errors.ConnectException;
+import io.debezium.connector.oracle.Scn;
+import org.apache.commons.lang3.StringUtils;
+
+import javax.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /** A structure describes an offset in a redo log event. */
 public class RedoLogOffset extends Offset {
 
     private static final long serialVersionUID = 1L;
 
-    public static final String REDO_LOG_SCN_OFFSET_KEY = "scn";
-    public static final String EVENTS_TO_SKIP_OFFSET_KEY = "event";
-    public static final String ROWS_TO_SKIP_OFFSET_KEY = "row";
+    public static final String SCN_KEY = "scn";
+    public static final String COMMIT_SCN_KEY = "commit_scn";
+    public static final String LCR_POSITION_KEY = "lcr_position";
 
+    public static final RedoLogOffset INITIAL_OFFSET = new RedoLogOffset(0L);
     public static final RedoLogOffset NO_STOPPING_OFFSET = new RedoLogOffset(Long.MIN_VALUE);
-    public static final RedoLogOffset INITIAL_OFFSET = new RedoLogOffset(0);
 
     public RedoLogOffset(Map<String, String> offset) {
         this.offset = offset;
     }
 
-    public RedoLogOffset(String readUTF, long scn) {
-        this.offset = new HashMap<>();
-        this.offset.put(REDO_LOG_SCN_OFFSET_KEY, String.valueOf(scn));
+    public RedoLogOffset(Long scn) {
+        this(scn, 0L, null);
     }
 
-    public RedoLogOffset(long scn) {
-        this.offset = new HashMap<>();
-        this.offset.put(REDO_LOG_SCN_OFFSET_KEY, String.valueOf(scn));
+    public RedoLogOffset(Long scn, Long commitScn, @Nullable String lcrPosition) {
+        Map<String, String> offsetMap = new HashMap<>();
+        offsetMap.put(SCN_KEY, String.valueOf(scn));
+        offsetMap.put(COMMIT_SCN_KEY, String.valueOf(commitScn));
+        offsetMap.put(LCR_POSITION_KEY, lcrPosition);
+        this.offset = offsetMap;
     }
 
-    public RedoLogOffset(String scn) {
-        this.offset = new HashMap<>();
-        this.offset.put(REDO_LOG_SCN_OFFSET_KEY, scn);
+    public String getScn() {
+        return offset.get(SCN_KEY);
     }
 
-    public Map<String, String> getOffset() {
-        return offset;
+    public String getCommitScn() {
+        return offset.get(COMMIT_SCN_KEY);
     }
 
-    public long longOffsetValue(Map<String, ?> values, String key) {
-        Object obj = values.get(key);
-        if (obj == null) {
-            return 0L;
-        }
-        if (obj instanceof Number) {
-            return ((Number) obj).longValue();
-        }
-        try {
-            return Long.parseLong(obj.toString());
-        } catch (NumberFormatException e) {
-            throw new ConnectException(
-                    "Source offset '"
-                            + key
-                            + "' parameter value "
-                            + obj
-                            + " could not be converted to a long");
-        }
+    public String getLcrPosition() {
+        return offset.get(LCR_POSITION_KEY);
     }
 
     @Override
-    public int compareTo(Offset that) {
-        if (Objects.isNull(this.offset.get(REDO_LOG_SCN_OFFSET_KEY))
-                && Objects.isNull(that.getOffset().get(REDO_LOG_SCN_OFFSET_KEY))) {
+    public int compareTo(Offset offset) {
+        RedoLogOffset that = (RedoLogOffset) offset;
+        // the NO_STOPPING_OFFSET is the max offset
+        if (NO_STOPPING_OFFSET.equals(that) && NO_STOPPING_OFFSET.equals(this)) {
             return 0;
         }
-        if (Objects.isNull(this.offset.get(REDO_LOG_SCN_OFFSET_KEY))
-                && !Objects.isNull(that.getOffset().get(REDO_LOG_SCN_OFFSET_KEY))) {
-            return -1;
-        }
-        if (!Objects.isNull(this.offset.get(REDO_LOG_SCN_OFFSET_KEY))
-                && Objects.isNull(that.getOffset().get(REDO_LOG_SCN_OFFSET_KEY))) {
+        if (NO_STOPPING_OFFSET.equals(this)) {
             return 1;
         }
+        if (NO_STOPPING_OFFSET.equals(that)) {
+            return -1;
+        }
 
-        Long thisScn = Long.parseLong(this.offset.get(REDO_LOG_SCN_OFFSET_KEY));
-        Long thatScn = Long.parseLong(that.getOffset().get(REDO_LOG_SCN_OFFSET_KEY));
-        return thisScn.compareTo(thatScn);
-    }
-
-    public boolean isAtOrBefore(RedoLogOffset that) {
-        return this.compareTo(that) <= 0;
-    }
-
-    public boolean isBefore(RedoLogOffset that) {
-        return this.compareTo(that) < 0;
-    }
-
-    public boolean isAtOrAfter(RedoLogOffset that) {
-        return this.compareTo(that) >= 0;
-    }
-
-    public boolean isAfter(RedoLogOffset that) {
-        return this.compareTo(that) > 0;
+        String scnStr = this.getScn();
+        String targetScnStr = that.getScn();
+        if (StringUtils.isNotEmpty(targetScnStr)) {
+            if (StringUtils.isNotEmpty(scnStr)) {
+                Scn scn = Scn.valueOf(scnStr);
+                Scn targetScn = Scn.valueOf(targetScnStr);
+                return scn.compareTo(targetScn);
+            }
+            return -1;
+        } else if (StringUtils.isNotEmpty(scnStr)) {
+            return 1;
+        }
+        return 0;
     }
 
     @Override
-    public String toString() {
-        return offset.toString();
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof RedoLogOffset)) {
+            return false;
+        }
+        RedoLogOffset that = (RedoLogOffset) o;
+        return offset.equals(that.offset);
     }
 }

@@ -167,6 +167,7 @@ public class OracleSourceTest extends AbstractTestBase {
     }
 
     @Test
+    @Ignore("It can be open until DBZ-5245 and DBZ-4936 fix")
     public void testCheckpointAndRestore() throws Exception {
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
