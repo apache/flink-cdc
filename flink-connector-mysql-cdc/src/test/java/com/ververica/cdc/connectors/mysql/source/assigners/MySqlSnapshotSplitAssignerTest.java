@@ -199,6 +199,19 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                             customerDatabase.getDatabaseName() + ".customers_sparse_dist"
                         });
         assertEquals(expected1, splits1);
+
+        // test sparse table that the approximate row count is bigger than chunk size
+        List<String> expected2 =
+                Arrays.asList("customers_sparse_dist null [18]", "customers_sparse_dist [18] null");
+        List<String> splits2 =
+                getTestAssignSnapshotSplits(
+                        8,
+                        10d,
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customers_sparse_dist"
+                        });
+        assertEquals(expected2, splits2);
     }
 
     @Test
