@@ -94,6 +94,19 @@ public class JdbcIncrementalSource<T>
                 };
     }
 
+    public JdbcIncrementalSource(
+            JdbcSourceConfigFactory configFactory,
+            DebeziumDeserializationSchema<T> deserializationSchema,
+            OffsetFactory offsetFactory,
+            JdbcDataSourceDialect dataSourceDialect,
+            SourceSplitSerializer sourceSplitSerializer) {
+        this.configFactory = configFactory;
+        this.deserializationSchema = deserializationSchema;
+        this.offsetFactory = offsetFactory;
+        this.dataSourceDialect = dataSourceDialect;
+        this.sourceSplitSerializer = sourceSplitSerializer;
+    }
+
     @Override
     public Boundedness getBoundedness() {
         return Boundedness.CONTINUOUS_UNBOUNDED;
@@ -111,7 +124,7 @@ public class JdbcIncrementalSource<T>
         Supplier<JdbcSourceSplitReader> splitReaderSupplier =
                 () ->
                         new JdbcSourceSplitReader(
-                                readerContext.getIndexOfSubtask(), dataSourceDialect);
+                                readerContext.getIndexOfSubtask(), dataSourceDialect, sourceConfig);
         return new JdbcIncrementalSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,

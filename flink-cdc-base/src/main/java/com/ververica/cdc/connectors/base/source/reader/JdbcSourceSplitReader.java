@@ -24,6 +24,7 @@ import org.apache.flink.connector.base.source.reader.splitreader.SplitReader;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
 
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -53,11 +54,14 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
     @Nullable private Fetcher<SourceRecord, SourceSplitBase> currentFetcher;
     @Nullable private String currentSplitId;
     private final JdbcDataSourceDialect dataSourceDialect;
+    private final JdbcSourceConfig sourceConfig;
 
-    public JdbcSourceSplitReader(int subtaskId, JdbcDataSourceDialect dataSourceDialect) {
+    public JdbcSourceSplitReader(
+            int subtaskId, JdbcDataSourceDialect dataSourceDialect, JdbcSourceConfig sourceConfig) {
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
         this.dataSourceDialect = dataSourceDialect;
+        this.sourceConfig = sourceConfig;
     }
 
     @Override
@@ -116,7 +120,7 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
             if (nextSplit.isSnapshotSplit()) {
                 if (currentFetcher == null) {
                     final JdbcSourceFetchTaskContext taskContext =
-                            dataSourceDialect.createFetchTaskContext(nextSplit);
+                            dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
                     currentFetcher = new JdbcSourceScanFetcher(taskContext, subtaskId);
                 }
             } else {
@@ -126,7 +130,7 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
                     currentFetcher.close();
                 }
                 final JdbcSourceFetchTaskContext taskContext =
-                        dataSourceDialect.createFetchTaskContext(nextSplit);
+                        dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
                 currentFetcher = new JdbcSourceStreamFetcher(taskContext, subtaskId);
                 LOG.info("Stream fetcher is created.");
             }

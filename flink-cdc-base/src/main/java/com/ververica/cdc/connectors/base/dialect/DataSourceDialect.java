@@ -20,6 +20,7 @@ package com.ververica.cdc.connectors.base.dialect;
 
 import org.apache.flink.annotation.Experimental;
 
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
@@ -71,5 +72,6 @@ public interface DataSourceDialect<ID extends DataCollectionId, S, C extends Sou
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
 
     /** The task context used for fetch task to fetch data from external systems. */
-    FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase);
+    FetchTask.Context createFetchTaskContext(
+            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig);
 }

@@ -32,6 +32,7 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.RelationalDatabaseSchema;
+import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.Table;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -83,4 +84,6 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     public abstract ChangeEventQueue<DataChangeEvent> getQueue();
 
     public abstract Offset getStreamOffset(SourceRecord sourceRecord);
+
+    public abstract RelationalTableFilters getRelationalTableFilters();
 }
