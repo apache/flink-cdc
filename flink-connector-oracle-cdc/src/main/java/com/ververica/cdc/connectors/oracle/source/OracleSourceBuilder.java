@@ -24,7 +24,6 @@ import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
-import com.ververica.cdc.connectors.oracle.source.meta.split.OracleSourceSplitSerializer;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
 import java.time.Duration;
@@ -218,12 +217,7 @@ public class OracleSourceBuilder<T> {
                 DebeziumDeserializationSchema<T> deserializationSchema,
                 RedoLogOffsetFactory offsetFactory,
                 OracleDialect dataSourceDialect) {
-            super(
-                    configFactory,
-                    deserializationSchema,
-                    offsetFactory,
-                    dataSourceDialect,
-                    new OracleSourceSplitSerializer(offsetFactory));
+            super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
         }
     }
 }

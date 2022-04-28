@@ -25,6 +25,7 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
+import io.debezium.connector.oracle.Scn;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.RelationalTableFilters;
@@ -69,7 +70,7 @@ public class OracleConnectionUtils {
                     rs -> {
                         if (rs.next()) {
                             final String scn = rs.getString(1);
-                            return new RedoLogOffset(scn);
+                            return new RedoLogOffset(Scn.valueOf(scn).longValue());
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the scn via '"
