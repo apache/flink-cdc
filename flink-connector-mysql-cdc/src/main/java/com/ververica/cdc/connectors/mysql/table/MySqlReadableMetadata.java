@@ -82,7 +82,7 @@ public enum MySqlReadableMetadata {
                 }
             }),
 
-    /** it indicates the time that the change was made in the FlinkCDC the time consume */
+    /** it indicates the time that the change was made in the FlinkCDC the time consume. */
     TS(
             "meta_ts",
             DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3).notNull(),
