@@ -84,7 +84,7 @@ public enum MySqlReadableMetadata {
 
     /** The update-before data for UPDATE record. */
     OLD(
-            "meta.update_before",
+            "update_before",
             DataTypes.ARRAY(
                             DataTypes.MAP(
                                             DataTypes.STRING().nullable(),
