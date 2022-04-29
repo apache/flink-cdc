@@ -82,29 +82,27 @@ public enum MySqlReadableMetadata {
                 }
             }),
 
-    /**
-     * The update-before data for UPDATE record.
-     */
+    /** The update-before data for UPDATE record. */
     OLD(
-        "meta.update_before",
-        DataTypes.ARRAY(
-                DataTypes.MAP(
-                        DataTypes.STRING().nullable(),
-                        DataTypes.STRING().nullable())
-                    .nullable())
-            .nullable(),
-        new MetadataConverter() {
-            private static final long serialVersionUID = 1L;
+            "meta.update_before",
+            DataTypes.ARRAY(
+                            DataTypes.MAP(
+                                            DataTypes.STRING().nullable(),
+                                            DataTypes.STRING().nullable())
+                                    .nullable())
+                    .nullable(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
 
-            @Override
-            public Object read(SourceRecord record) {
-                final Envelope.Operation op = Envelope.operationFor(record);
-                if (op != Envelope.Operation.UPDATE) {
-                    return null;
+                @Override
+                public Object read(SourceRecord record) {
+                    final Envelope.Operation op = Envelope.operationFor(record);
+                    if (op != Envelope.Operation.UPDATE) {
+                        return null;
+                    }
+                    return record;
                 }
-                return record;
-            }
-        });
+            });
 
     private final String key;
 
