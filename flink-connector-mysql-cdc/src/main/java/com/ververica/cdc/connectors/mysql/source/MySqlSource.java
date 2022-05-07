@@ -174,24 +174,38 @@ public class MySqlSource<T>
         validator.validate();
 
         final MySqlSplitAssigner splitAssigner;
-        if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
-            try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-                final List<TableId> remainingTables = discoverCapturedTables(jdbc, sourceConfig);
-                boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+        StartupMode startupMode = sourceConfig.getStartupOptions().startupMode;
+        switch (startupMode) {
+            case INITIAL:
+                try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+                    final List<TableId> remainingTables =
+                            discoverCapturedTables(jdbc, sourceConfig);
+                    boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                    splitAssigner =
+                            new MySqlHybridSplitAssigner(
+                                    sourceConfig,
+                                    enumContext.currentParallelism(),
+                                    remainingTables,
+                                    isTableIdCaseSensitive);
+                } catch (Exception e) {
+                    throw new FlinkRuntimeException(
+                            "Failed to discover captured tables for enumerator", e);
+                }
+                break;
+            case LATEST_OFFSET:
+                splitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
+                break;
+            case EARLIEST_OFFSET:
+            case TIMESTAMP:
                 splitAssigner =
-                        new MySqlHybridSplitAssigner(
+                        new MySqlBinlogSplitAssigner(
                                 sourceConfig,
-                                enumContext.currentParallelism(),
-                                remainingTables,
-                                isTableIdCaseSensitive);
-            } catch (Exception e) {
-                throw new FlinkRuntimeException(
-                        "Failed to discover captured tables for enumerator", e);
-            }
-        } else {
-            splitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
+                                MySqlBinlogSplitAssigner.BinlogOffsetReadingMode.EARLIEST_OFFSET);
+                break;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported startup mode: " + startupMode.name());
         }
-
         return new MySqlSourceEnumerator(enumContext, sourceConfig, splitAssigner);
     }
 

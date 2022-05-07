@@ -228,6 +228,8 @@ public class MySqlSourceConfigFactory implements Serializable {
         switch (startupOptions.startupMode) {
             case INITIAL:
             case LATEST_OFFSET:
+            case EARLIEST_OFFSET:
+            case TIMESTAMP:
                 break;
             default:
                 throw new UnsupportedOperationException(

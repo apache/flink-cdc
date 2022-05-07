@@ -29,8 +29,6 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.jdbc.JdbcConnection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,30 +39,37 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.earliestBinlogOffset;
 
 /** A {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitAssigner.class);
     private static final String BINLOG_SPLIT_ID = "binlog-split";
 
     private final MySqlSourceConfig sourceConfig;
 
     private boolean isBinlogSplitAssigned;
 
+    private BinlogOffsetReadingMode binlogOffsetReadingMode;
+
     public MySqlBinlogSplitAssigner(MySqlSourceConfig sourceConfig) {
-        this(sourceConfig, false);
+        this(sourceConfig, false, BinlogOffsetReadingMode.LATEST_OFFSET);
+    }
+
+    public MySqlBinlogSplitAssigner(MySqlSourceConfig sourceConfig, BinlogOffsetReadingMode binlogOffsetReadingMode) {
+        this(sourceConfig, false, binlogOffsetReadingMode);
     }
 
     public MySqlBinlogSplitAssigner(
             MySqlSourceConfig sourceConfig, BinlogPendingSplitsState checkpoint) {
-        this(sourceConfig, checkpoint.isBinlogSplitAssigned());
+        this(sourceConfig, checkpoint.isBinlogSplitAssigned(), BinlogOffsetReadingMode.LATEST_OFFSET);
     }
 
     private MySqlBinlogSplitAssigner(
-            MySqlSourceConfig sourceConfig, boolean isBinlogSplitAssigned) {
+            MySqlSourceConfig sourceConfig, boolean isBinlogSplitAssigned, BinlogOffsetReadingMode binlogOffsetReadingMode) {
         this.sourceConfig = sourceConfig;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
+        this.binlogOffsetReadingMode = binlogOffsetReadingMode;
     }
 
     @Override
@@ -76,7 +81,11 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
             return Optional.empty();
         } else {
             isBinlogSplitAssigned = true;
-            return Optional.of(createBinlogSplit());
+            if (binlogOffsetReadingMode == BinlogOffsetReadingMode.EARLIEST_OFFSET){
+                return Optional.of(createBinlogSplitFromEarliest());
+            }else{
+                return Optional.of(createBinlogSplitFromLatest());
+            }
         }
     }
 
@@ -127,7 +136,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     // ------------------------------------------------------------------------------------------
 
-    private MySqlBinlogSplit createBinlogSplit() {
+    private MySqlBinlogSplit createBinlogSplitFromLatest() {
         try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
             return new MySqlBinlogSplit(
                     BINLOG_SPLIT_ID,
@@ -139,5 +148,27 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         } catch (Exception e) {
             throw new FlinkRuntimeException("Read the binlog offset error", e);
         }
+    }
+
+    private MySqlBinlogSplit createBinlogSplitFromEarliest() {
+        try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            return new MySqlBinlogSplit(
+                    BINLOG_SPLIT_ID,
+                    earliestBinlogOffset(jdbc),
+                    BinlogOffset.NO_STOPPING_OFFSET,
+                    new ArrayList<>(),
+                    new HashMap<>(),
+                    0);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Read the binlog offset error", e);
+        }
+    }
+
+    /**
+     * Reading mode for binlog offset
+     */
+    public enum BinlogOffsetReadingMode {
+        LATEST_OFFSET,
+        EARLIEST_OFFSET
     }
 }

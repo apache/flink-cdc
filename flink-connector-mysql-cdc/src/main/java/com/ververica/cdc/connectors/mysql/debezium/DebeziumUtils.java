@@ -97,6 +97,27 @@ public class DebeziumUtils {
                 isTableIdCaseSensitive);
     }
 
+    /** Fetch earliest binlog offsets in MySql Server. */
+    public static BinlogOffset earliestBinlogOffset(JdbcConnection jdbc) {
+        final String purgedStmt = "SELECT @@global.gtid_purged";
+        try {
+            String gtidSet = jdbc.queryAndMap(purgedStmt, rs -> {
+                if (rs.next() && rs.getMetaData().getColumnCount() > 0) {
+                    return rs.getString(1);
+                }
+                return null;
+            });
+            return new BinlogOffset("", 0, 0,
+                    0, 0, gtidSet, null);
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(
+                    "Cannot read gtidSet via '"
+                            + purgedStmt
+                            + "'. Make sure your server is correctly configured",
+                    e);
+        }
+    }
+
     /** Fetch current binlog offsets in MySql Server. */
     public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
         final String showMasterStmt = "SHOW MASTER STATUS";

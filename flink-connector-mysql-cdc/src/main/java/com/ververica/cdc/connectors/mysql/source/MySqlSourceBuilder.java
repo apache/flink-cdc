@@ -20,7 +20,9 @@ package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.annotation.PublicEvolving;
 
+import com.ververica.cdc.connectors.mysql.SeekBinlogToTimestampFilter;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
@@ -54,6 +56,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class MySqlSourceBuilder<T> {
     private final MySqlSourceConfigFactory configFactory = new MySqlSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
+    private StartupOptions startupOptions;
 
     public MySqlSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);
@@ -198,6 +201,7 @@ public class MySqlSourceBuilder<T> {
 
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
+        this.startupOptions = startupOptions;
         this.configFactory.startupOptions(startupOptions);
         return this;
     }
@@ -235,6 +239,12 @@ public class MySqlSourceBuilder<T> {
      * @return a MySqlParallelSource with the settings made for this builder.
      */
     public MySqlSource<T> build() {
+        if (this.deserializer != null
+                && this.startupOptions != null
+                && this.startupOptions.startupMode == StartupMode.TIMESTAMP) {
+            Long startupTimestampMillis = this.startupOptions.startupTimestampMillis;
+            deserializer = new SeekBinlogToTimestampFilter<>(startupTimestampMillis, deserializer);
+        }
         return new MySqlSource<>(configFactory, checkNotNull(deserializer));
     }
 }
