@@ -56,17 +56,23 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         this(sourceConfig, false, BinlogOffsetReadingMode.LATEST_OFFSET);
     }
 
-    public MySqlBinlogSplitAssigner(MySqlSourceConfig sourceConfig, BinlogOffsetReadingMode binlogOffsetReadingMode) {
+    public MySqlBinlogSplitAssigner(
+            MySqlSourceConfig sourceConfig, BinlogOffsetReadingMode binlogOffsetReadingMode) {
         this(sourceConfig, false, binlogOffsetReadingMode);
     }
 
     public MySqlBinlogSplitAssigner(
             MySqlSourceConfig sourceConfig, BinlogPendingSplitsState checkpoint) {
-        this(sourceConfig, checkpoint.isBinlogSplitAssigned(), BinlogOffsetReadingMode.LATEST_OFFSET);
+        this(
+                sourceConfig,
+                checkpoint.isBinlogSplitAssigned(),
+                BinlogOffsetReadingMode.LATEST_OFFSET);
     }
 
     private MySqlBinlogSplitAssigner(
-            MySqlSourceConfig sourceConfig, boolean isBinlogSplitAssigned, BinlogOffsetReadingMode binlogOffsetReadingMode) {
+            MySqlSourceConfig sourceConfig,
+            boolean isBinlogSplitAssigned,
+            BinlogOffsetReadingMode binlogOffsetReadingMode) {
         this.sourceConfig = sourceConfig;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
         this.binlogOffsetReadingMode = binlogOffsetReadingMode;
@@ -81,9 +87,9 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
             return Optional.empty();
         } else {
             isBinlogSplitAssigned = true;
-            if (binlogOffsetReadingMode == BinlogOffsetReadingMode.EARLIEST_OFFSET){
+            if (binlogOffsetReadingMode == BinlogOffsetReadingMode.EARLIEST_OFFSET) {
                 return Optional.of(createBinlogSplitFromEarliest());
-            }else{
+            } else {
                 return Optional.of(createBinlogSplitFromLatest());
             }
         }
@@ -164,9 +170,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         }
     }
 
-    /**
-     * Reading mode for binlog offset
-     */
+    /** Reading mode for binlog offset */
     public enum BinlogOffsetReadingMode {
         LATEST_OFFSET,
         EARLIEST_OFFSET

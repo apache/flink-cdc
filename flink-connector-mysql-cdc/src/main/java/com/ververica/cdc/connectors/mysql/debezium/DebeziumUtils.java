@@ -101,14 +101,16 @@ public class DebeziumUtils {
     public static BinlogOffset earliestBinlogOffset(JdbcConnection jdbc) {
         final String purgedStmt = "SELECT @@global.gtid_purged";
         try {
-            String gtidSet = jdbc.queryAndMap(purgedStmt, rs -> {
-                if (rs.next() && rs.getMetaData().getColumnCount() > 0) {
-                    return rs.getString(1);
-                }
-                return null;
-            });
-            return new BinlogOffset("", 0, 0,
-                    0, 0, gtidSet, null);
+            String gtidSet =
+                    jdbc.queryAndMap(
+                            purgedStmt,
+                            rs -> {
+                                if (rs.next() && rs.getMetaData().getColumnCount() > 0) {
+                                    return rs.getString(1);
+                                }
+                                return null;
+                            });
+            return new BinlogOffset("", 0, 0, 0, 0, gtidSet, null);
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     "Cannot read gtidSet via '"
