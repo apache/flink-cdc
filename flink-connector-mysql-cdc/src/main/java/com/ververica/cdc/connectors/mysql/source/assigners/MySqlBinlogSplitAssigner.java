@@ -170,7 +170,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         }
     }
 
-    /** Reading mode for binlog offset */
+    /** Reading mode for binlog offset . */
     public enum BinlogOffsetReadingMode {
         LATEST_OFFSET,
         EARLIEST_OFFSET
