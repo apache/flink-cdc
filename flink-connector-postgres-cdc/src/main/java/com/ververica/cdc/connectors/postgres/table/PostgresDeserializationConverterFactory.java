@@ -29,7 +29,6 @@ import io.debezium.data.geometry.Point;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
-import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.Optional;
 
