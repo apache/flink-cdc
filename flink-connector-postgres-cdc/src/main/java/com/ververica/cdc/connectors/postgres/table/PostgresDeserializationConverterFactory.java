@@ -82,8 +82,8 @@ public class PostgresDeserializationConverterFactory {
                             // The stuct consists of 2 fields the wkb byte array and the srid
                             // specifier
                             Struct geometryStruct = (Struct) dbzObj;
-                            // The byte array is actually be ewkb thus srid could be encoded in
-                            // case of a geography object. See:
+                            // The byte array is actually ewkb thus srid should be encoded in
+                            // it in case of a geography object. See:
                             // https://github.com/debezium/debezium/blob/main/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgisGeometry.java
                             return geometryStruct.getBytes("wkb");
                         } else {
@@ -105,8 +105,8 @@ public class PostgresDeserializationConverterFactory {
                             // The stuct consists of 2 fields the wkb byte array and the srid
                             // specifier
                             Struct geometryStruct = (Struct) dbzObj;
-                            // The byte array is actually be ewkb thus srid could be encoded in
-                            // case of a geography object. See
+                            // The byte array is actually ewkb thus srid should be encoded in
+                            // it in case of a geography object. See
                             // https://github.com/debezium/debezium/blob/main/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/PostgisGeometry.java
                             byte[] wkb = geometryStruct.getBytes("wkb");
                             String s = byteToHexString(wkb);
