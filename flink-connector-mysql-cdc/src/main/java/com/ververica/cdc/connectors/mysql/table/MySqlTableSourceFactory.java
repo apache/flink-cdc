@@ -199,8 +199,12 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 return StartupOptions.latest();
 
             case SCAN_STARTUP_MODE_VALUE_EARLIEST:
-            case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET:
+                return StartupOptions.earliest();
+
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
+
+            case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET:
                 throw new ValidationException(
                         String.format(
                                 "Unsupported option value '%s', the options [%s, %s, %s] are not supported correctly, please do not use them until they're correctly supported",
@@ -233,9 +237,11 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         // validate mode
         Preconditions.checkState(
                 startupOptions.startupMode == StartupMode.INITIAL
-                        || startupOptions.startupMode == StartupMode.LATEST_OFFSET,
+                        || startupOptions.startupMode == StartupMode.LATEST_OFFSET
+                        || startupOptions.startupMode == StartupMode.EARLIEST_OFFSET
+                        || startupOptions.startupMode == StartupMode.TIMESTAMP,
                 String.format(
-                        "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
+                        "MySql Parallel Source only supports startup mode ['initial','latest-offset','earliest-offset','timestamp']"
                                 + " but actual is %s",
                         startupOptions.startupMode));
     }
