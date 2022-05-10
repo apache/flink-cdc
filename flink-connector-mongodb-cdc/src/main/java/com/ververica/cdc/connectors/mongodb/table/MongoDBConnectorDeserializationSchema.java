@@ -21,6 +21,7 @@ import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.data.RawValueData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
@@ -28,6 +29,7 @@ import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.RawType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeUtils;
 import org.apache.flink.types.RowKind;
@@ -258,8 +260,9 @@ public class MongoDBConnectorDeserializationSchema
                 return createArrayConverter((ArrayType) type);
             case MAP:
                 return createMapConverter((MapType) type);
-            case MULTISET:
             case RAW:
+                return createRawValueConverter((RawType<?>) type);
+            case MULTISET:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
@@ -730,6 +733,13 @@ public class MongoDBConnectorDeserializationSchema
             }
             return new GenericMapData(map);
         };
+    }
+
+    private DeserializationRuntimeConverter createRawValueConverter(RawType<?> rawType) {
+        checkArgument(
+                BsonValue.class.isAssignableFrom(rawType.getOriginatingClass()),
+                "RAW type conversion only supports type of org.bson.BsonValue for now.");
+        return RawValueData::fromObject;
     }
 
     private Object convertField(
