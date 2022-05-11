@@ -76,6 +76,8 @@ When an initial consistent snapshot is made for large databases, your establishe
 - `interactive_timeout`: The number of seconds the server waits for activity on an interactive connection before closing it. See [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_interactive_timeout).
 - `wait_timeout`: The number of seconds the server waits for activity on a noninteractive connection before closing it. See [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_wait_timeout).
 
+### Make sure your table in mysql has primary key
+If your table has no primary key,you will not see any data in flink (no matter history or new ) and has no error message.
 
 How to create a MySQL CDC table
 ----------------
