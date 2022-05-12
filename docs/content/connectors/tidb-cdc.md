@@ -203,7 +203,7 @@ The TiDB CDC connector is a Flink Source connector which will read database snap
 The config option `scan.startup.mode` specifies the startup mode for TiDB CDC consumer. The valid enumerations are:
 
 - `initial` (default): Takes a snapshot of structure and data of captured tables; useful if you want fetch a complete representation of the data from the captured tables.
-- `latest_offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be fetched.
+- `latest-offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be fetched.
 
 ### Multi Thread Reading
 
