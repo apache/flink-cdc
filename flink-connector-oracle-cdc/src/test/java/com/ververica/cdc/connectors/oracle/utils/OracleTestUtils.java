@@ -39,7 +39,7 @@ public class OracleTestUtils {
     //                                  "assets/activate-archivelog.sql",
     //                                  "docker/assets/activate-archivelog.sql")
     // ----------------- end --------------------------
-    private static final String ORACLE_IMAGE = "jark/oracle-xe-11g-r2-cdc:0.1";
+    private static final String ORACLE_IMAGE = "goodboy008/oracle-xe-11g-r2-cdc:0.1";
 
     public static final OracleContainer ORACLE_CONTAINER = new OracleContainer(ORACLE_IMAGE);
 
