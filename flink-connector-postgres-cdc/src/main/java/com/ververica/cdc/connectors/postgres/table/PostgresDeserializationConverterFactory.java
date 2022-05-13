@@ -38,11 +38,13 @@ import static org.apache.flink.util.StringUtils.byteToHexString;
 public class PostgresDeserializationConverterFactory {
 
     public static boolean isGeometrySchema(String schema) {
-        switch (schema) {
-            case Point.LOGICAL_NAME:
-            case Geometry.LOGICAL_NAME:
-            case Geography.LOGICAL_NAME:
-                return true;
+        if (schema != null) {
+            switch (schema) {
+                case Point.LOGICAL_NAME:
+                case Geometry.LOGICAL_NAME:
+                case Geography.LOGICAL_NAME:
+                    return true;
+            }
         }
 
         return false;
@@ -100,7 +102,6 @@ public class PostgresDeserializationConverterFactory {
 
                     @Override
                     public Object convert(Object dbzObj, Schema schema) throws Exception {
-
                         if (isGeometrySchema(schema.name())) {
                             // The stuct consists of 2 fields the wkb byte array and the srid
                             // specifier
