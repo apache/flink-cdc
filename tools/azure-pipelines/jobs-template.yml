@@ -78,8 +78,6 @@ jobs:
           module: mysql
         postgres:
           module: postgres
-        oracle:
-          module: oracle
         mongodb:
           module: mongodb
         sqlserver:

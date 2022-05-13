@@ -76,6 +76,8 @@ jobs:
       matrix:
         oceanbase:
           module: oceanbase
+        oracle:
+          module: oracle
     steps:
       # download artifact from compile stage
       - task: DownloadPipelineArtifact@2
