@@ -43,6 +43,7 @@ import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -169,7 +171,6 @@ public class OracleSourceTest extends AbstractTestBase {
     public void testCheckpointAndRestore() throws Exception {
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
-        int prevPos = 0;
         {
             // ---------------------------------------------------------------------------
             // Step-1: start the source from empty state
@@ -221,15 +222,10 @@ public class OracleSourceTest extends AbstractTestBase {
             assertEquals(1, offsetState.list.size());
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
             assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
-            // assertEquals("mysql-bin.000003", JsonPath.read(state, "$.sourceOffset.file"));
             assertFalse(state.contains("row"));
             assertFalse(state.contains("server_id"));
             assertFalse(state.contains("event"));
-            // int pos = JsonPath.read(state, "$.sourceOffset.pos");
-            // assertTrue(pos > prevPos);
-            // prevPos = pos;
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -282,7 +278,6 @@ public class OracleSourceTest extends AbstractTestBase {
             }
 
             // cancel the source
-            source2.cancel();
             source2.close();
             runThread2.sync();
         }
@@ -333,7 +328,6 @@ public class OracleSourceTest extends AbstractTestBase {
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
             assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
 
-            source3.cancel();
             source3.close();
             runThread3.sync();
         }
@@ -371,13 +365,13 @@ public class OracleSourceTest extends AbstractTestBase {
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
             assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
 
-            source4.cancel();
             source4.close();
             runThread4.sync();
         }
     }
 
     @Test
+    @Ignore("Debezium Oracle connector don't monitor unknown tables since 1.6, see DBZ-3612")
     public void testRecoverFromRenameOperation() throws Exception {
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
@@ -434,7 +428,6 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
-                source.cancel();
                 source.close();
                 runThread.sync();
             }
@@ -465,7 +458,6 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertEquals(1, records.size());
                 assertInsert(records.get(0), "ID", 113);
 
-                source2.cancel();
                 source2.close();
                 runThread2.sync();
             }
@@ -580,7 +572,9 @@ public class OracleSourceTest extends AbstractTestBase {
     }
 
     private OracleSource.Builder<SourceRecord> basicSourceBuilder(OracleContainer oracleContainer) {
-
+        Properties debeziumProperties = new Properties();
+        debeziumProperties.setProperty("debezium.log.mining.strategy", "online_catalog");
+        debeziumProperties.setProperty("debezium.log.mining.continuous.mine", "true");
         return OracleSource.<SourceRecord>builder()
                 .hostname(oracleContainer.getHost())
                 .port(oracleContainer.getOraclePort())
@@ -588,6 +582,7 @@ public class OracleSourceTest extends AbstractTestBase {
                 .tableList("debezium" + "." + "products") // monitor table "products"
                 .username(oracleContainer.getUsername())
                 .password(oracleContainer.getPassword())
+                .debeziumProperties(debeziumProperties)
                 .deserializer(new ForwardDeserializeSchema());
     }
 
@@ -596,7 +591,7 @@ public class OracleSourceTest extends AbstractTestBase {
         List<T> allRecords = new ArrayList<>();
         LinkedBlockingQueue<StreamRecord<T>> queue = sourceContext.getCollectedOutputs();
         while (allRecords.size() < expectedRecordCount) {
-            StreamRecord<T> record = queue.poll(100, TimeUnit.SECONDS);
+            StreamRecord<T> record = queue.poll(200, TimeUnit.SECONDS);
             if (record != null) {
                 allRecords.add(record.getValue());
             } else {

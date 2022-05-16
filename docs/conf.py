@@ -38,8 +38,8 @@ sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
-project = 'Flink CDC'
-copyright = '2021, ververica'
+project = 'CDC Connectors for Apache Flink®'
+copyright = '2022, Ververica GmbH; Apache Flink, Flink®, Apache®, the squirrel logo, and the Apache feather logo are either registered trademarks or trademarks of The Apache Software Foundation'
 author = 'ververica'
 
 

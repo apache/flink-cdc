@@ -19,18 +19,18 @@
 package com.ververica.cdc.connectors.tidb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.tidb.TiKVChangeEventDeserializationSchema;
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.key.RowKey;
-import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Cdcpb.Event.Row;
 
-import static com.ververica.cdc.connectors.tidb.table.utils.TiKVTypeUtils.getObjectsWithDataTypes;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.tikv.common.codec.TableCodec.decodeObjects;
 
 /**
@@ -46,50 +46,51 @@ public class RowDataTiKVChangeEventDeserializationSchema
     /** TypeInformation of the produced {@link RowData}. * */
     private final TypeInformation<RowData> resultTypeInfo;
 
-    /** Information of the TiKV table. * */
-    private final TiTableInfo tableInfo;
-
     public RowDataTiKVChangeEventDeserializationSchema(
+            TiConfiguration tiConf,
+            String database,
+            String tableName,
             TypeInformation<RowData> resultTypeInfo,
-            TiTableInfo tableInfo,
-            TiKVMetadataConverter[] metadataConverters) {
-
-        super(metadataConverters);
-        this.resultTypeInfo = resultTypeInfo;
-        this.tableInfo = tableInfo;
+            TiKVMetadataConverter[] metadataConverters,
+            RowType physicalDataType) {
+        super(tiConf, database, tableName, metadataConverters, physicalDataType);
+        this.resultTypeInfo = checkNotNull(resultTypeInfo);
     }
 
     @Override
     public void deserialize(Row row, Collector<RowData> out) throws Exception {
+        if (tableInfo == null) {
+            tableInfo = fetchTableInfo();
+        }
         final RowKey rowKey = RowKey.decode(row.getKey().toByteArray());
         final long handle = rowKey.getHandle();
+        Object[] tikvValues;
+
         switch (row.getOpType()) {
             case DELETE:
+                tikvValues = decodeObjects(row.getOldValue().toByteArray(), handle, tableInfo);
                 RowData rowDataDelete =
-                        GenericRowData.ofKind(
-                                RowKind.DELETE,
-                                getObjectsWithDataTypes(
-                                        decodeObjects(
-                                                row.getOldValue().toByteArray(), handle, tableInfo),
-                                        tableInfo));
+                        (RowData) physicalConverter.convert(tikvValues, tableInfo, null);
+                rowDataDelete.setRowKind(RowKind.DELETE);
                 emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataDelete, out);
                 break;
             case PUT:
                 try {
-                    if (row.getOldValue() == null) {
-                        RowData rowDataInsert =
-                                GenericRowData.ofKind(
-                                        RowKind.INSERT,
-                                        getRowDataFields(
-                                                row.getValue().toByteArray(), handle, tableInfo));
-                        emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataInsert, out);
+                    tikvValues =
+                            decodeObjects(
+                                    row.getValue().toByteArray(),
+                                    RowKey.decode(row.getKey().toByteArray()).getHandle(),
+                                    tableInfo);
+                    if (row.getOldValue() == null || row.getOldValue().isEmpty()) {
+                        RowData rowDataUpdateBefore =
+                                (RowData) physicalConverter.convert(tikvValues, tableInfo, null);
+                        rowDataUpdateBefore.setRowKind(RowKind.INSERT);
+                        emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataUpdateBefore, out);
                     } else {
-                        RowData rowDataUpdate =
-                                GenericRowData.ofKind(
-                                        RowKind.UPDATE_AFTER,
-                                        getRowDataFields(
-                                                row.getValue().toByteArray(), handle, tableInfo));
-                        emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataUpdate, out);
+                        RowData rowDataUpdateAfter =
+                                (RowData) physicalConverter.convert(tikvValues, tableInfo, null);
+                        rowDataUpdateAfter.setRowKind(RowKind.UPDATE_AFTER);
+                        emit(new TiKVMetadataConverter.TiKVRowValue(row), rowDataUpdateAfter, out);
                     }
                     break;
                 } catch (final RuntimeException e) {
@@ -100,13 +101,8 @@ public class RowDataTiKVChangeEventDeserializationSchema
                             e);
                 }
             default:
-                throw new IllegalArgumentException(
-                        "Unknown Row Op Type: " + row.getOpType().toString());
+                throw new IllegalArgumentException("Unknown Row Op Type: " + row.getOpType());
         }
-    }
-
-    private static Object[] getRowDataFields(byte[] value, Long handle, TiTableInfo tableInfo) {
-        return getObjectsWithDataTypes(decodeObjects(value, handle, tableInfo), tableInfo);
     }
 
     @Override

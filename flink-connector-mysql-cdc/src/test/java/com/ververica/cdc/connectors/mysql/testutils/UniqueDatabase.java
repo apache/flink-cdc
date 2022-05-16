@@ -48,6 +48,7 @@ public class UniqueDatabase {
 
     private static final String[] CREATE_DATABASE_DDL =
             new String[] {"CREATE DATABASE $DBNAME$;", "USE $DBNAME$;"};
+    private static final String DROP_DATABASE_DDL = "DROP DATABASE IF EXISTS $DBNAME$;";
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     private final MySqlContainer container;
@@ -137,6 +138,21 @@ public class UniqueDatabase {
                 for (String stmt : statements) {
                     statement.execute(stmt);
                 }
+            }
+        } catch (final Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Drop the database if is exists. */
+    public void dropDatabase() {
+        try {
+            try (Connection connection =
+                            DriverManager.getConnection(
+                                    container.getJdbcUrl(), username, password);
+                    Statement statement = connection.createStatement()) {
+                final String dropDatabaseStatement = convertSQL(DROP_DATABASE_DDL);
+                statement.execute(dropDatabaseStatement);
             }
         } catch (final Exception e) {
             throw new IllegalStateException(e);

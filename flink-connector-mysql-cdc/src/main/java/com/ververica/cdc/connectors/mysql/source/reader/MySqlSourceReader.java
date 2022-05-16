@@ -196,7 +196,9 @@ public class MySqlSourceReader<T>
         // notify split enumerator again about the finished unacked snapshot splits
         reportFinishedSnapshotSplitsIfNeed();
         // add all un-finished splits (including binlog split) to SourceReaderBase
-        super.addSplits(unfinishedSplits);
+        if (!unfinishedSplits.isEmpty()) {
+            super.addSplits(unfinishedSplits);
+        }
     }
 
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(MySqlBinlogSplit split) {

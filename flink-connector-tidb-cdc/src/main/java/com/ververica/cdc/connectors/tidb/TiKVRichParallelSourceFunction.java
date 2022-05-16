@@ -34,14 +34,12 @@ import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.tidb.table.StartupMode;
 import com.ververica.cdc.connectors.tidb.table.utils.TableKeyRangeUtils;
-import com.ververica.cdc.connectors.tidb.table.utils.TiKVTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.cdc.CDCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.RowKey;
-import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Kvrpcpb;
@@ -67,8 +65,9 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     private final TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema;
     private final TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema;
     private final TiConfiguration tiConf;
-    private final TiTableInfo tiTableInfo;
     private final StartupMode startupMode;
+    private final String database;
+    private final String tableName;
 
     // Task local variables
     private transient TiSession session = null;
@@ -87,22 +86,25 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema,
             TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema,
             TiConfiguration tiConf,
-            TiTableInfo tiTableInfo,
-            StartupMode startupMode) {
+            StartupMode startupMode,
+            String database,
+            String tableName) {
         this.snapshotEventDeserializationSchema = snapshotEventDeserializationSchema;
         this.changeEventDeserializationSchema = changeEventDeserializationSchema;
         this.tiConf = tiConf;
-        this.tiTableInfo = tiTableInfo;
         this.startupMode = startupMode;
+        this.database = database;
+        this.tableName = tableName;
     }
 
     @Override
     public void open(final Configuration config) throws Exception {
         super.open(config);
         session = TiSession.create(tiConf);
+        long tableId = session.getCatalog().getTable(database, tableName).getId();
         keyRange =
                 TableKeyRangeUtils.getTableKeyRange(
-                        tiTableInfo.getId(),
+                        tableId,
                         getRuntimeContext().getNumberOfParallelSubtasks(),
                         getRuntimeContext().getIndexOfThisSubtask());
         cdcClient = new CDCClient(session, keyRange);
@@ -135,7 +137,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     }
 
     private void handleRow(final Cdcpb.Event.Row row) {
-        if (!TiKVTypeUtils.isRecordKey(row.getKey().toByteArray())) {
+        if (!TableKeyRangeUtils.isRecordKey(row.getKey().toByteArray())) {
             // Don't handle index key for now
             return;
         }
@@ -175,7 +177,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                 }
 
                 for (final Kvrpcpb.KvPair pair : segment) {
-                    if (TiKVTypeUtils.isRecordKey(pair.getKey().toByteArray())) {
+                    if (TableKeyRangeUtils.isRecordKey(pair.getKey().toByteArray())) {
                         snapshotEventDeserializationSchema.deserialize(pair, outputCollector);
                     }
                 }

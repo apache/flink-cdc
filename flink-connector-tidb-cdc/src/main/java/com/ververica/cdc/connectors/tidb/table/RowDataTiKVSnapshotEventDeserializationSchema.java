@@ -19,17 +19,16 @@
 package com.ververica.cdc.connectors.tidb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.types.RowKind;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.connectors.tidb.TiKVSnapshotEventDeserializationSchema;
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.key.RowKey;
-import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
-import static com.ververica.cdc.connectors.tidb.table.utils.TiKVTypeUtils.getObjectsWithDataTypes;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.tikv.common.codec.TableCodec.decodeObjects;
 
 /**
@@ -45,37 +44,36 @@ public class RowDataTiKVSnapshotEventDeserializationSchema
     /** TypeInformation of the produced {@link RowData}. * */
     private final TypeInformation<RowData> resultTypeInfo;
 
-    /** Information of the TiKV table. * */
-    private final TiTableInfo tableInfo;
-
     public RowDataTiKVSnapshotEventDeserializationSchema(
+            TiConfiguration tiConf,
+            String database,
+            String tableName,
             TypeInformation<RowData> resultTypeInfo,
-            TiTableInfo tableInfo,
-            TiKVMetadataConverter[] metadataConverters) {
-
-        super(metadataConverters);
-        this.resultTypeInfo = resultTypeInfo;
-        this.tableInfo = tableInfo;
-    }
-
-    @Override
-    public void deserialize(KvPair record, Collector<RowData> out) throws Exception {
-        final RowKey rowKey = RowKey.decode(record.getKey().toByteArray());
-        final long handle = rowKey.getHandle();
-
-        RowData rowData =
-                GenericRowData.ofKind(
-                        RowKind.INSERT,
-                        getRowDataFields(record.getValue().toByteArray(), handle, tableInfo));
-        emit(new TiKVMetadataConverter.TiKVRowValue(record), rowData, out);
-    }
-
-    private static Object[] getRowDataFields(byte[] value, Long handle, TiTableInfo tableInfo) {
-        return getObjectsWithDataTypes(decodeObjects(value, handle, tableInfo), tableInfo);
+            TiKVMetadataConverter[] metadataConverters,
+            RowType physicalDataType) {
+        super(tiConf, database, tableName, metadataConverters, physicalDataType);
+        this.resultTypeInfo = checkNotNull(resultTypeInfo);
     }
 
     @Override
     public TypeInformation getProducedType() {
         return resultTypeInfo;
+    }
+
+    @Override
+    public void deserialize(KvPair record, Collector<RowData> out) throws Exception {
+        if (tableInfo == null) {
+            tableInfo = fetchTableInfo();
+        }
+        Object[] tikvValues =
+                decodeObjects(
+                        record.getValue().toByteArray(),
+                        RowKey.decode(record.getKey().toByteArray()).getHandle(),
+                        tableInfo);
+
+        emit(
+                new TiKVMetadataConverter.TiKVRowValue(record),
+                (RowData) physicalConverter.convert(tikvValues, tableInfo, null),
+                out);
     }
 }

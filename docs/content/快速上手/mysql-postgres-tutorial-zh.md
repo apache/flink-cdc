@@ -23,7 +23,6 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=1234
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -73,10 +72,10 @@ docker-compose up -d
 1. 下载 [Flink 1.13.2](https://archive.apache.org/dist/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) 并将其解压至目录 `flink-1.13.2`
 2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.13.2/lib/` 下：
 
-   **下载链接只在已发布的版本上可用**
+   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译**
     - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
-    - [flink-sql-connector-mysql-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.2-SNAPSHOT/flink-sql-connector-mysql-cdc-2.2-SNAPSHOT.jar)
-    - [flink-sql-connector-postgres-cdc-2.2-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.2-SNAPSHOT/flink-sql-connector-postgres-cdc-2.2-SNAPSHOT.jar)
+    - [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar)
+    - [flink-sql-connector-postgres-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.3-SNAPSHOT/flink-sql-connector-postgres-cdc-2.3-SNAPSHOT.jar)
 
 ### 准备数据
 #### 在 MySQL 数据库中准备数据

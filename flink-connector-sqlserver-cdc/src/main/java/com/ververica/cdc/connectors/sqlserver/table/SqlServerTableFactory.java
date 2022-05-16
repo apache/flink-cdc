@@ -33,6 +33,7 @@ import java.util.Set;
 
 import static com.ververica.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 
 /** Factory for creating configured instance of {@link SqlServerTableSource}. */
 public class SqlServerTableFactory implements DynamicTableSourceFactory {
@@ -113,7 +114,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
         int port = config.get(PORT);
         StartupOptions startupOptions = getStartupOptions(config);
-        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
+        ResolvedSchema physicalSchema =
+                getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
         return new SqlServerTableSource(
                 physicalSchema,

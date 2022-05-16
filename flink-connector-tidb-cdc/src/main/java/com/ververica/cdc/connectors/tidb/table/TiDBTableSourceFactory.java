@@ -32,18 +32,14 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.DATABASE_NAME;
-import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.HOSTNAME;
-import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.PD_ADDRESSES;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TABLE_NAME;
-import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_DELETE_CONCURRENCY;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_GET_CONCURRENCY;
-import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_PUT_CONCURRENCY;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_SCAN_CONCURRENCY;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_SCAN_TIMEOUT;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_GRPC_TIMEOUT;
-import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.USERNAME;
+import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 
 /** Factory for creating configured instance of {@link TiDBTableSource}. */
 public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
@@ -56,22 +52,17 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
                 FactoryUtil.createTableFactoryHelper(this, context);
 
         final ReadableConfig config = helper.getOptions();
-        String hostname = config.get(HOSTNAME);
-        String username = config.get(USERNAME);
-        String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         String pdAddresses = config.get(PD_ADDRESSES);
         StartupOptions startupOptions = getStartupOptions(config);
-        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
+        ResolvedSchema physicalSchema =
+                getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
         return new TiDBTableSource(
                 physicalSchema,
-                hostname,
                 databaseName,
                 tableName,
-                username,
-                password,
                 pdAddresses,
                 startupOptions,
                 TiKVOptions.getTiKVOptions(context.getCatalogTable().getOptions()));
@@ -85,9 +76,6 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(HOSTNAME);
-        options.add(USERNAME);
-        options.add(PASSWORD);
         options.add(DATABASE_NAME);
         options.add(TABLE_NAME);
         options.add(PD_ADDRESSES);
@@ -101,9 +89,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(TIKV_GRPC_TIMEOUT);
         options.add(TIKV_GRPC_SCAN_TIMEOUT);
         options.add(TIKV_BATCH_GET_CONCURRENCY);
-        options.add(TIKV_BATCH_PUT_CONCURRENCY);
         options.add(TIKV_BATCH_SCAN_CONCURRENCY);
-        options.add(TIKV_BATCH_DELETE_CONCURRENCY);
         return options;
     }
 

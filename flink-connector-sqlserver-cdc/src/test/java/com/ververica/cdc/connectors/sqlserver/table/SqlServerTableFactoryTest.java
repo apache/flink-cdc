@@ -35,6 +35,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -144,7 +145,7 @@ public class SqlServerTableFactoryTest {
         actualSource = sqlServerTableSource.copy();
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
-                        SCHEMA_WITH_METADATA,
+                        ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,

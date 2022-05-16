@@ -33,6 +33,7 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
 import java.time.Duration;
@@ -432,7 +433,7 @@ public class MySqlTableSourceFactoryTest {
 
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
-                        SCHEMA_WITH_METADATA,
+                        ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
                         3306,
                         MY_LOCALHOST,
                         MY_DATABASE,

@@ -19,7 +19,6 @@
 package com.ververica.cdc.connectors.oracle.utils;
 
 import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -27,16 +26,22 @@ import java.sql.SQLException;
 
 /** Utility class for oracle tests. */
 public class OracleTestUtils {
-    public static final OracleContainer ORACLE_CONTAINER =
-            new OracleContainer(
-                    new ImageFromDockerfile("oracle-xe-11g-tmp")
-                            .withFileFromClasspath(".", "docker")
-                            .withFileFromClasspath(
-                                    "assets/activate-archivelog.sh",
-                                    "docker/assets/activate-archivelog.sh")
-                            .withFileFromClasspath(
-                                    "assets/activate-archivelog.sql",
-                                    "docker/assets/activate-archivelog.sql"));
+
+    // You can build OracleContainer from official oracle docker image in following way, we use
+    // prebuilt image for time cost consideration
+    // ----------------- begin --------------------------
+    // new OracleContainer(new ImageFromDockerfile("oracle-xe-11g-tmp")
+    //                          .withFileFromClasspath(".", "docker")
+    //                          .withFileFromClasspath(
+    //                                  "assets/activate-archivelog.sh",
+    //                                  "docker/assets/activate-archivelog.sh")
+    //                          .withFileFromClasspath(
+    //                                  "assets/activate-archivelog.sql",
+    //                                  "docker/assets/activate-archivelog.sql")
+    // ----------------- end --------------------------
+    private static final String ORACLE_IMAGE = "jark/oracle-xe-11g-r2-cdc:0.1";
+
+    public static final OracleContainer ORACLE_CONTAINER = new OracleContainer(ORACLE_IMAGE);
 
     public static final String CONNECTOR_USER = "dbzuser";
 

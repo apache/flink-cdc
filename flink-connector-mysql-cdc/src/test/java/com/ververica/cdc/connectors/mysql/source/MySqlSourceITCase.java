@@ -59,6 +59,7 @@ import java.util.concurrent.ExecutionException;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MySqlSource}. */
 public class MySqlSourceITCase extends MySqlSourceTestBase {
@@ -138,7 +139,23 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     @Test
     public void testNewlyAddedTableForExistsPipelineOnce() throws Exception {
         testNewlyAddedTableOneByOne(
-                1, FailoverType.NONE, FailoverPhase.NEVER, "address_hangzhou", "address_beijing");
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                false,
+                "address_hangzhou",
+                "address_beijing");
+    }
+
+    @Test
+    public void testNewlyAddedTableForExistsPipelineOnceWithAheadBinlog() throws Exception {
+        testNewlyAddedTableOneByOne(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                true,
+                "address_hangzhou",
+                "address_beijing");
     }
 
     @Test
@@ -147,6 +164,19 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                false,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    @Test
+    public void testNewlyAddedTableForExistsPipelineTwiceWithAheadBinlog() throws Exception {
+        testNewlyAddedTableOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                true,
                 "address_hangzhou",
                 "address_beijing",
                 "address_shanghai");
@@ -155,7 +185,24 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     @Test
     public void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
         testNewlyAddedTableOneByOne(
-                1, FailoverType.NONE, FailoverPhase.NEVER, "address_hangzhou", "address_beijing");
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                false,
+                "address_hangzhou",
+                "address_beijing");
+    }
+
+    @Test
+    public void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadBinlog()
+            throws Exception {
+        testNewlyAddedTableOneByOne(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                true,
+                "address_hangzhou",
+                "address_beijing");
     }
 
     @Test
@@ -164,6 +211,18 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
+                false,
+                "address_hangzhou",
+                "address_beijing");
+    }
+
+    @Test
+    public void testJobManagerFailoverForNewlyAddedTableWithAheadBinlog() throws Exception {
+        testNewlyAddedTableOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.JM,
+                FailoverPhase.SNAPSHOT,
+                true,
                 "address_hangzhou",
                 "address_beijing");
     }
@@ -171,7 +230,39 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     @Test
     public void testTaskManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
-                1, FailoverType.TM, FailoverPhase.BINLOG, "address_hangzhou", "address_beijing");
+                1,
+                FailoverType.TM,
+                FailoverPhase.BINLOG,
+                false,
+                "address_hangzhou",
+                "address_beijing");
+    }
+
+    @Test
+    public void testTaskManagerFailoverForNewlyAddedTableWithAheadBinlog() throws Exception {
+        testNewlyAddedTableOneByOne(
+                1,
+                FailoverType.TM,
+                FailoverPhase.BINLOG,
+                false,
+                "address_hangzhou",
+                "address_beijing");
+    }
+
+    @Test
+    public void testConsumingTableWithoutPrimaryKey() {
+        try {
+            testMySqlParallelSource(
+                    1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers_no_pk"});
+        } catch (Exception e) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    e,
+                                    String.format(
+                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
+                                            customDatabase.getDatabaseName() + ".customers_no_pk"))
+                            .isPresent());
+        }
     }
 
     private void testMySqlParallelSource(
@@ -304,6 +395,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             int parallelism,
             FailoverType failoverType,
             FailoverPhase failoverPhase,
+            boolean makeBinlogBeforeCapture,
             String... captureAddressTables)
             throws Exception {
 
@@ -324,6 +416,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     Arrays.asList(captureAddressTables)
                             .subList(0, round + 1)
                             .toArray(new String[0]);
+            String newlyAddedTable = captureAddressTables[round];
+            if (makeBinlogBeforeCapture) {
+                makeBinlogBeforeCaptureForAddressTable(getConnection(), newlyAddedTable);
+            }
             StreamExecutionEnvironment env =
                     getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
             StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -346,7 +442,6 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             JobClient jobClient = tableResult.getJobClient().get();
 
             // step 2: assert fetched snapshot data in this round
-            String newlyAddedTable = captureAddressTables[round];
             String cityName = newlyAddedTable.split("_")[1];
             List<String> expectedSnapshotDataThisRound =
                     Arrays.asList(
@@ -359,11 +454,25 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                             format(
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     newlyAddedTable, cityName, cityName));
+            if (makeBinlogBeforeCapture) {
+                expectedSnapshotDataThisRound =
+                        Arrays.asList(
+                                format(
+                                        "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
+                                        newlyAddedTable, cityName, cityName),
+                                format(
+                                        "+I[%s, 416927583791428523, China, %s, %s West Town address 2]",
+                                        newlyAddedTable, cityName, cityName),
+                                format(
+                                        "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
+                                        newlyAddedTable, cityName, cityName),
+                                format(
+                                        "+I[%s, 417022095255614381, China, %s, %s West Town address 5]",
+                                        newlyAddedTable, cityName, cityName));
+            }
 
             // trigger failover after some snapshot data read finished
-            if (failoverPhase == FailoverPhase.SNAPSHOT
-                    && TestValuesTableFactory.getRawResults("sink").size()
-                            > fetchedDataList.size()) {
+            if (failoverPhase == FailoverPhase.SNAPSHOT) {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
@@ -613,6 +722,23 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             connection.execute(
                     format(
                             "INSERT INTO %s VALUES(417022095255614380, 'China','%s','%s West Town address 4')",
+                            tableId, cityName, cityName));
+            connection.commit();
+        } finally {
+            connection.close();
+        }
+    }
+
+    private void makeBinlogBeforeCaptureForAddressTable(JdbcConnection connection, String tableName)
+            throws SQLException {
+        try {
+            connection.setAutoCommit(false);
+            // make binlog before the capture of the table
+            String tableId = customDatabase.getDatabaseName() + "." + tableName;
+            String cityName = tableName.split("_")[1];
+            connection.execute(
+                    format(
+                            "INSERT INTO %s VALUES(417022095255614381, 'China','%s','%s West Town address 5')",
                             tableId, cityName, cityName));
             connection.commit();
         } finally {
