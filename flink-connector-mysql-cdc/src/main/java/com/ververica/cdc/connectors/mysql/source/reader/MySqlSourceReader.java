@@ -203,7 +203,8 @@ public class MySqlSourceReader<T>
 
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(MySqlBinlogSplit split) {
         final String splitId = split.splitId();
-        if (split.getTableSchemas().isEmpty()) {
+        if (split.getTableSchemas().size()
+                < DebeziumUtils.getFilterTablesNum(sourceConfig.getTableList())) {
             try (MySqlConnection jdbc =
                     DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
                 Map<TableId, TableChanges.TableChange> tableSchemas =
