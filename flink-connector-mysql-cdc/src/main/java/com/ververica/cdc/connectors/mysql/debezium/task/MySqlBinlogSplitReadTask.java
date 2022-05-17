@@ -46,9 +46,9 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
     private final MySqlBinlogSplit binlogSplit;
-    private final EventDispatcherImpl<TableId> eventDispatcher;
     private final SignalEventDispatcher signalEventDispatcher;
     private final ErrorHandler errorHandler;
+    private final boolean isBoundedRead;
     private ChangeEventSourceContext context;
 
     public MySqlBinlogSplitReadTask(
@@ -63,9 +63,9 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
             MySqlBinlogSplit binlogSplit) {
         super(connectorConfig, connection, dispatcher, errorHandler, clock, taskContext, metrics);
         this.binlogSplit = binlogSplit;
-        this.eventDispatcher = dispatcher;
         this.errorHandler = errorHandler;
         this.signalEventDispatcher = signalEventDispatcher;
+        this.isBoundedRead = !NO_STOPPING_OFFSET.equals(binlogSplit.getEndingOffset());
     }
 
     @Override
@@ -79,7 +79,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     protected void handleEvent(MySqlOffsetContext offsetContext, Event event) {
         super.handleEvent(offsetContext, event);
         // check do we need to stop for read binlog for snapshot split.
-        if (isBoundedRead()) {
+        if (isBoundedRead) {
             final BinlogOffset currentBinlogOffset = getBinlogPosition(offsetContext.getOffset());
             // reach the high watermark, the binlog reader should finished
             if (currentBinlogOffset.isAtOrAfter(binlogSplit.getEndingOffset())) {
@@ -96,11 +96,8 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
                 }
                 // tell reader the binlog task finished
                 ((SnapshotBinlogSplitChangeEventSourceContextImpl) context).finished();
+                LOG.info("The backfill binlog read for split {} finished.", binlogSplit);
             }
         }
-    }
-
-    private boolean isBoundedRead() {
-        return !NO_STOPPING_OFFSET.equals(binlogSplit.getEndingOffset());
     }
 }

@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
@@ -65,7 +66,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
-    private final ExecutorService executor;
+    private final ExecutorService executorService;
+    private static final long READER_CLOSE_TIMEOUT = 30000L;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -83,7 +85,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
     }
@@ -108,7 +110,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
                         currentBinlogSplit);
 
-        executor.submit(
+        executorService.submit(
                 () -> {
                     try {
                         binlogSplitReadTask.execute(
@@ -175,6 +177,15 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             }
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
+            }
+            if (executorService != null) {
+                executorService.shutdown();
+                if (!executorService.awaitTermination(
+                        READER_CLOSE_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                    LOG.warn(
+                            "Failed to close the binlog split reader in {} ms.",
+                            READER_CLOSE_TIMEOUT);
+                }
             }
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);

@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.formatMessageTimestamp;
@@ -73,7 +74,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
-    private final ExecutorService executor;
+    private final ExecutorService executorService;
+    private static final long READER_CLOSE_TIMEOUT = 30000L;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -90,7 +92,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subtaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
         this.reachEnd = new AtomicBoolean(false);
@@ -114,7 +116,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit);
-        executor.submit(
+        executorService.submit(
                 () -> {
                     try {
                         currentTaskRunning = true;
@@ -185,6 +187,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(
             MySqlBinlogSplit backfillBinlogSplit) {
+        LOG.info("Create backfill binlog read task for split {}", backfillBinlogSplit);
         // we should only capture events for the current table,
         // otherwise, we may can't find corresponding schema
         Configuration dezConf =
@@ -327,6 +330,15 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             }
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
+            }
+            if (executorService != null) {
+                executorService.shutdown();
+                if (!executorService.awaitTermination(
+                        READER_CLOSE_TIMEOUT, TimeUnit.MILLISECONDS)) {
+                    LOG.warn(
+                            "Failed to close the snapshot split reader in {} ms.",
+                            READER_CLOSE_TIMEOUT);
+                }
             }
         } catch (Exception e) {
             LOG.error("Close snapshot reader error", e);
