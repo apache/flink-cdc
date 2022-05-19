@@ -128,10 +128,10 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             }
         } else {
             LOG.info("Skip snapshot read");
+            resolvedTs = session.getTimestamp().getVersion();
         }
 
         LOG.info("start read change events");
-        resolvedTs = session.getTimestamp().getVersion();
         cdcClient.start(resolvedTs);
         readChangeEvents();
     }
