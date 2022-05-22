@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.split;
 
+import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 
@@ -25,10 +26,12 @@ import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
+import io.debezium.document.DocumentWriter;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
@@ -118,6 +123,24 @@ public class MySqlSplitSerializerTest {
     }
 
     @Test
+    public void testBinlogSplitCompatible() throws Exception {
+        final MySqlSplit binlogSplit =
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        new BinlogOffset("mysql-bin.000001", 4L),
+                        BinlogOffset.NO_STOPPING_OFFSET,
+                        new ArrayList<>(),
+                        new HashMap<>(),
+                        0);
+
+        final byte[] serialized = serializeBinlogSplitMyCdc220(binlogSplit.asBinlogSplit());
+        final MySqlSplitSerializer sqlSplitSerializer = new MySqlSplitSerializer();
+        final MySqlSplit deserializedBinlogSplit =
+                sqlSplitSerializer.deserialize(sqlSplitSerializer.getVersion(), serialized);
+        assertEquals(binlogSplit, deserializedBinlogSplit);
+    }
+
+    @Test
     public void testRepeatedSerializationCache() throws Exception {
         final MySqlSplit split =
                 new MySqlSnapshotSplit(
@@ -139,6 +162,52 @@ public class MySqlSplitSerializerTest {
         final MySqlSplitSerializer sqlSplitSerializer = new MySqlSplitSerializer();
         byte[] serialized = sqlSplitSerializer.serialize(split);
         return sqlSplitSerializer.deserialize(sqlSplitSerializer.getVersion(), serialized);
+    }
+
+    private byte[] serializeBinlogSplitMyCdc220(MySqlBinlogSplit binlogSplit) throws Exception {
+        final MySqlSplitSerializer sqlSplitSerializer = new MySqlSplitSerializer();
+        final DataOutputSerializer out = new DataOutputSerializer(64);
+        out.writeInt(2);
+        out.writeUTF(binlogSplit.splitId());
+        out.writeUTF("");
+        writeBinlogPosition(binlogSplit.getStartingOffset(), out);
+        writeBinlogPosition(binlogSplit.getEndingOffset(), out);
+
+        // writeFinishedSplitsInfo
+        List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
+                binlogSplit.getFinishedSnapshotSplitInfos();
+        int size = finishedSplitsInfo.size();
+        out.writeInt(size);
+        for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo) {
+            out.writeUTF(splitInfo.getTableId().toString());
+            out.writeUTF(splitInfo.getSplitId());
+            out.writeUTF(rowToSerializedString(splitInfo.getSplitStart()));
+            out.writeUTF(rowToSerializedString(splitInfo.getSplitEnd()));
+            writeBinlogPosition(splitInfo.getHighWatermark(), out);
+        }
+
+        // writeTableSchemas
+        final Map<TableId, TableChange> tableSchemas = binlogSplit.getTableSchemas();
+        FlinkJsonTableChangeSerializer jsonSerializer = new FlinkJsonTableChangeSerializer();
+        DocumentWriter documentWriter = DocumentWriter.defaultWriter();
+        size = tableSchemas.size();
+        out.writeInt(size);
+        for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
+            out.writeUTF(entry.getKey().toString());
+            final String tableChangeStr =
+                    documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
+            final byte[] tableChangeBytes = tableChangeStr.getBytes(StandardCharsets.UTF_8);
+            out.writeInt(tableChangeBytes.length);
+            out.write(tableChangeBytes);
+        }
+
+        out.writeInt(binlogSplit.getTotalFinishedSplitSize());
+        // did not write isSuspended in mysql-cd 2.2.0
+        // out.writeBoolean(binlogSplit.isSuspended());
+        final byte[] result = out.getCopyOfBuffer();
+        out.clear();
+
+        return result;
     }
 
     public static TableChange getTestTableSchema() throws Exception {

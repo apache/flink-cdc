@@ -161,7 +161,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             boolean isSuspended = false;
             if (version >= 3) {
                 totalFinishedSplitSize = in.readInt();
-                if (version > 3) {
+                if (version > 3 && in.available() > 0) {
                     isSuspended = in.readBoolean();
                 }
             }
