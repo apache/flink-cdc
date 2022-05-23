@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.sqlserver;
+package com.ververica.cdc.connectors.sqlserver.old;
 
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;

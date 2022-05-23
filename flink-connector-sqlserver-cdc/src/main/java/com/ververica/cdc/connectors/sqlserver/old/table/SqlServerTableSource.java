@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.sqlserver.table;
+package com.ververica.cdc.connectors.sqlserver.old.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -30,7 +30,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.ververica.cdc.connectors.sqlserver.SqlServerSource;
+import com.ververica.cdc.connectors.sqlserver.old.SqlServerSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.MetadataConverter;

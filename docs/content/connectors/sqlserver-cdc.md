@@ -248,7 +248,7 @@ The SQLServer CDC connector can also be a DataStream source. You can create a So
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.sqlserver.SqlServerSource;
+import com.ververica.cdc.connectors.sqlserver.old.SqlServerSource;
 
 public class SqlServerSourceExample {
   public static void main(String[] args) throws Exception {

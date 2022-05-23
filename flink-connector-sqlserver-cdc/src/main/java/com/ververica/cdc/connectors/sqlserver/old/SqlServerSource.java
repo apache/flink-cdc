@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.sqlserver;
+package com.ververica.cdc.connectors.sqlserver.old;
 
-import com.ververica.cdc.connectors.sqlserver.table.StartupOptions;
+import com.ververica.cdc.connectors.sqlserver.old.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.connector.sqlserver.SqlServerConnector;
