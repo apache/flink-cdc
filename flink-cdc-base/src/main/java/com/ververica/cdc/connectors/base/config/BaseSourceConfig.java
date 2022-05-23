@@ -66,7 +66,6 @@ public abstract class BaseSourceConfig implements SourceConfig {
         return startupOptions;
     }
 
-    @Override
     public int getSplitSize() {
         return splitSize;
     }
@@ -76,12 +75,10 @@ public abstract class BaseSourceConfig implements SourceConfig {
         return splitMetaGroupSize;
     }
 
-    @Override
     public double getDistributionFactorUpper() {
         return distributionFactorUpper;
     }
 
-    @Override
     public double getDistributionFactorLower() {
         return distributionFactorLower;
     }

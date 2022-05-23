@@ -34,10 +34,10 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
-import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceRecordEmitter;
+import com.ververica.cdc.connectors.base.relational.JdbcSourceSplitSerializer;
 import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.StreamSplitAssigner;
@@ -54,6 +54,7 @@ import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceRead
 import com.ververica.cdc.connectors.base.source.reader.JdbcSourceSplitReader;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.List;
@@ -66,7 +67,11 @@ import java.util.function.Supplier;
  */
 @Experimental
 public class JdbcIncrementalSource<T>
-        implements Source<T, SourceSplitBase, PendingSplitsState>, ResultTypeQueryable<T> {
+        implements Source<
+                        T,
+                        SourceSplitBase<TableId, TableChange>,
+                        PendingSplitsState<TableId, TableChange>>,
+                ResultTypeQueryable<T> {
 
     private static final long serialVersionUID = 1L;
 
@@ -74,7 +79,7 @@ public class JdbcIncrementalSource<T>
     private final JdbcDataSourceDialect dataSourceDialect;
     private final OffsetFactory offsetFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
-    private final SourceSplitSerializer sourceSplitSerializer;
+    private final SourceSplitSerializer<TableId, TableChange> sourceSplitSerializer;
 
     public JdbcIncrementalSource(
             JdbcSourceConfigFactory configFactory,
@@ -85,13 +90,7 @@ public class JdbcIncrementalSource<T>
         this.deserializationSchema = deserializationSchema;
         this.offsetFactory = offsetFactory;
         this.dataSourceDialect = dataSourceDialect;
-        this.sourceSplitSerializer =
-                new SourceSplitSerializer() {
-                    @Override
-                    public OffsetFactory getOffsetFactory() {
-                        return offsetFactory;
-                    }
-                };
+        this.sourceSplitSerializer = new JdbcSourceSplitSerializer(offsetFactory);
     }
 
     @Override
@@ -100,7 +99,8 @@ public class JdbcIncrementalSource<T>
     }
 
     @Override
-    public SourceReader createReader(SourceReaderContext readerContext) {
+    public SourceReader<T, SourceSplitBase<TableId, TableChange>> createReader(
+            SourceReaderContext readerContext) {
         // create source config for the given subtask (e.g. unique server id)
         JdbcSourceConfig sourceConfig = configFactory.create(readerContext.getIndexOfSubtask());
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
@@ -112,7 +112,7 @@ public class JdbcIncrementalSource<T>
                 () ->
                         new JdbcSourceSplitReader(
                                 readerContext.getIndexOfSubtask(), dataSourceDialect);
-        return new JdbcIncrementalSourceReader<>(
+        return new JdbcIncrementalSourceReader<T>(
                 elementsQueue,
                 splitReaderSupplier,
                 new JdbcSourceRecordEmitter<>(
@@ -128,10 +128,12 @@ public class JdbcIncrementalSource<T>
     }
 
     @Override
-    public SplitEnumerator<SourceSplitBase, PendingSplitsState> createEnumerator(
-            SplitEnumeratorContext<SourceSplitBase> enumContext) {
+    public SplitEnumerator<
+                    SourceSplitBase<TableId, TableChange>, PendingSplitsState<TableId, TableChange>>
+            createEnumerator(
+                    SplitEnumeratorContext<SourceSplitBase<TableId, TableChange>> enumContext) {
         JdbcSourceConfig sourceConfig = configFactory.create(0);
-        final SplitAssigner splitAssigner;
+        final SplitAssigner<TableId, TableChange, JdbcSourceConfig> splitAssigner;
         if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
             try {
                 final List<TableId> remainingTables =
@@ -139,7 +141,7 @@ public class JdbcIncrementalSource<T>
                 boolean isTableIdCaseSensitive =
                         dataSourceDialect.isDataCollectionIdCaseSensitive(sourceConfig);
                 splitAssigner =
-                        new HybridSplitAssigner(
+                        new HybridSplitAssigner<>(
                                 sourceConfig,
                                 enumContext.currentParallelism(),
                                 remainingTables,
@@ -151,49 +153,55 @@ public class JdbcIncrementalSource<T>
                         "Failed to discover captured tables for enumerator", e);
             }
         } else {
-            splitAssigner = new StreamSplitAssigner(sourceConfig, dataSourceDialect, offsetFactory);
+            splitAssigner =
+                    new StreamSplitAssigner<>(sourceConfig, dataSourceDialect, offsetFactory);
         }
 
-        return new IncrementalSourceEnumerator(enumContext, sourceConfig, splitAssigner);
+        return new IncrementalSourceEnumerator<>(enumContext, sourceConfig, splitAssigner);
     }
 
     @Override
-    public SplitEnumerator<SourceSplitBase, PendingSplitsState> restoreEnumerator(
-            SplitEnumeratorContext<SourceSplitBase> enumContext, PendingSplitsState checkpoint) {
-        SourceConfig sourceConfig = configFactory.create(0);
+    public SplitEnumerator<
+                    SourceSplitBase<TableId, TableChange>, PendingSplitsState<TableId, TableChange>>
+            restoreEnumerator(
+                    SplitEnumeratorContext<SourceSplitBase<TableId, TableChange>> enumContext,
+                    PendingSplitsState<TableId, TableChange> checkpoint) {
+        JdbcSourceConfig sourceConfig = configFactory.create(0);
 
-        final SplitAssigner splitAssigner;
+        final SplitAssigner<TableId, TableChange, JdbcSourceConfig> splitAssigner;
         if (checkpoint instanceof HybridPendingSplitsState) {
             splitAssigner =
-                    new HybridSplitAssigner(
+                    new HybridSplitAssigner<>(
                             sourceConfig,
                             enumContext.currentParallelism(),
-                            (HybridPendingSplitsState) checkpoint,
+                            (HybridPendingSplitsState<TableId, TableChange>) checkpoint,
                             dataSourceDialect,
                             offsetFactory);
         } else if (checkpoint instanceof StreamPendingSplitsState) {
             splitAssigner =
-                    new StreamSplitAssigner(
+                    new StreamSplitAssigner<>(
                             sourceConfig,
-                            (StreamPendingSplitsState) checkpoint,
+                            (StreamPendingSplitsState<TableId, TableChange>) checkpoint,
                             dataSourceDialect,
                             offsetFactory);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
-        return new IncrementalSourceEnumerator(enumContext, sourceConfig, splitAssigner);
+        return new IncrementalSourceEnumerator<>(enumContext, sourceConfig, splitAssigner);
     }
 
     @Override
-    public SimpleVersionedSerializer<SourceSplitBase> getSplitSerializer() {
+    public SimpleVersionedSerializer<SourceSplitBase<TableId, TableChange>> getSplitSerializer() {
         return sourceSplitSerializer;
     }
 
     @Override
-    public SimpleVersionedSerializer<PendingSplitsState> getEnumeratorCheckpointSerializer() {
-        SourceSplitSerializer sourceSplitSerializer = (SourceSplitSerializer) getSplitSerializer();
-        return new PendingSplitsStateSerializer(sourceSplitSerializer);
+    public SimpleVersionedSerializer<PendingSplitsState<TableId, TableChange>>
+            getEnumeratorCheckpointSerializer() {
+        SourceSplitSerializer<TableId, TableChange> sourceSplitSerializer =
+                (SourceSplitSerializer<TableId, TableChange>) getSplitSerializer();
+        return new PendingSplitsStateSerializer<>(sourceSplitSerializer);
     }
 
     @Override

@@ -21,15 +21,14 @@ package com.ververica.cdc.connectors.base.source.meta.split;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.connector.source.SourceSplit;
 
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.schema.DataCollectionId;
 
 import java.util.Map;
 import java.util.Objects;
 
 /** The split of table comes from a Table that splits by primary key. */
 @Experimental
-public abstract class SourceSplitBase implements SourceSplit {
+public abstract class SourceSplitBase<ID extends DataCollectionId, S> implements SourceSplit {
 
     protected final String splitId;
 
@@ -48,13 +47,13 @@ public abstract class SourceSplitBase implements SourceSplit {
     }
 
     /** Casts this split into a {@link SnapshotSplit}. */
-    public final SnapshotSplit asSnapshotSplit() {
-        return (SnapshotSplit) this;
+    public final SnapshotSplit<ID, S> asSnapshotSplit() {
+        return (SnapshotSplit<ID, S>) this;
     }
 
     /** Casts this split into a {@link StreamSplit}. */
-    public final StreamSplit asStreamSplit() {
-        return (StreamSplit) this;
+    public final StreamSplit<ID, S> asStreamSplit() {
+        return (StreamSplit<ID, S>) this;
     }
 
     @Override
@@ -62,7 +61,7 @@ public abstract class SourceSplitBase implements SourceSplit {
         return splitId;
     }
 
-    public abstract Map<TableId, TableChange> getTableSchemas();
+    public abstract Map<ID, S> getTableSchemas();
 
     @Override
     public boolean equals(Object o) {
@@ -72,7 +71,7 @@ public abstract class SourceSplitBase implements SourceSplit {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        SourceSplitBase that = (SourceSplitBase) o;
+        SourceSplitBase<?, ?> that = (SourceSplitBase<?, ?>) o;
         return Objects.equals(splitId, that.splitId);
     }
 

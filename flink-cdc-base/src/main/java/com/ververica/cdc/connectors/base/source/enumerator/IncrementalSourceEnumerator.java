@@ -37,6 +37,7 @@ import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitMetaReque
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import io.debezium.schema.DataCollectionId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,23 +56,23 @@ import java.util.stream.Collectors;
  * readers.
  */
 @Experimental
-public class IncrementalSourceEnumerator
-        implements SplitEnumerator<SourceSplitBase, PendingSplitsState> {
+public class IncrementalSourceEnumerator<ID extends DataCollectionId, S, C extends SourceConfig>
+        implements SplitEnumerator<SourceSplitBase<ID, S>, PendingSplitsState<ID, S>> {
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceEnumerator.class);
     private static final long CHECK_EVENT_INTERVAL = 30_000L;
 
-    private final SplitEnumeratorContext<SourceSplitBase> context;
-    private final SourceConfig sourceConfig;
-    private final SplitAssigner splitAssigner;
+    private final SplitEnumeratorContext<SourceSplitBase<ID, S>> context;
+    private final C sourceConfig;
+    private final SplitAssigner<ID, S, C> splitAssigner;
 
-    // using TreeSet to prefer assigning binlog split to task-0 for easier debug
+    // using TreeSet to prefer assigning stream split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
-    private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
+    private List<List<FinishedSnapshotSplitInfo<ID>>> streamSplitMeta;
 
     public IncrementalSourceEnumerator(
-            SplitEnumeratorContext<SourceSplitBase> context,
-            SourceConfig sourceConfig,
-            SplitAssigner splitAssigner) {
+            SplitEnumeratorContext<SourceSplitBase<ID, S>> context,
+            C sourceConfig,
+            SplitAssigner<ID, S, C> splitAssigner) {
         this.context = context;
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
@@ -100,8 +101,8 @@ public class IncrementalSourceEnumerator
     }
 
     @Override
-    public void addSplitsBack(List<SourceSplitBase> splits, int subtaskId) {
-        LOG.debug("MySQL Source Enumerator adds splits back: {}", splits);
+    public void addSplitsBack(List<SourceSplitBase<ID, S>> splits, int subtaskId) {
+        LOG.debug("Incremental Source Enumerator adds splits back: {}", splits);
         splitAssigner.addSplits(splits);
     }
 
@@ -127,21 +128,21 @@ public class IncrementalSourceEnumerator
             context.sendEventToSourceReader(subtaskId, ackEvent);
         } else if (sourceEvent instanceof StreamSplitMetaRequestEvent) {
             LOG.debug(
-                    "The enumerator receives request for binlog split meta from subtask {}.",
+                    "The enumerator receives request for stream split meta from subtask {}.",
                     subtaskId);
-            sendBinlogMeta(subtaskId, (StreamSplitMetaRequestEvent) sourceEvent);
+            sendStreamSplitMeta(subtaskId, (StreamSplitMetaRequestEvent) sourceEvent);
         }
     }
 
     @Override
-    public PendingSplitsState snapshotState(long checkpointId) {
+    public PendingSplitsState<ID, S> snapshotState(long checkpointId) {
         return splitAssigner.snapshotState(checkpointId);
     }
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         splitAssigner.notifyCheckpointComplete(checkpointId);
-        // binlog split may be available after checkpoint complete
+        // stream split may be available after checkpoint complete
         assignSplits();
     }
 
@@ -165,12 +166,12 @@ public class IncrementalSourceEnumerator
                 continue;
             }
 
-            Optional<SourceSplitBase> split = splitAssigner.getNext();
+            Optional<SourceSplitBase<ID, S>> split = splitAssigner.getNext();
             if (split.isPresent()) {
-                final SourceSplitBase mySqlSplit = split.get();
-                context.assignSplit(mySqlSplit, nextAwaiting);
+                final SourceSplitBase<ID, S> sourceSplit = split.get();
+                context.assignSplit(sourceSplit, nextAwaiting);
                 awaitingReader.remove();
-                LOG.info("Assign split {} to subtask {}", mySqlSplit, nextAwaiting);
+                LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
                 break;
@@ -201,10 +202,10 @@ public class IncrementalSourceEnumerator
         }
     }
 
-    private void sendBinlogMeta(int subTask, StreamSplitMetaRequestEvent requestEvent) {
+    private void sendStreamSplitMeta(int subTask, StreamSplitMetaRequestEvent requestEvent) {
         // initialize once
-        if (binlogSplitMeta == null) {
-            final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
+        if (streamSplitMeta == null) {
+            final List<FinishedSnapshotSplitInfo<ID>> finishedSnapshotSplitInfos =
                     splitAssigner.getFinishedSplitInfos();
             if (finishedSnapshotSplitInfos.isEmpty()) {
                 LOG.error(
@@ -212,14 +213,15 @@ public class IncrementalSourceEnumerator
                 throw new FlinkRuntimeException(
                         "The assigner offer empty finished split information, this should not happen");
             }
-            binlogSplitMeta =
+            streamSplitMeta =
                     Lists.partition(
                             finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
 
-        if (binlogSplitMeta.size() > requestMetaGroupId) {
-            List<FinishedSnapshotSplitInfo> metaToSend = binlogSplitMeta.get(requestMetaGroupId);
+        if (streamSplitMeta.size() > requestMetaGroupId) {
+            List<FinishedSnapshotSplitInfo<ID>> metaToSend =
+                    streamSplitMeta.get(requestMetaGroupId);
             StreamSplitMetaEvent metadataEvent =
                     new StreamSplitMetaEvent(
                             requestEvent.getSplitId(),
@@ -232,7 +234,7 @@ public class IncrementalSourceEnumerator
             LOG.error(
                     "Received invalid request meta group id {}, the invalid meta group id range is [0, {}]",
                     requestMetaGroupId,
-                    binlogSplitMeta.size() - 1);
+                    streamSplitMeta.size() - 1);
         }
     }
 }

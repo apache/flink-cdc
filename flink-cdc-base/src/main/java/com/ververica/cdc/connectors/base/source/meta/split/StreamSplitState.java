@@ -19,21 +19,20 @@
 package com.ververica.cdc.connectors.base.source.meta.split;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.schema.DataCollectionId;
 
 import javax.annotation.Nullable;
 
 import java.util.Map;
 
-/** The state of split to describe the binlog of table(s). */
-public class StreamSplitState extends SourceSplitState {
+/** The state of split to describe the transaction of table(s). */
+public class StreamSplitState<ID extends DataCollectionId, S> extends SourceSplitState<ID, S> {
 
     @Nullable private Offset startingOffset;
     @Nullable private Offset endingOffset;
-    private final Map<TableId, TableChange> tableSchemas;
+    private final Map<ID, S> tableSchemas;
 
-    public StreamSplitState(StreamSplit split) {
+    public StreamSplitState(StreamSplit<ID, S> split) {
         super(split);
         this.startingOffset = split.getStartingOffset();
         this.endingOffset = split.getEndingOffset();
@@ -58,24 +57,24 @@ public class StreamSplitState extends SourceSplitState {
         this.endingOffset = endingOffset;
     }
 
-    public Map<TableId, TableChange> getTableSchemas() {
+    public Map<ID, S> getTableSchemas() {
         return tableSchemas;
     }
 
-    public void recordSchema(TableId tableId, TableChange latestTableChange) {
+    public void recordSchema(ID tableId, S latestTableChange) {
         this.tableSchemas.put(tableId, latestTableChange);
     }
 
     @Override
-    public StreamSplit toSourceSplit() {
-        final StreamSplit binlogSplit = split.asStreamSplit();
-        return new StreamSplit(
-                binlogSplit.splitId(),
+    public StreamSplit<ID, S> toSourceSplit() {
+        final StreamSplit<ID, S> streamSplit = split.asStreamSplit();
+        return new StreamSplit<>(
+                streamSplit.splitId(),
                 getStartingOffset(),
                 getEndingOffset(),
-                binlogSplit.asStreamSplit().getFinishedSnapshotSplitInfos(),
+                streamSplit.asStreamSplit().getFinishedSnapshotSplitInfos(),
                 getTableSchemas(),
-                binlogSplit.getTotalFinishedSplitSize());
+                streamSplit.getTotalFinishedSplitSize());
     }
 
     @Override

@@ -31,6 +31,8 @@ import com.ververica.cdc.connectors.base.source.reader.external.Fetcher;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceScanFetcher;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceStreamFetcher;
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,13 +46,14 @@ import java.util.Queue;
 
 /** Basic class read {@link SourceSplitBase} and return {@link SourceRecord}. */
 @Experimental
-public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSplitBase> {
+public class JdbcSourceSplitReader
+        implements SplitReader<SourceRecord, SourceSplitBase<TableId, TableChange>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceSplitReader.class);
-    private final Queue<SourceSplitBase> splits;
+    private final Queue<SourceSplitBase<TableId, TableChange>> splits;
     private final int subtaskId;
 
-    @Nullable private Fetcher<SourceRecord, SourceSplitBase> currentFetcher;
+    @Nullable private Fetcher<SourceRecord, SourceSplitBase<TableId, TableChange>> currentFetcher;
     @Nullable private String currentSplitId;
     private final JdbcDataSourceDialect dataSourceDialect;
 
@@ -76,7 +79,8 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
     }
 
     @Override
-    public void handleSplitsChanges(SplitsChange<SourceSplitBase> splitsChanges) {
+    public void handleSplitsChanges(
+            SplitsChange<SourceSplitBase<TableId, TableChange>> splitsChanges) {
         if (!(splitsChanges instanceof SplitsAddition)) {
             throw new UnsupportedOperationException(
                     String.format(
@@ -107,7 +111,7 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
         }
 
         if (canAssignNextSplit()) {
-            final SourceSplitBase nextSplit = splits.poll();
+            final SourceSplitBase<TableId, TableChange> nextSplit = splits.poll();
             if (nextSplit == null) {
                 throw new IOException("Cannot fetch from another split - no split remaining.");
             }

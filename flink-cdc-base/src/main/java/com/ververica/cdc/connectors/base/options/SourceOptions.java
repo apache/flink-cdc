@@ -58,7 +58,7 @@ public class SourceOptions {
                     .stringType()
                     .defaultValue("initial")
                     .withDescription(
-                            "Optional startup mode for MySQL CDC consumer, valid enumerations are "
+                            "Optional startup mode for CDC consumer, valid enumerations are "
                                     + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
                                     + "or \"specific-offset\"");
 

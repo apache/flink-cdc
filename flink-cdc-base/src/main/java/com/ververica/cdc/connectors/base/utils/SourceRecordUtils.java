@@ -90,10 +90,10 @@ public class SourceRecordUtils {
     }
 
     /**
-     * Return the timestamp when the change event is produced in MySQL.
+     * Return the timestamp when the change event is produced in database server side.
      *
      * <p>The field `source.ts_ms` in {@link SourceRecord} data struct is the time when the change
-     * event is operated in MySQL.
+     * event is operated in database server side..
      */
     public static Long getMessageTimestamp(SourceRecord record) {
         Schema schema = record.valueSchema();

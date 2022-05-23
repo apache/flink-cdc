@@ -28,7 +28,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplit
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
-import io.debezium.relational.TableId;
+import io.debezium.schema.DataCollectionId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,86 +41,106 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.source.meta.split.StreamSplit.STREAM_SPLIT_ID;
+
 /** Assigner for Hybrid split which contains snapshot splits and stream splits. */
-public class HybridSplitAssigner implements SplitAssigner {
+public class HybridSplitAssigner<ID extends DataCollectionId, S, C extends SourceConfig>
+        implements SplitAssigner<ID, S, C> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HybridSplitAssigner.class);
-    private static final String BINLOG_SPLIT_ID = "binlog-split";
 
-    private final int splitMetaGroupSize;
+    protected final C sourceConfig;
 
     private boolean isStreamSplitAssigned;
 
-    private final SnapshotSplitAssigner snapshotSplitAssigner;
+    private Offset startupOffset;
 
-    private OffsetFactory offsetFactory;
+    protected final DataSourceDialect<ID, S, C> dialect;
+
+    protected final OffsetFactory offsetFactory;
+
+    protected final SnapshotSplitAssigner<ID, S, C> snapshotSplitAssigner;
 
     public HybridSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
-            List<TableId> remainingTables,
+            List<ID> remainingTables,
             boolean isTableIdCaseSensitive,
-            DataSourceDialect dialect,
+            DataSourceDialect<ID, S, C> dialect,
             OffsetFactory offsetFactory) {
         this(
-                new SnapshotSplitAssigner(
+                sourceConfig,
+                dialect,
+                new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
                         remainingTables,
                         isTableIdCaseSensitive,
                         dialect,
                         offsetFactory),
+                offsetFactory,
                 false,
-                sourceConfig.getSplitMetaGroupSize());
-        this.offsetFactory = offsetFactory;
+                null);
     }
 
     public HybridSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
-            HybridPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            HybridPendingSplitsState<ID, S> checkpoint,
+            DataSourceDialect<ID, S, C> dialect,
             OffsetFactory offsetFactory) {
         this(
-                new SnapshotSplitAssigner(
+                sourceConfig,
+                dialect,
+                new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
                         checkpoint.getSnapshotPendingSplits(),
                         dialect,
                         offsetFactory),
+                offsetFactory,
                 checkpoint.isStreamSplitAssigned(),
-                sourceConfig.getSplitMetaGroupSize());
+                checkpoint.getStartupOffset());
     }
 
     private HybridSplitAssigner(
-            SnapshotSplitAssigner snapshotSplitAssigner,
+            C sourceConfig,
+            DataSourceDialect<ID, S, C> dialect,
+            SnapshotSplitAssigner<ID, S, C> snapshotSplitAssigner,
+            OffsetFactory offsetFactory,
             boolean isStreamSplitAssigned,
-            int splitMetaGroupSize) {
+            Offset startupOffset) {
+        this.sourceConfig = sourceConfig;
+        this.dialect = dialect;
         this.snapshotSplitAssigner = snapshotSplitAssigner;
+        this.offsetFactory = offsetFactory;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
-        this.splitMetaGroupSize = splitMetaGroupSize;
+        this.startupOffset = startupOffset;
     }
 
     @Override
     public void open() {
         snapshotSplitAssigner.open();
+        if (!isStreamSplitAssigned && startupOffset == null) {
+            this.startupOffset = dialect.displayCurrentOffset(sourceConfig);
+        }
     }
 
     @Override
-    public Optional<SourceSplitBase> getNext() {
+    public Optional<SourceSplitBase<ID, S>> getNext() {
         if (snapshotSplitAssigner.noMoreSplits()) {
-            // binlog split assigning
+            // stream split assigning
             if (isStreamSplitAssigned) {
                 // no more splits for the assigner
                 return Optional.empty();
             } else if (snapshotSplitAssigner.isFinished()) {
                 // we need to wait snapshot-assigner to be finished before
-                // assigning the binlog split. Otherwise, records emitted from binlog split
+                // assigning the stream split. Otherwise, records emitted from stream split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isStreamSplitAssigned = true;
                 return Optional.of(createStreamSplit());
             } else {
-                // binlog split is not ready by now
+                // stream split is not ready by now
                 return Optional.empty();
             }
         } else {
@@ -135,7 +155,7 @@ public class HybridSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
+    public List<FinishedSnapshotSplitInfo<ID>> getFinishedSplitInfos() {
         return snapshotSplitAssigner.getFinishedSplitInfos();
     }
 
@@ -145,13 +165,13 @@ public class HybridSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public void addSplits(Collection<SourceSplitBase> splits) {
-        List<SourceSplitBase> snapshotSplits = new ArrayList<>();
-        for (SourceSplitBase split : splits) {
+    public void addSplits(Collection<SourceSplitBase<ID, S>> splits) {
+        List<SourceSplitBase<ID, S>> snapshotSplits = new ArrayList<>();
+        for (SourceSplitBase<ID, S> split : splits) {
             if (split.isSnapshotSplit()) {
                 snapshotSplits.add(split);
             } else {
-                // we don't store the split, but will re-create binlog split later
+                // we don't store the split, but will re-create stream split later
                 isStreamSplitAssigned = false;
             }
         }
@@ -159,9 +179,11 @@ public class HybridSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public PendingSplitsState snapshotState(long checkpointId) {
-        return new HybridPendingSplitsState(
-                snapshotSplitAssigner.snapshotState(checkpointId), isStreamSplitAssigned);
+    public PendingSplitsState<ID, S> snapshotState(long checkpointId) {
+        return new HybridPendingSplitsState<>(
+                snapshotSplitAssigner.snapshotState(checkpointId),
+                isStreamSplitAssigned,
+                startupOffset);
     }
 
     @Override
@@ -176,42 +198,51 @@ public class HybridSplitAssigner implements SplitAssigner {
 
     // --------------------------------------------------------------------------------------------
 
-    public StreamSplit createStreamSplit() {
-        final List<SnapshotSplit> assignedSnapshotSplit =
+    protected StreamSplit<ID, S> createStreamSplit() {
+        final List<SnapshotSplit<ID, S>> assignedSnapshotSplit =
                 snapshotSplitAssigner.getAssignedSplits().values().stream()
                         .sorted(Comparator.comparing(SourceSplitBase::splitId))
                         .collect(Collectors.toList());
 
         Map<String, Offset> splitFinishedOffsets = snapshotSplitAssigner.getSplitFinishedOffsets();
-        final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
+        final List<FinishedSnapshotSplitInfo<ID>> finishedSnapshotSplitInfos = new ArrayList<>();
 
-        Offset minBinlogOffset = null;
-        for (SnapshotSplit split : assignedSnapshotSplit) {
-            // find the min binlog offset
-            Offset binlogOffset = splitFinishedOffsets.get(split.splitId());
-            if (minBinlogOffset == null || binlogOffset.isBefore(minBinlogOffset)) {
-                minBinlogOffset = binlogOffset;
+        Offset minOffset = null;
+        for (SnapshotSplit<ID, S> split : assignedSnapshotSplit) {
+            // find the min stream offset
+            Offset offset = splitFinishedOffsets.get(split.splitId());
+            if (minOffset == null || offset.isBefore(minOffset)) {
+                minOffset = offset;
             }
             finishedSnapshotSplitInfos.add(
-                    new FinishedSnapshotSplitInfo(
+                    new FinishedSnapshotSplitInfo<>(
                             split.getTableId(),
                             split.splitId(),
                             split.getSplitStart(),
                             split.getSplitEnd(),
-                            binlogOffset,
+                            minOffset,
                             offsetFactory));
         }
 
         // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
         // then transfer them
 
-        boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
-        return new StreamSplit(
-                BINLOG_SPLIT_ID,
-                minBinlogOffset == null ? offsetFactory.createInitialOffset() : minBinlogOffset,
+        boolean divideMetaToGroups =
+                finishedSnapshotSplitInfos.size() > sourceConfig.getSplitMetaGroupSize();
+        return new StreamSplit<>(
+                STREAM_SPLIT_ID,
+                minOffset == null ? startupOffset : minOffset,
                 offsetFactory.createNoStoppingOffset(),
                 divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
                 new HashMap<>(),
                 finishedSnapshotSplitInfos.size());
+    }
+
+    protected boolean isStreamSplitAssigned() {
+        return isStreamSplitAssigned;
+    }
+
+    protected Offset getStartupOffset() {
+        return startupOffset;
     }
 }

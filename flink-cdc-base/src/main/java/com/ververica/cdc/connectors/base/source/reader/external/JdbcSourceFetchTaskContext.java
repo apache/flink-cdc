@@ -33,6 +33,8 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.RelationalDatabaseSchema;
 import io.debezium.relational.Table;
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -52,7 +54,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
         this.schemaNameAdjuster = SchemaNameAdjuster.create();
     }
 
-    public abstract void configure(SourceSplitBase sourceSplitBase);
+    public abstract void configure(SourceSplitBase<TableId, TableChange> sourceSplitBase);
 
     public SourceConfig getSourceConfig() {
         return sourceConfig;

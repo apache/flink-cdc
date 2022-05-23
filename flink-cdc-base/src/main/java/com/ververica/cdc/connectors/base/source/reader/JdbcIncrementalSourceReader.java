@@ -47,7 +47,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitState;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplitState;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges;
+import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,25 +70,28 @@ import static org.apache.flink.util.Preconditions.checkState;
 @Experimental
 public class JdbcIncrementalSourceReader<T>
         extends SingleThreadMultiplexSourceReaderBase<
-                SourceRecord, T, SourceSplitBase, SourceSplitState> {
+                SourceRecord,
+                T,
+                SourceSplitBase<TableId, TableChange>,
+                SourceSplitState<TableId, TableChange>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcIncrementalSourceReader.class);
 
-    private final Map<String, SnapshotSplit> finishedUnackedSplits;
-    private final Map<String, StreamSplit> uncompletedBinlogSplits;
+    private final Map<String, SnapshotSplit<TableId, TableChange>> finishedUnackedSplits;
+    private final Map<String, StreamSplit<TableId, TableChange>> uncompletedBinlogSplits;
     private final int subtaskId;
-    private final SourceSplitSerializer sourceSplitSerializer;
+    private final SourceSplitSerializer<TableId, TableChange> sourceSplitSerializer;
     private final JdbcSourceConfig sourceConfig;
     private final JdbcDataSourceDialect dialect;
 
     public JdbcIncrementalSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
             Supplier<JdbcSourceSplitReader> splitReaderSupplier,
-            RecordEmitter<SourceRecord, T, SourceSplitState> recordEmitter,
+            RecordEmitter<SourceRecord, T, SourceSplitState<TableId, TableChange>> recordEmitter,
             Configuration config,
             SourceReaderContext context,
             JdbcSourceConfig sourceConfig,
-            SourceSplitSerializer sourceSplitSerializer,
+            SourceSplitSerializer<TableId, TableChange> sourceSplitSerializer,
             JdbcDataSourceDialect dialect) {
         super(
                 elementQueue,
@@ -112,18 +115,19 @@ public class JdbcIncrementalSourceReader<T>
     }
 
     @Override
-    protected SourceSplitState initializedState(SourceSplitBase split) {
+    protected SourceSplitState<TableId, TableChange> initializedState(
+            SourceSplitBase<TableId, TableChange> split) {
         if (split.isSnapshotSplit()) {
-            return new SnapshotSplitState(split.asSnapshotSplit());
+            return new SnapshotSplitState<>(split.asSnapshotSplit());
         } else {
-            return new StreamSplitState(split.asStreamSplit());
+            return new StreamSplitState<>(split.asStreamSplit());
         }
     }
 
     @Override
-    public List<SourceSplitBase> snapshotState(long checkpointId) {
+    public List<SourceSplitBase<TableId, TableChange>> snapshotState(long checkpointId) {
         // unfinished splits
-        List<SourceSplitBase> stateSplits = super.snapshotState(checkpointId);
+        List<SourceSplitBase<TableId, TableChange>> stateSplits = super.snapshotState(checkpointId);
 
         // add finished snapshot splits that didn't receive ack yet
         stateSplits.addAll(finishedUnackedSplits.values());
@@ -135,27 +139,28 @@ public class JdbcIncrementalSourceReader<T>
     }
 
     @Override
-    protected void onSplitFinished(Map<String, SourceSplitState> finishedSplitIds) {
-        for (SourceSplitState splitState : finishedSplitIds.values()) {
-            SourceSplitBase mySqlSplit = splitState.toSourceSplit();
+    protected void onSplitFinished(
+            Map<String, SourceSplitState<TableId, TableChange>> finishedSplitIds) {
+        for (SourceSplitState<TableId, TableChange> splitState : finishedSplitIds.values()) {
+            SourceSplitBase<TableId, TableChange> sourceSplit = splitState.toSourceSplit();
             checkState(
-                    mySqlSplit.isSnapshotSplit(),
+                    sourceSplit.isSnapshotSplit(),
                     String.format(
                             "Only snapshot split could finish, but the actual split is binlog split %s",
-                            mySqlSplit));
-            finishedUnackedSplits.put(mySqlSplit.splitId(), mySqlSplit.asSnapshotSplit());
+                            sourceSplit));
+            finishedUnackedSplits.put(sourceSplit.splitId(), sourceSplit.asSnapshotSplit());
         }
         reportFinishedSnapshotSplitsIfNeed();
         context.sendSplitRequest();
     }
 
     @Override
-    public void addSplits(List<SourceSplitBase> splits) {
+    public void addSplits(List<SourceSplitBase<TableId, TableChange>> splits) {
         // restore for finishedUnackedSplits
-        List<SourceSplitBase> unfinishedSplits = new ArrayList<>();
-        for (SourceSplitBase split : splits) {
+        List<SourceSplitBase<TableId, TableChange>> unfinishedSplits = new ArrayList<>();
+        for (SourceSplitBase<TableId, TableChange> split : splits) {
             if (split.isSnapshotSplit()) {
-                SnapshotSplit snapshotSplit = split.asSnapshotSplit();
+                SnapshotSplit<TableId, TableChange> snapshotSplit = split.asSnapshotSplit();
                 if (snapshotSplit.isSnapshotReadFinished()) {
                     finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
                 } else {
@@ -168,9 +173,9 @@ public class JdbcIncrementalSourceReader<T>
                     requestBinlogSplitMetaIfNeeded(split.asStreamSplit());
                 } else {
                     uncompletedBinlogSplits.remove(split.splitId());
-                    StreamSplit mySqlBinlogSplit =
+                    StreamSplit<TableId, TableChange> streamSplit =
                             discoverTableSchemasForBinlogSplit(split.asStreamSplit());
-                    unfinishedSplits.add(mySqlBinlogSplit);
+                    unfinishedSplits.add(streamSplit);
                 }
             }
         }
@@ -180,11 +185,12 @@ public class JdbcIncrementalSourceReader<T>
         super.addSplits(unfinishedSplits);
     }
 
-    private StreamSplit discoverTableSchemasForBinlogSplit(StreamSplit split) {
+    private StreamSplit<TableId, TableChange> discoverTableSchemasForBinlogSplit(
+            StreamSplit<TableId, TableChange> split) {
         final String splitId = split.splitId();
         if (split.getTableSchemas().isEmpty()) {
             try {
-                Map<TableId, TableChanges.TableChange> tableSchemas =
+                Map<TableId, TableChange> tableSchemas =
                         dialect.discoverDataCollectionSchemas(sourceConfig);
                 LOG.info("The table schema discovery for binlog split {} success", splitId);
                 return StreamSplit.fillTableSchemas(split, tableSchemas);
@@ -229,7 +235,8 @@ public class JdbcIncrementalSourceReader<T>
     }
 
     private void fillMetaDataForBinlogSplit(StreamSplitMetaEvent metadataEvent) {
-        StreamSplit binlogSplit = uncompletedBinlogSplits.get(metadataEvent.getSplitId());
+        StreamSplit<TableId, TableChange> binlogSplit =
+                uncompletedBinlogSplits.get(metadataEvent.getSplitId());
         if (binlogSplit != null) {
             final int receivedMetaGroupId = metadataEvent.getMetaGroupId();
             final int expectedMetaGroupId =
@@ -237,9 +244,9 @@ public class JdbcIncrementalSourceReader<T>
                             binlogSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             if (receivedMetaGroupId == expectedMetaGroupId) {
-                List<FinishedSnapshotSplitInfo> metaDataGroup =
+                List<FinishedSnapshotSplitInfo<TableId>> metaDataGroup =
                         metadataEvent.getMetaGroup().stream()
-                                .map(bytes -> sourceSplitSerializer.deserialize(bytes))
+                                .map(sourceSplitSerializer::readFinishedSplitInfo)
                                 .collect(Collectors.toList());
                 uncompletedBinlogSplits.put(
                         binlogSplit.splitId(),
@@ -261,26 +268,26 @@ public class JdbcIncrementalSourceReader<T>
         }
     }
 
-    private void requestBinlogSplitMetaIfNeeded(StreamSplit binlogSplit) {
-        final String splitId = binlogSplit.splitId();
-        if (!binlogSplit.isCompletedSplit()) {
+    private void requestBinlogSplitMetaIfNeeded(StreamSplit<TableId, TableChange> streamSplit) {
+        final String splitId = streamSplit.splitId();
+        if (!streamSplit.isCompletedSplit()) {
             final int nextMetaGroupId =
                     getNextMetaGroupId(
-                            binlogSplit.getFinishedSnapshotSplitInfos().size(),
+                            streamSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             StreamSplitMetaRequestEvent splitMetaRequestEvent =
                     new StreamSplitMetaRequestEvent(splitId, nextMetaGroupId);
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
-            LOG.info("The meta of binlog split {} has been collected success", splitId);
-            this.addSplits(Arrays.asList(binlogSplit));
+            LOG.info("The meta of stream split {} has been collected success", splitId);
+            this.addSplits(Arrays.asList(streamSplit));
         }
     }
 
     private void reportFinishedSnapshotSplitsIfNeed() {
         if (!finishedUnackedSplits.isEmpty()) {
             final Map<String, Offset> finishedOffsets = new HashMap<>();
-            for (SnapshotSplit split : finishedUnackedSplits.values()) {
+            for (SnapshotSplit<TableId, TableChange> split : finishedUnackedSplits.values()) {
                 finishedOffsets.put(split.splitId(), split.getHighWatermark());
             }
             FinishedSnapshotSplitsReportEvent reportEvent =
@@ -302,7 +309,8 @@ public class JdbcIncrementalSourceReader<T>
     }
 
     @Override
-    protected SourceSplitBase toSplitType(String splitId, SourceSplitState splitState) {
+    protected SourceSplitBase<TableId, TableChange> toSplitType(
+            String splitId, SourceSplitState<TableId, TableChange> splitState) {
         return splitState.toSourceSplit();
     }
 }

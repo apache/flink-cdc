@@ -30,8 +30,10 @@ import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceRead
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.document.Array;
+import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
+import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,11 +52,11 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isWaterm
 /**
  * The {@link RecordEmitter} implementation for {@link JdbcIncrementalSourceReader}.
  *
- * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the binlog reader to
+ * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the stream reader to
  * emit records rather than emit the records directly.
  */
 public class JdbcSourceRecordEmitter<T>
-        implements RecordEmitter<SourceRecord, T, SourceSplitState> {
+        implements RecordEmitter<SourceRecord, T, SourceSplitState<TableId, TableChange>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
@@ -80,7 +82,9 @@ public class JdbcSourceRecordEmitter<T>
 
     @Override
     public void emitRecord(
-            SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
+            SourceRecord element,
+            SourceOutput<T> output,
+            SourceSplitState<TableId, TableChange> splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
             Offset watermark = getWatermark(element);

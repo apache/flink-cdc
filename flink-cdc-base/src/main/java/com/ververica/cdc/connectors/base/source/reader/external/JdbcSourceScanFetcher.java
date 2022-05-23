@@ -27,6 +27,8 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -45,7 +47,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Fetcher to fetch data from table split, the split is the snapshot split {@link SnapshotSplit}.
  */
-public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitBase> {
+public class JdbcSourceScanFetcher
+        implements Fetcher<SourceRecord, SourceSplitBase<TableId, TableChange>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceScanFetcher.class);
 
@@ -58,8 +61,8 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
     private volatile Throwable readException;
 
     // task to read snapshot for current split
-    private FetchTask<SourceSplitBase> snapshotSplitReadTask;
-    private SnapshotSplit currentSnapshotSplit;
+    private FetchTask<SourceSplitBase<TableId, TableChange>> snapshotSplitReadTask;
+    private SnapshotSplit<TableId, TableChange> currentSnapshotSplit;
 
     public JdbcSourceScanFetcher(JdbcSourceFetchTaskContext taskContext, int subtaskId) {
         this.taskContext = taskContext;
@@ -73,7 +76,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
     }
 
     @Override
-    public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
+    public void submitTask(FetchTask<SourceSplitBase<TableId, TableChange>> fetchTask) {
         this.snapshotSplitReadTask = fetchTask;
         this.currentSnapshotSplit = fetchTask.getSplit().asSnapshotSplit();
         taskContext.configure(currentSnapshotSplit);

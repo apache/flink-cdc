@@ -66,7 +66,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
     }
 
     @Override
-    public Collection<SnapshotSplit> generateSplits(TableId tableId) {
+    public Collection<SnapshotSplit<TableId, TableChange>> generateSplits(TableId tableId) {
         try (JdbcConnection jdbc = dialect.openJdbcConnection(sourceConfig)) {
 
             LOG.info("Start splitting table {} into chunks...", tableId);
@@ -82,11 +82,11 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
             }
 
             // convert chunks into splits
-            List<SnapshotSplit> splits = new ArrayList<>();
+            List<SnapshotSplit<TableId, TableChange>> splits = new ArrayList<>();
             RowType splitType = getSplitType(splitColumn);
             for (int i = 0; i < chunks.size(); i++) {
                 ChunkRange chunk = chunks.get(i);
-                SnapshotSplit split =
+                SnapshotSplit<TableId, TableChange> split =
                         createSnapshotSplit(
                                 jdbc,
                                 tableId,
@@ -278,7 +278,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
         }
     }
 
-    private SnapshotSplit createSnapshotSplit(
+    private SnapshotSplit<TableId, TableChange> createSnapshotSplit(
             JdbcConnection jdbc,
             TableId tableId,
             int chunkId,
@@ -290,7 +290,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
         Object[] splitEnd = chunkEnd == null ? null : new Object[] {chunkEnd};
         Map<TableId, TableChange> schema = new HashMap<>();
         schema.put(tableId, dialect.queryTableSchema(jdbc, tableId));
-        return new SnapshotSplit(
+        return new SnapshotSplit<>(
                 tableId,
                 splitId(tableId, chunkId),
                 splitKeyType,

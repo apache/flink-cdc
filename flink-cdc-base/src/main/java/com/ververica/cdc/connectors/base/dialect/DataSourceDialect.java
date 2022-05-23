@@ -29,7 +29,6 @@ import io.debezium.schema.DataCollectionId;
 
 import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The dialect of data source.
@@ -49,13 +48,6 @@ public interface DataSourceDialect<ID extends DataCollectionId, S, C extends Sou
     List<ID> discoverDataCollections(C sourceConfig);
 
     /**
-     * Discovers the captured data collections' schema by {@link SourceConfig}.
-     *
-     * @param sourceConfig a basic source configuration.
-     */
-    Map<ID, S> discoverDataCollectionSchemas(C sourceConfig);
-
-    /**
      * Displays current offset from the database e.g. query Mysql binary logs by query <code>
      * SHOW MASTER STATUS</code>.
      */
@@ -65,11 +57,11 @@ public interface DataSourceDialect<ID extends DataCollectionId, S, C extends Sou
     boolean isDataCollectionIdCaseSensitive(C sourceConfig);
 
     /** Returns the {@link ChunkSplitter} which used to split collection to splits. */
-    ChunkSplitter<ID> createChunkSplitter(C sourceConfig);
+    ChunkSplitter<ID, S> createChunkSplitter(C sourceConfig);
 
     /** The fetch task used to fetch data of a snapshot split or stream split. */
-    FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
+    FetchTask<SourceSplitBase<ID, S>> createFetchTask(SourceSplitBase<ID, S> sourceSplitBase);
 
     /** The task context used for fetch task to fetch data from external systems. */
-    FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase);
+    FetchTask.Context createFetchTaskContext(SourceSplitBase<ID, S> sourceSplitBase);
 }

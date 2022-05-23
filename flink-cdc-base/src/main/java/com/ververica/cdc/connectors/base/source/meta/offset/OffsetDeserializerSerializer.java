@@ -20,19 +20,12 @@ package com.ververica.cdc.connectors.base.source.meta.offset;
 
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-
-import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
-import io.debezium.relational.TableId;
 
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Map;
-
-import static com.ververica.cdc.connectors.base.utils.SerializerUtils.serializedStringToObject;
-import static com.ververica.cdc.connectors.base.utils.SerializerUtils.serializedStringToRow;
 
 /** read {@link Offset} from input stream and write {@link Offset} to output stream. */
 public interface OffsetDeserializerSerializer extends Serializable {
@@ -58,11 +51,11 @@ public interface OffsetDeserializerSerializer extends Serializable {
     default Offset readOffsetPosition(DataInputDeserializer in) throws IOException {
         boolean offsetNonNull = in.readBoolean();
         if (offsetNonNull) {
-            int binlogOffsetBytesLength = in.readInt();
-            byte[] binlogOffsetBytes = new byte[binlogOffsetBytesLength];
-            in.readFully(binlogOffsetBytes);
+            int offsetBytesLength = in.readInt();
+            byte[] offsetBytes = new byte[offsetBytesLength];
+            in.readFully(offsetBytes);
             OffsetDeserializer offsetDeserializer = createOffsetDeserializer();
-            return offsetDeserializer.deserialize(binlogOffsetBytes);
+            return offsetDeserializer.deserialize(offsetBytes);
         } else {
             return null;
         }
@@ -71,32 +64,14 @@ public interface OffsetDeserializerSerializer extends Serializable {
     default void writeOffsetPosition(Offset offset, DataOutputSerializer out) throws IOException {
         out.writeBoolean(offset != null);
         if (offset != null) {
-            byte[] binlogOffsetBytes = OffsetSerializer.INSTANCE.serialize(offset);
-            out.writeInt(binlogOffsetBytes.length);
-            out.write(binlogOffsetBytes);
+            byte[] offsetBytes = OffsetSerializer.INSTANCE.serialize(offset);
+            out.writeInt(offsetBytes.length);
+            out.write(offsetBytes);
         }
     }
 
     default OffsetDeserializer createOffsetDeserializer() {
         return new OffsetDeserializer(getOffsetFactory());
-    }
-
-    default FinishedSnapshotSplitInfo deserialize(byte[] serialized) {
-        try {
-            final DataInputDeserializer in = new DataInputDeserializer(serialized);
-            TableId tableId = TableId.parse(in.readUTF());
-            String splitId = in.readUTF();
-            Object[] splitStart = serializedStringToRow(in.readUTF());
-            Object[] splitEnd = serializedStringToRow(in.readUTF());
-            OffsetFactory offsetFactory = (OffsetFactory) serializedStringToObject(in.readUTF());
-            Offset highWatermark = readOffsetPosition(in);
-            in.releaseArrays();
-
-            return new FinishedSnapshotSplitInfo(
-                    tableId, splitId, splitStart, splitEnd, highWatermark, offsetFactory);
-        } catch (IOException e) {
-            throw new FlinkRuntimeException(e);
-        }
     }
 
     /** Serializer for {@link Offset}. */

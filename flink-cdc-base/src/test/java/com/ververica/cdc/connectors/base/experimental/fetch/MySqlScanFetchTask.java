@@ -164,7 +164,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 context.getSourceConfig()
                         .getDbzConfiguration()
                         .edit()
-                        .with("table.include.list", split.getTableId().toString())
+                        .with("table.include.list", split.getTableId().identifier())
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
@@ -271,7 +271,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                     offsetContext.getPartition(), snapshotSplit, lowWatermark, WatermarkKind.LOW);
 
             LOG.info("Snapshot step 2 - Snapshotting data");
-            createDataEvents(ctx, snapshotSplit.getTableId());
+            createDataEvents(ctx, TableId.parse(snapshotSplit.getTableId().identifier()));
 
             final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
             LOG.info(
@@ -330,7 +330,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
 
             final String selectSql =
                     buildSplitScanQuery(
-                            snapshotSplit.getTableId(),
+                            TableId.parse(snapshotSplit.getTableId().identifier()),
                             snapshotSplit.getSplitKeyType(),
                             snapshotSplit.getSplitStart() == null,
                             snapshotSplit.getSplitEnd() == null);

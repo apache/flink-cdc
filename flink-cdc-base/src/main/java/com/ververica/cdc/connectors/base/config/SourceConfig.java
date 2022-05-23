@@ -30,13 +30,7 @@ public interface SourceConfig extends Serializable {
 
     StartupOptions getStartupOptions();
 
-    int getSplitSize();
-
     int getSplitMetaGroupSize();
-
-    double getDistributionFactorUpper();
-
-    double getDistributionFactorLower();
 
     boolean isIncludeSchemaChanges();
 

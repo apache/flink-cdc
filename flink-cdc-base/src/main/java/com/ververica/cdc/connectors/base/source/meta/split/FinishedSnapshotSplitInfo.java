@@ -25,7 +25,7 @@ import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetDeserializerSerializer;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.utils.SerializerUtils;
-import io.debezium.relational.TableId;
+import io.debezium.schema.DataCollectionId;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -34,12 +34,13 @@ import java.util.Objects;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** The information used to describe a finished snapshot split. */
-public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
+public class FinishedSnapshotSplitInfo<ID extends DataCollectionId>
+        implements OffsetDeserializerSerializer {
 
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
-    private final TableId tableId;
+    private final ID tableId;
     private final String splitId;
     private final Object[] splitStart;
     private final Object[] splitEnd;
@@ -48,7 +49,7 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
     private final OffsetFactory offsetFactory;
 
     public FinishedSnapshotSplitInfo(
-            TableId tableId,
+            ID tableId,
             String splitId,
             Object[] splitStart,
             Object[] splitEnd,
@@ -62,7 +63,7 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         this.offsetFactory = checkNotNull(offsetFactory);
     }
 
-    public TableId getTableId() {
+    public ID getTableId() {
         return tableId;
     }
 
@@ -90,7 +91,7 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        FinishedSnapshotSplitInfo that = (FinishedSnapshotSplitInfo) o;
+        FinishedSnapshotSplitInfo<?> that = (FinishedSnapshotSplitInfo<?>) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(splitId, that.splitId)
                 && Arrays.equals(splitStart, that.splitStart)
@@ -139,7 +140,7 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
     }
 
     public byte[] serialize(final DataOutputSerializer out) throws IOException {
-        out.writeUTF(this.getTableId().toString());
+        out.writeUTF(this.getTableId().identifier());
         out.writeUTF(this.getSplitId());
         out.writeUTF(SerializerUtils.rowToSerializedString(this.getSplitStart()));
         out.writeUTF(SerializerUtils.rowToSerializedString(this.getSplitEnd()));

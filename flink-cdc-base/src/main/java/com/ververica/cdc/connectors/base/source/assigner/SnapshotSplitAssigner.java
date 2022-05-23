@@ -29,7 +29,7 @@ import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
-import io.debezium.relational.TableId;
+import io.debezium.schema.DataCollectionId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,33 +47,34 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Assigner for snapshot split. */
-public class SnapshotSplitAssigner implements SplitAssigner {
+public class SnapshotSplitAssigner<ID extends DataCollectionId, S, C extends SourceConfig>
+        implements SplitAssigner<ID, S, C> {
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitAssigner.class);
 
-    private final List<TableId> alreadyProcessedTables;
-    private final List<SnapshotSplit> remainingSplits;
-    private final Map<String, SnapshotSplit> assignedSplits;
+    private final List<ID> alreadyProcessedTables;
+    private final List<SnapshotSplit<ID, S>> remainingSplits;
+    private final Map<String, SnapshotSplit<ID, S>> assignedSplits;
     private final Map<String, Offset> splitFinishedOffsets;
     private boolean assignerFinished;
 
-    private final SourceConfig sourceConfig;
+    private final C sourceConfig;
     private final int currentParallelism;
-    private final LinkedList<TableId> remainingTables;
+    private final LinkedList<ID> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
 
-    private ChunkSplitter chunkSplitter;
+    private ChunkSplitter<ID, S> chunkSplitter;
     private boolean isTableIdCaseSensitive;
 
     @Nullable private Long checkpointIdToFinish;
-    private final DataSourceDialect dialect;
+    private final DataSourceDialect<ID, S, C> dialect;
     private final OffsetFactory offsetFactory;
 
     public SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
-            List<TableId> remainingTables,
+            List<ID> remainingTables,
             boolean isTableIdCaseSensitive,
-            DataSourceDialect dialect,
+            DataSourceDialect<ID, S, C> dialect,
             OffsetFactory offsetFactory) {
         this(
                 sourceConfig,
@@ -91,10 +92,10 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     public SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
-            SnapshotPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            SnapshotPendingSplitsState<ID, S> checkpoint,
+            DataSourceDialect<ID, S, C> dialect,
             OffsetFactory offsetFactory) {
         this(
                 sourceConfig,
@@ -112,17 +113,17 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     private SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
-            List<TableId> alreadyProcessedTables,
-            List<SnapshotSplit> remainingSplits,
-            Map<String, SnapshotSplit> assignedSplits,
+            List<ID> alreadyProcessedTables,
+            List<SnapshotSplit<ID, S>> remainingSplits,
+            Map<String, SnapshotSplit<ID, S>> assignedSplits,
             Map<String, Offset> splitFinishedOffsets,
             boolean assignerFinished,
-            List<TableId> remainingTables,
+            List<ID> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
-            DataSourceDialect dialect,
+            DataSourceDialect<ID, S, C> dialect,
             OffsetFactory offsetFactory) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
@@ -145,7 +146,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
         // the legacy state didn't snapshot remaining tables, discovery remaining table here
         if (!isRemainingTablesCheckpointed && !assignerFinished) {
             try {
-                final List<TableId> discoverTables = dialect.discoverDataCollections(sourceConfig);
+                final List<ID> discoverTables = dialect.discoverDataCollections(sourceConfig);
                 discoverTables.removeAll(alreadyProcessedTables);
                 this.remainingTables.addAll(discoverTables);
                 this.isTableIdCaseSensitive = dialect.isDataCollectionIdCaseSensitive(sourceConfig);
@@ -157,20 +158,20 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public Optional<SourceSplitBase> getNext() {
+    public Optional<SourceSplitBase<ID, S>> getNext() {
         if (!remainingSplits.isEmpty()) {
             // return remaining splits firstly
-            Iterator<SnapshotSplit> iterator = remainingSplits.iterator();
-            SnapshotSplit split = iterator.next();
+            Iterator<SnapshotSplit<ID, S>> iterator = remainingSplits.iterator();
+            SnapshotSplit<ID, S> split = iterator.next();
             iterator.remove();
             assignedSplits.put(split.splitId(), split);
             return Optional.of(split);
         } else {
             // it's turn for new table
-            TableId nextTable = remainingTables.pollFirst();
+            ID nextTable = remainingTables.pollFirst();
             if (nextTable != null) {
                 // split the given table into chunks (snapshot splits)
-                Collection<SnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
+                Collection<SnapshotSplit<ID, S>> splits = chunkSplitter.generateSplits(nextTable);
                 remainingSplits.addAll(splits);
                 alreadyProcessedTables.add(nextTable);
                 return getNext();
@@ -186,27 +187,27 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
+    public List<FinishedSnapshotSplitInfo<ID>> getFinishedSplitInfos() {
         if (waitingForFinishedSplits()) {
             LOG.error(
                     "The assigner is not ready to offer finished split information, this should not be called");
             throw new FlinkRuntimeException(
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
-        final List<SnapshotSplit> assignedSnapshotSplit =
+        final List<SnapshotSplit<ID, S>> assignedSnapshotSplit =
                 assignedSplits.values().stream()
                         .sorted(Comparator.comparing(SourceSplitBase::splitId))
                         .collect(Collectors.toList());
-        List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        for (SnapshotSplit split : assignedSnapshotSplit) {
-            Offset binlogOffset = splitFinishedOffsets.get(split.splitId());
+        List<FinishedSnapshotSplitInfo<ID>> finishedSnapshotSplitInfos = new ArrayList<>();
+        for (SnapshotSplit<ID, S> split : assignedSnapshotSplit) {
+            Offset finishedOffset = splitFinishedOffsets.get(split.splitId());
             finishedSnapshotSplitInfos.add(
-                    new FinishedSnapshotSplitInfo(
+                    new FinishedSnapshotSplitInfo<>(
                             split.getTableId(),
                             split.splitId(),
                             split.getSplitStart(),
                             split.getSplitEnd(),
-                            binlogOffset,
+                            finishedOffset,
                             offsetFactory));
         }
         return finishedSnapshotSplitInfos;
@@ -217,7 +218,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
         this.splitFinishedOffsets.putAll(splitFinishedOffsets);
         if (allSplitsFinished()) {
             // Skip the waiting checkpoint when current parallelism is 1 which means we do not need
-            // to care about the global output data order of snapshot splits and binlog split.
+            // to care about the global output data order of snapshot splits and stream split.
             if (currentParallelism == 1) {
                 assignerFinished = true;
                 LOG.info(
@@ -231,8 +232,8 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public void addSplits(Collection<SourceSplitBase> splits) {
-        for (SourceSplitBase split : splits) {
+    public void addSplits(Collection<SourceSplitBase<ID, S>> splits) {
+        for (SourceSplitBase<ID, S> split : splits) {
             remainingSplits.add(split.asSnapshotSplit());
             // we should remove the add-backed splits from the assigned list,
             // because they are failed
@@ -242,9 +243,9 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public SnapshotPendingSplitsState snapshotState(long checkpointId) {
-        SnapshotPendingSplitsState state =
-                new SnapshotPendingSplitsState(
+    public SnapshotPendingSplitsState<ID, S> snapshotState(long checkpointId) {
+        SnapshotPendingSplitsState<ID, S> state =
+                new SnapshotPendingSplitsState<>(
                         alreadyProcessedTables,
                         remainingSplits,
                         assignedSplits,
@@ -287,7 +288,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
         return assignerFinished;
     }
 
-    public Map<String, SnapshotSplit> getAssignedSplits() {
+    public Map<String, SnapshotSplit<ID, S>> getAssignedSplits() {
         return assignedSplits;
     }
 

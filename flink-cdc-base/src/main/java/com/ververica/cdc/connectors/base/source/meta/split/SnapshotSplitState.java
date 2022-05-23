@@ -19,15 +19,16 @@
 package com.ververica.cdc.connectors.base.source.meta.split;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
+import io.debezium.schema.DataCollectionId;
 
 import javax.annotation.Nullable;
 
 /** The state of split to describe the snapshot of table(s). */
-public class SnapshotSplitState extends SourceSplitState {
+public class SnapshotSplitState<ID extends DataCollectionId, S> extends SourceSplitState<ID, S> {
 
     @Nullable private Offset highWatermark;
 
-    public SnapshotSplitState(SnapshotSplit split) {
+    public SnapshotSplitState(SnapshotSplit<ID, S> split) {
         super(split);
         this.highWatermark = split.getHighWatermark();
     }
@@ -42,9 +43,9 @@ public class SnapshotSplitState extends SourceSplitState {
     }
 
     @Override
-    public SnapshotSplit toSourceSplit() {
-        final SnapshotSplit snapshotSplit = split.asSnapshotSplit();
-        return new SnapshotSplit(
+    public SnapshotSplit<ID, S> toSourceSplit() {
+        final SnapshotSplit<ID, S> snapshotSplit = split.asSnapshotSplit();
+        return new SnapshotSplit<>(
                 snapshotSplit.asSnapshotSplit().getTableId(),
                 snapshotSplit.splitId(),
                 snapshotSplit.getSplitKeyType(),

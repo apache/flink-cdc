@@ -18,25 +18,37 @@
 
 package com.ververica.cdc.connectors.base.source.assigner.state;
 
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
+import io.debezium.schema.DataCollectionId;
+
 import java.util.Objects;
 
-/** A {@link PendingSplitsState} for pending hybrid (snapshot & binlog) splits. */
-public class HybridPendingSplitsState extends PendingSplitsState {
-    private final SnapshotPendingSplitsState snapshotPendingSplits;
+/** A {@link PendingSplitsState} for pending hybrid (snapshot & stream) splits. */
+public class HybridPendingSplitsState<ID extends DataCollectionId, S>
+        extends PendingSplitsState<ID, S> {
+    private final SnapshotPendingSplitsState<ID, S> snapshotPendingSplits;
     private final boolean isStreamSplitAssigned;
+    private final Offset startupOffset;
 
     public HybridPendingSplitsState(
-            SnapshotPendingSplitsState snapshotPendingSplits, boolean isStreamSplitAssigned) {
+            SnapshotPendingSplitsState<ID, S> snapshotPendingSplits,
+            boolean isStreamSplitAssigned,
+            Offset initialOffset) {
         this.snapshotPendingSplits = snapshotPendingSplits;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
+        this.startupOffset = initialOffset;
     }
 
-    public SnapshotPendingSplitsState getSnapshotPendingSplits() {
+    public SnapshotPendingSplitsState<ID, S> getSnapshotPendingSplits() {
         return snapshotPendingSplits;
     }
 
     public boolean isStreamSplitAssigned() {
         return isStreamSplitAssigned;
+    }
+
+    public Offset getStartupOffset() {
+        return startupOffset;
     }
 
     @Override
@@ -47,14 +59,15 @@ public class HybridPendingSplitsState extends PendingSplitsState {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        HybridPendingSplitsState that = (HybridPendingSplitsState) o;
+        HybridPendingSplitsState<?, ?> that = (HybridPendingSplitsState<?, ?>) o;
         return isStreamSplitAssigned == that.isStreamSplitAssigned
+                && Objects.equals(startupOffset, that.startupOffset)
                 && Objects.equals(snapshotPendingSplits, that.snapshotPendingSplits);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(snapshotPendingSplits, isStreamSplitAssigned);
+        return Objects.hash(snapshotPendingSplits, isStreamSplitAssigned, startupOffset);
     }
 
     @Override
@@ -62,8 +75,10 @@ public class HybridPendingSplitsState extends PendingSplitsState {
         return "HybridPendingSplitsState{"
                 + "snapshotPendingSplits="
                 + snapshotPendingSplits
-                + ", isBinlogSplitAssigned="
+                + ", isStreamSplitAssigned="
                 + isStreamSplitAssigned
+                + ", startupOffset="
+                + startupOffset
                 + '}';
     }
 }

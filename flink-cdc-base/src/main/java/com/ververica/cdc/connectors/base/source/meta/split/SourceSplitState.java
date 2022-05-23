@@ -18,12 +18,14 @@
 
 package com.ververica.cdc.connectors.base.source.meta.split;
 
+import io.debezium.schema.DataCollectionId;
+
 /** State of the reader, essentially a mutable version of the {@link SourceSplitBase}. */
-public abstract class SourceSplitState {
+public abstract class SourceSplitState<ID extends DataCollectionId, S> {
 
-    protected final SourceSplitBase split;
+    protected final SourceSplitBase<ID, S> split;
 
-    public SourceSplitState(SourceSplitBase split) {
+    public SourceSplitState(SourceSplitBase<ID, S> split) {
         this.split = split;
     }
 
@@ -32,21 +34,21 @@ public abstract class SourceSplitState {
         return getClass() == SnapshotSplitState.class;
     }
 
-    /** Checks whether this split state is a binlog split state. */
+    /** Checks whether this split state is a stream split state. */
     public final boolean isStreamSplitState() {
         return getClass() == StreamSplitState.class;
     }
 
     /** Casts this split state into a {@link SnapshotSplitState}. */
-    public final SnapshotSplitState asSnapshotSplitState() {
-        return (SnapshotSplitState) this;
+    public final SnapshotSplitState<ID, S> asSnapshotSplitState() {
+        return (SnapshotSplitState<ID, S>) this;
     }
 
     /** Casts this split state into a {@link StreamSplitState}. */
-    public final StreamSplitState asStreamSplitState() {
-        return (StreamSplitState) this;
+    public final StreamSplitState<ID, S> asStreamSplitState() {
+        return (StreamSplitState<ID, S>) this;
     }
 
-    /** Use the current split state to create a new MySqlSplit. */
-    public abstract SourceSplitBase toSourceSplit();
+    /** Use the current split state to create a new Split. */
+    public abstract SourceSplitBase<ID, S> toSourceSplit();
 }

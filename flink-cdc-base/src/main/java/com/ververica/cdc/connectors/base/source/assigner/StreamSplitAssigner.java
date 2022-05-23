@@ -27,6 +27,7 @@ import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
+import io.debezium.schema.DataCollectionId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,36 +39,38 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.ververica.cdc.connectors.base.source.meta.split.StreamSplit.STREAM_SPLIT_ID;
+
 /** Assigner for stream split. */
-public class StreamSplitAssigner implements SplitAssigner {
+public class StreamSplitAssigner<ID extends DataCollectionId, S, C extends SourceConfig>
+        implements SplitAssigner<ID, S, C> {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreamSplitAssigner.class);
-    private static final String BINLOG_SPLIT_ID = "binlog-split";
 
-    private final SourceConfig sourceConfig;
+    private final C sourceConfig;
 
     private boolean isStreamSplitAssigned;
 
-    private final DataSourceDialect dialect;
+    private final DataSourceDialect<ID, S, C> dialect;
     private final OffsetFactory offsetFactory;
 
     public StreamSplitAssigner(
-            SourceConfig sourceConfig, DataSourceDialect dialect, OffsetFactory offsetFactory) {
+            C sourceConfig, DataSourceDialect<ID, S, C> dialect, OffsetFactory offsetFactory) {
         this(sourceConfig, false, dialect, offsetFactory);
     }
 
     public StreamSplitAssigner(
-            SourceConfig sourceConfig,
-            StreamPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            C sourceConfig,
+            StreamPendingSplitsState<ID, S> checkpoint,
+            DataSourceDialect<ID, S, C> dialect,
             OffsetFactory offsetFactory) {
         this(sourceConfig, checkpoint.isStreamSplitAssigned(), dialect, offsetFactory);
     }
 
     private StreamSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             boolean isStreamSplitAssigned,
-            DataSourceDialect dialect,
+            DataSourceDialect<ID, S, C> dialect,
             OffsetFactory offsetFactory) {
         this.sourceConfig = sourceConfig;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
@@ -79,7 +82,7 @@ public class StreamSplitAssigner implements SplitAssigner {
     public void open() {}
 
     @Override
-    public Optional<SourceSplitBase> getNext() {
+    public Optional<SourceSplitBase<ID, S>> getNext() {
         if (isStreamSplitAssigned) {
             return Optional.empty();
         } else {
@@ -94,7 +97,7 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
+    public List<FinishedSnapshotSplitInfo<ID>> getFinishedSplitInfos() {
         return Collections.EMPTY_LIST;
     }
 
@@ -104,14 +107,14 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public void addSplits(Collection<SourceSplitBase> splits) {
-        // we don't store the split, but will re-create binlog split later
+    public void addSplits(Collection<SourceSplitBase<ID, S>> splits) {
+        // we don't store the split, but will re-create stream split later
         isStreamSplitAssigned = false;
     }
 
     @Override
-    public PendingSplitsState snapshotState(long checkpointId) {
-        return new StreamPendingSplitsState(isStreamSplitAssigned);
+    public PendingSplitsState<ID, S> snapshotState(long checkpointId) {
+        return new StreamPendingSplitsState<>(isStreamSplitAssigned);
     }
 
     @Override
@@ -124,12 +127,12 @@ public class StreamSplitAssigner implements SplitAssigner {
 
     // ------------------------------------------------------------------------------------------
 
-    public StreamSplit createStreamSplit() {
+    public StreamSplit<ID, S> createStreamSplit() {
 
-        return new StreamSplit(
-                BINLOG_SPLIT_ID,
+        return new StreamSplit<>(
+                STREAM_SPLIT_ID,
                 dialect.displayCurrentOffset(sourceConfig),
-                offsetFactory.createInitialOffset(),
+                offsetFactory.createNoStoppingOffset(),
                 new ArrayList<>(),
                 new HashMap<>(),
                 0);

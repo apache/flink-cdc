@@ -32,6 +32,7 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,8 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataCh
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.splitKeyRangeContains;
 
 /** Fetcher to fetch data from table split, the split is the stream split {@link StreamSplit}. */
-public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSplitBase> {
+public class JdbcSourceStreamFetcher
+        implements Fetcher<SourceRecord, SourceSplitBase<TableId, TableChange>> {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceStreamFetcher.class);
 
     private final JdbcSourceFetchTaskContext taskContext;
@@ -61,9 +63,9 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile Throwable readException;
 
-    private FetchTask<SourceSplitBase> streamFetchTask;
-    private StreamSplit currentStreamSplit;
-    private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
+    private FetchTask<SourceSplitBase<TableId, TableChange>> streamFetchTask;
+    private StreamSplit<TableId, TableChange> currentStreamSplit;
+    private Map<TableId, List<FinishedSnapshotSplitInfo<TableId>>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, Offset> maxSplitHighWatermarkMap;
     private Tables.TableFilter capturedTableFilter;
@@ -76,7 +78,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
     }
 
     @Override
-    public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
+    public void submitTask(FetchTask<SourceSplitBase<TableId, TableChange>> fetchTask) {
         this.streamFetchTask = fetchTask;
         this.currentStreamSplit = fetchTask.getSplit().asStreamSplit();
         taskContext.configure(currentStreamSplit);
@@ -88,7 +90,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
                     } catch (Exception e) {
                         LOG.error(
                                 String.format(
-                                        "Execute binlog read task for stream split %s fail",
+                                        "Execute transaction log read task for stream split %s fail",
                                         currentStreamSplit),
                                 e);
                         readException = e;
@@ -159,7 +161,8 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
                 Object[] key =
                         SourceRecordUtils.getSplitKey(
                                 splitKeyType, sourceRecord, taskContext.getSchemaNameAdjuster());
-                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
+                for (FinishedSnapshotSplitInfo<TableId> splitInfo :
+                        finishedSplitsInfo.get(tableId)) {
                     if (splitKeyRangeContains(
                                     key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
                             && position.isAfter(splitInfo.getHighWatermark())) {
@@ -187,9 +190,9 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
     }
 
     private void configureFilter() {
-        List<FinishedSnapshotSplitInfo> finishedSplitInfos =
+        List<FinishedSnapshotSplitInfo<TableId>> finishedSplitInfos =
                 currentStreamSplit.getFinishedSnapshotSplitInfos();
-        Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
+        Map<TableId, List<FinishedSnapshotSplitInfo<TableId>>> splitsInfoMap = new HashMap<>();
         Map<TableId, Offset> tableIdBinlogPositionMap = new HashMap<>();
         // latest-offset mode
         if (finishedSplitInfos.isEmpty()) {
@@ -199,9 +202,9 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
         }
         // initial mode
         else {
-            for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
+            for (FinishedSnapshotSplitInfo<TableId> finishedSplitInfo : finishedSplitInfos) {
                 TableId tableId = finishedSplitInfo.getTableId();
-                List<FinishedSnapshotSplitInfo> list =
+                List<FinishedSnapshotSplitInfo<TableId>> list =
                         splitsInfoMap.getOrDefault(tableId, new ArrayList<>());
                 list.add(finishedSplitInfo);
                 splitsInfoMap.put(tableId, list);

@@ -23,17 +23,13 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetDeserializerSerializer;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.utils.SerializerUtils;
-import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
-import io.debezium.document.Document;
-import io.debezium.document.DocumentReader;
-import io.debezium.document.DocumentWriter;
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.schema.DataCollectionId;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -42,16 +38,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.base.utils.SerializerUtils.serializedStringToObject;
+import static com.ververica.cdc.connectors.base.utils.SerializerUtils.serializedStringToRow;
+
 /** A serializer for the {@link SourceSplitBase}. */
-public abstract class SourceSplitSerializer
-        implements SimpleVersionedSerializer<SourceSplitBase>, OffsetDeserializerSerializer {
+public abstract class SourceSplitSerializer<ID extends DataCollectionId, S>
+        implements SimpleVersionedSerializer<SourceSplitBase<ID, S>>, OffsetDeserializerSerializer {
 
     private static final int VERSION = 3;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
     private static final int SNAPSHOT_SPLIT_FLAG = 1;
-    private static final int BINLOG_SPLIT_FLAG = 2;
+    private static final int STREAM_SPLIT_FLAG = 2;
 
     @Override
     public int getVersion() {
@@ -59,9 +58,9 @@ public abstract class SourceSplitSerializer
     }
 
     @Override
-    public byte[] serialize(SourceSplitBase split) throws IOException {
+    public byte[] serialize(SourceSplitBase<ID, S> split) throws IOException {
         if (split.isSnapshotSplit()) {
-            final SnapshotSplit snapshotSplit = split.asSnapshotSplit();
+            final SnapshotSplit<ID, S> snapshotSplit = split.asSnapshotSplit();
             // optimization: the splits lazily cache their own serialized form
             if (snapshotSplit.serializedFormCache != null) {
                 return snapshotSplit.serializedFormCache;
@@ -69,7 +68,7 @@ public abstract class SourceSplitSerializer
 
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
             out.writeInt(SNAPSHOT_SPLIT_FLAG);
-            out.writeUTF(snapshotSplit.getTableId().toString());
+            out.writeUTF(snapshotSplit.getTableId().identifier());
             out.writeUTF(snapshotSplit.splitId());
             out.writeUTF(snapshotSplit.getSplitKeyType().asSerializableString());
 
@@ -87,31 +86,31 @@ public abstract class SourceSplitSerializer
             snapshotSplit.serializedFormCache = result;
             return result;
         } else {
-            final StreamSplit binlogSplit = split.asStreamSplit();
+            final StreamSplit<ID, S> streamSplit = split.asStreamSplit();
             // optimization: the splits lazily cache their own serialized form
-            if (binlogSplit.serializedFormCache != null) {
-                return binlogSplit.serializedFormCache;
+            if (streamSplit.serializedFormCache != null) {
+                return streamSplit.serializedFormCache;
             }
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
-            out.writeInt(BINLOG_SPLIT_FLAG);
-            out.writeUTF(binlogSplit.splitId());
+            out.writeInt(STREAM_SPLIT_FLAG);
+            out.writeUTF(streamSplit.splitId());
             out.writeUTF("");
-            writeOffsetPosition(binlogSplit.getStartingOffset(), out);
-            writeOffsetPosition(binlogSplit.getEndingOffset(), out);
-            writeFinishedSplitsInfo(binlogSplit.getFinishedSnapshotSplitInfos(), out);
-            writeTableSchemas(binlogSplit.getTableSchemas(), out);
-            out.writeInt(binlogSplit.getTotalFinishedSplitSize());
+            writeOffsetPosition(streamSplit.getStartingOffset(), out);
+            writeOffsetPosition(streamSplit.getEndingOffset(), out);
+            writeFinishedSplitsInfo(streamSplit.getFinishedSnapshotSplitInfos(), out);
+            writeTableSchemas(streamSplit.getTableSchemas(), out);
+            out.writeInt(streamSplit.getTotalFinishedSplitSize());
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
             // serialization
-            binlogSplit.serializedFormCache = result;
+            streamSplit.serializedFormCache = result;
             return result;
         }
     }
 
     @Override
-    public SourceSplitBase deserialize(int version, byte[] serialized) throws IOException {
+    public SourceSplitBase<ID, S> deserialize(int version, byte[] serialized) throws IOException {
         switch (version) {
             case 1:
             case 2:
@@ -122,20 +121,21 @@ public abstract class SourceSplitSerializer
         }
     }
 
-    public SourceSplitBase deserializeSplit(int version, byte[] serialized) throws IOException {
+    public SourceSplitBase<ID, S> deserializeSplit(int version, byte[] serialized)
+            throws IOException {
         final DataInputDeserializer in = new DataInputDeserializer(serialized);
 
         int splitKind = in.readInt();
         if (splitKind == SNAPSHOT_SPLIT_FLAG) {
-            TableId tableId = TableId.parse(in.readUTF());
+            ID tableId = parseTableId(in.readUTF());
             String splitId = in.readUTF();
             RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
             Object[] splitBoundaryStart = SerializerUtils.serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = SerializerUtils.serializedStringToRow(in.readUTF());
             Offset highWatermark = readOffsetPosition(version, in);
-            Map<TableId, TableChange> tableSchemas = readTableSchemas(version, in);
+            Map<ID, S> tableSchemas = readTableSchemas(version, in);
 
-            return new SnapshotSplit(
+            return new SnapshotSplit<>(
                     tableId,
                     splitId,
                     splitKeyType,
@@ -143,21 +143,21 @@ public abstract class SourceSplitSerializer
                     splitBoundaryEnd,
                     highWatermark,
                     tableSchemas);
-        } else if (splitKind == BINLOG_SPLIT_FLAG) {
+        } else if (splitKind == STREAM_SPLIT_FLAG) {
             String splitId = in.readUTF();
             // skip split Key Type
             in.readUTF();
             Offset startingOffset = readOffsetPosition(version, in);
             Offset endingOffset = readOffsetPosition(version, in);
-            List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
+            List<FinishedSnapshotSplitInfo<ID>> finishedSplitsInfo =
                     readFinishedSplitsInfo(version, in);
-            Map<TableId, TableChange> tableChangeMap = readTableSchemas(version, in);
+            Map<ID, S> tableChangeMap = readTableSchemas(version, in);
             int totalFinishedSplitSize = finishedSplitsInfo.size();
             if (version == 3) {
                 totalFinishedSplitSize = in.readInt();
             }
             in.releaseArrays();
-            return new StreamSplit(
+            return new StreamSplit<>(
                     splitId,
                     startingOffset,
                     endingOffset,
@@ -169,29 +169,30 @@ public abstract class SourceSplitSerializer
         }
     }
 
-    private static void writeTableSchemas(
-            Map<TableId, TableChange> tableSchemas, DataOutputSerializer out) throws IOException {
-        FlinkJsonTableChangeSerializer jsonSerializer = new FlinkJsonTableChangeSerializer();
-        DocumentWriter documentWriter = DocumentWriter.defaultWriter();
+    public abstract ID parseTableId(String identity);
+
+    protected abstract S readTableSchema(String serialized) throws IOException;
+
+    protected abstract String writeTableSchema(S tableSchema) throws IOException;
+
+    private void writeTableSchemas(Map<ID, S> tableSchemas, DataOutputSerializer out)
+            throws IOException {
         final int size = tableSchemas.size();
         out.writeInt(size);
-        for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
+        for (Map.Entry<ID, S> entry : tableSchemas.entrySet()) {
             out.writeUTF(entry.getKey().toString());
-            final String tableChangeStr =
-                    documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
+            final String tableChangeStr = writeTableSchema(entry.getValue());
             final byte[] tableChangeBytes = tableChangeStr.getBytes(StandardCharsets.UTF_8);
             out.writeInt(tableChangeBytes.length);
             out.write(tableChangeBytes);
         }
     }
 
-    private static Map<TableId, TableChange> readTableSchemas(int version, DataInputDeserializer in)
-            throws IOException {
-        DocumentReader documentReader = DocumentReader.defaultReader();
-        Map<TableId, TableChange> tableSchemas = new HashMap<>();
+    private Map<ID, S> readTableSchemas(int version, DataInputDeserializer in) throws IOException {
+        Map<ID, S> tableSchemas = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
-            TableId tableId = TableId.parse(in.readUTF());
+            ID tableId = parseTableId(in.readUTF());
             final String tableChangeStr;
             switch (version) {
                 case 1:
@@ -207,40 +208,56 @@ public abstract class SourceSplitSerializer
                 default:
                     throw new IOException("Unknown version: " + version);
             }
-            Document document = documentReader.read(tableChangeStr);
-            TableChange tableChange = FlinkJsonTableChangeSerializer.fromDocument(document, true);
-            tableSchemas.put(tableId, tableChange);
+            S tableSchema = readTableSchema(tableChangeStr);
+            tableSchemas.put(tableId, tableSchema);
         }
         return tableSchemas;
     }
 
     private void writeFinishedSplitsInfo(
-            List<FinishedSnapshotSplitInfo> finishedSplitsInfo, DataOutputSerializer out)
+            List<FinishedSnapshotSplitInfo<ID>> finishedSplitsInfo, DataOutputSerializer out)
             throws IOException {
         final int size = finishedSplitsInfo.size();
         out.writeInt(size);
-        for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo) {
+        for (FinishedSnapshotSplitInfo<ID> splitInfo : finishedSplitsInfo) {
             splitInfo.serialize(out);
         }
     }
 
-    private List<FinishedSnapshotSplitInfo> readFinishedSplitsInfo(
+    private List<FinishedSnapshotSplitInfo<ID>> readFinishedSplitsInfo(
             int version, DataInputDeserializer in) throws IOException {
-        List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
+        List<FinishedSnapshotSplitInfo<ID>> finishedSplitsInfo = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
-            TableId tableId = TableId.parse(in.readUTF());
+            ID tableId = parseTableId(in.readUTF());
             String splitId = in.readUTF();
-            Object[] splitStart = SerializerUtils.serializedStringToRow(in.readUTF());
-            Object[] splitEnd = SerializerUtils.serializedStringToRow(in.readUTF());
-            OffsetFactory offsetFactory =
-                    (OffsetFactory) SerializerUtils.serializedStringToObject(in.readUTF());
+            Object[] splitStart = serializedStringToRow(in.readUTF());
+            Object[] splitEnd = serializedStringToRow(in.readUTF());
+            OffsetFactory offsetFactory = (OffsetFactory) serializedStringToObject(in.readUTF());
             Offset highWatermark = readOffsetPosition(version, in);
 
             finishedSplitsInfo.add(
-                    new FinishedSnapshotSplitInfo(
+                    new FinishedSnapshotSplitInfo<>(
                             tableId, splitId, splitStart, splitEnd, highWatermark, offsetFactory));
         }
         return finishedSplitsInfo;
+    }
+
+    public FinishedSnapshotSplitInfo<ID> readFinishedSplitInfo(byte[] serialized) {
+        try {
+            final DataInputDeserializer in = new DataInputDeserializer(serialized);
+            ID tableId = parseTableId(in.readUTF());
+            String splitId = in.readUTF();
+            Object[] splitStart = serializedStringToRow(in.readUTF());
+            Object[] splitEnd = serializedStringToRow(in.readUTF());
+            OffsetFactory offsetFactory = (OffsetFactory) serializedStringToObject(in.readUTF());
+            Offset highWatermark = readOffsetPosition(in);
+            in.releaseArrays();
+
+            return new FinishedSnapshotSplitInfo<>(
+                    tableId, splitId, splitStart, splitEnd, highWatermark, offsetFactory);
+        } catch (IOException e) {
+            throw new FlinkRuntimeException(e);
+        }
     }
 }

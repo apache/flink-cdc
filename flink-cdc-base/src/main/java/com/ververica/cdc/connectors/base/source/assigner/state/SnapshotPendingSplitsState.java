@@ -22,32 +22,33 @@ import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnum
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.reader.JdbcSourceSplitReader;
-import io.debezium.relational.TableId;
+import io.debezium.schema.DataCollectionId;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 /** A {@link PendingSplitsState} for pending snapshot splits. */
-public class SnapshotPendingSplitsState extends PendingSplitsState {
+public class SnapshotPendingSplitsState<ID extends DataCollectionId, S>
+        extends PendingSplitsState<ID, S> {
 
     /** The tables in the checkpoint. */
-    private final List<TableId> remainingTables;
+    private final List<ID> remainingTables;
 
     /**
      * The paths that are no longer in the enumerator checkpoint, but have been processed before and
      * should this be ignored. Relevant only for sources in continuous monitoring mode.
      */
-    private final List<TableId> alreadyProcessedTables;
+    private final List<ID> alreadyProcessedTables;
 
     /** The splits in the checkpoint. */
-    private final List<SnapshotSplit> remainingSplits;
+    private final List<SnapshotSplit<ID, S>> remainingSplits;
 
     /**
      * The snapshot splits that the {@link IncrementalSourceEnumerator} has assigned to {@link
      * JdbcSourceSplitReader}s.
      */
-    private final Map<String, SnapshotSplit> assignedSplits;
+    private final Map<String, SnapshotSplit<ID, S>> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link IncrementalSourceEnumerator} has
@@ -68,12 +69,12 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final boolean isRemainingTablesCheckpointed;
 
     public SnapshotPendingSplitsState(
-            List<TableId> alreadyProcessedTables,
-            List<SnapshotSplit> remainingSplits,
-            Map<String, SnapshotSplit> assignedSplits,
+            List<ID> alreadyProcessedTables,
+            List<SnapshotSplit<ID, S>> remainingSplits,
+            Map<String, SnapshotSplit<ID, S>> assignedSplits,
             Map<String, Offset> splitFinishedOffsets,
             boolean isAssignerFinished,
-            List<TableId> remainingTables,
+            List<ID> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed) {
         this.alreadyProcessedTables = alreadyProcessedTables;
@@ -86,15 +87,15 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
     }
 
-    public List<TableId> getAlreadyProcessedTables() {
+    public List<ID> getAlreadyProcessedTables() {
         return alreadyProcessedTables;
     }
 
-    public List<SnapshotSplit> getRemainingSplits() {
+    public List<SnapshotSplit<ID, S>> getRemainingSplits() {
         return remainingSplits;
     }
 
-    public Map<String, SnapshotSplit> getAssignedSplits() {
+    public Map<String, SnapshotSplit<ID, S>> getAssignedSplits() {
         return assignedSplits;
     }
 
@@ -106,7 +107,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return isAssignerFinished;
     }
 
-    public List<TableId> getRemainingTables() {
+    public List<ID> getRemainingTables() {
         return remainingTables;
     }
 
@@ -126,7 +127,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         if (!(o instanceof SnapshotPendingSplitsState)) {
             return false;
         }
-        SnapshotPendingSplitsState that = (SnapshotPendingSplitsState) o;
+        SnapshotPendingSplitsState<?, ?> that = (SnapshotPendingSplitsState<?, ?>) o;
         return isAssignerFinished == that.isAssignerFinished
                 && isTableIdCaseSensitive == that.isTableIdCaseSensitive
                 && isRemainingTablesCheckpointed == that.isRemainingTablesCheckpointed

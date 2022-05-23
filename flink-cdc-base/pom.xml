@@ -45,6 +45,7 @@ under the License.
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>4.0.3</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>

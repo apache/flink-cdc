@@ -18,10 +18,13 @@
 
 package com.ververica.cdc.connectors.base.source.assigner.state;
 
+import io.debezium.schema.DataCollectionId;
+
 import java.util.Objects;
 
-/** A {@link PendingSplitsState} for pending binlog splits. */
-public class StreamPendingSplitsState extends PendingSplitsState {
+/** A {@link PendingSplitsState} for pending stream splits. */
+public class StreamPendingSplitsState<ID extends DataCollectionId, S>
+        extends PendingSplitsState<ID, S> {
 
     private final boolean isStreamSplitAssigned;
 
@@ -41,7 +44,7 @@ public class StreamPendingSplitsState extends PendingSplitsState {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        StreamPendingSplitsState that = (StreamPendingSplitsState) o;
+        StreamPendingSplitsState<?, ?> that = (StreamPendingSplitsState<?, ?>) o;
         return isStreamSplitAssigned == that.isStreamSplitAssigned;
     }
 

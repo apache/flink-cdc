@@ -27,6 +27,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
 import java.util.Collection;
@@ -36,11 +37,11 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 
 /** The {@code ChunkSplitter} used to split table into a set of chunks for JDBC data source. */
 @Experimental
-public interface JdbcSourceChunkSplitter extends ChunkSplitter<TableId> {
+public interface JdbcSourceChunkSplitter extends ChunkSplitter<TableId, TableChange> {
 
     /** Generates all snapshot splits (chunks) for the give table path. */
     @Override
-    Collection<SnapshotSplit> generateSplits(TableId tableId);
+    Collection<SnapshotSplit<TableId, TableChange>> generateSplits(TableId tableId);
 
     /**
      * Query the maximum and minimum value of the column in the table. e.g. query string <code>

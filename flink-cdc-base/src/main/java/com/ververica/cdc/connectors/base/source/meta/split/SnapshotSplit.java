@@ -21,8 +21,7 @@ package com.ververica.cdc.connectors.base.source.meta.split;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.schema.DataCollectionId;
 
 import javax.annotation.Nullable;
 
@@ -31,12 +30,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** The split to describe a split of a MySql table snapshot. */
-public class SnapshotSplit extends SourceSplitBase {
+/** The split to describe a split of a data collection snapshot. */
+public class SnapshotSplit<ID extends DataCollectionId, S> extends SourceSplitBase<ID, S> {
 
-    private final TableId tableId;
+    private final ID tableId;
     private final RowType splitKeyType;
-    private final Map<TableId, TableChange> tableSchemas;
+    private final Map<ID, S> tableSchemas;
 
     @Nullable private final Object[] splitStart;
     @Nullable private final Object[] splitEnd;
@@ -46,13 +45,13 @@ public class SnapshotSplit extends SourceSplitBase {
     @Nullable transient byte[] serializedFormCache;
 
     public SnapshotSplit(
-            TableId tableId,
+            ID tableId,
             String splitId,
             RowType splitKeyType,
             Object[] splitStart,
             Object[] splitEnd,
             Offset highWatermark,
-            Map<TableId, TableChange> tableSchemas) {
+            Map<ID, S> tableSchemas) {
         super(splitId);
         this.tableId = tableId;
         this.splitKeyType = splitKeyType;
@@ -62,7 +61,7 @@ public class SnapshotSplit extends SourceSplitBase {
         this.tableSchemas = tableSchemas;
     }
 
-    public TableId getTableId() {
+    public ID getTableId() {
         return tableId;
     }
 
@@ -86,7 +85,7 @@ public class SnapshotSplit extends SourceSplitBase {
     }
 
     @Override
-    public Map<TableId, TableChange> getTableSchemas() {
+    public Map<ID, S> getTableSchemas() {
         return tableSchemas;
     }
 
@@ -101,7 +100,7 @@ public class SnapshotSplit extends SourceSplitBase {
         if (!super.equals(o)) {
             return false;
         }
-        SnapshotSplit that = (SnapshotSplit) o;
+        SnapshotSplit<?, ?> that = (SnapshotSplit<?, ?>) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(splitKeyType, that.splitKeyType)
                 && Arrays.equals(splitStart, that.splitStart)
@@ -128,7 +127,7 @@ public class SnapshotSplit extends SourceSplitBase {
                 splitKeyType.getFields().stream()
                         .map(RowType.RowField::asSummaryString)
                         .collect(Collectors.joining(",", "[", "]"));
-        return "MySqlSnapshotSplit{"
+        return "SnapshotSplit{"
                 + "tableId="
                 + tableId
                 + ", splitId='"

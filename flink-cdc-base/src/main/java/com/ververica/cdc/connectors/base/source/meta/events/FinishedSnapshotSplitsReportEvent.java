@@ -29,7 +29,7 @@ import java.util.Map;
 /**
  * The {@link SourceEvent} that {@link JdbcIncrementalSourceReader} sends to {@link
  * IncrementalSourceEnumerator} to notify the snapshot split has read finished with the consistent
- * binlog position.
+ * transaction log position.
  */
 public class FinishedSnapshotSplitsReportEvent implements SourceEvent {
 

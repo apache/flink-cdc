@@ -19,8 +19,7 @@
 package com.ververica.cdc.connectors.base.source.meta.split;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.schema.DataCollectionId;
 
 import javax.annotation.Nullable;
 
@@ -28,13 +27,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** The split to describe the binlog of MySql table(s). */
-public class StreamSplit extends SourceSplitBase {
+/** The split to describe the transaction log split. */
+public class StreamSplit<ID extends DataCollectionId, S> extends SourceSplitBase<ID, S> {
+
+    public static final String STREAM_SPLIT_ID = "stream-split";
 
     private final Offset startingOffset;
     private final Offset endingOffset;
-    private final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos;
-    private final Map<TableId, TableChange> tableSchemas;
+    private final List<FinishedSnapshotSplitInfo<ID>> finishedSnapshotSplitInfos;
+    private final Map<ID, S> tableSchemas;
     private final int totalFinishedSplitSize;
     @Nullable transient byte[] serializedFormCache;
 
@@ -42,8 +43,8 @@ public class StreamSplit extends SourceSplitBase {
             String splitId,
             Offset startingOffset,
             Offset endingOffset,
-            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
-            Map<TableId, TableChange> tableSchemas,
+            List<FinishedSnapshotSplitInfo<ID>> finishedSnapshotSplitInfos,
+            Map<ID, S> tableSchemas,
             int totalFinishedSplitSize) {
         super(splitId);
         this.startingOffset = startingOffset;
@@ -61,12 +62,12 @@ public class StreamSplit extends SourceSplitBase {
         return endingOffset;
     }
 
-    public List<FinishedSnapshotSplitInfo> getFinishedSnapshotSplitInfos() {
+    public List<FinishedSnapshotSplitInfo<ID>> getFinishedSnapshotSplitInfos() {
         return finishedSnapshotSplitInfos;
     }
 
     @Override
-    public Map<TableId, TableChange> getTableSchemas() {
+    public Map<ID, S> getTableSchemas() {
         return tableSchemas;
     }
 
@@ -89,7 +90,7 @@ public class StreamSplit extends SourceSplitBase {
         if (!super.equals(o)) {
             return false;
         }
-        StreamSplit that = (StreamSplit) o;
+        StreamSplit<?, ?> that = (StreamSplit<?, ?>) o;
         return totalFinishedSplitSize == that.totalFinishedSplitSize
                 && Objects.equals(startingOffset, that.startingOffset)
                 && Objects.equals(endingOffset, that.endingOffset)
@@ -110,7 +111,7 @@ public class StreamSplit extends SourceSplitBase {
 
     @Override
     public String toString() {
-        return "MySqlBinlogSplit{"
+        return "StreamSplit{"
                 + "splitId='"
                 + splitId
                 + '\''
@@ -124,27 +125,27 @@ public class StreamSplit extends SourceSplitBase {
     // -------------------------------------------------------------------
     // factory utils to build new StreamSplit instance
     // -------------------------------------------------------------------
-    public static StreamSplit appendFinishedSplitInfos(
-            StreamSplit binlogSplit, List<FinishedSnapshotSplitInfo> splitInfos) {
-        splitInfos.addAll(binlogSplit.getFinishedSnapshotSplitInfos());
-        return new StreamSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
+    public static <ID extends DataCollectionId, S> StreamSplit<ID, S> appendFinishedSplitInfos(
+            StreamSplit<ID, S> streamSplit, List<FinishedSnapshotSplitInfo<ID>> splitInfos) {
+        splitInfos.addAll(streamSplit.getFinishedSnapshotSplitInfos());
+        return new StreamSplit<>(
+                streamSplit.splitId,
+                streamSplit.getStartingOffset(),
+                streamSplit.getEndingOffset(),
                 splitInfos,
-                binlogSplit.getTableSchemas(),
-                binlogSplit.getTotalFinishedSplitSize());
+                streamSplit.getTableSchemas(),
+                streamSplit.getTotalFinishedSplitSize());
     }
 
-    public static StreamSplit fillTableSchemas(
-            StreamSplit binlogSplit, Map<TableId, TableChange> tableSchemas) {
-        tableSchemas.putAll(binlogSplit.getTableSchemas());
-        return new StreamSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
-                binlogSplit.getFinishedSnapshotSplitInfos(),
+    public static <ID extends DataCollectionId, S> StreamSplit<ID, S> fillTableSchemas(
+            StreamSplit<ID, S> streamSplit, Map<ID, S> tableSchemas) {
+        tableSchemas.putAll(streamSplit.getTableSchemas());
+        return new StreamSplit<>(
+                streamSplit.splitId,
+                streamSplit.getStartingOffset(),
+                streamSplit.getEndingOffset(),
+                streamSplit.getFinishedSnapshotSplitInfos(),
                 tableSchemas,
-                binlogSplit.getTotalFinishedSplitSize());
+                streamSplit.getTotalFinishedSplitSize());
     }
 }

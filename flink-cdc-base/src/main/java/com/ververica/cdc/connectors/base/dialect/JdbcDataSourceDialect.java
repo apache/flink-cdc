@@ -45,7 +45,6 @@ public interface JdbcDataSourceDialect
     List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig);
 
     /** Discovers the captured tables' schema by {@link SourceConfig}. */
-    @Override
     Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig);
 
     /**
@@ -74,8 +73,10 @@ public interface JdbcDataSourceDialect
     TableChange queryTableSchema(JdbcConnection jdbc, TableId tableId);
 
     @Override
-    FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
+    FetchTask<SourceSplitBase<TableId, TableChange>> createFetchTask(
+            SourceSplitBase<TableId, TableChange> sourceSplitBase);
 
     @Override
-    JdbcSourceFetchTaskContext createFetchTaskContext(SourceSplitBase sourceSplitBase);
+    JdbcSourceFetchTaskContext createFetchTaskContext(
+            SourceSplitBase<TableId, TableChange> sourceSplitBase);
 }

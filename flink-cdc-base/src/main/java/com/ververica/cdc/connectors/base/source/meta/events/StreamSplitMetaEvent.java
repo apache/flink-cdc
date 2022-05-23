@@ -28,7 +28,7 @@ import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to pass binlog metadata, i.e. {@link FinishedSnapshotSplitInfo}.
+ * JdbcIncrementalSourceReader} to pass stream split metadata, i.e. {@link FinishedSnapshotSplitInfo}.
  */
 public class StreamSplitMetaEvent implements SourceEvent {
 
@@ -36,10 +36,10 @@ public class StreamSplitMetaEvent implements SourceEvent {
 
     private final String splitId;
 
-    /** The metadata of binlog split is divided to multiple groups. */
+    /** The metadata of stream split is divided to multiple groups. */
     private final int metaGroupId;
     /**
-     * The serialized metadata of binlog split, it's serialized/deserialized by {@link
+     * The serialized metadata of stream split, it's serialized/deserialized by {@link
      * FinishedSnapshotSplitInfo#serialize()} and {@link
      * FinishedSnapshotSplitInfo#deserialize(byte[])}.
      */

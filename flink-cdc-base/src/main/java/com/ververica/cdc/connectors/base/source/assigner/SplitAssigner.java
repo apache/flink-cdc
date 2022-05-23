@@ -21,10 +21,12 @@ package com.ververica.cdc.connectors.base.source.assigner;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.state.CheckpointListener;
 
+import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import io.debezium.schema.DataCollectionId;
 
 import java.util.Collection;
 import java.util.List;
@@ -36,7 +38,7 @@ import java.util.Optional;
  * determines split processing order.
  */
 @Experimental
-public interface SplitAssigner {
+public interface SplitAssigner<ID extends DataCollectionId, S, C extends SourceConfig> {
 
     /**
      * Called to open the assigner to acquire any resources, like threads or network connections.
@@ -49,7 +51,7 @@ public interface SplitAssigner {
      * <p>When this method returns an empty {@code Optional}, then the set of splits is assumed to
      * be done and the source will finish once the readers finished their current splits.
      */
-    Optional<SourceSplitBase> getNext();
+    Optional<SourceSplitBase<ID, S>> getNext();
 
     /**
      * Whether the split assigner is still waiting for callback of finished splits, i.e. {@link
@@ -58,14 +60,14 @@ public interface SplitAssigner {
     boolean waitingForFinishedSplits();
 
     /**
-     * Gets the finished splits information. This is useful meta data to generate a binlog split
+     * Gets the finished splits information. This is useful meta data to generate a stream split
      * that considering finished snapshot splits.
      */
-    List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();
+    List<FinishedSnapshotSplitInfo<ID>> getFinishedSplitInfos();
 
     /**
-     * Callback to handle the finished splits with finished binlog offset. This is useful for
-     * determine when to generate binlog split and what binlog split to generate.
+     * Callback to handle the finished splits with finished stream offset. This is useful for
+     * determine when to generate stream split and what stream split to generate.
      */
     void onFinishedSplits(Map<String, Offset> splitFinishedOffsets);
 
@@ -73,7 +75,7 @@ public interface SplitAssigner {
      * Adds a set of splits to this assigner. This happens for example when some split processing
      * failed and the splits need to be re-added.
      */
-    void addSplits(Collection<SourceSplitBase> splits);
+    void addSplits(Collection<SourceSplitBase<ID, S>> splits);
 
     /**
      * Creates a snapshot of the state of this split assigner, to be stored in a checkpoint.
@@ -93,7 +95,7 @@ public interface SplitAssigner {
      * @param checkpointId The ID of the checkpoint for which the snapshot is created.
      * @return an object containing the state of the split enumerator.
      */
-    PendingSplitsState snapshotState(long checkpointId);
+    PendingSplitsState<ID, S> snapshotState(long checkpointId);
 
     /**
      * Notifies the listener that the checkpoint with the given {@code checkpointId} completed and
