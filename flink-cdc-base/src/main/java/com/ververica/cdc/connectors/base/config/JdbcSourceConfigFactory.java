@@ -122,8 +122,8 @@ public abstract class JdbcSourceConfigFactory implements Factory {
     }
 
     /**
-     * The group size of split meta, if the meta size exceeds the group size, the meta will be will
-     * be divided into multiple groups.
+     * The group size of split meta, if the meta size exceeds the group size, the meta will be
+     * divided into multiple groups.
      */
     public JdbcSourceConfigFactory splitMetaGroupSize(int splitMetaGroupSize) {
         this.splitMetaGroupSize = splitMetaGroupSize;
