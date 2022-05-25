@@ -88,7 +88,7 @@ public class SourceOptions {
                     .intType()
                     .defaultValue(1000)
                     .withDescription(
-                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be will be divided into multiple groups.");
+                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.");
 
     public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
             ConfigOptions.key("split-key.even-distribution.factor.upper-bound")

@@ -152,8 +152,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /**
-     * The group size of split meta, if the meta size exceeds the group size, the meta will be will
-     * be divided into multiple groups.
+     * The group size of split meta, if the meta size exceeds the group size, the meta will be
+     * divided into multiple groups.
      */
     public MySqlSourceConfigFactory splitMetaGroupSize(int splitMetaGroupSize) {
         this.splitMetaGroupSize = splitMetaGroupSize;
