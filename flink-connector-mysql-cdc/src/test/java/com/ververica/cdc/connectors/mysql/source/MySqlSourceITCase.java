@@ -52,6 +52,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
@@ -753,7 +754,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
-        return DebeziumUtils.createMySqlConnection(configuration);
+        return DebeziumUtils.createMySqlConnection(configuration, new Properties());
     }
 
     // ------------------------------------------------------------------------

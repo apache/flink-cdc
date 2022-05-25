@@ -71,7 +71,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"}, 10);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
-        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+        mySqlConnection =
+                DebeziumUtils.createMySqlConnection(
+                        sourceConfig.getDbzConfiguration(), sourceConfig.getJdbcProperties());
     }
 
     @Test

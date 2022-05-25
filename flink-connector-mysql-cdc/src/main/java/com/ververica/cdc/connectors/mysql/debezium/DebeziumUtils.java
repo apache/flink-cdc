@@ -21,6 +21,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.connection.JdbcConnectionFactory;
+import com.ververica.cdc.connectors.mysql.source.connection.MySqlConnectionWithJdbcProperties;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -42,6 +43,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
@@ -66,9 +68,11 @@ public class DebeziumUtils {
     }
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
-    public static MySqlConnection createMySqlConnection(Configuration dbzConfiguration) {
-        return new MySqlConnection(
-                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration));
+    public static MySqlConnection createMySqlConnection(
+            Configuration dbzConfiguration, Properties jdbcProperties) {
+        return new MySqlConnectionWithJdbcProperties(
+                new MySqlConnectionWithJdbcProperties.MySqlConnectionConfigurationWithCustomUrl(
+                        dbzConfiguration, jdbcProperties));
     }
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */

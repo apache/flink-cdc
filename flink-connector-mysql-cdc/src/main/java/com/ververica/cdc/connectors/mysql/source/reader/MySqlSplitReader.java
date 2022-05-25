@@ -136,7 +136,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                 }
                 if (currentReader == null) {
                     final MySqlConnection jdbcConnection =
-                            createMySqlConnection(sourceConfig.getDbzConfiguration());
+                            createMySqlConnection(
+                                    sourceConfig.getDbzConfiguration(),
+                                    sourceConfig.getJdbcProperties());
                     final BinaryLogClient binaryLogClient =
                             createBinaryClient(sourceConfig.getDbzConfiguration());
                     final StatefulTaskContext statefulTaskContext =
@@ -150,7 +152,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                     currentReader.close();
                 }
                 final MySqlConnection jdbcConnection =
-                        createMySqlConnection(sourceConfig.getDbzConfiguration());
+                        createMySqlConnection(
+                                sourceConfig.getDbzConfiguration(),
+                                sourceConfig.getJdbcProperties());
                 final BinaryLogClient binaryLogClient =
                         createBinaryClient(sourceConfig.getDbzConfiguration());
                 final StatefulTaskContext statefulTaskContext =

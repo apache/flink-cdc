@@ -203,7 +203,8 @@ public class MySqlSourceReader<T>
         final String splitId = split.splitId();
         if (split.getTableSchemas().isEmpty()) {
             try (MySqlConnection jdbc =
-                    DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+                    DebeziumUtils.createMySqlConnection(
+                            sourceConfig.getDbzConfiguration(), sourceConfig.getJdbcProperties())) {
                 Map<TableId, TableChanges.TableChange> tableSchemas =
                         TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
                 LOG.info("The table schema discovery for binlog split {} success", splitId);
