@@ -120,7 +120,7 @@ public class StatefulTaskContext {
 
         final int queueSize =
                 mySqlSplit.isSnapshotSplit()
-                        ? Integer.MAX_VALUE
+                        ? sourceConfig.getSplitSize() + 1024
                         : connectorConfig.getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()

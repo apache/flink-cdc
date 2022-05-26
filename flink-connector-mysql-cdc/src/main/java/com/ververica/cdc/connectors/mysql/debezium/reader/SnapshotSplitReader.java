@@ -41,6 +41,7 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,14 +49,23 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.normalizedSplitRecords;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.formatMessageTimestamp;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isLowWatermarkEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.splitKeyRangeContains;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.upsertBinlog;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
@@ -229,23 +239,54 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             // data input: [low watermark event][snapshot events][high watermark event][binlog
             // events][binlog-end event]
             // data output: [low watermark event][normalized events][high watermark event]
+            boolean reachBinlogStart = false;
             boolean reachBinlogEnd = false;
-            final List<SourceRecord> sourceRecords = new ArrayList<>();
+            SourceRecord lowWatermark = null;
+            SourceRecord highWatermark = null;
+            Map<Struct, SourceRecord> snapshotRecords = new HashMap<>();
             while (!reachBinlogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
                 for (DataChangeEvent event : batch) {
-                    sourceRecords.add(event.getRecord());
-                    if (RecordUtils.isEndWatermarkEvent(event.getRecord())) {
+                    SourceRecord record = event.getRecord();
+                    if (lowWatermark == null) {
+                        lowWatermark = record;
+                        checkLowWatermark(lowWatermark);
+                        continue;
+                    }
+
+                    if (highWatermark == null && isHighWatermarkEvent(record)) {
+                        highWatermark = record;
+                        checkHighWatermark(highWatermark);
+                        // snapshot events capture end and begin to capture binlog events
+                        reachBinlogStart = true;
+                        continue;
+                    }
+
+                    if (RecordUtils.isEndWatermarkEvent(record)) {
+                        // capture to end watermark events, stop the loop
                         reachBinlogEnd = true;
                         break;
+                    }
+
+                    if (!reachBinlogStart) {
+                        snapshotRecords.put((Struct) record.key(), record);
+                    } else {
+                        if (checkValidBinlogRecord(record)) {
+                            // upsert binlog events through the record key
+                            upsertBinlog(snapshotRecords, record);
+                        }
                     }
                 }
             }
             // snapshot split return its data once
             hasNextElement.set(false);
-            return normalizedSplitRecords(currentSnapshotSplit, sourceRecords, nameAdjuster)
-                    .iterator();
+
+            final List<SourceRecord> normalizedRecords = new ArrayList<>();
+            normalizedRecords.add(lowWatermark);
+            normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
+            normalizedRecords.add(highWatermark);
+            return normalizedRecords.iterator();
         }
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
@@ -260,6 +301,36 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                             currentSnapshotSplit, readException.getMessage()),
                     readException);
         }
+    }
+
+    private void checkLowWatermark(SourceRecord lowWatermark) {
+        checkState(
+                isLowWatermarkEvent(lowWatermark),
+                String.format(
+                        "The first record should be low watermark signal event, but is %s",
+                        lowWatermark));
+    }
+
+    private void checkHighWatermark(SourceRecord highWatermark) {
+        checkState(
+                isHighWatermarkEvent(highWatermark),
+                String.format(
+                        "The last record should be high watermark signal event, but is %s",
+                        highWatermark));
+    }
+
+    private boolean checkValidBinlogRecord(SourceRecord record) {
+        if (isDataChangeRecord(record)) {
+            Object[] key =
+                    getSplitKey(currentSnapshotSplit.getSplitKeyType(), record, nameAdjuster);
+            if (splitKeyRangeContains(
+                    key,
+                    currentSnapshotSplit.getSplitStart(),
+                    currentSnapshotSplit.getSplitEnd())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
