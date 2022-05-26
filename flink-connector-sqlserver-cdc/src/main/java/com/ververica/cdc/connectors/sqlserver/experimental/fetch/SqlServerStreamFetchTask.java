@@ -34,7 +34,7 @@ import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.ververica.cdc.connectors.sqlserver.experimental.offset.BinlogOffset.NO_STOPPING_OFFSET;
+import static com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset.NO_STOPPING_OFFSET;
 
 /** The task to work for fetching data of MySQL table stream split . */
 public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {

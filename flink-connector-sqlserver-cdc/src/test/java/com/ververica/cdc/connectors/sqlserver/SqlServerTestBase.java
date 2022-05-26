@@ -65,7 +65,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                     .withEnv("MSSQL_PID", "Standard")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeClass
+//    @BeforeClass
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();

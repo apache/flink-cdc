@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.connectors.sqlserver.old.table;
 
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -25,9 +26,13 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
+import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.sqlserver.SqlServerTestBase;
+import com.ververica.cdc.connectors.sqlserver.experimental.SqlServerSourceBuilder;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.sql.Connection;
@@ -59,6 +64,35 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
+    }
+
+    @Test
+    public void testConsumingAllEventsForNew() throws Exception {
+
+        SqlServerSourceBuilder.SqlServerIncrementalSource<String> serverIncrementalSource = new SqlServerSourceBuilder()
+                .hostname("localhost")
+                .port(1433)
+                .database("inventory")
+                .tableList("products")
+                .username("SA")
+                .password("Password!")
+                .deserializer(new JsonDebeziumDeserializationSchema())
+                .includeSchemaChanges(true) // output the schema changes as well
+                .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        // enable checkpoint
+        env.enableCheckpointing(3000);
+        // set the source parallelism to 4
+        env.fromSource(
+                        serverIncrementalSource,
+                        WatermarkStrategy.noWatermarks(),
+                        "SqlServerParallelSource")
+                .setParallelism(4)
+                .print()
+                .setParallelism(1);
+
+        env.execute("Print Sql Server Snapshot + Binlog");
     }
 
     @Test

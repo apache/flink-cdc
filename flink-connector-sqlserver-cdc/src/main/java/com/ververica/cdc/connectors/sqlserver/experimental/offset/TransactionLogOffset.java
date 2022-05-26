@@ -31,10 +31,10 @@ import java.util.Map;
  *
  * <p>This structure can also be used to deal the binlog event in transaction, a transaction may
  * contains multiple change events, and each change event may contain multiple rows. When restart
- * from a specific {@link BinlogOffset}, we need to skip the processed change events and the
+ * from a specific {@link TransactionLogOffset}, we need to skip the processed change events and the
  * processed rows.
  */
-public class BinlogOffset extends Offset {
+public class TransactionLogOffset extends Offset {
 
     private static final long serialVersionUID = 1L;
 
@@ -46,18 +46,19 @@ public class BinlogOffset extends Offset {
     public static final String TIMESTAMP_KEY = "ts_sec";
     public static final String SERVER_ID_KEY = "server_id";
 
-    public static final BinlogOffset INITIAL_OFFSET = new BinlogOffset("", 0);
-    public static final BinlogOffset NO_STOPPING_OFFSET = new BinlogOffset("", Long.MIN_VALUE);
+    public static final TransactionLogOffset INITIAL_OFFSET = new TransactionLogOffset("", 0);
+    public static final TransactionLogOffset NO_STOPPING_OFFSET =
+            new TransactionLogOffset("", Long.MIN_VALUE);
 
-    public BinlogOffset(Map<String, String> offset) {
+    public TransactionLogOffset(Map<String, String> offset) {
         this.offset = offset;
     }
 
-    public BinlogOffset(String filename, long position) {
+    public TransactionLogOffset(String filename, long position) {
         this(filename, position, 0L, 0L, 0L, null, null);
     }
 
-    public BinlogOffset(
+    public TransactionLogOffset(
             String filename,
             long position,
             long restartSkipEvents,
@@ -121,10 +122,10 @@ public class BinlogOffset extends Offset {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof BinlogOffset)) {
+        if (!(o instanceof TransactionLogOffset)) {
             return false;
         }
-        BinlogOffset that = (BinlogOffset) o;
+        TransactionLogOffset that = (TransactionLogOffset) o;
         return offset.equals(that.offset);
     }
 }

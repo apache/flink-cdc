@@ -25,19 +25,19 @@ import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 
 import java.util.Map;
 
-/** An offset factory class create {@link BinlogOffset} instance. */
-public class BinlogOffsetFactory extends OffsetFactory {
+/** An offset factory class create {@link TransactionLogOffset} instance. */
+public class TransactionLogOffsetFactory extends OffsetFactory {
 
-    public BinlogOffsetFactory() {}
+    public TransactionLogOffsetFactory() {}
 
     @Override
     public Offset newOffset(Map<String, String> offset) {
-        return new BinlogOffset(offset);
+        return new TransactionLogOffset(offset);
     }
 
     @Override
     public Offset newOffset(String filename, Long position) {
-        return new BinlogOffset(filename, position);
+        return new TransactionLogOffset(filename, position);
     }
 
     @Override
@@ -47,11 +47,11 @@ public class BinlogOffsetFactory extends OffsetFactory {
 
     @Override
     public Offset createInitialOffset() {
-        return BinlogOffset.INITIAL_OFFSET;
+        return TransactionLogOffset.INITIAL_OFFSET;
     }
 
     @Override
     public Offset createNoStoppingOffset() {
-        return BinlogOffset.NO_STOPPING_OFFSET;
+        return TransactionLogOffset.NO_STOPPING_OFFSET;
     }
 }

@@ -46,7 +46,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.createSqlServerConnection;
-import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.currentBinlogOffset;
+import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.currentTransactionLogOffset;
 import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.isTableIdCaseSensitive;
 
 /** The {@link JdbcDataSourceDialect} implementation for MySQL datasource. */
@@ -71,7 +71,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
     @Override
     public Offset displayCurrentOffset(JdbcSourceConfig sourceConfig) {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
-            return currentBinlogOffset(jdbcConnection);
+            return currentTransactionLogOffset(jdbcConnection);
         } catch (Exception e) {
             throw new FlinkRuntimeException("Read the binlog offset error", e);
         }

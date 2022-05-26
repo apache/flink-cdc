@@ -20,8 +20,9 @@ package com.ververica.cdc.connectors.sqlserver.experimental.utils;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.sqlserver.experimental.offset.BinlogOffset;
+import com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset;
 import io.debezium.config.Configuration;
+import io.debezium.connector.sqlserver.Lsn;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
@@ -61,34 +62,10 @@ public class SqlServerConnectionUtils {
                 dbzSqlServerConfig, valueConverters, topicSelector, schemaNameAdjuster);
     }
 
-    /** Fetch current binlog offsets in SqlServer Server. */
-    public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
-        final String showMasterStmt = "SHOW MASTER STATUS";
-        try {
-            return jdbc.queryAndMap(
-                    showMasterStmt,
-                    rs -> {
-                        if (rs.next()) {
-                            final String binlogFilename = rs.getString(1);
-                            final long binlogPosition = rs.getLong(2);
-                            final String gtidSet =
-                                    rs.getMetaData().getColumnCount() > 4 ? rs.getString(5) : null;
-                            return new BinlogOffset(
-                                    binlogFilename, binlogPosition, 0L, 0, 0, gtidSet, null);
-                        } else {
-                            throw new FlinkRuntimeException(
-                                    "Cannot read the binlog filename and position via '"
-                                            + showMasterStmt
-                                            + "'. Make sure your server is correctly configured");
-                        }
-                    });
-        } catch (SQLException e) {
-            throw new FlinkRuntimeException(
-                    "Cannot read the binlog filename and position via '"
-                            + showMasterStmt
-                            + "'. Make sure your server is correctly configured",
-                    e);
-        }
+    /** Fetch current largest log sequence number in SqlServer Server. */
+    public static TransactionLogOffset currentTransactionLogOffset(JdbcConnection jdbc) throws SQLException {
+        Lsn maxTransactionLsn = ((SqlServerConnection) jdbc).getMaxTransactionLsn();
+        return null;
     }
 
     // --------------------------------------------------------------------------------------------

@@ -30,6 +30,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** A factory to initialize {@link SqlServerSourceConfig}. */
 public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
 
+    private static final String DATABASE_SERVER_NAME = "sqlserver_transaction_log_source";
+
     /** Creates a new {@link SqlServerSourceConfig} for the given subtask {@code subtaskId}. */
     public SqlServerSourceConfig create(int subtaskId) {
 
@@ -41,7 +43,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
         // all other connectors, since it is used as a prefix for all Kafka topic names
         // emanating from this connector. Only alphanumeric characters and underscores should be
         // used.
-        props.setProperty("database.server.name", "sqlserver_transaction_log_source");
+        props.setProperty("database.server.name", DATABASE_SERVER_NAME);
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));

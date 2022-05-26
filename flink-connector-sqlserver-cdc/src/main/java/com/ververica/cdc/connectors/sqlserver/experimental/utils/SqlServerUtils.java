@@ -21,7 +21,7 @@ package com.ververica.cdc.connectors.sqlserver.experimental.utils;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 
-import com.ververica.cdc.connectors.sqlserver.experimental.offset.BinlogOffset;
+import com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
 import io.debezium.connector.sqlserver.SqlServerTopicSelector;
@@ -277,17 +277,17 @@ public class SqlServerUtils {
                 dbzSqlServerConfig.binaryHandlingMode());
     }
 
-    public static BinlogOffset getBinlogPosition(SourceRecord dataRecord) {
-        return getBinlogPosition(dataRecord.sourceOffset());
+    public static TransactionLogOffset getTransactionLogPosition(SourceRecord dataRecord) {
+        return getTransactionLogPosition(dataRecord.sourceOffset());
     }
 
-    public static BinlogOffset getBinlogPosition(Map<String, ?> offset) {
+    public static TransactionLogOffset getTransactionLogPosition(Map<String, ?> offset) {
         Map<String, String> offsetStrMap = new HashMap<>();
         for (Map.Entry<String, ?> entry : offset.entrySet()) {
             offsetStrMap.put(
                     entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
         }
-        return new BinlogOffset(offsetStrMap);
+        return new TransactionLogOffset(offsetStrMap);
     }
 
     public static RowType getSplitType(Column splitColumn) {

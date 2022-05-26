@@ -28,7 +28,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.sqlserver.experimental.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.sqlserver.experimental.config.SqlServerSourceConfig;
-import com.ververica.cdc.connectors.sqlserver.experimental.offset.BinlogOffset;
+import com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset;
 import com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.sqlserver.SourceInfo;
@@ -188,7 +188,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
 
     @Override
     public Offset getStreamOffset(SourceRecord sourceRecord) {
-        return SqlServerUtils.getBinlogPosition(sourceRecord);
+        return SqlServerUtils.getTransactionLogPosition(sourceRecord);
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
@@ -196,7 +196,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
             OffsetContext.Loader loader, SourceSplitBase mySqlSplit) {
         Offset offset =
                 mySqlSplit.isSnapshotSplit()
-                        ? BinlogOffset.INITIAL_OFFSET
+                        ? TransactionLogOffset.INITIAL_OFFSET
                         : mySqlSplit.asStreamSplit().getStartingOffset();
 
         SqlServerOffsetContext mySqlOffsetContext =

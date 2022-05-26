@@ -23,7 +23,7 @@ import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.Wa
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
-import com.ververica.cdc.connectors.sqlserver.experimental.offset.BinlogOffset;
+import com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset;
 import io.debezium.DebeziumException;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
@@ -53,7 +53,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 
-import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.currentBinlogOffset;
+import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.currentTransactionLogOffset;
 import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerUtils.buildSplitScanQuery;
 import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerUtils.readTableSplitDataStatement;
 
@@ -152,7 +152,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
                     (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
 
-            final BinlogOffset lowWatermark = currentBinlogOffset(jdbcConnection);
+            final TransactionLogOffset lowWatermark = currentTransactionLogOffset(jdbcConnection);
             LOG.info(
                     "Snapshot step 1 - Determining low watermark {} for split {}",
                     lowWatermark,
@@ -164,7 +164,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
             LOG.info("Snapshot step 2 - Snapshotting data");
             createDataEvents(ctx, snapshotSplit.getTableId());
 
-            final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
+            final TransactionLogOffset highWatermark = currentTransactionLogOffset(jdbcConnection);
             LOG.info(
                     "Snapshot step 3 - Determining high watermark {} for split {}",
                     highWatermark,
@@ -296,22 +296,22 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
     public class SnapshotSplitChangeEventSourceContext
             implements ChangeEventSource.ChangeEventSourceContext {
 
-        private BinlogOffset lowWatermark;
-        private BinlogOffset highWatermark;
+        private TransactionLogOffset lowWatermark;
+        private TransactionLogOffset highWatermark;
 
-        public BinlogOffset getLowWatermark() {
+        public TransactionLogOffset getLowWatermark() {
             return lowWatermark;
         }
 
-        public void setLowWatermark(BinlogOffset lowWatermark) {
+        public void setLowWatermark(TransactionLogOffset lowWatermark) {
             this.lowWatermark = lowWatermark;
         }
 
-        public BinlogOffset getHighWatermark() {
+        public TransactionLogOffset getHighWatermark() {
             return highWatermark;
         }
 
-        public void setHighWatermark(BinlogOffset highWatermark) {
+        public void setHighWatermark(TransactionLogOffset highWatermark) {
             this.highWatermark = highWatermark;
         }
 
