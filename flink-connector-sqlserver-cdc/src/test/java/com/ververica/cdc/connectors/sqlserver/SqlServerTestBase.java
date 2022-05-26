@@ -22,7 +22,6 @@ import org.apache.flink.test.util.AbstractTestBase;
 
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
-import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
@@ -65,7 +64,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                     .withEnv("MSSQL_PID", "Standard")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-//    @BeforeClass
+    //    @BeforeClass
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();

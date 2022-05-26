@@ -63,7 +63,8 @@ public class SqlServerConnectionUtils {
     }
 
     /** Fetch current largest log sequence number in SqlServer Server. */
-    public static TransactionLogOffset currentTransactionLogOffset(JdbcConnection jdbc) throws SQLException {
+    public static TransactionLogOffset currentTransactionLogOffset(JdbcConnection jdbc)
+            throws SQLException {
         Lsn maxTransactionLsn = ((SqlServerConnection) jdbc).getMaxTransactionLsn();
         return null;
     }
@@ -82,25 +83,4 @@ public class SqlServerConnectionUtils {
         return false;
     }
 
-    private static Map<String, String> querySystemVariables(
-            JdbcConnection connection, String statement) {
-        final Map<String, String> variables = new HashMap<>();
-        try {
-            connection.query(
-                    statement,
-                    rs -> {
-                        while (rs.next()) {
-                            String varName = rs.getString(1);
-                            String value = rs.getString(2);
-                            if (varName != null && value != null) {
-                                variables.put(varName, value);
-                            }
-                        }
-                    });
-        } catch (SQLException e) {
-            throw new FlinkRuntimeException("Error reading MySQL variables: " + e.getMessage(), e);
-        }
-
-        return variables;
-    }
 }

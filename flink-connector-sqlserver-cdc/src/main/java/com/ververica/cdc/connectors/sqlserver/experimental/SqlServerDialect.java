@@ -131,7 +131,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         if (sqlServerSchema == null) {
             sqlServerSchema =
                     new SqlServerSchema(
-                            sourceConfig, isDataCollectionIdCaseSensitive(sourceConfig));
+                            sourceConfig);
         }
         return sqlServerSchema.getTableSchema(jdbc, tableId);
     }

@@ -27,13 +27,14 @@ import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoo
 @Experimental
 public class SqlServerPooledDataSourceFactory extends JdbcConnectionPoolFactory {
 
-    public static final String JDBC_URL_PATTERN = "jdbc:sqlserver://%s:%s";
+    public static final String JDBC_URL_PATTERN = "jdbc:sqlserver://%s:%s;databaseName=%s";
 
     @Override
     public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
         String hostName = sourceConfig.getHostname();
         int port = sourceConfig.getPort();
+        String database = sourceConfig.getDatabaseList().get(0);
 
-        return String.format(JDBC_URL_PATTERN, hostName, port);
+        return String.format(JDBC_URL_PATTERN, hostName, port, database);
     }
 }

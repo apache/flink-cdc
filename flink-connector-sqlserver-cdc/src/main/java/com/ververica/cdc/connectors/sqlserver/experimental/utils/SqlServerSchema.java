@@ -42,7 +42,7 @@ public class SqlServerSchema {
     private final SqlServerDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
 
-    public SqlServerSchema(SqlServerSourceConfig sourceConfig, boolean isTableIdCaseSensitive) {
+    public SqlServerSchema(SqlServerSourceConfig sourceConfig) {
         this.connectorConfig = sourceConfig.getDbzConnectorConfig();
         this.databaseSchema = createSqlServerDatabaseSchema(connectorConfig);
         this.schemasByTableId = new HashMap<>();

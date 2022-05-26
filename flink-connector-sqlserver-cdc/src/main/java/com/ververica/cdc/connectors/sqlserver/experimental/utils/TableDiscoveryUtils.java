@@ -28,62 +28,39 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerUtils.quote;
-
 /** Utilities to discovery matched tables. */
 public class TableDiscoveryUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
+    private static final String GET_DATABASE_NAME = "SELECT db_name()";
+
+    private static final String GET_LIST_OF_CDC_ENABLED_TABLES =
+            "EXEC sys.sp_cdc_help_change_data_capture";
+
     public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)
             throws SQLException {
-        final List<TableId> capturedTableIds = new ArrayList<>();
-        // -------------------
-        // READ DATABASE NAMES
-        // -------------------
-        // Get the list of databases ...
-        LOG.info("Read list of available databases");
-        final List<String> databaseNames = new ArrayList<>();
 
-        jdbc.query(
-                "SHOW DATABASES",
+        String realDatabaseName =
+                jdbc.queryAndMap(
+                        GET_DATABASE_NAME,
+                        jdbc.singleResultMapper(
+                                rs -> rs.getString(1), "Could not retrieve database name"));
+
+        return jdbc.queryAndMap(
+                GET_LIST_OF_CDC_ENABLED_TABLES,
                 rs -> {
+                    final List<TableId> capturedTableIds = new ArrayList<>();
                     while (rs.next()) {
-                        databaseNames.add(rs.getString(1));
+                        TableId tableId =
+                                new TableId(realDatabaseName, rs.getString(1), rs.getString(2));
+                        if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
+                            capturedTableIds.add(tableId);
+                            LOG.info("\t including '{}' for further processing", tableId);
+                        } else {
+                            LOG.info("\t '{}' is filtered out of capturing", tableId);
+                        }
                     }
+                    return capturedTableIds;
                 });
-        LOG.info("\t list of available databases is: {}", databaseNames);
-
-        // ----------------
-        // READ TABLE NAMES
-        // ----------------
-        // Get the list of table IDs for each database. We can't use a prepared statement with
-        // MySQL, so we have to build the SQL statement each time. Although in other cases this
-        // might lead to SQL injection, in our case we are reading the database names from the
-        // database and not taking them from the user ...
-        LOG.info("Read list of available tables in each database");
-        for (String dbName : databaseNames) {
-            try {
-                jdbc.query(
-                        "SHOW FULL TABLES IN " + quote(dbName) + " where Table_Type = 'BASE TABLE'",
-                        rs -> {
-                            while (rs.next()) {
-                                TableId tableId = new TableId(dbName, null, rs.getString(1));
-                                if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
-                                    capturedTableIds.add(tableId);
-                                    LOG.info("\t including '{}' for further processing", tableId);
-                                } else {
-                                    LOG.info("\t '{}' is filtered out of capturing", tableId);
-                                }
-                            }
-                        });
-            } catch (SQLException e) {
-                // We were unable to execute the query or process the results, so skip this ...
-                LOG.warn(
-                        "\t skipping database '{}' due to error reading tables: {}",
-                        dbName,
-                        e.getMessage());
-            }
-        }
-        return capturedTableIds;
     }
 }
