@@ -56,9 +56,7 @@ public class SqlServerUtils {
     public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
             throws SQLException {
         final String minMaxQuery =
-                String.format(
-                        "SELECT MIN(%s), MAX(%s) FROM %s",
-                        quote(columnName), quote(columnName), quote(tableId));
+                String.format("SELECT MIN(%s), MAX(%s) FROM %s", columnName, columnName, tableId);
         return jdbc.queryAndMap(
                 minMaxQuery,
                 rs -> {
@@ -77,19 +75,23 @@ public class SqlServerUtils {
             throws SQLException {
         // The statement used to get approximate row count which is less
         // accurate than COUNT(*), but is more efficient for large table.
-        final String useDatabaseStatement = String.format("USE %s;", quote(tableId.catalog()));
-        final String rowCountQuery = String.format("SHOW TABLE STATUS LIKE '%s';", tableId.table());
-        jdbc.executeWithoutCommitting(useDatabaseStatement);
+        final String rowCountQuery =
+                String.format(
+                        "SELECT SUM(used_page_count) AS total_number_of_used_pages,\n"
+                                + "    SUM (row_count) AS total_number_of_rows\n"
+                                + "FROM sys.dm_db_partition_stats\n"
+                                + "WHERE object_id=OBJECT_ID('%s.%s')    AND (index_id=0 or index_id=1);",
+                        tableId.schema(), tableId.table());
         return jdbc.queryAndMap(
                 rowCountQuery,
                 rs -> {
-                    if (!rs.next() || rs.getMetaData().getColumnCount() < 5) {
+                    if (!rs.next()) {
                         throw new SQLException(
                                 String.format(
                                         "No result returned after running query [%s]",
                                         rowCountQuery));
                     }
-                    return rs.getLong(5);
+                    return rs.getLong(2);
                 });
     }
 
@@ -98,8 +100,7 @@ public class SqlServerUtils {
             throws SQLException {
         final String minQuery =
                 String.format(
-                        "SELECT MIN(%s) FROM %s WHERE %s > ?",
-                        quote(columnName), quote(tableId), quote(columnName));
+                        "SELECT MIN(%s) FROM %s WHERE %s > ?", columnName, tableId, columnName);
         return jdbc.prepareQueryAndMap(
                 minQuery,
                 ps -> ps.setObject(1, excludedLowerBound),

@@ -22,34 +22,37 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.sqlserver.experimental.config.SqlServerSourceConfig;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
-import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
+import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
-
-import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerUtils.createSqlServerDatabaseSchema;
+import java.util.Set;
 
 /** A component used to get schema by table path. */
 public class SqlServerSchema {
-    private static final String SHOW_CREATE_TABLE = "SHOW CREATE TABLE ";
-    private static final String DESC_TABLE = "DESC ";
+
+    private static final int CHANGE_TABLE_DATA_COLUMN_OFFSET = 5;
+
+    private static final String GET_LIST_OF_KEY_COLUMNS =
+            "SELECT * FROM cdc.index_columns WHERE object_id=?";
 
     private final SqlServerConnectorConfig connectorConfig;
-    private final SqlServerDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
 
     public SqlServerSchema(SqlServerSourceConfig sourceConfig) {
         this.connectorConfig = sourceConfig.getDbzConnectorConfig();
-        this.databaseSchema = createSqlServerDatabaseSchema(connectorConfig);
         this.schemasByTableId = new HashMap<>();
     }
 
     /**
-     * Gets table schema for the given table path. It will request to MySQL server by running `SHOW
+     * Gets table schema for the given table path. It will request to Sql Server by running `SHOW
      * CREATE TABLE` if cache missed.
      */
     public TableChange getTableSchema(JdbcConnection jdbc, TableId tableId) {
@@ -63,44 +66,27 @@ public class SqlServerSchema {
     }
 
     private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
-        final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
-        final String sql = "SHOW CREATE TABLE " + SqlServerUtils.quote(tableId);
+
+        Set<TableId> tableIdSet = new HashSet<>();
+        tableIdSet.add(tableId);
+
+        Tables tables = new Tables();
+        tables.overwriteTable(tables.editOrCreateTable(tableId).create());
         try {
-            jdbc.query(
-                    sql,
-                    rs -> {
-                        if (rs.next()) {
-                            //                            final String ddl = rs.getString(2);
-                            //                            final SqlServerOffsetContext offsetContext
-                            // =
-                            //
-                            // SqlServerOffsetContext(connectorConfig);
-                            //                            List<SchemaChangeEvent> schemaChangeEvents
-                            // =
-                            //                                    databaseSchema.parseSnapshotDdl(
-                            //                                            ddl, tableId.catalog(),
-                            // offsetContext, Instant.now());
-                            //                            for (SchemaChangeEvent schemaChangeEvent :
-                            // schemaChangeEvents) {
-                            //                                for (TableChange tableChange :
-                            //
-                            // schemaChangeEvent.getTableChanges()) {
-                            //                                    tableChangeMap.put(tableId,
-                            // tableChange);
-                            //                                }
-                            //                            }
-                        }
-                    });
+            jdbc.readSchema(
+                    tables,
+                    tableId.catalog(),
+                    tableId.schema(),
+                    connectorConfig.getTableFilters().dataCollectionFilter(),
+                    null,
+                    false);
+
+            Table table = tables.forTable(tableId);
+
+            return new TableChange(TableChanges.TableChangeType.CREATE, table);
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
-                    String.format("Failed to read schema for table %s by running %s", tableId, sql),
-                    e);
+                    String.format("Failed to read schema for table %s", tableId), e);
         }
-        if (!tableChangeMap.containsKey(tableId)) {
-            throw new FlinkRuntimeException(
-                    String.format("Can't obtain schema for table %s by running %s", tableId, sql));
-        }
-
-        return tableChangeMap.get(tableId);
     }
 }

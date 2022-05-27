@@ -20,10 +20,12 @@ package com.ververica.cdc.connectors.sqlserver.experimental.config;
 
 import com.microsoft.sqlserver.jdbc.SQLServerDriver;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
+import com.ververica.cdc.connectors.sqlserver.experimental.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnector;
 
 import java.util.Properties;
+import java.util.UUID;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -48,8 +50,15 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
+
+        // database history
+        props.setProperty(
+                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
+        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+        props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
 
         if (tableList != null) {
             props.setProperty("table.include.list", String.join(",", tableList));

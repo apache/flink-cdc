@@ -49,7 +49,7 @@ import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServe
 import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.currentTransactionLogOffset;
 import static com.ververica.cdc.connectors.sqlserver.experimental.utils.SqlServerConnectionUtils.isTableIdCaseSensitive;
 
-/** The {@link JdbcDataSourceDialect} implementation for MySQL datasource. */
+/** The {@link JdbcDataSourceDialect} implementation for Sql Server datasource. */
 @Experimental
 public class SqlServerDialect implements JdbcDataSourceDialect {
 
@@ -82,7 +82,8 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
             return isTableIdCaseSensitive(jdbcConnection);
         } catch (SQLException e) {
-            throw new FlinkRuntimeException("Error reading MySQL variables: " + e.getMessage(), e);
+            throw new FlinkRuntimeException(
+                    "Error reading Sql Server variables: " + e.getMessage(), e);
         }
     }
 
@@ -129,9 +130,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
     @Override
     public TableChange queryTableSchema(JdbcConnection jdbc, TableId tableId) {
         if (sqlServerSchema == null) {
-            sqlServerSchema =
-                    new SqlServerSchema(
-                            sourceConfig);
+            sqlServerSchema = new SqlServerSchema(sourceConfig);
         }
         return sqlServerSchema.getTableSchema(jdbc, tableId);
     }

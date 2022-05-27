@@ -18,8 +18,6 @@
 
 package com.ververica.cdc.connectors.sqlserver.experimental.utils;
 
-import org.apache.flink.util.FlinkRuntimeException;
-
 import com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.Lsn;
@@ -35,17 +33,18 @@ import io.debezium.util.Clock;
 import io.debezium.util.SchemaNameAdjuster;
 
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Map;
 
-/** MySQL connection Utilities. */
+/** Sql Server connection Utilities. */
 public class SqlServerConnectionUtils {
 
     /** Creates a new {@link SqlServerConnection}, but not open the connection. */
     public static SqlServerConnection createSqlServerConnection(Configuration dbzConfiguration) {
         SqlServerConnectorConfig sqlServerConfig = new SqlServerConnectorConfig(dbzConfiguration);
         return new SqlServerConnection(
-                dbzConfiguration, Clock.system(), sqlServerConfig.getSourceTimestampMode(), null);
+                sqlServerConfig.jdbcConfig(),
+                Clock.system(),
+                sqlServerConfig.getSourceTimestampMode(),
+                null);
     }
 
     /**
@@ -82,5 +81,4 @@ public class SqlServerConnectionUtils {
     public static boolean isTableIdCaseSensitive(JdbcConnection connection) {
         return false;
     }
-
 }

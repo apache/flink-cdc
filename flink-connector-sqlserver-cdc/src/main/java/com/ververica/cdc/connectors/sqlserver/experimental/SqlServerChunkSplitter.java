@@ -245,7 +245,7 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
         while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
-            // may sleep a while to avoid DDOS on MySQL server
+            // may sleep a while to avoid DDOS on Sql Server server
             maySleep(count++, tableId);
             chunkStart = chunkEnd;
             chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);

@@ -26,7 +26,7 @@ import io.debezium.relational.Column;
 /** Utilities for converting from SqlServer types to Flink types. */
 public class SqlServerTypeUtils {
 
-    // ------ MySQL Type ------
+    // ------ Sql Server Type ------
     private static final String BIT = "BIT";
     private static final String TINYINT = "TINYINT";
     private static final String TINYINT_UNSIGNED = "TINYINT UNSIGNED";
@@ -84,51 +84,13 @@ public class SqlServerTypeUtils {
     private static DataType convertFromColumn(Column column) {
         String typeName = column.typeName();
         switch (typeName) {
-            case TINYINT:
-                return column.length() == 1 ? DataTypes.BOOLEAN() : DataTypes.TINYINT();
-            case TINYINT_UNSIGNED:
-            case SMALLINT:
-                return DataTypes.SMALLINT();
             case SMALLINT_UNSIGNED:
             case INT:
-            case MEDIUMINT:
+            case "int identity":
                 return DataTypes.INT();
-            case INT_UNSIGNED:
-            case MEDIUMINT_UNSIGNED:
-            case BIGINT:
-                return DataTypes.BIGINT();
-            case BIGINT_UNSIGNED:
-                return DataTypes.DECIMAL(20, 0);
-            case FLOAT:
-                return DataTypes.FLOAT();
-            case DOUBLE:
-                return DataTypes.DOUBLE();
-            case DECIMAL:
-                return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
-            case TIME:
-                return column.length() >= 0 ? DataTypes.TIME(column.length()) : DataTypes.TIME();
-            case DATE:
-                return DataTypes.DATE();
-            case DATETIME:
-            case TIMESTAMP:
-                return column.length() >= 0
-                        ? DataTypes.TIMESTAMP(column.length())
-                        : DataTypes.TIMESTAMP();
-            case CHAR:
-                return DataTypes.CHAR(column.length());
-            case VARCHAR:
-                return DataTypes.VARCHAR(column.length());
-            case TEXT:
-                return DataTypes.STRING();
-            case BINARY:
-                return DataTypes.BINARY(column.length());
-            case VARBINARY:
-                return DataTypes.VARBINARY(column.length());
-            case BLOB:
-                return DataTypes.BYTES();
             default:
                 throw new UnsupportedOperationException(
-                        String.format("Don't support MySQL type '%s' yet.", typeName));
+                        String.format("Don't support Sql Server type '%s' yet.", typeName));
         }
     }
 }

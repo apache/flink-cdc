@@ -36,12 +36,12 @@ import org.slf4j.LoggerFactory;
 
 import static com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset.NO_STOPPING_OFFSET;
 
-/** The task to work for fetching data of MySQL table stream split . */
+/** The task to work for fetching data of Sql Server table stream split . */
 public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
-    private SqlServerBinlogSplitReadTask binlogSplitReadTask;
+    private SqlServeTransactionLogSplitReadTask transactionLogSplitReadTask;
 
     public SqlServerStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -49,11 +49,12 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     @Override
     public void execute(Context context) throws Exception {
+        // TODO: 2022/5/27 stream task
         SqlServerSourceFetchTaskContext sourceFetchContext =
                 (SqlServerSourceFetchTaskContext) context;
         taskRunning = true;
-        /*        binlogSplitReadTask =
-        new SqlServerBinlogSplitReadTask(
+        /* transactionLogSplitReadTask =
+        new SqlServeTransactionLogSplitReadTask(
                 sourceFetchContext.getDbzConnectorConfig(),
                 sourceFetchContext.getOffsetContext(),
                 sourceFetchContext.getDataConnection(),
@@ -64,7 +65,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                 split);*/
         BinlogSplitChangeEventSourceContext changeEventSourceContext =
                 new BinlogSplitChangeEventSourceContext();
-        binlogSplitReadTask.execute(
+        transactionLogSplitReadTask.execute(
                 changeEventSourceContext, sourceFetchContext.getOffsetContext());
     }
 
@@ -82,10 +83,11 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
      * A wrapped task to read all transaction log for table and also supports read bounded (from
      * lowWatermark to highWatermark) transaction log.
      */
-    public static class SqlServerBinlogSplitReadTask extends SqlServerStreamingChangeEventSource {
+    public static class SqlServeTransactionLogSplitReadTask
+            extends SqlServerStreamingChangeEventSource {
 
         private static final Logger LOG =
-                LoggerFactory.getLogger(SqlServerBinlogSplitReadTask.class);
+                LoggerFactory.getLogger(SqlServeTransactionLogSplitReadTask.class);
         private final StreamSplit binlogSplit;
         private final SqlServerOffsetContext offsetContext;
         private final JdbcSourceEventDispatcher dispatcher;
@@ -94,7 +96,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private final SqlServerDatabaseSchema schema;
 
-        public SqlServerBinlogSplitReadTask(
+        public SqlServeTransactionLogSplitReadTask(
                 SqlServerConnectorConfig connectorConfig,
                 SqlServerOffsetContext offsetContext,
                 SqlServerConnection dataConnection,

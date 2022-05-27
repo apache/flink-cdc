@@ -80,7 +80,9 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     @Override
-    public void execute(Context context) throws Exception {}
+    public void execute(Context context) throws Exception {
+        // TODO: 2022/5/27 snapshot task
+    }
 
     /** A wrapped task to fetch snapshot split of table. */
     public static class SqlServerSnapshotSplitReadTask extends AbstractSnapshotChangeEventSource {
