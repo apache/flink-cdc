@@ -22,13 +22,16 @@ import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.sqlserver.experimental.offset.TransactionLogOffset;
 import io.debezium.DebeziumException;
+import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
 import io.debezium.connector.sqlserver.SqlServerOffsetContext;
+import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
@@ -81,8 +84,82 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
 
     @Override
     public void execute(Context context) throws Exception {
-        // TODO: 2022/5/27 snapshot task
+        SqlServerSourceFetchTaskContext sourceFetchContext =
+                (SqlServerSourceFetchTaskContext) context;
+        taskRunning = true;
+        snapshotSplitReadTask =
+                new SqlServerSnapshotSplitReadTask(
+                        sourceFetchContext.getDbzConnectorConfig(),
+                        sourceFetchContext.getOffsetContext(),
+                        sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
+                        sourceFetchContext.getDatabaseSchema(),
+                        sourceFetchContext.getDataConnection(),
+                        sourceFetchContext.getDispatcher(),
+                        split);
+        SnapshotSplitChangeEventSourceContext changeEventSourceContext =
+                new SnapshotSplitChangeEventSourceContext();
+        SnapshotResult snapshotResult =
+                snapshotSplitReadTask.execute(
+                        changeEventSourceContext, sourceFetchContext.getOffsetContext());
+        System.out.println(snapshotResult);
+        /*final StreamSplit backfillBinlogSplit = createBackfillBinlogSplit(changeEventSourceContext);
+        // optimization that skip the binlog read when the low watermark equals high
+        // watermark
+        final boolean binlogBackfillRequired =
+                backfillBinlogSplit
+                        .getEndingOffset()
+                        .isAfter(backfillBinlogSplit.getStartingOffset());
+        if (!binlogBackfillRequired) {
+            dispatchBinlogEndEvent(
+                    backfillBinlogSplit,
+                    ((SqlServerSourceFetchTaskContext) context).getOffsetContext().getPartition(),
+                    ((SqlServerSourceFetchTaskContext) context).getDispatcher());
+            taskRunning = false;
+            return;
+        }
+        // execute binlog read task
+        if (snapshotResult.isCompletedOrSkipped()) {
+            final SqlServeTransactionLogSplitReadTask serveTransactionLogSplitReadTask =
+                    createBackfillBinlogReadTask(backfillBinlogSplit, sourceFetchContext);
+            backfillBinlogReadTask.execute(
+                    new SnapshotBinlogSplitChangeEventSourceContext(),
+                    sourceFetchContext.getOffsetContext());
+        } else {
+            taskRunning = false;
+            throw new IllegalStateException(
+                    String.format("Read snapshot for mysql split %s fail", split));
+        }*/
     }
+
+/*    private SqlServerStreamFetchTask.SqlServeTransactionLogSplitReadTask
+            createBackfillBinlogReadTask(
+                    StreamSplit backfillBinlogSplit, MySqlSourceFetchTaskContext context) {
+        final MySqlOffsetContext.Loader loader =
+                new MySqlOffsetContext.Loader(context.getSourceConfig().getDbzConnectorConfig());
+        final MySqlOffsetContext mySqlOffsetContext =
+                (MySqlOffsetContext)
+                        loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
+        // we should only capture events for the current table,
+        // otherwise, we may can't find corresponding schema
+        Configuration dezConf =
+                context.getSourceConfig()
+                        .getDbzConfiguration()
+                        .edit()
+                        .with("table.include.list", split.getTableId().toString())
+                        // Disable heartbeat event in snapshot split fetcher
+                        .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
+                        .build();
+        // task to read binlog and backfill for current split
+        return new MySqlBinlogSplitReadTask(
+                new MySqlConnectorConfig(dezConf),
+                mySqlOffsetContext,
+                createMySqlConnection(context.getSourceConfig().getDbzConfiguration()),
+                context.getDispatcher(),
+                context.getErrorHandler(),
+                context.getTaskContext(),
+                context.getStreamingChangeEventSourceMetrics(),
+                backfillBinlogSplit);
+    }*/
 
     /** A wrapped task to fetch snapshot split of table. */
     public static class SqlServerSnapshotSplitReadTask extends AbstractSnapshotChangeEventSource {

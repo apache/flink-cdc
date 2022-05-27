@@ -34,8 +34,10 @@ import java.util.Map;
  * from a specific {@link TransactionLogOffset}, we need to skip the processed change events and the
  * processed rows.
  */
+
 public class TransactionLogOffset extends Offset {
 
+    // TODO: 2022/5/27 sqlserver offset object
     private static final long serialVersionUID = 1L;
 
     public static final String BINLOG_FILENAME_OFFSET_KEY = "file";
@@ -79,34 +81,6 @@ public class TransactionLogOffset extends Offset {
             offsetMap.put(SERVER_ID_KEY, String.valueOf(serverId));
         }
         this.offset = offsetMap;
-    }
-
-    public String getFilename() {
-        return offset.get(BINLOG_FILENAME_OFFSET_KEY);
-    }
-
-    public long getPosition() {
-        return longOffsetValue(offset, BINLOG_POSITION_OFFSET_KEY);
-    }
-
-    public long getRestartSkipEvents() {
-        return longOffsetValue(offset, EVENTS_TO_SKIP_OFFSET_KEY);
-    }
-
-    public long getRestartSkipRows() {
-        return longOffsetValue(offset, ROWS_TO_SKIP_OFFSET_KEY);
-    }
-
-    public String getGtidSet() {
-        return offset.get(GTID_SET_KEY);
-    }
-
-    public long getTimestamp() {
-        return longOffsetValue(offset, TIMESTAMP_KEY);
-    }
-
-    public Long getServerId() {
-        return longOffsetValue(offset, SERVER_ID_KEY);
     }
 
     /**
