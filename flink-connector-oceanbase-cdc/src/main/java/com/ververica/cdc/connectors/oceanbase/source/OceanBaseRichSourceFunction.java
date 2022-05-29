@@ -38,7 +38,6 @@ import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.exception.LogProxyClientException;
 import com.oceanbase.clogproxy.client.listener.RecordListener;
-import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import com.oceanbase.oms.logmessage.DataMessage;
 import com.oceanbase.oms.logmessage.LogMessage;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -51,8 +50,6 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,6 +60,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * The source implementation for OceanBase that read snapshot events first and then read the change
@@ -83,14 +82,14 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final String tenantName;
     private final String databaseName;
     private final String tableName;
-    private final String hostname;
-    private final Integer port;
+    private final ZoneOffset zoneOffset;
     private final Duration connectTimeout;
-    private final String rsList;
+    private final String hostname;
+    private final int port;
     private final String logProxyHost;
     private final int logProxyPort;
-    private final long startTimestamp;
-    private final ZoneOffset zoneOffset;
+    private final String logProxyClientId;
+    private final Map<String, String> obCdcConfigs;
     private final DebeziumDeserializationSchema<T> deserializer;
 
     private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
@@ -105,35 +104,35 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     public OceanBaseRichSourceFunction(
             boolean snapshot,
-            long startTimestamp,
             String username,
             String password,
             String tenantName,
             String databaseName,
             String tableName,
+            ZoneOffset zoneOffset,
+            Duration connectTimeout,
             String hostname,
             Integer port,
-            Duration connectTimeout,
-            String rsList,
             String logProxyHost,
             int logProxyPort,
-            ZoneId serverTimeZone,
+            String logProxyClientId,
+            Map<String, String> obCdcConfigs,
             DebeziumDeserializationSchema<T> deserializer) {
-        this.snapshot = snapshot;
-        this.username = username;
-        this.password = password;
-        this.tenantName = tenantName;
-        this.databaseName = databaseName;
-        this.tableName = tableName;
+        this.snapshot = checkNotNull(snapshot);
+        this.username = checkNotNull(username);
+        this.password = checkNotNull(password);
+        this.tenantName = checkNotNull(tenantName);
+        this.databaseName = checkNotNull(databaseName);
+        this.tableName = checkNotNull(tableName);
+        this.zoneOffset = checkNotNull(zoneOffset);
+        this.connectTimeout = checkNotNull(connectTimeout);
         this.hostname = hostname;
         this.port = port;
-        this.connectTimeout = connectTimeout;
-        this.rsList = rsList;
-        this.logProxyHost = logProxyHost;
-        this.logProxyPort = logProxyPort;
-        this.startTimestamp = startTimestamp;
-        this.zoneOffset = serverTimeZone.getRules().getOffset(Instant.now());
-        this.deserializer = deserializer;
+        this.logProxyHost = checkNotNull(logProxyHost);
+        this.logProxyPort = checkNotNull(logProxyPort);
+        this.logProxyClientId = checkNotNull(logProxyClientId);
+        this.obCdcConfigs = checkNotNull(obCdcConfigs);
+        this.deserializer = checkNotNull(deserializer);
     }
 
     @Override
@@ -278,26 +277,21 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     }
 
     protected void readChangeEvents() throws InterruptedException {
-        String tableWhiteList = String.format("%s.%s.%s", tenantName, databaseName, tableName);
-        ObReaderConfig obReaderConfig = new ObReaderConfig();
-        obReaderConfig.setRsList(rsList);
-        obReaderConfig.setUsername(username);
-        obReaderConfig.setPassword(password);
-        obReaderConfig.setTableWhiteList(tableWhiteList);
-
+        ObReaderConfig obReaderConfig = new ObReaderConfig(obCdcConfigs);
         if (resolvedTimestamp > 0) {
-            obReaderConfig.setStartTimestamp(resolvedTimestamp);
+            obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
             LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
-        } else {
-            obReaderConfig.setStartTimestamp(startTimestamp);
-            LOG.info("Read change events from startTimestamp: {}", startTimestamp);
         }
 
-        final CountDownLatch latch = new CountDownLatch(1);
+        ClientConf clientConf =
+                ClientConf.builder()
+                        .clientId(logProxyClientId)
+                        .connectTimeoutMs((int) connectTimeout.toMillis())
+                        .build();
 
-        // avoid client id duplication when starting multiple connectors in one etl
-        ClientConf.USER_DEFINED_CLIENTID = ClientIdGenerator.generate() + tableWhiteList;
-        logProxyClient = new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig);
+        logProxyClient = new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig, clientConf);
+
+        final CountDownLatch latch = new CountDownLatch(1);
 
         logProxyClient.addListener(
                 new RecordListener() {

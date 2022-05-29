@@ -27,29 +27,24 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import java.time.Duration;
-import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /** Factory for creating configured instance of {@link OceanBaseTableSource}. */
 public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "oceanbase-cdc";
+    private static final String OB_CDC_PREFIX = "obcdc.";
 
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")
                     .stringType()
-                    .defaultValue("initial")
+                    .noDefaultValue()
                     .withDescription(
                             "Optional startup mode for OceanBase CDC consumer, valid enumerations are "
                                     + "\"initial\", \"latest-offset\" or \"timestamp\"");
-
-    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP =
-            ConfigOptions.key("scan.startup.timestamp")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional timestamp in seconds used in case of \"timestamp\" startup mode.");
 
     public static final ConfigOption<String> USERNAME =
             ConfigOptions.key("username")
@@ -81,6 +76,19 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Table name of OceanBase to monitor.");
 
+    public static final ConfigOption<String> SERVER_TIME_ZONE =
+            ConfigOptions.key("server-time-zone")
+                    .stringType()
+                    .defaultValue("UTC")
+                    .withDescription("The session time zone in database server.");
+
+    public static final ConfigOption<Duration> CONNECT_TIMEOUT =
+            ConfigOptions.key("connect.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription(
+                            "The maximum time that the connector should wait after trying to connect to the database server or log proxy server before timing out.");
+
     public static final ConfigOption<String> HOSTNAME =
             ConfigOptions.key("hostname")
                     .stringType()
@@ -95,26 +103,6 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Integer port number of OceanBase database server or OceanBase proxy server.");
 
-    public static final ConfigOption<Duration> CONNECT_TIMEOUT =
-            ConfigOptions.key("connect.timeout")
-                    .durationType()
-                    .defaultValue(Duration.ofSeconds(30))
-                    .withDescription(
-                            "The maximum time that the connector should wait after trying to connect to the OceanBase database server before timing out.");
-
-    public static final ConfigOption<String> SERVER_TIME_ZONE =
-            ConfigOptions.key("server-time-zone")
-                    .stringType()
-                    .defaultValue("UTC")
-                    .withDescription("The session time zone in database server.");
-
-    public static final ConfigOption<String> RS_LIST =
-            ConfigOptions.key("rootserver-list")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`.");
-
     public static final ConfigOption<String> LOG_PROXY_HOST =
             ConfigOptions.key("logproxy.host")
                     .stringType()
@@ -127,6 +115,34 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Port number of OceanBase log proxy service.");
 
+    public static final ConfigOption<String> LOG_PROXY_CLIENT_ID =
+            ConfigOptions.key("logproxy.client.id")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Id of log proxy client, used to distinguish different connections.");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP =
+            ConfigOptions.key("scan.startup.timestamp")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional timestamp in seconds used in case of \"timestamp\" startup mode.");
+
+    public static final ConfigOption<String> RS_LIST =
+            ConfigOptions.key("rootserver-list")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The semicolon-separated list of root servers in format `ip:rpc_port:sql_port`, corresponding to the parameter 'rootservice_list' in the database.");
+
+    public static final ConfigOption<String> CONFIG_URL =
+            ConfigOptions.key("config-url")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The url used to get root servers list, corresponding to the parameter 'obconfig_url' in the database.");
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -138,37 +154,57 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         ReadableConfig config = helper.getOptions();
 
         StartupMode startupMode = StartupMode.getStartupMode(config.get(SCAN_STARTUP_MODE));
-        Long startupTimestamp = config.get(SCAN_STARTUP_TIMESTAMP);
 
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String tenantName = config.get(TENANT_NAME);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
-        String rsList = config.get(RS_LIST);
-        String logProxyHost = config.get(LOG_PROXY_HOST);
-        int logProxyPort = config.get(LOG_PROXY_PORT);
+        String serverTimeZone = config.get(SERVER_TIME_ZONE);
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
+
         String hostname = config.get(HOSTNAME);
         Integer port = config.get(PORT);
-        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
-        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+
+        String logProxyHost = config.get(LOG_PROXY_HOST);
+        Integer logProxyPort = config.get(LOG_PROXY_PORT);
+        String logProxyClientId = config.get(LOG_PROXY_CLIENT_ID);
+        Long startupTimestamp = config.get(SCAN_STARTUP_TIMESTAMP);
+        String rsList = config.get(RS_LIST);
+        String configUrl = config.get(CONFIG_URL);
 
         return new OceanBaseTableSource(
                 physicalSchema,
                 startupMode,
-                startupTimestamp,
                 username,
                 password,
                 tenantName,
                 databaseName,
                 tableName,
+                serverTimeZone,
+                connectTimeout,
                 hostname,
                 port,
-                connectTimeout,
-                serverTimeZone,
-                rsList,
                 logProxyHost,
-                logProxyPort);
+                logProxyPort,
+                logProxyClientId,
+                startupTimestamp,
+                rsList,
+                configUrl,
+                getObCdcConfigs(context.getCatalogTable().getOptions()));
+    }
+
+    protected Map<String, String> getObCdcConfigs(Map<String, String> tableOptions) {
+        Map<String, String> configs = new HashMap<>();
+        tableOptions.keySet().stream()
+                .filter(key -> key.startsWith(OB_CDC_PREFIX))
+                .forEach(
+                        key -> {
+                            final String value = tableOptions.get(key);
+                            final String subKey = key.substring((OB_CDC_PREFIX).length());
+                            configs.put(subKey, value);
+                        });
+        return configs;
     }
 
     @Override
@@ -185,7 +221,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(TENANT_NAME);
         options.add(DATABASE_NAME);
         options.add(TABLE_NAME);
-        options.add(RS_LIST);
+        options.add(SERVER_TIME_ZONE);
+        options.add(CONNECT_TIMEOUT);
         options.add(LOG_PROXY_HOST);
         options.add(LOG_PROXY_PORT);
         return options;
@@ -194,11 +231,12 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(SCAN_STARTUP_TIMESTAMP);
         options.add(HOSTNAME);
         options.add(PORT);
-        options.add(CONNECT_TIMEOUT);
-        options.add(SERVER_TIME_ZONE);
+        options.add(LOG_PROXY_CLIENT_ID);
+        options.add(SCAN_STARTUP_TIMESTAMP);
+        options.add(RS_LIST);
+        options.add(CONFIG_URL);
         return options;
     }
 }

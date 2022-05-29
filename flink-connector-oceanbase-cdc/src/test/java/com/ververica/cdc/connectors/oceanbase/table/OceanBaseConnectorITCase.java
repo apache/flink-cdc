@@ -100,9 +100,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
-                                + " 'rootserver-list' = '%s',"
                                 + " 'logproxy.host' = '%s',"
-                                + " 'logproxy.port' = '%s'"
+                                + " 'logproxy.port' = '%s',"
+                                + " 'rootserver-list' = '%s'"
                                 + ")",
                         OB_SYS_USERNAME,
                         OB_SYS_PASSWORD,
@@ -111,9 +111,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         "products",
                         OB_WITH_LOG_PROXY.getContainerIpAddress(),
                         OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT),
-                        "127.0.0.1:2882:2881",
                         OB_WITH_LOG_PROXY.getContainerIpAddress(),
-                        OB_WITH_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT));
+                        OB_WITH_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT),
+                        "127.0.0.1:2882:2881");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -344,24 +344,24 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'tenant-name' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = '%s',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
-                                + " 'rootserver-list' = '%s',"
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
-                                + " 'server-time-zone' = '%s'"
+                                + " 'rootserver-list' = '%s'"
                                 + ")",
                         OB_SYS_USERNAME,
                         OB_SYS_PASSWORD,
                         "sys",
                         "column_type_test",
                         "full_types",
+                        serverTimeZone,
                         OB_WITH_LOG_PROXY.getContainerIpAddress(),
                         OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT),
-                        "127.0.0.1:2882:2881",
                         OB_WITH_LOG_PROXY.getContainerIpAddress(),
                         OB_WITH_LOG_PROXY.getMappedPort(OB_LOG_PROXY_PORT),
-                        serverTimeZone);
+                        "127.0.0.1:2882:2881");
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + "    `id` INT NOT NULL,\n"
