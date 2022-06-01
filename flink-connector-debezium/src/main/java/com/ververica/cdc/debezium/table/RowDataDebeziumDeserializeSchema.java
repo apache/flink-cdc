@@ -131,7 +131,7 @@ public final class RowDataDebeziumDeserializeSchema
             delete.setRowKind(RowKind.DELETE);
             emit(record, delete, out);
         } else {
-            if (changelogMode == DebeziumChangelogMode.RETRACT) {
+            if (changelogMode == DebeziumChangelogMode.ALL) {
                 GenericRowData before = extractBeforeRow(value, valueSchema);
                 validator.validate(before, RowKind.UPDATE_BEFORE);
                 before.setRowKind(RowKind.UPDATE_BEFORE);
@@ -186,7 +186,7 @@ public final class RowDataDebeziumDeserializeSchema
         private ZoneId serverTimeZone = ZoneId.of("UTC");
         private DeserializationRuntimeConverterFactory userDefinedConverterFactory =
                 DeserializationRuntimeConverterFactory.DEFAULT;
-        private DebeziumChangelogMode changelogMode = DebeziumChangelogMode.RETRACT;
+        private DebeziumChangelogMode changelogMode = DebeziumChangelogMode.ALL;
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;

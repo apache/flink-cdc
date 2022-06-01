@@ -36,6 +36,7 @@ import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContex
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
@@ -64,6 +65,17 @@ public class PostgreSQLTableFactoryTest {
                             Column.physical("eee", DataTypes.TIMESTAMP(3))),
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
+
+    private static final ResolvedSchema SCHEMA_WITHOUT_PRIMARY_KEY =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("aaa", DataTypes.INT().notNull()),
+                            Column.physical("bbb", DataTypes.STRING().notNull()),
+                            Column.physical("ccc", DataTypes.DOUBLE()),
+                            Column.physical("ddd", DataTypes.DECIMAL(31, 18)),
+                            Column.physical("eee", DataTypes.TIMESTAMP(3))),
+                    new ArrayList<>(),
+                    null);
 
     private static final ResolvedSchema SCHEMA_WITH_METADATA =
             new ResolvedSchema(
@@ -105,6 +117,7 @@ public class PostgreSQLTableFactoryTest {
                         MY_PASSWORD,
                         "decoderbufs",
                         "flink",
+                        DebeziumChangelogMode.ALL,
                         PROPERTIES);
         assertEquals(expectedSource, actualSource);
     }
@@ -116,6 +129,7 @@ public class PostgreSQLTableFactoryTest {
         options.put("decoding.plugin.name", "wal2json");
         options.put("debezium.snapshot.mode", "never");
         options.put("slot.name", "flink");
+        options.put("changelog-mode", "upsert");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -132,6 +146,7 @@ public class PostgreSQLTableFactoryTest {
                         MY_PASSWORD,
                         "wal2json",
                         "flink",
+                        DebeziumChangelogMode.UPSERT,
                         dbzProperties);
         assertEquals(expectedSource, actualSource);
     }
@@ -159,6 +174,7 @@ public class PostgreSQLTableFactoryTest {
                         MY_PASSWORD,
                         "decoderbufs",
                         "flink",
+                        DebeziumChangelogMode.ALL,
                         new Properties());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
@@ -218,6 +234,22 @@ public class PostgreSQLTableFactoryTest {
         } catch (Throwable t) {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
+                            .isPresent());
+        }
+    }
+
+    @Test
+    public void testUpsertModeWithoutPrimaryKeyError() {
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("changelog-mode", "upsert");
+
+            createTableSource(SCHEMA_WITHOUT_PRIMARY_KEY, properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "Primary key must be present when upsert mode is selected.")
                             .isPresent());
         }
     }

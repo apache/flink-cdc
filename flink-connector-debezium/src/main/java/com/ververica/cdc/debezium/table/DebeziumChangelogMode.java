@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -18,24 +16,24 @@
 
 package com.ververica.cdc.debezium.table;
 
-import org.apache.flink.table.api.ValidationException;
-
 /** Changelog modes used to encode changes from Debezium to Flink internal structure. */
 public enum DebeziumChangelogMode {
-    /** Default mode. It encodes changes as retract stream. */
-    RETRACT,
-    /** It encodes changes as upsert stream. */
-    UPSERT;
+    /** Encodes changes as retract stream using all RowKinds. This is the default mode. */
+    ALL("all"),
+    /**
+     * Encodes changes as upsert stream that describes idempotent updates on a key. Primary keys
+     * must be set in tables to use this changelog mode.
+     */
+    UPSERT("upsert");
 
-    public static DebeziumChangelogMode getChangelogMode(String modeString) {
-        switch (modeString.toLowerCase()) {
-            case "retract":
-                return RETRACT;
-            case "upsert":
-                return UPSERT;
-            default:
-                throw new ValidationException(
-                        String.format("Invalid changelog mode '%s'.", modeString));
-        }
+    private final String value;
+
+    DebeziumChangelogMode(String value) {
+        this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return value;
     }
 }
