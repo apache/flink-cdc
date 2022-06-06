@@ -89,23 +89,23 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         } else {
             isBinlogSplitAssigned = true;
             StartupMode startupMode = this.sourceConfig.getStartupOptions().startupMode;
-            if (startupMode == StartupMode.EARLIEST_OFFSET) {
-                return Optional.of(createBinlogSplitFromEarliest());
-            } else if (startupMode == StartupMode.LATEST_OFFSET) {
-                return Optional.of(createBinlogSplitFromLatest());
-            } else if (startupMode == StartupMode.TIMESTAMP) {
-                return Optional.of(createBinlogSplitFromTimestamp());
-            } else {
-                throw new ValidationException(
-                        String.format(
-                                "Invalid value for MySqlBinlogSplitAssigner '%s'. Supported values are [%s, %s, %s], but was: %s",
-                                SCAN_STARTUP_MODE.key(),
-                                StartupMode.EARLIEST_OFFSET,
-                                StartupMode.LATEST_OFFSET,
-                                StartupMode.TIMESTAMP,
-                                startupMode.name()));
+            switch (startupMode){
+                case EARLIEST_OFFSET:
+                    return Optional.of(createBinlogSplitFromEarliest());
+                case LATEST_OFFSET:
+                    return Optional.of(createBinlogSplitFromLatest());
+                case TIMESTAMP:
+                    return Optional.of(createBinlogSplitFromTimestamp());
+                default:
+                    throw new ValidationException(
+                            String.format(
+                                    "Invalid value for MySqlBinlogSplitAssigner '%s'. Supported values are [%s, %s, %s], but was: %s",
+                                    SCAN_STARTUP_MODE.key(),
+                                    StartupMode.EARLIEST_OFFSET,
+                                    StartupMode.LATEST_OFFSET,
+                                    StartupMode.TIMESTAMP,
+                                    startupMode.name()));
             }
-
         }
     }
 
