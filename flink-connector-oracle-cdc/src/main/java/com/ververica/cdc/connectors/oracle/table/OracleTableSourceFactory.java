@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * Factory for creating configured instance of {@link
@@ -51,6 +52,13 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                     .intType()
                     .defaultValue(1521)
                     .withDescription("Integer port number of the Oracle database server.");
+
+    private static final ConfigOption<String> URL =
+            ConfigOptions.key("url")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Complete JDBC URL as an alternative to specifying hostname, port and database provided  as a way to support alternative connection scenarios.");
 
     private static final ConfigOption<String> USERNAME =
             ConfigOptions.key("username")
@@ -105,12 +113,17 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
-        int port = config.get(PORT);
+        String url = config.get(URL);
+        Integer port = config.get(PORT);
         StartupOptions startupOptions = getStartupOptions(config);
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
-
+        if (url == null) {
+            checkNotNull(hostname, "hostname is required when url is not configured");
+            checkNotNull(port, "port is required when url is not configured");
+        }
         return new OracleTableSource(
                 physicalSchema,
+                url,
                 port,
                 hostname,
                 databaseName,
@@ -130,7 +143,6 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(HOSTNAME);
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(DATABASE_NAME);
@@ -142,7 +154,9 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(HOSTNAME);
         options.add(PORT);
+        options.add(URL);
         options.add(SCAN_STARTUP_MODE);
 
         return options;
