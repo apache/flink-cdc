@@ -65,12 +65,17 @@ public class OracleValidator implements Validator {
 
     public static Connection openConnection(Properties properties) throws SQLException {
         DriverManager.registerDriver(new oracle.jdbc.OracleDriver());
-        String hostname = properties.getProperty("database.hostname");
-        String port = properties.getProperty("database.port");
-        String dbname = properties.getProperty("database.dbname");
+        String url;
+        if (properties.containsKey("database.url")) {
+            url = properties.getProperty("database.url");
+        } else {
+            String hostname = properties.getProperty("database.hostname");
+            String port = properties.getProperty("database.port");
+            String dbname = properties.getProperty("database.dbname");
+            url = "jdbc:oracle:thin:@" + hostname + ":" + port + ":" + dbname;
+        }
         String userName = properties.getProperty("database.user");
         String userpwd = properties.getProperty("database.password");
-        return DriverManager.getConnection(
-                "jdbc:oracle:thin:@" + hostname + ":" + port + ":" + dbname, userName, userpwd);
+        return DriverManager.getConnection(url, userName, userpwd);
     }
 }
