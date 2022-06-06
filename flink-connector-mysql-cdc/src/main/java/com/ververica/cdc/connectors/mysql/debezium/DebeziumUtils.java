@@ -18,14 +18,14 @@
 
 package com.ververica.cdc.connectors.mysql.debezium;
 
-import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
-import com.ververica.cdc.connectors.mysql.source.offset.SeekBinlogByTimestampListener;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.connection.JdbcConnectionFactory;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.SeekBinlogByTimestampListener;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -122,28 +122,36 @@ public class DebeziumUtils {
         }
     }
 
-    public static BinlogOffset seekBinlogOffsetByTimestamp(String binlogFile, BinlogOffset maxBinlogOffset,
-                                                           MySqlSourceConfig sourceConfig, long timestamp) {
-        BinaryLogClient client = new BinaryLogClient(sourceConfig.getHostname(), sourceConfig.getPort(),
-                sourceConfig.getDatabaseList().get(0), sourceConfig.getUsername(), sourceConfig.getPassword());
+    public static BinlogOffset seekBinlogOffsetByTimestamp(
+            String binlogFile,
+            BinlogOffset maxBinlogOffset,
+            MySqlSourceConfig sourceConfig,
+            long timestamp) {
+        BinaryLogClient client =
+                new BinaryLogClient(
+                        sourceConfig.getHostname(),
+                        sourceConfig.getPort(),
+                        sourceConfig.getDatabaseList().get(0),
+                        sourceConfig.getUsername(),
+                        sourceConfig.getPassword());
         client.setServerId(sourceConfig.getServerIdRange().getEndServerId());
         EventDeserializer eventDeserializer = new EventDeserializer();
         eventDeserializer.setCompatibilityMode(
                 EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
-                EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY
-        );
+                EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY);
         client.setEventDeserializer(eventDeserializer);
         client.setBinlogFilename(binlogFile);
         // The min position of binlog file is 4L
         client.setBinlogPosition(4L);
-        SeekBinlogByTimestampListener listener = new SeekBinlogByTimestampListener(timestamp, client, maxBinlogOffset);
+        SeekBinlogByTimestampListener listener =
+                new SeekBinlogByTimestampListener(timestamp, client, maxBinlogOffset);
         try {
             client.registerEventListener(listener);
             client.connect();
             return listener.getBinlogOffset();
         } catch (Exception e) {
-            throw new FlinkRuntimeException("Unexpected error while seek binlog offset using timestamp  " +
-                    timestamp, e);
+            throw new FlinkRuntimeException(
+                    "Unexpected error while seek binlog offset using timestamp  " + timestamp, e);
         } finally {
             try {
                 if (client.isConnected()) {

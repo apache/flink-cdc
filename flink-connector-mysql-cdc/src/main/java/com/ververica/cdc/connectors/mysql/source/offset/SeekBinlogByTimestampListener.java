@@ -35,7 +35,8 @@ public class SeekBinlogByTimestampListener implements BinaryLogClient.EventListe
     private BinlogOffset binlogOffset;
     private BinlogOffset lastBinlogOffset;
 
-    public SeekBinlogByTimestampListener(long seekTimestamp, BinaryLogClient client, BinlogOffset maxBinlogOffset) {
+    public SeekBinlogByTimestampListener(
+            long seekTimestamp, BinaryLogClient client, BinlogOffset maxBinlogOffset) {
         this.seekTimestamp = seekTimestamp;
         this.client = client;
         this.maxBinlogOffset = maxBinlogOffset;
@@ -56,16 +57,21 @@ public class SeekBinlogByTimestampListener implements BinaryLogClient.EventListe
 
             // The first event binlogTimestamp > seekTimestamp , we skip this binlog file directly
             if (eventType == EventType.FORMAT_DESCRIPTION && seekTimestamp < binlogTimestamp) {
-                LOG.info("skip this binlog file {} directly , binlogTimestamp = {}, seekTimestamp = {}",
-                        client.getBinlogFilename(),binlogTimestamp, seekTimestamp);
+                LOG.info(
+                        "skip this binlog file {} directly , binlogTimestamp = {}, seekTimestamp = {}",
+                        client.getBinlogFilename(),
+                        binlogTimestamp,
+                        seekTimestamp);
                 client.disconnect();
             }
 
             // up to the binlog file max position , exit it
             if (client.getBinlogPosition() >= maxBinlogOffset.getPosition()
                     && client.getBinlogFilename().equals(maxBinlogOffset.getFilename())) {
-                LOG.info("up to the binlog file max position , exit it , binlogFile = {}, binlogPosition = {}",
-                        client.getBinlogPosition(), client.getBinlogFilename());
+                LOG.info(
+                        "up to the binlog file max position , exit it , binlogFile = {}, binlogPosition = {}",
+                        client.getBinlogPosition(),
+                        client.getBinlogFilename());
                 client.disconnect();
             }
 
@@ -75,9 +81,13 @@ public class SeekBinlogByTimestampListener implements BinaryLogClient.EventListe
                     && seekTimestamp / 1000 >= lastBinlogOffset.getTimestamp()
                     && seekTimestamp <= binlogTimestamp) {
                 binlogOffset = buildBinlogOffset(binlogTimestamp);
-                LOG.info("found the binlog offset , lastBinlogOffset = {}, " +
-                        "currentBinlogOffset = {}, seekTimestamp = {}" +
-                        "", lastBinlogOffset, binlogOffset, seekTimestamp);
+                LOG.info(
+                        "found the binlog offset , lastBinlogOffset = {}, "
+                                + "currentBinlogOffset = {}, seekTimestamp = {}"
+                                + "",
+                        lastBinlogOffset,
+                        binlogOffset,
+                        seekTimestamp);
                 client.disconnect();
             }
 
@@ -88,8 +98,13 @@ public class SeekBinlogByTimestampListener implements BinaryLogClient.EventListe
     }
 
     private BinlogOffset buildBinlogOffset(long binlogTimestamp) {
-        return new BinlogOffset(client.getBinlogFilename(), client.getBinlogPosition(),
-                0, 0, binlogTimestamp / 1000, client.getGtidSet(),
+        return new BinlogOffset(
+                client.getBinlogFilename(),
+                client.getBinlogPosition(),
+                0,
+                0,
+                binlogTimestamp / 1000,
+                client.getGtidSet(),
                 ((Long) client.getServerId()).intValue());
     }
 

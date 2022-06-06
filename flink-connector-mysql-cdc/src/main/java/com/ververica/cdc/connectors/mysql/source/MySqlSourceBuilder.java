@@ -20,9 +20,7 @@ package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.annotation.PublicEvolving;
 
-import com.ververica.cdc.connectors.mysql.SeekBinlogToTimestampFilter;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
-import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 

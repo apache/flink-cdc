@@ -18,10 +18,9 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
-import com.ververica.cdc.connectors.mysql.table.StartupMode;
-import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
@@ -31,8 +30,9 @@ import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import io.debezium.jdbc.JdbcConnection;
-import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,9 +47,7 @@ import java.util.Optional;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.*;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_MODE;
 
-/**
- * A {@link MySqlSplitAssigner} which only read binlog from current binlog position.
- */
+/** A {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitAssigner.class);
@@ -71,16 +69,14 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     private MySqlBinlogSplitAssigner(
-            MySqlSourceConfig sourceConfig,
-            boolean isBinlogSplitAssigned) {
+            MySqlSourceConfig sourceConfig, boolean isBinlogSplitAssigned) {
         this.sourceConfig = sourceConfig;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
         this.startupOptions = this.sourceConfig.getStartupOptions();
     }
 
     @Override
-    public void open() {
-    }
+    public void open() {}
 
     @Override
     public Optional<MySqlSplit> getNext() {
@@ -89,7 +85,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         } else {
             isBinlogSplitAssigned = true;
             StartupMode startupMode = this.sourceConfig.getStartupOptions().startupMode;
-            switch (startupMode){
+            switch (startupMode) {
                 case EARLIEST_OFFSET:
                     return Optional.of(createBinlogSplitFromEarliest());
                 case LATEST_OFFSET:
@@ -169,11 +165,12 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     private BinlogOffset createBinlogOffsetFromTimestamp() {
         List<String> databaseList = sourceConfig.getDatabaseList();
-        Preconditions.checkArgument(databaseList.size() == 1,
-                "startup by timestamp only support 1 mysql database");
+        Preconditions.checkArgument(
+                databaseList.size() == 1, "startup by timestamp only support 1 mysql database");
 
         Long startupTimestampMillis = this.startupOptions.startupTimestampMillis;
-        Preconditions.checkArgument(startupTimestampMillis < System.currentTimeMillis(),
+        Preconditions.checkArgument(
+                startupTimestampMillis < System.currentTimeMillis(),
                 "startup timestamp should be small than now .");
 
         final long beginTimestampMills = System.currentTimeMillis();
@@ -184,40 +181,45 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
             BinlogOffset seekBinlogOffset = null;
             boolean shouldBreak = false;
             while (!shouldBreak) {
-                BinlogOffset binlogOffset = DebeziumUtils
-                        .seekBinlogOffsetByTimestamp(binlogFile, maxBinlogOffset, sourceConfig, startupTimestampMillis);
+                BinlogOffset binlogOffset =
+                        DebeziumUtils.seekBinlogOffsetByTimestamp(
+                                binlogFile, maxBinlogOffset, sourceConfig, startupTimestampMillis);
 
                 // Can not find the binlog offset if the binlog offset's timestamp is 0 .
                 // see SeekBinlogTimestampListener to find more detail
                 if (binlogOffset == null || binlogOffset.getTimestamp() == 0) {
                     maxBinlogOffset = binlogOffset;
                 } else {
-                    LOG.info("Binlog offset found it, binlogOffset = {}, spendMills = {}", binlogOffset,
+                    LOG.info(
+                            "Binlog offset found it, binlogOffset = {}, spendMills = {}",
+                            binlogOffset,
                             System.currentTimeMillis() - beginTimestampMills);
                     seekBinlogOffset = binlogOffset;
                     shouldBreak = true;
                 }
 
                 // find next binlog file
-                int binlogSeqNum = Integer.parseInt(binlogFile.substring(binlogFile.indexOf(".") + 1));
+                int binlogSeqNum =
+                        Integer.parseInt(binlogFile.substring(binlogFile.indexOf(".") + 1));
                 if (binlogSeqNum <= 1) {
                     LOG.warn("Can not find binlog file by timestamp = {}", startupTimestampMillis);
                     shouldBreak = true;
                 } else {
                     int nextBinlogSeqNum = binlogSeqNum - 1;
-                    String binlogFileNamePrefix = binlogFile.substring(0, binlogFile.indexOf(".") + 1);
+                    String binlogFileNamePrefix =
+                            binlogFile.substring(0, binlogFile.indexOf(".") + 1);
                     String binlogFileNameSuffix = String.format("%06d", nextBinlogSeqNum);
                     binlogFile = binlogFileNamePrefix + binlogFileNameSuffix;
                 }
             }
 
-            Preconditions.checkArgument(seekBinlogOffset != null,
-                    "Can not find binlog position " +
-                            "by timestamp " + startupTimestampMillis);
+            Preconditions.checkArgument(
+                    seekBinlogOffset != null,
+                    "Can not find binlog position " + "by timestamp " + startupTimestampMillis);
             return seekBinlogOffset;
         } catch (Exception e) {
-            throw new FlinkRuntimeException("Can not find binlog position " +
-                    "by timestamp " + startupTimestampMillis, e);
+            throw new FlinkRuntimeException(
+                    "Can not find binlog position " + "by timestamp " + startupTimestampMillis, e);
         }
     }
 
@@ -248,5 +250,4 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
             throw new FlinkRuntimeException("Read the binlog offset error", e);
         }
     }
-
 }
