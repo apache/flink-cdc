@@ -193,14 +193,9 @@ public class MySqlSource<T>
                 }
                 break;
             case LATEST_OFFSET:
-                splitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
-                break;
             case EARLIEST_OFFSET:
             case TIMESTAMP:
-                splitAssigner =
-                        new MySqlBinlogSplitAssigner(
-                                sourceConfig,
-                                MySqlBinlogSplitAssigner.BinlogOffsetReadingMode.EARLIEST_OFFSET);
+                splitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);;
                 break;
             default:
                 throw new UnsupportedOperationException(

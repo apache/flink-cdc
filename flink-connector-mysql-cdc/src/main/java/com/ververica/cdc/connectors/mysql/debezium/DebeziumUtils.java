@@ -18,6 +18,8 @@
 
 package com.ververica.cdc.connectors.mysql.debezium;
 
+import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
+import com.ververica.cdc.connectors.mysql.source.offset.SeekBinlogByTimestampListener;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
@@ -117,6 +119,39 @@ public class DebeziumUtils {
                             + purgedStmt
                             + "'. Make sure your server is correctly configured",
                     e);
+        }
+    }
+
+    public static BinlogOffset seekBinlogOffsetByTimestamp(String binlogFile, BinlogOffset maxBinlogOffset,
+                                                           MySqlSourceConfig sourceConfig, long timestamp) {
+        BinaryLogClient client = new BinaryLogClient(sourceConfig.getHostname(), sourceConfig.getPort(),
+                sourceConfig.getDatabaseList().get(0), sourceConfig.getUsername(), sourceConfig.getPassword());
+        client.setServerId(sourceConfig.getServerIdRange().getEndServerId());
+        EventDeserializer eventDeserializer = new EventDeserializer();
+        eventDeserializer.setCompatibilityMode(
+                EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
+                EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY
+        );
+        client.setEventDeserializer(eventDeserializer);
+        client.setBinlogFilename(binlogFile);
+        // The min position of binlog file is 4L
+        client.setBinlogPosition(4L);
+        SeekBinlogByTimestampListener listener = new SeekBinlogByTimestampListener(timestamp, client, maxBinlogOffset);
+        try {
+            client.registerEventListener(listener);
+            client.connect();
+            return listener.getBinlogOffset();
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Unexpected error while seek binlog offset using timestamp  " +
+                    timestamp, e);
+        } finally {
+            try {
+                if (client.isConnected()) {
+                    client.disconnect();
+                }
+            } catch (Exception e) {
+                LOG.warn("Error while disconnector binary log client .");
+            }
         }
     }
 

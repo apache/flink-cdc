@@ -239,12 +239,6 @@ public class MySqlSourceBuilder<T> {
      * @return a MySqlParallelSource with the settings made for this builder.
      */
     public MySqlSource<T> build() {
-        if (this.deserializer != null
-                && this.startupOptions != null
-                && this.startupOptions.startupMode == StartupMode.TIMESTAMP) {
-            Long startupTimestampMillis = this.startupOptions.startupTimestampMillis;
-            deserializer = new SeekBinlogToTimestampFilter<>(startupTimestampMillis, deserializer);
-        }
         return new MySqlSource<>(configFactory, checkNotNull(deserializer));
     }
 }
