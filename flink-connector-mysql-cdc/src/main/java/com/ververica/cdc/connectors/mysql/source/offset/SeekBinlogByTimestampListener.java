@@ -25,6 +25,7 @@ import com.github.shyiko.mysql.binlog.event.EventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** event listener to seek binlog offset by timestamp . */
 public class SeekBinlogByTimestampListener implements BinaryLogClient.EventListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(SeekBinlogByTimestampListener.class);

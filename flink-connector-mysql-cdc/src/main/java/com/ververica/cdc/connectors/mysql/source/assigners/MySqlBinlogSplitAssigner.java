@@ -44,10 +44,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.*;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.earliestBinlogOffset;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_MODE;
 
-/** A {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
+/** {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitAssigner.class);
@@ -176,7 +177,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
         final long beginTimestampMills = System.currentTimeMillis();
         LOG.info("Begin to find binlog offset by timestamp {}", startupTimestampMillis);
         try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
-            BinlogOffset maxBinlogOffset = DebeziumUtils.currentBinlogOffset(jdbc);
+            BinlogOffset maxBinlogOffset = currentBinlogOffset(jdbc);
             String binlogFile = maxBinlogOffset.getFilename();
             BinlogOffset seekBinlogOffset = null;
             boolean shouldBreak = false;
