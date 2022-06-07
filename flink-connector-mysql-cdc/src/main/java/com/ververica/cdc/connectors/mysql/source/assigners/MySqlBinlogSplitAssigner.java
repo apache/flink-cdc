@@ -89,10 +89,11 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
             switch (startupMode) {
                 case EARLIEST_OFFSET:
                     return Optional.of(createBinlogSplitFromEarliest());
-                case LATEST_OFFSET:
-                    return Optional.of(createBinlogSplitFromLatest());
                 case TIMESTAMP:
                     return Optional.of(createBinlogSplitFromTimestamp());
+                case INITIAL:
+                case LATEST_OFFSET:
+                    return Optional.of(createBinlogSplitFromLatest());
                 default:
                     throw new ValidationException(
                             String.format(
