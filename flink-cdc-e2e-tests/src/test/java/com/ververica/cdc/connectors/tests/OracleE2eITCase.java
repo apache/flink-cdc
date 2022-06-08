@@ -167,8 +167,17 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
         System.setProperty("oracle.jdbc.timezoneAsRegion", "false");
         try (Connection conn = getOracleJdbcConnection();
                 Statement statement = conn.createStatement()) {
+            try {
+                statement.execute(
+                        "INSERT INTO debezium.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT)\n"
+                                + "    VALUES (106,'hammer','16oz carpenters hammer',1.0)");
+            } catch (Exception e) {
+                LOG.error("insert into PRODUCTS.", e);
+            }
+
             statement.execute(
-                    "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' ,WEIGHT=2.0 WHERE ID=106");
+                    "UPDATE debezium.PRODUCTS SET DESCRIPTION='18oz carpenter hammer' ,WEIGHT=2.0 WHERE ID=106");
+            Thread.sleep(30000);
             statement.execute(
                     "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker',WEIGHT=5.1 WHERE ID=107");
             statement.execute(
