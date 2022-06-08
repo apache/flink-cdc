@@ -121,9 +121,10 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "SELECT * FROM products_source;");
 
         try (Connection conn = getOracleJdbcConnection();
-                Statement statement = conn.createStatement()) {
+                Statement statement =
+                        conn.prepareStatement("select ID,DESCRIPTION from debezium.products")) {
             ResultSet resultSet =
-                    statement.executeQuery("selct ID,DESCRIPTION from debezium.products");
+                    statement.executeQuery("select ID,DESCRIPTION from debezium.products");
             while (resultSet.next()) {
                 System.out.println(
                         "id -> " + resultSet.getObject(1) + " name -> " + resultSet.getObject(2));
@@ -162,9 +163,10 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
         }
 
         try (Connection conn = getOracleJdbcConnection();
-                Statement statement = conn.createStatement()) {
+                Statement statement =
+                        conn.prepareStatement("select ID,DESCRIPTION from debezium.products")) {
             ResultSet resultSet =
-                    statement.executeQuery("selct ID,DESCRIPTION from debezium.products");
+                    statement.executeQuery("select ID,DESCRIPTION from debezium.products");
             System.out.println("updateAfter------------------");
             while (resultSet.next()) {
                 System.out.println(
