@@ -234,7 +234,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                360000L);
+                500000L);
     }
 
     protected Connection getTidbJdbcConnection(String databaseName) throws SQLException {

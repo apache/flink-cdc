@@ -162,8 +162,9 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
         try (Connection conn = getOracleJdbcConnection();
                 Statement statement = conn.createStatement()) {
             statement.execute(
-                    "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
-            statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
+                    "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' ,WEIGHT=2.0 WHERE ID=106");
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker',WEIGHT=5.1 WHERE ID=107");
             statement.execute(
                     "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)");
             statement.execute(
@@ -201,8 +202,8 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8",
                         "104,hammer,12oz carpenters hammer,0.75",
                         "105,hammer,14oz carpenters hammer,0.875",
-                        "106,hammer,18oz carpenter hammer,1.0",
-                        "107,rocks,box of assorted rocks,5.1",
+                        "106,hammer,18oz carpenter hammer,2.0",
+                        "107,rocks,new water resistent white wind breaker,5.1",
                         "108,jacket,water resistent black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
                         "111,jacket,new water resistent white wind breaker,0.5");
@@ -210,7 +211,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                150000L);
+                400000L);
     }
 
     private Connection getOracleJdbcConnection() throws SQLException {
