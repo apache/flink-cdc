@@ -120,11 +120,24 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
+        // assert final results
+        String mysqlUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+
+        JdbcProxy proxy =
+                new JdbcProxy(mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_DRIVER_CLASS);
+        proxy.print("products_sink", new String[] {"id", "name", "description", "weight"});
+
         try (Connection conn = getOracleJdbcConnection();
                 Statement statement =
                         conn.prepareStatement("select ID,DESCRIPTION from debezium.products")) {
             ResultSet resultSet =
                     statement.executeQuery("select ID,DESCRIPTION from debezium.products");
+            System.out.println("updatebefore----------------");
             while (resultSet.next()) {
                 System.out.println(
                         "id -> " + resultSet.getObject(1) + " name -> " + resultSet.getObject(2));
@@ -134,6 +147,8 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
+
+        System.out.println("updatebefore end----------------");
 
         submitSQLJob(sqlLines, oracleCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
@@ -177,16 +192,8 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
+        System.out.println("updateAfter end------------------");
 
-        // assert final results
-        String mysqlUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        mysqlInventoryDatabase.getDatabaseName());
-        JdbcProxy proxy =
-                new JdbcProxy(mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_DRIVER_CLASS);
         List<String> expectResult =
                 Arrays.asList(
                         "101,scooter,Small 2-wheel scooter,3.14",

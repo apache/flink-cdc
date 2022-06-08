@@ -17,6 +17,7 @@
 
 package com.ververica.cdc.connectors.tests.utils;
 
+import com.google.gson.Gson;
 import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Connection;
@@ -43,6 +44,30 @@ public class JdbcProxy {
         this.userName = userName;
         this.password = password;
         this.driverClass = driverClass;
+    }
+
+    public void print(String table, String[] fields) throws SQLException, ClassNotFoundException {
+        Class.forName(driverClass);
+        try (Connection dbConn = DriverManager.getConnection(url, userName, password);
+                PreparedStatement statement = dbConn.prepareStatement("select * from " + table);
+                ResultSet resultSet = statement.executeQuery()) {
+            List<String> results = new ArrayList<>();
+            while (resultSet.next()) {
+                List<String> result = new ArrayList<>();
+                for (String field : fields) {
+                    Object value = resultSet.getObject(field);
+                    if (value == null) {
+                        result.add("null");
+                    } else {
+                        result.add(value.toString());
+                    }
+                }
+
+                results.add(StringUtils.join(result, ","));
+            }
+            Collections.sort(results);
+            System.out.println("print mysql--> " + new Gson().toJson(results));
+        }
     }
 
     public void checkResult(List<String> expectedResult, String table, String[] fields)
