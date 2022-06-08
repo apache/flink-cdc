@@ -34,6 +34,7 @@ import org.testcontainers.lifecycle.Startables;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
@@ -119,6 +120,20 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
+        try (Connection conn = getOracleJdbcConnection();
+                Statement statement = conn.createStatement()) {
+            ResultSet resultSet =
+                    statement.executeQuery("selct ID,DESCRIPTION from debezium.products");
+            while (resultSet.next()) {
+                System.out.println(
+                        "id -> " + resultSet.getObject(1) + " name -> " + resultSet.getObject(2));
+            }
+
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
         submitSQLJob(sqlLines, oracleCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
@@ -141,6 +156,21 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                     "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        try (Connection conn = getOracleJdbcConnection();
+                Statement statement = conn.createStatement()) {
+            ResultSet resultSet =
+                    statement.executeQuery("selct ID,DESCRIPTION from debezium.products");
+            System.out.println("updateAfter------------------");
+            while (resultSet.next()) {
+                System.out.println(
+                        "id -> " + resultSet.getObject(1) + " name -> " + resultSet.getObject(2));
+            }
+
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
