@@ -134,13 +134,19 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
 
         try (Connection conn = getOracleJdbcConnection();
                 Statement statement =
-                        conn.prepareStatement("select ID,DESCRIPTION from debezium.products")) {
+                        conn.prepareStatement(
+                                "select ID,DESCRIPTION,WEIGHT from debezium.products")) {
             ResultSet resultSet =
-                    statement.executeQuery("select ID,DESCRIPTION from debezium.products");
+                    statement.executeQuery("select ID,DESCRIPTION,WEIGHT from debezium.products");
             System.out.println("updatebefore----------------");
             while (resultSet.next()) {
                 System.out.println(
-                        "id -> " + resultSet.getObject(1) + " name -> " + resultSet.getObject(2));
+                        "id -> "
+                                + resultSet.getObject(1)
+                                + " name -> "
+                                + resultSet.getObject(2)
+                                + " weight -> "
+                                + resultSet.getObject(3));
             }
 
         } catch (SQLException e) {
@@ -211,7 +217,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                400000L);
+                600000L);
     }
 
     private Connection getOracleJdbcConnection() throws SQLException {
