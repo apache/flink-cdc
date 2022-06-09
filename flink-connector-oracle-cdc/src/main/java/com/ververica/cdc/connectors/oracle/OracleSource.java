@@ -170,17 +170,6 @@ public class OracleSource {
                 props.putAll(dbzProperties);
             }
 
-            String hostname = props.getProperty("database.hostname");
-            String port = props.getProperty("database.port");
-            String dbname = props.getProperty("database.dbname");
-
-            String url;
-            if (!props.containsKey("database.url")) {
-                url = "jdbc:oracle:thin:@" + hostname + ":" + port + ":" + dbname;
-                // debezium default URL format is SID rather than serviceName， so we should set url
-                props.setProperty("database.url", url);
-            }
-
             return new DebeziumSourceFunction<>(
                     deserializer, props, specificOffset, new OracleValidator(props));
         }
