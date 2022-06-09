@@ -30,6 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 import com.alibaba.fastjson.JSONObject;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.kafka.connect.json.DecimalFormat;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.junit.Test;
 
@@ -56,13 +57,18 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
-        testConsumingAllEventsWithJsonFormat(true);
+    public void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
+        testConsumingAllEventsWithJsonFormat(
+                false, "file/debezium-data-schema-exclude-with-numeric-decimal.json");
     }
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
-        testConsumingAllEventsWithJsonFormat(false);
+    public void testConsumingAllEventsWithJsonFormatWithBase64Decimal() throws Exception {
+        Map<String, Object> customConverterConfigs = new HashMap<>();
+        customConverterConfigs.put(
+                JsonConverterConfig.DECIMAL_FORMAT_CONFIG, DecimalFormat.BASE64.name());
+        testConsumingAllEventsWithJsonFormat(
+                true, customConverterConfigs, "file/debezium-data-schema-include.json");
     }
 
     @Test
@@ -132,11 +138,8 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    private void testConsumingAllEventsWithJsonFormat(Boolean includeSchema) throws Exception {
-        String expectedFile =
-                includeSchema
-                        ? "file/debezium-data-schema-include.json"
-                        : "file/debezium-data-schema-exclude.json";
+    private void testConsumingAllEventsWithJsonFormat(Boolean includeSchema, String expectedFile)
+            throws Exception {
         testConsumingAllEventsWithJsonFormat(includeSchema, null, expectedFile);
     }
 
