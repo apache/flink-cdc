@@ -53,14 +53,14 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
     private Map<String, Object> customConverterConfigs;
 
     public JsonDebeziumDeserializationSchema() {
-        this(false);
+        this(
+                false,
+                Collections.singletonMap(
+                        JsonConverterConfig.DECIMAL_FORMAT_CONFIG, DecimalFormat.NUMERIC.name()));
     }
 
     public JsonDebeziumDeserializationSchema(Boolean includeSchema) {
         this.includeSchema = includeSchema;
-        this.customConverterConfigs =
-                Collections.singletonMap(
-                        JsonConverterConfig.DECIMAL_FORMAT_CONFIG, DecimalFormat.NUMERIC.name());
     }
 
     public JsonDebeziumDeserializationSchema(
