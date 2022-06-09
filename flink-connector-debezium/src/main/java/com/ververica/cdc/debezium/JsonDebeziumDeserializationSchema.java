@@ -22,12 +22,14 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.util.Collector;
 
+import org.apache.kafka.connect.json.DecimalFormat;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.storage.ConverterConfig;
 import org.apache.kafka.connect.storage.ConverterType;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -56,6 +58,9 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
 
     public JsonDebeziumDeserializationSchema(Boolean includeSchema) {
         this.includeSchema = includeSchema;
+        this.customConverterConfigs =
+                Collections.singletonMap(
+                        JsonConverterConfig.DECIMAL_FORMAT_CONFIG, DecimalFormat.NUMERIC.name());
     }
 
     public JsonDebeziumDeserializationSchema(
