@@ -59,11 +59,22 @@ SELECT id, UPPER(name), description, weight FROM mysql_binlog;
 
 Include following Maven dependency (available through Maven Central):
 
+If you are using flink version 1.13.x, please use the following dependencies
 ```
 <dependency>
   <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <version>2.3-SNAPSHOT</version>
+</dependency>
+```
+If you are using flink version 1.14.x+ please use the following dependencies
+```
+<dependency>
+  <groupId>com.ververica</groupId>
+  <!-- add the dependency matching your database -->
+  <artifactId>flink-sql-connector-mysql-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
   <version>2.3-SNAPSHOT</version>
 </dependency>
