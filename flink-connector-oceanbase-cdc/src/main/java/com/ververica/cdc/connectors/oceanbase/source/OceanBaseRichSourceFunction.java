@@ -58,6 +58,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -276,7 +278,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         }
     }
 
-    protected void readChangeEvents() throws InterruptedException {
+    protected void readChangeEvents() throws InterruptedException, TimeoutException {
         ObReaderConfig obReaderConfig = new ObReaderConfig(obCdcConfigs);
         if (resolvedTimestamp > 0) {
             obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
@@ -354,11 +356,13 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
         logProxyClient.start();
         LOG.info("LogProxyClient started");
-        latch.await();
+        if (!latch.await(connectTimeout.getSeconds(), TimeUnit.SECONDS)) {
+            throw new TimeoutException("Timeout to receive messages in RecordListener");
+        }
         LOG.info("LogProxyClient packet processing started");
     }
 
-    private SourceRecord getRecordFromLogMessage(LogMessage message) throws Exception {
+    private SourceRecord getRecordFromLogMessage(LogMessage message) {
         String databaseName = message.getDbName().replace(tenantName + ".", "");
         // TODO make topic name configurable
         String topicName = getDefaultTopicName(tenantName, databaseName, message.getTableName());
