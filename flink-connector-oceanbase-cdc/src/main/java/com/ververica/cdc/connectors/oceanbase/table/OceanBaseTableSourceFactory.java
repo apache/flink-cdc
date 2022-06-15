@@ -27,9 +27,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 /** Factory for creating configured instance of {@link OceanBaseTableSource}. */
@@ -143,6 +141,13 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The url used to get root servers list, corresponding to the parameter 'obconfig_url' in the database.");
 
+    public static final ConfigOption<String> WORKING_MODE =
+            ConfigOptions.key("working-mode")
+                    .stringType()
+                    .defaultValue("storage")
+                    .withDescription(
+                            "The working mode of 'obcdc', can be `storage` (default value, supported from `obcdc` 3.1.3) or `memory`.");
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -172,6 +177,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         Long startupTimestamp = config.get(SCAN_STARTUP_TIMESTAMP);
         String rsList = config.get(RS_LIST);
         String configUrl = config.get(CONFIG_URL);
+        String workingMode = config.get(WORKING_MODE);
 
         return new OceanBaseTableSource(
                 physicalSchema,
@@ -191,20 +197,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 startupTimestamp,
                 rsList,
                 configUrl,
-                getObCdcConfigs(context.getCatalogTable().getOptions()));
-    }
-
-    protected Map<String, String> getObCdcConfigs(Map<String, String> tableOptions) {
-        Map<String, String> configs = new HashMap<>();
-        tableOptions.keySet().stream()
-                .filter(key -> key.startsWith(OB_CDC_PREFIX))
-                .forEach(
-                        key -> {
-                            final String value = tableOptions.get(key);
-                            final String subKey = key.substring((OB_CDC_PREFIX).length());
-                            configs.put(subKey, value);
-                        });
-        return configs;
+                workingMode);
     }
 
     @Override

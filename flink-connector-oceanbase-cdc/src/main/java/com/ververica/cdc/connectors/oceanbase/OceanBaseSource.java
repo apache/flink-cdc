@@ -70,7 +70,7 @@ public class OceanBaseSource {
         private Long startupTimestamp;
         private String rsList;
         private String configUrl;
-        private Map<String, String> obCdcConfigs;
+        private String workingMode;
 
         private DebeziumDeserializationSchema<T> deserializer;
 
@@ -154,8 +154,8 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> obCdcConfigs(Map<String, String> obCdcConfigs) {
-            this.obCdcConfigs = obCdcConfigs;
+        public Builder<T> workingMode(String workingMode) {
+            this.workingMode = workingMode;
             return this;
         }
 
@@ -204,9 +204,7 @@ public class OceanBaseSource {
                 logProxyClientId = ClientIdGenerator.generate() + "_" + tableWhiteList;
             }
 
-            if (obCdcConfigs == null) {
-                obCdcConfigs = new HashMap<>();
-            }
+            Map<String, String> obCdcConfigs = new HashMap<>();
             if (StringUtils.isEmpty(rsList) && StringUtils.isEmpty(configUrl)) {
                 throw new IllegalArgumentException(
                         "Either 'rootserver-list' or  'config-url' should be set");
@@ -216,6 +214,9 @@ public class OceanBaseSource {
             }
             if (StringUtils.isNotEmpty(configUrl)) {
                 obCdcConfigs.put("cluster_url", configUrl);
+            }
+            if (StringUtils.isNotEmpty(workingMode)) {
+                obCdcConfigs.put("working_mode", workingMode);
             }
             obCdcConfigs.put("cluster_user", checkNotNull(username));
             obCdcConfigs.put("cluster_password", checkNotNull(password));

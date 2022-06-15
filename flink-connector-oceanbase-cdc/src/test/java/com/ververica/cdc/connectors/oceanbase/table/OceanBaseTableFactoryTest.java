@@ -87,6 +87,7 @@ public class OceanBaseTableFactoryTest {
     private static final Integer LOG_PROXY_PORT = 2983;
     private static final String LOG_PROXY_CLIENT_ID = "clientId";
     private static final String RS_LIST = "127.0.0.1:2882:2881";
+    private static final String WORKING_MODE = "storage";
 
     @Test
     public void testCommonProperties() {
@@ -113,7 +114,7 @@ public class OceanBaseTableFactoryTest {
                         null,
                         RS_LIST,
                         null,
-                        new HashMap<>());
+                        WORKING_MODE);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -146,7 +147,7 @@ public class OceanBaseTableFactoryTest {
                         null,
                         RS_LIST,
                         null,
-                        new HashMap<>());
+                        WORKING_MODE);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -181,7 +182,7 @@ public class OceanBaseTableFactoryTest {
                         null,
                         RS_LIST,
                         null,
-                        new HashMap<>());
+                        WORKING_MODE);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "tenant_name", "database_name", "table_name");
