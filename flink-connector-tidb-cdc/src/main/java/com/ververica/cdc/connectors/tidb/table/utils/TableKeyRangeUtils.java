@@ -20,7 +20,7 @@ package com.ververica.cdc.connectors.tidb.table.utils;
 
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava18.com.google.common.collect.ImmutableList;
+import org.apache.flink.shaded.guava30.com.google.common.collect.ImmutableList;
 
 import org.tikv.common.key.RowKey;
 import org.tikv.common.util.KeyRangeUtils;

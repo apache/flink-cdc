@@ -356,6 +356,11 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         public void markIdle() {}
 
         @Override
+        public void markActive() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public SourceOutput<SourceRecord> createOutputForSplit(java.lang.String splitId) {
             return this;
         }
