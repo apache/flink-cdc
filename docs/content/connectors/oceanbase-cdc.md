@@ -174,7 +174,7 @@ Connector Options
             <tr>
                 <td>port</td>
                 <td>optional</td>
-                <td style="word-wrap: break-word;">(none))</td>
+                <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Integer port number to connect to OceanBase. It can be the SQL port of OceanBase server, which is 2881 by default, or the port of OceanBase proxy service, which is 2883 by default.</td>
             </tr>

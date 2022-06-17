@@ -87,7 +87,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final ZoneOffset zoneOffset;
     private final Duration connectTimeout;
     private final String hostname;
-    private final int port;
+    private final Integer port;
     private final String logProxyHost;
     private final int logProxyPort;
     private final String logProxyClientId;
