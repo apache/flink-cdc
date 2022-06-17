@@ -49,6 +49,7 @@ import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProper
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkState;
 
+/** Factory for creating configured instance of {@link TdSqlTableSource}. */
 public class TdSqlTableSourceFactory implements DynamicTableSourceFactory {
     private static final String IDENTIFIER = "tdsql-cdc";
 

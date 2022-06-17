@@ -1,23 +1,30 @@
 package com.ververica.cdc.connectors.tdsql.source.enumerator;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.connector.source.SplitsAssignment;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
+
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.tdsql.bases.set.TdSqlSet;
 import com.ververica.cdc.connectors.tdsql.source.assigner.splitter.TdSqlSplit;
 import com.ververica.cdc.connectors.tdsql.source.assigner.state.TdSqlPendingSplitsState;
 import com.ververica.cdc.connectors.tdsql.source.events.TdSqlSourceEvent;
+import org.eclipse.jetty.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,51 +37,49 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** tdsql source enumerator. */
+@Internal
 public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlPendingSplitsState> {
     private static final Logger LOG = LoggerFactory.getLogger(TdSqlSourceEnumerator.class);
 
     private final SplitEnumeratorContext<TdSqlSplit> context;
-    private final MySqlSourceConfig sourceConfig;
+    private final Function<TdSqlSet, MySqlSourceConfig> sourceConfigFunction;
     private final Map<TdSqlSet, MySqlSplitAssigner> tdSqlAssigners;
     private final int currentParallelism;
     private final Map<Integer, List<TdSqlSet>> readerRef;
-
-    private final TreeSet<Integer> readersAwaitingSplit;
+    private Map<TdSqlSet, List<List<FinishedSnapshotSplitInfo>>> binlogSplitMeta;
 
     public TdSqlSourceEnumerator(
             SplitEnumeratorContext<TdSqlSplit> context,
-            MySqlSourceConfig sourceConfig,
+            Function<TdSqlSet, MySqlSourceConfig> sourceConfigFunction,
             Map<TdSqlSet, MySqlSplitAssigner> tdSqlAssigners) {
         this.context = context;
-        this.sourceConfig = sourceConfig;
+        this.sourceConfigFunction = sourceConfigFunction;
         this.tdSqlAssigners = tdSqlAssigners;
         this.currentParallelism = context.currentParallelism();
         this.readerRef = new HashMap<>(context.currentParallelism());
-        this.readersAwaitingSplit = new TreeSet<>();
+        this.binlogSplitMeta = new HashMap<>();
     }
 
     @Override
     public void start() {
-        tdSqlAssigners.values().forEach(MySqlSplitAssigner::open);
-
         int size = tdSqlAssigners.size();
         int index = 0;
         for (TdSqlSet set : tdSqlAssigners.keySet()) {
             int subtaskId = index % currentParallelism;
-            List<TdSqlSet> partitionSet = readerRef.get(subtaskId);
-            if (partitionSet == null) {
-                partitionSet = new ArrayList<>(size);
-            }
+            List<TdSqlSet> partitionSet = readerRef.getOrDefault(subtaskId, new ArrayList<>(size));
             partitionSet.add(set);
             readerRef.put(subtaskId, partitionSet);
             index++;
         }
 
-        this.context.callAsync(this::getRegisteredReader, this::syncWithReaders);
+        LOG.info("dispatch rule: {}", JSON.toString(readerRef));
+
+        LOG.trace("open mysql split assigners.");
+        tdSqlAssigners.values().forEach(MySqlSplitAssigner::open);
     }
 
     @Override
@@ -104,6 +109,7 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
 
     @Override
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
+        LOG.trace("receive subtask {} source event.", subtaskId);
         TdSqlSourceEvent tdSqlSourceEvent = (TdSqlSourceEvent) sourceEvent;
         SourceEvent mySqlSourceEvent = tdSqlSourceEvent.getMySqlEvent();
         TdSqlSet tdSqlSet = tdSqlSourceEvent.getSet();
@@ -112,14 +118,21 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
             FinishedSnapshotSplitsReportEvent reportEvent =
                     (FinishedSnapshotSplitsReportEvent) mySqlSourceEvent;
             Map<String, BinlogOffset> finishedOffsets = reportEvent.getFinishedOffsets();
-
-            tdSqlAssigners
-                    .get(tdSqlSet)
-                    .onFinishedSplits(asMySqlBinlogOffset(tdSqlSet, finishedOffsets));
+            LOG.trace(
+                    "finished split reader in set {} offset: {}",
+                    tdSqlSet.getSetKey(),
+                    JSON.toString(finishedOffsets));
+            tdSqlAssigners.get(tdSqlSet).onFinishedSplits(finishedOffsets);
 
             FinishedSnapshotSplitsAckEvent ackEvent =
                     new FinishedSnapshotSplitsAckEvent(new ArrayList<>(finishedOffsets.keySet()));
             context.sendEventToSourceReader(subtaskId, new TdSqlSourceEvent(ackEvent, tdSqlSet));
+        } else if (mySqlSourceEvent instanceof BinlogSplitMetaRequestEvent) {
+            LOG.trace(
+                    "handle BinlogSplitMetaRequestEvent... subtaskId {}, split id {}",
+                    subtaskId,
+                    ((BinlogSplitMetaRequestEvent) mySqlSourceEvent).getSplitId());
+            sendBinlogMeta(subtaskId, (BinlogSplitMetaRequestEvent) mySqlSourceEvent, tdSqlSet);
         }
     }
 
@@ -200,10 +213,51 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
             for (TdSqlSet set : partitions) {
                 MySqlSplitAssigner assigner = tdSqlAssigners.get(set);
                 if (assigner.waitingForFinishedSplits()) {
+                    LOG.trace(
+                            "set {} had waiting for finished split. trigger FinishedSnapshotSplitsRequestEvent",
+                            set.getSetKey());
                     context.sendEventToSourceReader(
                             subtaskId, new FinishedSnapshotSplitsRequestEvent());
                 }
             }
+        }
+    }
+
+    private void sendBinlogMeta(
+            int subTask, BinlogSplitMetaRequestEvent requestEvent, TdSqlSet tdSqlSet) {
+        List<List<FinishedSnapshotSplitInfo>> metas = binlogSplitMeta.get(tdSqlSet);
+
+        if (metas == null) {
+            final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
+                    tdSqlAssigners.get(tdSqlSet).getFinishedSplitInfos();
+            if (finishedSnapshotSplitInfos.isEmpty()) {
+                LOG.error(
+                        "The assigner offer empty finished split information, this should not happen");
+                throw new FlinkRuntimeException(
+                        "The assigner offer empty finished split information, this should not happen");
+            }
+            metas =
+                    Lists.partition(
+                            finishedSnapshotSplitInfos,
+                            sourceConfigFunction.apply(tdSqlSet).getSplitMetaGroupSize());
+            binlogSplitMeta.put(tdSqlSet, metas);
+        }
+        final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
+        if (metas.size() > requestMetaGroupId) {
+            List<FinishedSnapshotSplitInfo> metaToSend = metas.get(requestMetaGroupId);
+            BinlogSplitMetaEvent metadataEvent =
+                    new BinlogSplitMetaEvent(
+                            requestEvent.getSplitId(),
+                            requestMetaGroupId,
+                            metaToSend.stream()
+                                    .map(FinishedSnapshotSplitInfo::serialize)
+                                    .collect(Collectors.toList()));
+            context.sendEventToSourceReader(subTask, new TdSqlSourceEvent(metadataEvent, tdSqlSet));
+        } else {
+            LOG.error(
+                    "Received invalid request meta group id {}, the invalid meta group id range is [0, {}]",
+                    requestMetaGroupId,
+                    binlogSplitMeta.size() - 1);
         }
     }
 }

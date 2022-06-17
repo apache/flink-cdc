@@ -22,7 +22,7 @@ import java.util.function.Supplier;
  */
 public class TdSqlFetcherManager<T> extends SplitFetcherManager<T, TdSqlSplit> {
 
-    private final Map<String, SplitFetcher<T, TdSqlSplit>> splitFetcherMapping = new HashMap<>();
+    private final Map<String, Integer> splitFetcherMapping = new HashMap<>();
     private final Map<String, Boolean> fetcherStatus = new HashMap<>();
 
     /**
@@ -56,18 +56,35 @@ public class TdSqlFetcherManager<T> extends SplitFetcherManager<T, TdSqlSplit> {
     }
 
     private SplitFetcher<T, TdSqlSplit> getOrCreateFetcher(String setKey) {
-        SplitFetcher<T, TdSqlSplit> fetcher = splitFetcherMapping.get(setKey);
+        Integer fetcherId = splitFetcherMapping.get(setKey);
 
-        if (fetcher == null) {
+        SplitFetcher<T, TdSqlSplit> fetcher;
+        if (fetcherId == null) {
             fetcher = createSplitFetcher();
-            // this fetcher has been stopped.
+            recordMapping(setKey);
+        } else {
+            fetcher = fetchers.get(fetcherId);
+
             if (fetcher == null) {
                 fetcherStatus.remove(setKey);
                 fetcher = createSplitFetcher();
+                recordMapping(setKey);
             }
         }
-        splitFetcherMapping.put(setKey, fetcher);
 
         return fetcher;
+    }
+
+    private void recordMapping(String setKey) {
+        splitFetcherMapping.put(setKey, getLatestFetcherId());
+    }
+
+    private Integer getLatestFetcherId() {
+        int maxId = 0;
+
+        for (Integer fid : fetchers.keySet()) {
+            maxId = Math.max(maxId, fid);
+        }
+        return maxId;
     }
 }

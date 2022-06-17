@@ -9,6 +9,12 @@ import com.ververica.cdc.connectors.tdsql.source.split.TdSqlSplitState;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.kafka.connect.source.SourceRecord;
 
+/**
+ * The {@link RecordEmitter} implementation for {@link TdSqlSourceReader}.
+ *
+ * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the binlog reader to
+ * emit records rather than emit the records directly.
+ */
 public class TdSqlRecordEmitter<T> implements RecordEmitter<SourceRecord, T, TdSqlSplitState> {
     private final MySqlRecordEmitter<T> mySqlRecordEmitter;
 

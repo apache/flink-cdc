@@ -4,6 +4,10 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.tdsql.bases.set.TdSqlSet;
 
+/**
+ * State of the reader, essentially a mutable version of the {@link
+ * com.ververica.cdc.connectors.tdsql.source.assigner.splitter.TdSqlSplit}.
+ */
 public class TdSqlSplitState {
     private final TdSqlSet setInfo;
 

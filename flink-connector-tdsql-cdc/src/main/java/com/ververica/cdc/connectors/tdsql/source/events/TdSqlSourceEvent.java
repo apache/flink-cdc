@@ -4,6 +4,7 @@ import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.ververica.cdc.connectors.tdsql.bases.set.TdSqlSet;
 
+/** send mysql event with tdsql set info. */
 public class TdSqlSourceEvent implements SourceEvent {
     private static final long serialVersionUID = -5194600926649657532L;
 

@@ -20,9 +20,10 @@ public class TdSqlUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TdSqlUtils.class);
 
     private static final String SET_KEY = "set";
+    private static final String IP_KEY_SUFFIX = ":ip";
 
     public static List<TdSqlSet> discoverSets(JdbcConnection jdbc) {
-        final String showStatusStmts = "/*proxy*/SHOW STATUS";
+        final String showStatusStmts = "/*proxy*/show status";
 
         try {
             return jdbc.queryAndMap(
@@ -42,11 +43,16 @@ public class TdSqlUtils {
                                             + "', Make sure your server is correctly configured");
                         }
 
+                        LOG.trace("configs {}", asString(tdsqlStatus));
+
                         String[] setKeys = sets.get();
                         List<TdSqlSet> res = new ArrayList<>(setKeys.length);
 
                         for (String setKey : setKeys) {
-                            String value = tdsqlStatus.get(setKey);
+                            String setIpKey = setKey.trim() + IP_KEY_SUFFIX;
+                            String value = tdsqlStatus.get(setIpKey);
+                            LOG.trace("get set ip {} by key {}", value, setIpKey);
+
                             int setMasterIPSplitIndex = value.indexOf(";");
                             int setHostIndex = value.indexOf(":");
 
@@ -65,7 +71,9 @@ public class TdSqlUtils {
                                             value.substring(
                                                     setHostIndex + 1, setMasterIPSplitIndex));
 
-                            res.add(new TdSqlSet(setKey, host, port));
+                            TdSqlSet set = new TdSqlSet(setKey.trim(), host, port);
+                            LOG.info("add set: {}", set);
+                            res.add(set);
                         }
                         return res;
                     });

@@ -1,9 +1,11 @@
 package com.ververica.cdc.connectors.tdsql.bases.set;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /** tdsql set info. */
-public class TdSqlSet {
+public class TdSqlSet implements Serializable {
+    private static final long serialVersionUID = -3395810101971522360L;
     private String setKey;
 
     private String host;

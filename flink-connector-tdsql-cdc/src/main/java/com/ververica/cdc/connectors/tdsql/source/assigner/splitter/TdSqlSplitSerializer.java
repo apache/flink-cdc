@@ -1,18 +1,16 @@
 package com.ververica.cdc.connectors.tdsql.source.assigner.splitter;
 
-import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.core.memory.DataInputDeserializer;
-import org.apache.flink.core.memory.DataOutputSerializer;
-
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import com.ververica.cdc.connectors.tdsql.bases.set.TdSqlSet;
+import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.core.memory.DataInputDeserializer;
+import org.apache.flink.core.memory.DataOutputSerializer;
 
 import java.io.IOException;
 
 /** A serializer for the {@link TdSqlSplit}. */
 public class TdSqlSplitSerializer implements SimpleVersionedSerializer<TdSqlSplit> {
-
     public static final TdSqlSplitSerializer INSTANCE = new TdSqlSplitSerializer();
 
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
@@ -69,7 +67,7 @@ public class TdSqlSplitSerializer implements SimpleVersionedSerializer<TdSqlSpli
 
     @Override
     public TdSqlSplit deserialize(int version, byte[] serialized) throws IOException {
-        final DataInputDeserializer in = new DataInputDeserializer();
+        final DataInputDeserializer in = new DataInputDeserializer(serialized);
 
         TdSqlSet set = deserializeTdSqlSet(in);
 

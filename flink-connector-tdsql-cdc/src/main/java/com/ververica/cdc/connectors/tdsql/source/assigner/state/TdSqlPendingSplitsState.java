@@ -37,8 +37,12 @@ public class TdSqlPendingSplitsState extends PendingSplitsState {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof TdSqlPendingSplitsState)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof TdSqlPendingSplitsState)) {
+            return false;
+        }
         TdSqlPendingSplitsState that = (TdSqlPendingSplitsState) o;
         return Objects.equals(getStateMap(), that.getStateMap());
     }

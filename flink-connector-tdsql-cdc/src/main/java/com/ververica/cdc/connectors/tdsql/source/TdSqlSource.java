@@ -1,5 +1,6 @@
 package com.ververica.cdc.connectors.tdsql.source;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Boundedness;
@@ -16,7 +17,6 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.MySqlValidator;
-import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
@@ -43,6 +43,8 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -51,6 +53,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.discoverCapturedTables;
+import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.isTableIdCaseSensitive;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static com.ververica.cdc.connectors.tdsql.bases.TdSqlUtils.discoverSets;
 
@@ -60,22 +63,21 @@ import static com.ververica.cdc.connectors.tdsql.bases.TdSqlUtils.discoverSets;
  *
  * @param <T> the output type of the source.
  */
+@Internal
 public class TdSqlSource<T>
         implements Source<T, TdSqlSplit, TdSqlPendingSplitsState>, ResultTypeQueryable<T> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TdSqlSource.class);
 
     private static final long serialVersionUID = 943718471756513230L;
 
     private final MySqlSourceConfigFactory configFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
 
-    private final MySqlSourceConfig proxySourceConfig;
-
-    public TdSqlSource(
+    TdSqlSource(
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema) {
         this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
-        this.proxySourceConfig = configFactory.createConfig(0);
     }
 
     @PublicEvolving
@@ -109,10 +111,11 @@ public class TdSqlSource<T>
         Supplier<TdSqlSplitReader> splitReaderSupplier =
                 () ->
                         new TdSqlSplitReader(
-                                new MySqlSplitReader(
-                                        sourceConfig,
-                                        readerContext.getIndexOfSubtask(),
-                                        mySqlSourceReaderContext));
+                                set ->
+                                        addMySqlSplitReaderBySet(
+                                                set,
+                                                readerContext.getIndexOfSubtask(),
+                                                mySqlSourceReaderContext));
 
         return new TdSqlSourceReader<>(
                 elementsQueue,
@@ -122,7 +125,16 @@ public class TdSqlSource<T>
                         sourceReaderMetrics,
                         sourceConfig.isIncludeSchemaChanges()),
                 readerContext.getConfiguration(),
-                mySqlSourceReaderContext.getSourceReaderContext());
+                mySqlSourceReaderContext.getSourceReaderContext(),
+                set -> createConfig(set.getHost(), set.getPort()));
+    }
+
+    private MySqlSplitReader addMySqlSplitReaderBySet(
+            TdSqlSet set, int subtaskId, MySqlSourceReaderContext context) {
+        configFactory.port(set.getPort());
+        configFactory.hostname(set.getHost());
+        MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+        return new MySqlSplitReader(sourceConfig, subtaskId, context);
     }
 
     @Override
@@ -140,7 +152,9 @@ public class TdSqlSource<T>
 
         boolean initialStartMode =
                 sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL;
+
         for (TdSqlSet set : sets) {
+            LOGGER.trace("init tdsql set {} assigner.", set.getSetKey());
             MySqlSplitAssigner splitAssigner;
 
             MySqlSourceConfig setSourceConfig = createConfig(set.getHost(), set.getPort());
@@ -149,10 +163,10 @@ public class TdSqlSource<T>
                 try (JdbcConnection setJdbc = openJdbcConnection(setSourceConfig)) {
                     final List<TableId> remainingTables =
                             discoverCapturedTables(setJdbc, setSourceConfig);
-                    boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(setJdbc);
+                    boolean isTableIdCaseSensitive = isTableIdCaseSensitive(setJdbc);
                     splitAssigner =
                             new MySqlHybridSplitAssigner(
-                                    sourceConfig,
+                                    setSourceConfig,
                                     enumContext.currentParallelism(),
                                     remainingTables,
                                     isTableIdCaseSensitive);
@@ -161,13 +175,14 @@ public class TdSqlSource<T>
                             "Failed to discover captured tables for enumerator", e);
                 }
             } else {
-                splitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
+                splitAssigner = new MySqlBinlogSplitAssigner(setSourceConfig);
             }
 
             assignerMap.put(set, splitAssigner);
         }
 
-        return new TdSqlSourceEnumerator(enumContext, sourceConfig, assignerMap);
+        return new TdSqlSourceEnumerator(
+                enumContext, set -> createConfig(set.getHost(), set.getPort()), assignerMap);
     }
 
     @Override
@@ -201,7 +216,8 @@ public class TdSqlSource<T>
             assignerMap.put(set, splitAssigner);
         }
 
-        return new TdSqlSourceEnumerator(enumContext, proxySourceConfig, assignerMap);
+        return new TdSqlSourceEnumerator(
+                enumContext, set -> createConfig(set.getHost(), set.getPort()), assignerMap);
     }
 
     private MySqlSourceConfig createConfig(String host, int port) {

@@ -14,7 +14,6 @@ import java.util.Objects;
 public class TdSqlSplit implements SourceSplit {
     private final TdSqlSet setInfo;
     private final MySqlSplit mySqlSplit;
-
     @Nullable transient byte[] serializedFormCache;
 
     public TdSqlSplit(TdSqlSet setInfo, MySqlSplit mySqlSplit) {
@@ -38,6 +37,10 @@ public class TdSqlSplit implements SourceSplit {
         return mySqlSplit.isBinlogSplit();
     }
 
+    public boolean isSnapshotSplit() {
+        return mySqlSplit().isSnapshotSplit();
+    }
+
     @Override
     public String splitId() {
         return setInfo.getSetKey() + ":" + mySqlSplit.splitId();
@@ -53,7 +56,6 @@ public class TdSqlSplit implements SourceSplit {
         if (this == o) {
             return true;
         }
-        ;
         if (!(o instanceof TdSqlSplit)) {
             return false;
         }

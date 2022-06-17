@@ -1,27 +1,36 @@
 package com.ververica.cdc.connectors.tdsql.source;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
+/**
+ * tdsql source builder like {@link com.ververica.cdc.connectors.mysql.source.MySqlSourceBuilder}.
+ */
+@PublicEvolving
 public class TdSqlSourceBuilder<T> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TdSqlSourceBuilder.class);
     private final MySqlSourceConfigFactory configFactory = new MySqlSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
 
     public TdSqlSourceBuilder<T> hostname(String hostname) {
-        this.configFactory.hostname(hostname);
+        configFactory.hostname(hostname);
         return this;
     }
 
     /** Integer port number of the MySQL database server. */
     public TdSqlSourceBuilder<T> port(int port) {
-        this.configFactory.port(port);
+        configFactory.port(port);
         return this;
     }
 
@@ -194,6 +203,7 @@ public class TdSqlSourceBuilder<T> {
      * @return a MySqlParallelSource with the settings made for this builder.
      */
     public TdSqlSource<T> build() {
+        LOGGER.info("build tdsql source....");
         return new TdSqlSource<>(configFactory, checkNotNull(deserializer));
     }
 }
