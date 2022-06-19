@@ -10,9 +10,7 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import com.ververica.cdc.connectors.tdsql.source.assigner.splitter.TdSqlSplit;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -21,10 +19,6 @@ import java.util.function.Supplier;
  * @param <T> The output type for flink.
  */
 public class TdSqlFetcherManager<T> extends SplitFetcherManager<T, TdSqlSplit> {
-
-    private final Map<String, Integer> splitFetcherMapping = new HashMap<>();
-    private final Map<String, Boolean> fetcherStatus = new HashMap<>();
-
     /**
      * Creates a new SplitFetcherManager with multiple I/O threads.
      *
@@ -42,49 +36,9 @@ public class TdSqlFetcherManager<T> extends SplitFetcherManager<T, TdSqlSplit> {
     @Override
     public void addSplits(List<TdSqlSplit> splitsToAdd) {
         for (TdSqlSplit split : splitsToAdd) {
-            SplitFetcher<T, TdSqlSplit> fetcher = getOrCreateFetcher(split.setKey());
+            SplitFetcher<T, TdSqlSplit> fetcher = createSplitFetcher();
             fetcher.addSplits(Collections.singletonList(split));
-            startFetcher(split.setKey(), fetcher);
+            startFetcher(fetcher);
         }
-    }
-
-    private void startFetcher(String setKey, SplitFetcher<T, TdSqlSplit> fetcher) {
-        if (fetcherStatus.get(setKey) != Boolean.TRUE) {
-            fetcherStatus.put(setKey, true);
-            super.startFetcher(fetcher);
-        }
-    }
-
-    private SplitFetcher<T, TdSqlSplit> getOrCreateFetcher(String setKey) {
-        Integer fetcherId = splitFetcherMapping.get(setKey);
-
-        SplitFetcher<T, TdSqlSplit> fetcher;
-        if (fetcherId == null) {
-            fetcher = createSplitFetcher();
-            recordMapping(setKey);
-        } else {
-            fetcher = fetchers.get(fetcherId);
-
-            if (fetcher == null) {
-                fetcherStatus.remove(setKey);
-                fetcher = createSplitFetcher();
-                recordMapping(setKey);
-            }
-        }
-
-        return fetcher;
-    }
-
-    private void recordMapping(String setKey) {
-        splitFetcherMapping.put(setKey, getLatestFetcherId());
-    }
-
-    private Integer getLatestFetcherId() {
-        int maxId = 0;
-
-        for (Integer fid : fetchers.keySet()) {
-            maxId = Math.max(maxId, fid);
-        }
-        return maxId;
     }
 }

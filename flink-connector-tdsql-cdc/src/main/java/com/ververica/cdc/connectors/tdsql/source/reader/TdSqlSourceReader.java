@@ -100,7 +100,6 @@ public class TdSqlSourceReader<T>
         List<TdSqlSplit> unfinishedSplits = new ArrayList<>();
         for (TdSqlSplit split : splits) {
             if (split.isBinlogSplit()) {
-                context.sendSplitRequest();
                 MySqlBinlogSplit binlogSplit = split.mySqlSplit().asBinlogSplit();
                 LOGGER.trace(
                         "binlog split {}, isCompletedSplit {}, start offset is {}, getTotalFinishedSplitSize {}",
@@ -168,11 +167,16 @@ public class TdSqlSourceReader<T>
 
     @Override
     protected void onSplitFinished(Map<String, TdSqlSplitState> finishedSplitIds) {
-        for (String splitId : finishedSplitIds.keySet()) {
-            LOGGER.info("split reader finish split[{}] read.", splitId);
-            TdSqlSplitState state = finishedSplitIds.get(splitId);
-            finishedUnackedSplits.put(splitId, state.mySqlSplit().asSnapshotSplit());
-            splitIdBelongSet.put(splitId, state.setInfo());
+        for (String tdSqlSplitId : finishedSplitIds.keySet()) {
+            LOGGER.info("split reader finish split[{}] read.", tdSqlSplitId);
+            TdSqlSplitState state = finishedSplitIds.get(tdSqlSplitId);
+            finishedUnackedSplits.put(tdSqlSplitId, state.mySqlSplit().asSnapshotSplit());
+            LOGGER.info(
+                    "split {} set info is {}, offset {}",
+                    tdSqlSplitId,
+                    state.setInfo(),
+                    finishedUnackedSplits.get(tdSqlSplitId));
+            splitIdBelongSet.put(tdSqlSplitId, state.setInfo());
         }
         reportFinishedSnapshotSplitsIfNeed();
         context.sendSplitRequest();
@@ -211,7 +215,10 @@ public class TdSqlSourceReader<T>
                         reportGroup.getOrDefault(set, new HashMap<>());
                 finishedOffsets.put(
                         mySqlSnapshotSplit.splitId(), mySqlSnapshotSplit.getHighWatermark());
-                LOGGER.trace("finished offset: {}", JSON.toString(finishedOffsets));
+                LOGGER.trace(
+                        "tdSqlSplitId {} finished offset: {}",
+                        tdSqlSplitId,
+                        JSON.toString(finishedOffsets));
                 reportGroup.put(set, finishedOffsets);
             }
 

@@ -67,7 +67,6 @@ import static com.ververica.cdc.connectors.tdsql.bases.TdSqlUtils.discoverSets;
 public class TdSqlSource<T>
         implements Source<T, TdSqlSplit, TdSqlPendingSplitsState>, ResultTypeQueryable<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(TdSqlSource.class);
-
     private static final long serialVersionUID = 943718471756513230L;
 
     private final MySqlSourceConfigFactory configFactory;
@@ -144,12 +143,11 @@ public class TdSqlSource<T>
         new MySqlValidator(sourceConfig).validate();
 
         List<TdSqlSet> sets;
-
         Map<TdSqlSet, MySqlSplitAssigner> assignerMap = new HashMap<>();
+
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             sets = discoverSets(jdbc);
         }
-
         boolean initialStartMode =
                 sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL;
 

@@ -1,11 +1,12 @@
 package com.ververica.cdc.connectors.tdsql.source.assigner.splitter;
 
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
-import com.ververica.cdc.connectors.tdsql.bases.set.TdSqlSet;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
+
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
+import com.ververica.cdc.connectors.tdsql.bases.set.TdSqlSet;
 
 import java.io.IOException;
 

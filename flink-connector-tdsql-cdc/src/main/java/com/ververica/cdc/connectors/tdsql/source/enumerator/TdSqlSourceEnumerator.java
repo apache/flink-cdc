@@ -4,7 +4,6 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
-import org.apache.flink.api.connector.source.SplitsAssignment;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
@@ -32,11 +31,13 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -50,7 +51,9 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
     private final Map<TdSqlSet, MySqlSplitAssigner> tdSqlAssigners;
     private final int currentParallelism;
     private final Map<Integer, List<TdSqlSet>> readerRef;
-    private Map<TdSqlSet, List<List<FinishedSnapshotSplitInfo>>> binlogSplitMeta;
+    private final Map<TdSqlSet, List<List<FinishedSnapshotSplitInfo>>> binlogSplitMeta;
+
+    private final Set<Integer> readersAwaitingSplit;
 
     public TdSqlSourceEnumerator(
             SplitEnumeratorContext<TdSqlSplit> context,
@@ -62,6 +65,7 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
         this.currentParallelism = context.currentParallelism();
         this.readerRef = new HashMap<>(context.currentParallelism());
         this.binlogSplitMeta = new HashMap<>();
+        this.readersAwaitingSplit = new HashSet<>();
     }
 
     @Override
@@ -76,10 +80,10 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
             index++;
         }
 
-        LOG.info("dispatch rule: {}", JSON.toString(readerRef));
-
-        LOG.trace("open mysql split assigners.");
+        LOG.trace("dispatch rule: {}", JSON.toString(readerRef));
         tdSqlAssigners.values().forEach(MySqlSplitAssigner::open);
+
+        context.callAsync(this::getRegisteredReader, this::syncWithReaders);
     }
 
     @Override
@@ -88,12 +92,13 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
             // reader failed between sending the request and now. skip this request.
             return;
         }
-        assignSplits(subtaskId);
+        readersAwaitingSplit.add(subtaskId);
+        prepareAssign();
     }
 
     @Override
     public void addSplitsBack(List<TdSqlSplit> splits, int subtaskId) {
-        LOG.debug("TdSql Source Enumerator adds splits back: {}", splits);
+        LOG.info("TdSql Source Enumerator adds splits back: {}", splits);
 
         splits.stream()
                 .collect(
@@ -101,7 +106,23 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
                                 TdSqlSplit::setInfo,
                                 Collectors.mapping(TdSqlSplit::mySqlSplit, Collectors.toList())))
                 .forEach((k, v) -> tdSqlAssigners.get(k).addSplits(v));
-        assignSplits(subtaskId);
+        readersAwaitingSplit.add(subtaskId);
+        prepareAssign();
+    }
+
+    private void prepareAssign() {
+        Iterator<Integer> readers = readersAwaitingSplit.iterator();
+        while (readers.hasNext()) {
+            Integer subtaskId = readers.next();
+
+            if (!context.registeredReaders().containsKey(subtaskId)) {
+                readers.remove();
+                continue;
+            }
+            if (assignSplits(subtaskId)) {
+                readers.remove();
+            }
+        }
     }
 
     @Override
@@ -109,7 +130,7 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
 
     @Override
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
-        LOG.trace("receive subtask {} source event.", subtaskId);
+        LOG.info("receive subtask {} source event.", subtaskId);
         TdSqlSourceEvent tdSqlSourceEvent = (TdSqlSourceEvent) sourceEvent;
         SourceEvent mySqlSourceEvent = tdSqlSourceEvent.getMySqlEvent();
         TdSqlSet tdSqlSet = tdSqlSourceEvent.getSet();
@@ -118,7 +139,7 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
             FinishedSnapshotSplitsReportEvent reportEvent =
                     (FinishedSnapshotSplitsReportEvent) mySqlSourceEvent;
             Map<String, BinlogOffset> finishedOffsets = reportEvent.getFinishedOffsets();
-            LOG.trace(
+            LOG.info(
                     "finished split reader in set {} offset: {}",
                     tdSqlSet.getSetKey(),
                     JSON.toString(finishedOffsets));
@@ -150,32 +171,33 @@ public class TdSqlSourceEnumerator implements SplitEnumerator<TdSqlSplit, TdSqlP
         return removeSetInfoFinishedOffset;
     }
 
-    private void assignSplits(int subtaskId) {
+    private boolean assignSplits(int subtaskId) {
         List<TdSqlSet> sets = readerRef.get(subtaskId);
 
-        List<TdSqlSplit> splits = new ArrayList<>();
         for (TdSqlSet set : sets) {
             Optional<MySqlSplit> split = tdSqlAssigners.get(set).getNext();
 
             if (split.isPresent()) {
                 TdSqlSplit tdSqlSplit = new TdSqlSplit(set, split.get());
-                splits.add(tdSqlSplit);
+                LOG.info("Assign split {} to subtask {}", tdSqlSplit, subtaskId);
+                context.assignSplit(tdSqlSplit, subtaskId);
+                return true;
+            } else {
+                LOG.info(
+                        "Finished Assign split to subtask {} in set {}",
+                        subtaskId,
+                        set.getSetKey());
             }
         }
-        if (splits.isEmpty()) {
-            LOG.info("Finished Assign split to subtask {}", subtaskId);
-            return;
-        }
-        SplitsAssignment<TdSqlSplit> assignment =
-                new SplitsAssignment<>(Collections.singletonMap(subtaskId, splits));
-        context.assignSplits(assignment);
-        LOG.info("Assign split {} to subtask {}", splits, subtaskId);
+        return false;
     }
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
         tdSqlAssigners.values().forEach(s -> s.notifyCheckpointComplete(checkpointId));
-        // binlog split may be available after checkpoint complete ??? TODO
+        // binlog split may be available after checkpoint complete.
+        // checkpoint mark snapshotAssigner change assign status.
+        prepareAssign();
     }
 
     @Override
