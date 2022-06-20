@@ -21,6 +21,8 @@ package com.ververica.cdc.connectors.oceanbase;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
+import com.oceanbase.clogproxy.client.config.ClientConf;
+import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
@@ -31,8 +33,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.Map;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -203,26 +203,27 @@ public class OceanBaseSource {
             if (logProxyClientId == null) {
                 logProxyClientId = ClientIdGenerator.generate() + "_" + tableWhiteList;
             }
+            ClientConf clientConf =
+                    ClientConf.builder()
+                            .clientId(logProxyClientId)
+                            .connectTimeoutMs((int) connectTimeout.toMillis())
+                            .build();
 
-            Map<String, String> obCdcConfigs = new HashMap<>();
-            if (StringUtils.isEmpty(rsList) && StringUtils.isEmpty(configUrl)) {
-                throw new IllegalArgumentException(
-                        "Either 'rootserver-list' or  'config-url' should be set");
-            }
+            ObReaderConfig obReaderConfig = new ObReaderConfig();
             if (StringUtils.isNotEmpty(rsList)) {
-                obCdcConfigs.put("rootserver_list", rsList);
+                obReaderConfig.setRsList(rsList);
             }
             if (StringUtils.isNotEmpty(configUrl)) {
-                obCdcConfigs.put("cluster_url", configUrl);
+                obReaderConfig.setClusterUrl(configUrl);
             }
             if (StringUtils.isNotEmpty(workingMode)) {
-                obCdcConfigs.put("working_mode", workingMode);
+                obReaderConfig.setWorkingMode(workingMode);
             }
-            obCdcConfigs.put("cluster_user", checkNotNull(username));
-            obCdcConfigs.put("cluster_password", checkNotNull(password));
-            obCdcConfigs.put("tb_white_list", tableWhiteList);
-            obCdcConfigs.put("first_start_timestamp", String.valueOf(startupTimestamp));
-            obCdcConfigs.put("timezone", zoneOffset.getId());
+            obReaderConfig.setUsername(username);
+            obReaderConfig.setPassword(password);
+            obReaderConfig.setTableWhiteList(tableWhiteList);
+            obReaderConfig.setStartTimestamp(startupTimestamp);
+            obReaderConfig.setTimezone(zoneOffset.getId());
 
             return new OceanBaseRichSourceFunction<T>(
                     StartupMode.INITIAL.equals(startupMode),
@@ -237,8 +238,8 @@ public class OceanBaseSource {
                     port,
                     logProxyHost,
                     logProxyPort,
-                    logProxyClientId,
-                    obCdcConfigs,
+                    clientConf,
+                    obReaderConfig,
                     deserializer);
         }
     }

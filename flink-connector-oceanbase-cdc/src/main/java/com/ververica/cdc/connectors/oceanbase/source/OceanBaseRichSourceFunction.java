@@ -90,8 +90,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final Integer port;
     private final String logProxyHost;
     private final int logProxyPort;
-    private final String logProxyClientId;
-    private final Map<String, String> obCdcConfigs;
+    private final ClientConf logProxyClientConf;
+    private final ObReaderConfig obReaderConfig;
     private final DebeziumDeserializationSchema<T> deserializer;
 
     private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
@@ -117,8 +117,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             Integer port,
             String logProxyHost,
             int logProxyPort,
-            String logProxyClientId,
-            Map<String, String> obCdcConfigs,
+            ClientConf logProxyClientConf,
+            ObReaderConfig obReaderConfig,
             DebeziumDeserializationSchema<T> deserializer) {
         this.snapshot = checkNotNull(snapshot);
         this.username = checkNotNull(username);
@@ -132,8 +132,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.port = port;
         this.logProxyHost = checkNotNull(logProxyHost);
         this.logProxyPort = checkNotNull(logProxyPort);
-        this.logProxyClientId = checkNotNull(logProxyClientId);
-        this.obCdcConfigs = checkNotNull(obCdcConfigs);
+        this.logProxyClientConf = checkNotNull(logProxyClientConf);
+        this.obReaderConfig = checkNotNull(obReaderConfig);
         this.deserializer = checkNotNull(deserializer);
     }
 
@@ -279,19 +279,13 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     }
 
     protected void readChangeEvents() throws InterruptedException, TimeoutException {
-        ObReaderConfig obReaderConfig = new ObReaderConfig(obCdcConfigs);
         if (resolvedTimestamp > 0) {
             obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
             LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
         }
 
-        ClientConf clientConf =
-                ClientConf.builder()
-                        .clientId(logProxyClientId)
-                        .connectTimeoutMs((int) connectTimeout.toMillis())
-                        .build();
-
-        logProxyClient = new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig, clientConf);
+        logProxyClient =
+                new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig, logProxyClientConf);
 
         final CountDownLatch latch = new CountDownLatch(1);
 
