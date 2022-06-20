@@ -61,15 +61,13 @@ public class OceanBaseTestBase extends TestLogger {
     public static final int OB_SERVER_RPC_PORT = 2882;
     public static final int LOG_PROXY_PORT = 2983;
 
-    // Here we use root user of system tenant for testing, as the log proxy service needs
-    // a user of system tenant for authentication. It is not recommended for production.
     public static final String OB_SYS_USERNAME = "root";
     public static final String OB_SYS_PASSWORD = "pswd";
 
     public static final String NETWORK_MODE = "host";
 
     // --------------------------------------------------------------------------------------------
-    // Attributes about host and port when network is on 'host' mode
+    // Attributes about host and port when network is on 'host' mode.
     // --------------------------------------------------------------------------------------------
 
     protected static String getObServerHost() {
@@ -90,6 +88,23 @@ public class OceanBaseTestBase extends TestLogger {
 
     protected static int getLogProxyPort() {
         return LOG_PROXY_PORT;
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Attributes about user.
+    // Here we use the root user of 'sys' tenant, which is not recommended for production.
+    // --------------------------------------------------------------------------------------------
+
+    protected static String getTenant() {
+        return "sys";
+    }
+
+    protected static String getUsername() {
+        return OB_SYS_USERNAME;
+    }
+
+    protected static String getPassword() {
+        return OB_SYS_PASSWORD;
     }
 
     @ClassRule
@@ -143,8 +158,7 @@ public class OceanBaseTestBase extends TestLogger {
     }
 
     protected static Connection getJdbcConnection(String databaseName) throws SQLException {
-        return DriverManager.getConnection(
-                getJdbcUrl(databaseName), OB_SYS_USERNAME, OB_SYS_PASSWORD);
+        return DriverManager.getConnection(getJdbcUrl(databaseName), getUsername(), getPassword());
     }
 
     private static void dropTestDatabase(Connection connection, String databaseName) {

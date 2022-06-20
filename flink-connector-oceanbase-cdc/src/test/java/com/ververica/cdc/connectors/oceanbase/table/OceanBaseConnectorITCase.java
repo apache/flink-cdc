@@ -104,9 +104,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s'"
                                 + ")",
-                        OB_SYS_USERNAME,
-                        OB_SYS_PASSWORD,
-                        "sys",
+                        getUsername(),
+                        getPassword(),
+                        getTenant(),
                         "inventory",
                         "products",
                         getObServerHost(),
@@ -228,9 +228,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s'"
                                 + ")",
-                        OB_SYS_USERNAME,
-                        OB_SYS_PASSWORD,
-                        "sys",
+                        getUsername(),
+                        getPassword(),
+                        getTenant(),
                         "inventory_meta",
                         "products",
                         getObServerHost(),
@@ -351,9 +351,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s'"
                                 + ")",
-                        OB_SYS_USERNAME,
-                        OB_SYS_PASSWORD,
-                        "sys",
+                        getUsername(),
+                        getPassword(),
+                        getTenant(),
                         "column_type_test",
                         "full_types",
                         serverTimeZone,
