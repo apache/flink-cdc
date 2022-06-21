@@ -286,7 +286,7 @@ The extended CREATE TABLE example demonstrates the syntax for exposing these met
 ```sql
 CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
     _id STRING, // must be declared
     name STRING,
