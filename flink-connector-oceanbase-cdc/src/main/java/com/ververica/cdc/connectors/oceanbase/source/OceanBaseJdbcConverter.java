@@ -134,7 +134,7 @@ public class OceanBaseJdbcConverter {
             case Types.BINARY:
                 return ByteBuffer.wrap(value.toString().getBytes(StandardCharsets.UTF_8));
             default:
-                return value.toString();
+                return value.toString(StandardCharsets.UTF_8.toString());
         }
     }
 
