@@ -75,7 +75,6 @@ public class OceanBaseTableSchema {
         for (int i = 0; i < columnNames.length; i++) {
             tableEditor.addColumn(getColumn(columnNames[i], jdbcTypes[i]));
         }
-        // TODO add column filter and mapper
         return tableSchemaBuilder(zoneOffset)
                 .create(
                         null,

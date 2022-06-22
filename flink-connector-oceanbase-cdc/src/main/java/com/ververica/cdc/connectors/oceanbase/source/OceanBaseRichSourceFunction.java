@@ -45,6 +45,7 @@ import io.debezium.relational.TableSchema;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.apache.kafka.trogdor.common.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -199,12 +200,12 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             LOG.error("Query database and table name failed", e);
             throw new FlinkRuntimeException(e);
         }
+        LOG.info("Tables matched in snapshot read: {}", JsonUtil.toJsonString(tableMap));
         tableMap.forEach(this::readSnapshotFromTable);
         snapshotCompleted.set(true);
     }
 
     private void readSnapshotFromTable(String databaseName, String tableName) {
-        // TODO make topic name configurable
         String topicName = getDefaultTopicName(tenantName, databaseName, tableName);
         Map<String, String> partition = getSourcePartition(tenantName, databaseName, tableName);
         // the offset here is useless
@@ -326,7 +327,10 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                                 }
                                             });
                                     logMessageBuffer.clear();
-                                    resolvedTimestamp = Long.parseLong(message.getTimestamp());
+                                    long timestamp = getCheckpointTimestamp(message);
+                                    if (timestamp > resolvedTimestamp) {
+                                        resolvedTimestamp = timestamp;
+                                    }
                                 }
                                 break;
                             case DDL:
@@ -358,7 +362,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     private SourceRecord getRecordFromLogMessage(LogMessage message) {
         String databaseName = message.getDbName().replace(tenantName + ".", "");
-        // TODO make topic name configurable
         String topicName = getDefaultTopicName(tenantName, databaseName, message.getTableName());
 
         if (tableSchemaMap.get(topicName) == null) {
@@ -384,7 +387,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                         tenantName,
                         databaseName,
                         message.getTableName(),
-                        message.getTimestamp(),
+                        String.valueOf(getCheckpointTimestamp(message)),
                         message.getOB10UniqueId());
         Struct struct;
         switch (message.getOpt()) {
@@ -428,7 +431,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         }
         return new SourceRecord(
                 getSourcePartition(tenantName, databaseName, message.getTableName()),
-                getSourceOffset(Long.parseLong(message.getTimestamp())),
+                getSourceOffset(getCheckpointTimestamp(message)),
                 topicName,
                 null,
                 null,
@@ -486,6 +489,27 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             }
         }
         return value;
+    }
+
+    /**
+     * Get log message checkpoint timestamp in seconds. Refer to 'globalSafeTimestamp' in {@link
+     * LogMessage}.
+     *
+     * @param message Log message.
+     * @return Timestamp in seconds.
+     */
+    private long getCheckpointTimestamp(LogMessage message) {
+        long timestamp = -1;
+        try {
+            if (DataMessage.Record.Type.HEARTBEAT.equals(message.getOpt())) {
+                timestamp = Long.parseLong(message.getTimestamp());
+            } else {
+                timestamp = message.getFileNameOffset();
+            }
+        } catch (Throwable t) {
+            LOG.error("Failed to get checkpoint from log message", t);
+        }
+        return timestamp;
     }
 
     @Override
