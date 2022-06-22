@@ -48,19 +48,6 @@ under the License.
             <groupId>com.oceanbase.logclient</groupId>
             <artifactId>logproxy-client</artifactId>
             <version>${oblogclient.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>logback-classic</artifactId>
-                    <groupId>ch.qos.logback</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <!-- The MySQL JDBC driver for reading snapshot-->
-        <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
-            <version>5.1.47</version>
         </dependency>
 
         <!-- test dependencies on Flink -->
@@ -128,6 +115,14 @@ under the License.
             <artifactId>flink-table-planner-blink_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- The MySQL JDBC driver for reading snapshot-->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.47</version>
             <scope>test</scope>
         </dependency>
 

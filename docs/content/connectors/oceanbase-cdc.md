@@ -7,6 +7,10 @@ Dependencies
 
 In order to setup the OceanBase CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
+Note that `mysql-connector-java` is only used for reading snapshot data, you can ignore it if you only deal with the log data. `5.1.47` is the recommended version of MySQL driver, and later versions may have type incompatibility issues. The cdc connector will preferentially use `com.mysql.jdbc.Driver` as the driver name and fall back to `com.mysql.cj.jdbc.Driver` on failure.
+
+### Maven dependency
+
 ```xml
 <dependency>
   <groupId>com.ververica</groupId>
@@ -14,13 +18,20 @@ In order to setup the OceanBase CDC connector, the following table provides depe
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
   <version>2.3-SNAPSHOT</version>
 </dependency>
+<dependency>
+  <groupId>mysql</groupId>
+  <artifactId>mysql-connector-java</artifactId>
+  <version>5.1.47</version>
+</dependency>
 ```
 
 ### SQL Client JAR
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.3-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download following jar files and put them under `<FLINK_HOME>/lib/`.
+- [flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.3-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar)
+- [mysql-connector-java-5.1.47.jar](https://repo1.maven.org/maven2/mysql/mysql-connector-java/5.1.47/mysql-connector-java-5.1.47.jar)
 
 **Note:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oceanbase-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-oceanbase-cdc), the released version will be available in the Maven central warehouse.
 

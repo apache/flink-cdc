@@ -106,6 +106,7 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
 - [flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.3-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar)
+- [mysql-connector-java-5.1.47.jar](https://repo1.maven.org/maven2/mysql/mysql-connector-java/5.1.47/mysql-connector-java-5.1.47.jar)
 
 ### 在 Flink SQL CLI 中使用 Flink DDL 创建表
 

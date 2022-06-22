@@ -20,15 +20,18 @@ package com.ververica.cdc.connectors.oceanbase.source;
 
 import io.debezium.config.Configuration;
 import io.debezium.jdbc.JdbcConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 
 /** {@link JdbcConnection} extension to be used with OceanBase server. */
 public class OceanBaseConnection extends JdbcConnection {
 
+    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseRichSourceFunction.class);
+
     protected static final String URL_PATTERN =
             "jdbc:mysql://${hostname}:${port}/?useInformationSchema=true&nullCatalogMeansCurrent=false&useSSL=false&useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&zeroDateTimeBehavior=convertToNull&connectTimeout=${connectTimeout}";
-    protected static final String DRIVER_CLASS_NAME = "com.mysql.jdbc.Driver";
 
     public OceanBaseConnection(
             String hostname,
@@ -52,6 +55,17 @@ public class OceanBaseConnection extends JdbcConnection {
     }
 
     public static JdbcConnection.ConnectionFactory factory(ClassLoader classLoader) {
-        return JdbcConnection.patternBasedFactory(URL_PATTERN, DRIVER_CLASS_NAME, classLoader);
+        return JdbcConnection.patternBasedFactory(URL_PATTERN, getDriverClassName(), classLoader);
+    }
+
+    public static String getDriverClassName() {
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            return "com.mysql.jdbc.Driver";
+        } catch (ClassNotFoundException e) {
+            LOG.warn(
+                    "Can't find class 'com.mysql.jdbc.Driver', try to use 'com.mysql.cj.jdbc.Driver' instead");
+            return "com.mysql.cj.jdbc.Driver";
+        }
     }
 }

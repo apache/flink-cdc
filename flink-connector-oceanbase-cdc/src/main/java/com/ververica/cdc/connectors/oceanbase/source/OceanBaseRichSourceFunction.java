@@ -32,7 +32,6 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.mysql.jdbc.ResultSetMetaData;
 import com.oceanbase.clogproxy.client.LogProxyClient;
 import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
@@ -49,6 +48,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
@@ -215,7 +215,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             snapshotConnection.query(
                     selectSql,
                     rs -> {
-                        ResultSetMetaData metaData = (ResultSetMetaData) rs.getMetaData();
+                        ResultSetMetaData metaData = rs.getMetaData();
                         String[] columnNames = new String[metaData.getColumnCount()];
                         int[] jdbcTypes = new int[metaData.getColumnCount()];
                         for (int i = 0; i < metaData.getColumnCount(); i++) {

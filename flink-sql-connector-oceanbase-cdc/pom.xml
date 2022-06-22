@@ -57,7 +57,6 @@ under the License.
                                     <include>io.debezium:debezium-core</include>
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-oceanbase-cdc</include>
-                                    <include>mysql:mysql-connector-java</include>
                                     <include>com.oceanbase.logclient:*</include>
                                     <include>io.netty:netty-all</include>
                                     <include>com.google.protobuf:protobuf-java</include>
