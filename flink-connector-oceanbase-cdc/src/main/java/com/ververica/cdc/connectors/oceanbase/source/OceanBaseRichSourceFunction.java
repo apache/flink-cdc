@@ -214,6 +214,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         String fullName = String.format("`%s`.`%s`", databaseName, tableName);
         String selectSql = "SELECT * FROM " + fullName;
         try {
+            LOG.info("Start to read snapshot from {}", fullName);
             snapshotConnection.query(
                     selectSql,
                     rs -> {
@@ -273,6 +274,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                             }
                         }
                     });
+            LOG.info("Read snapshot from {} finished", fullName);
         } catch (SQLException e) {
             LOG.error("Read snapshot from table " + fullName + " failed", e);
             throw new FlinkRuntimeException(e);
