@@ -30,7 +30,9 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +58,8 @@ import static org.junit.Assert.assertNotNull;
 public class OracleSourceITCase extends OracleSourceTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSourceITCase.class);
+
+    @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
@@ -142,6 +146,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'false',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true'"
                                 + ")",
