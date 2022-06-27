@@ -288,7 +288,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                     "INSERT INTO " + tableId + " VALUES(112, 'user_12','Shanghai','123567891234')",
                 };
 
-        String[] dataRecoverySql =
+        String[] recoveryDataSql =
                 new String[] {
                     "DELETE FROM " + tableId + " where id = 111",
                     "DELETE FROM " + tableId + " where id = 112",
@@ -329,7 +329,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 readTableSnapshotSplits(
                         mySqlSplits, statefulTaskContext, mySqlSplits.size(), dataType);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
-        executeSql(sourceConfig, dataRecoverySql);
+        executeSql(sourceConfig, recoveryDataSql);
     }
 
     @Test
@@ -344,7 +344,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                     "DELETE FROM " + tableId + " where id = 102",
                 };
 
-        String[] dataRecoverySql =
+        String[] recoveryDataSql =
                 new String[] {
                     "INSERT INTO " + tableId + " VALUES(101, 'user_1','Shanghai','123567891234')",
                     "INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')",
@@ -381,7 +381,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 readTableSnapshotSplits(
                         mySqlSplits, statefulTaskContext, mySqlSplits.size(), dataType);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
-        executeSql(sourceConfig, dataRecoverySql);
+        executeSql(sourceConfig, recoveryDataSql);
     }
 
     private List<String> readTableSnapshotSplits(
@@ -462,15 +462,14 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 .createConfig(0);
     }
 
-    private boolean executeSql(MySqlSourceConfig sourceConfig, String[] sql) {
+    private boolean executeSql(MySqlSourceConfig sourceConfig, String[] sqlStatements) {
         JdbcConnection connection = DebeziumUtils.openJdbcConnection(sourceConfig);
-        // make binlog events
         try {
             connection.setAutoCommit(false);
-            connection.execute(sql);
+            connection.execute(sqlStatements);
             connection.commit();
         } catch (SQLException e) {
-            LOG.error("Failed to update table.", e);
+            LOG.error("Failed to execute sql statements.", e);
             return false;
         }
         return true;
@@ -478,13 +477,13 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     class MakeBinlogEventTaskContext extends StatefulTaskContext {
 
-        private Supplier makeBinlogFunction;
+        private Supplier<Boolean> makeBinlogFunction;
 
         public MakeBinlogEventTaskContext(
                 MySqlSourceConfig sourceConfig,
                 BinaryLogClient binaryLogClient,
                 MySqlConnection connection,
-                Supplier makeBinlogFunction) {
+                Supplier<Boolean> makeBinlogFunction) {
             super(sourceConfig, binaryLogClient, connection);
             this.makeBinlogFunction = makeBinlogFunction;
         }

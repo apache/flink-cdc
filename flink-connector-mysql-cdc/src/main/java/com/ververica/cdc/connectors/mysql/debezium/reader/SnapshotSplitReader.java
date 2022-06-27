@@ -258,13 +258,12 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
                     if (highWatermark == null && isHighWatermarkEvent(record)) {
                         highWatermark = record;
-                        checkHighWatermark(highWatermark);
                         // snapshot events capture end and begin to capture binlog events
                         reachBinlogStart = true;
                         continue;
                     }
 
-                    if (RecordUtils.isEndWatermarkEvent(record)) {
+                    if (reachBinlogStart && RecordUtils.isEndWatermarkEvent(record)) {
                         // capture to end watermark events, stop the loop
                         reachBinlogEnd = true;
                         break;
@@ -312,24 +311,12 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         lowWatermark));
     }
 
-    private void checkHighWatermark(SourceRecord highWatermark) {
-        checkState(
-                isHighWatermarkEvent(highWatermark),
-                String.format(
-                        "The last record should be high watermark signal event, but is %s",
-                        highWatermark));
-    }
-
     private boolean checkValidBinlogRecord(SourceRecord record) {
         if (isDataChangeRecord(record)) {
             Object[] key =
                     getSplitKey(currentSnapshotSplit.getSplitKeyType(), record, nameAdjuster);
-            if (splitKeyRangeContains(
-                    key,
-                    currentSnapshotSplit.getSplitStart(),
-                    currentSnapshotSplit.getSplitEnd())) {
-                return true;
-            }
+            return splitKeyRangeContains(
+                    key, currentSnapshotSplit.getSplitStart(), currentSnapshotSplit.getSplitEnd());
         }
         return false;
     }

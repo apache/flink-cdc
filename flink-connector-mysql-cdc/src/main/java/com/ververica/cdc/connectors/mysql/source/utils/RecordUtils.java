@@ -73,31 +73,31 @@ public class RecordUtils {
         return row;
     }
 
-    /** upsert binlog events to snapshot events collect. */
+    /** upsert binlog events to snapshot events collection. */
     public static void upsertBinlog(
-            Map<Struct, SourceRecord> snapshotRecords, SourceRecord binlog) {
-        Struct key = (Struct) binlog.key();
-        Struct value = (Struct) binlog.value();
+            Map<Struct, SourceRecord> snapshotRecords, SourceRecord binlogRecord) {
+        Struct key = (Struct) binlogRecord.key();
+        Struct value = (Struct) binlogRecord.value();
         if (value != null) {
             Envelope.Operation operation =
                     Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
             switch (operation) {
                 case CREATE:
                 case UPDATE:
-                    Envelope envelope = Envelope.fromSchema(binlog.valueSchema());
+                    Envelope envelope = Envelope.fromSchema(binlogRecord.valueSchema());
                     Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                     Struct after = value.getStruct(Envelope.FieldName.AFTER);
                     Instant fetchTs =
                             Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
                     SourceRecord record =
                             new SourceRecord(
-                                    binlog.sourcePartition(),
-                                    binlog.sourceOffset(),
-                                    binlog.topic(),
-                                    binlog.kafkaPartition(),
-                                    binlog.keySchema(),
-                                    binlog.key(),
-                                    binlog.valueSchema(),
+                                    binlogRecord.sourcePartition(),
+                                    binlogRecord.sourceOffset(),
+                                    binlogRecord.topic(),
+                                    binlogRecord.kafkaPartition(),
+                                    binlogRecord.keySchema(),
+                                    binlogRecord.key(),
+                                    binlogRecord.valueSchema(),
                                     envelope.read(after, source, fetchTs));
                     snapshotRecords.put(key, record);
                     break;
@@ -108,7 +108,7 @@ public class RecordUtils {
                     throw new IllegalStateException(
                             String.format(
                                     "Binlog record shouldn't use READ operation, the the record is %s.",
-                                    binlog));
+                                    binlogRecord));
             }
         }
     }
