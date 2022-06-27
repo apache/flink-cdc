@@ -27,11 +27,11 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * A structure describes a fine grained offset in a binlog event including binlog position and gtid
+ * A structure describes a fine-grained offset in a binlog event including binlog position and gtid
  * set etc.
  *
  * <p>This structure can also be used to deal the binlog event in transaction, a transaction may
- * contains multiple change events, and each change event may contain multiple rows. When restart
+ * contain multiple change events, and each change event may contain multiple rows. When restart
  * from a specific {@link Offset}, we need to skip the processed change events and the processed
  * rows.
  */

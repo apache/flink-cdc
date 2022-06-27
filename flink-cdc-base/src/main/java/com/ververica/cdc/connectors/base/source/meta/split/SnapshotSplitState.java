@@ -22,7 +22,7 @@ import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 
 import javax.annotation.Nullable;
 
-/** The state of split to describe the binlog of MySql table(s). */
+/** The state of split to describe the snapshot of table(s). */
 public class SnapshotSplitState extends SourceSplitState {
 
     @Nullable private Offset highWatermark;
@@ -56,11 +56,6 @@ public class SnapshotSplitState extends SourceSplitState {
 
     @Override
     public String toString() {
-        return "MySqlSnapshotSplitState{"
-                + "highWatermark="
-                + highWatermark
-                + ", split="
-                + split
-                + '}';
+        return "SnapshotSplitState{highWatermark=" + highWatermark + ", split=" + split + '}';
     }
 }

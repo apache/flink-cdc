@@ -80,7 +80,7 @@ public class StreamSplitState extends SourceSplitState {
 
     @Override
     public String toString() {
-        return "MySqlBinlogSplitState{"
+        return "StreamSplitState{"
                 + "startingOffset="
                 + startingOffset
                 + ", endingOffset="

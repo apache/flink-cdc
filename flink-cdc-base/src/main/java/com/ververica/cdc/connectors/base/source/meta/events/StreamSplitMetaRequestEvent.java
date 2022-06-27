@@ -24,8 +24,8 @@ import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnum
 import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to pull binlog meta data, i.e. sending {@link StreamSplitMetaEvent}.
+ * The {@link SourceEvent} that {@link JdbcIncrementalSourceReader} sends to {@link
+ * IncrementalSourceEnumerator} to pull binlog metadata, i.e. sending {@link StreamSplitMetaEvent}.
  */
 public class StreamSplitMetaRequestEvent implements SourceEvent {
 
