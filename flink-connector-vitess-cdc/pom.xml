@@ -161,30 +161,6 @@ under the License.
             <scope>test</scope>
         </dependency>
 
-        <!-- tests will have log4j as the default logging framework available -->
-
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-slf4j-impl</artifactId>
-            <version>${log4j.version}</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
-                    <forkCount>1</forkCount>
-                    <argLine>-Xms256m -Xmx2048m -Dlog4j.configurationFile=${log4j.configuration}
-                        -Dmvn.forkNumber=${surefire.forkNumber} -XX:-UseGCOverheadLimit
-                    </argLine>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 
 </project>
