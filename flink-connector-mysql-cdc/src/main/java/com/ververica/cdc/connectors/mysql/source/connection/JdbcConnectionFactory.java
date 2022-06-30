@@ -46,7 +46,10 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
         final int connectRetryTimes = sourceConfig.getConnectMaxRetries();
 
         final ConnectionPoolId connectionPoolId =
-                new ConnectionPoolId(sourceConfig.getHostname(), sourceConfig.getPort());
+                new ConnectionPoolId(
+                        sourceConfig.getHostname(),
+                        sourceConfig.getPort(),
+                        sourceConfig.getUsername());
 
         HikariDataSource dataSource =
                 JdbcConnectionPools.getInstance()
