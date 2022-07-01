@@ -312,7 +312,7 @@ public class SourceRecordUtils {
                         case READ:
                             throw new IllegalStateException(
                                     String.format(
-                                            "Binlog record shouldn't use READ operation, the the record is %s.",
+                                            "Binlog record shouldn't use READ operation, the record is %s.",
                                             binlog));
                     }
                 }

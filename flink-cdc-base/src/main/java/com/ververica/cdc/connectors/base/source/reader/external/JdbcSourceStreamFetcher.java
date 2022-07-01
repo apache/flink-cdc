@@ -88,7 +88,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
                     } catch (Exception e) {
                         LOG.error(
                                 String.format(
-                                        "Execute binlog read task for mysql split %s fail",
+                                        "Execute binlog read task for stream split %s fail",
                                         currentStreamSplit),
                                 e);
                         readException = e;

@@ -70,6 +70,6 @@ public interface DataSourceDialect<ID extends DataCollectionId, S, C extends Sou
     /** The fetch task used to fetch data of a snapshot split or stream split. */
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
 
-    /** The task context used fot fetch task to fetch data from external systems. */
+    /** The task context used for fetch task to fetch data from external systems. */
     FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase);
 }

@@ -40,7 +40,7 @@ public class SnapshotSplit extends SourceSplitBase {
 
     @Nullable private final Object[] splitStart;
     @Nullable private final Object[] splitEnd;
-    /** The high watermark is not bull when the split read finished. */
+    /** The high watermark is not null when the split read finished. */
     @Nullable private final Offset highWatermark;
 
     @Nullable transient byte[] serializedFormCache;

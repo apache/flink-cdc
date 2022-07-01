@@ -27,8 +27,8 @@ import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceRead
 import java.util.Map;
 
 /**
- * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to notify the snapshot split has read finished with the consistent
+ * The {@link SourceEvent} that {@link JdbcIncrementalSourceReader} sends to {@link
+ * IncrementalSourceEnumerator} to notify the snapshot split has read finished with the consistent
  * binlog position.
  */
 public class FinishedSnapshotSplitsReportEvent implements SourceEvent {

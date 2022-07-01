@@ -122,7 +122,7 @@ public class StreamSplit extends SourceSplitBase {
     }
 
     // -------------------------------------------------------------------
-    // factory utils to build new MySqlBinlogSplit instance
+    // factory utils to build new StreamSplit instance
     // -------------------------------------------------------------------
     public static StreamSplit appendFinishedSplitInfos(
             StreamSplit binlogSplit, List<FinishedSnapshotSplitInfo> splitInfos) {

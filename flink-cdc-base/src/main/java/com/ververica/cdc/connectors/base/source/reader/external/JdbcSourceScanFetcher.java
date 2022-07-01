@@ -87,7 +87,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
                     } catch (Exception e) {
                         LOG.error(
                                 String.format(
-                                        "Execute snapshot read task for mysql split %s fail",
+                                        "Execute snapshot read task for snapshot split %s fail",
                                         currentSnapshotSplit),
                                 e);
                         readException = e;
