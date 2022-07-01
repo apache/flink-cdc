@@ -43,6 +43,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isData
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHeartbeatEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isTransactionMetadataRecord;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
 
 /**
@@ -61,15 +62,18 @@ public final class MySqlRecordEmitter<T>
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
+    private final boolean includeTransactionMetadata;
     private final OutputCollector<T> outputCollector;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            boolean includeSchemaChanges) {
+            boolean includeSchemaChanges,
+            boolean includeTransactionMetadata) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
+        this.includeTransactionMetadata = includeTransactionMetadata;
         this.outputCollector = new OutputCollector<>();
     }
 
@@ -100,6 +104,10 @@ public final class MySqlRecordEmitter<T>
             emitElement(element, output);
         } else if (isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
+        } else if (isTransactionMetadataRecord(element)) {
+            if (includeTransactionMetadata) {
+                emitElement(element, output);
+            }
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
