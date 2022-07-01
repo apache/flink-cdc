@@ -38,7 +38,6 @@ import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.exception.LogProxyClientException;
 import com.oceanbase.clogproxy.client.listener.RecordListener;
-import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import com.oceanbase.oms.logmessage.DataMessage;
 import com.oceanbase.oms.logmessage.LogMessage;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -46,13 +45,12 @@ import io.debezium.relational.TableSchema;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.apache.kafka.trogdor.common.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,8 +59,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * The source implementation for OceanBase that read snapshot events first and then read the change
@@ -83,14 +85,14 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final String tenantName;
     private final String databaseName;
     private final String tableName;
+    private final ZoneOffset zoneOffset;
+    private final Duration connectTimeout;
     private final String hostname;
     private final Integer port;
-    private final Duration connectTimeout;
-    private final String rsList;
     private final String logProxyHost;
     private final int logProxyPort;
-    private final long startTimestamp;
-    private final ZoneOffset zoneOffset;
+    private final ClientConf logProxyClientConf;
+    private final ObReaderConfig obReaderConfig;
     private final DebeziumDeserializationSchema<T> deserializer;
 
     private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
@@ -105,35 +107,35 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     public OceanBaseRichSourceFunction(
             boolean snapshot,
-            long startTimestamp,
             String username,
             String password,
             String tenantName,
             String databaseName,
             String tableName,
+            ZoneOffset zoneOffset,
+            Duration connectTimeout,
             String hostname,
             Integer port,
-            Duration connectTimeout,
-            String rsList,
             String logProxyHost,
             int logProxyPort,
-            ZoneId serverTimeZone,
+            ClientConf logProxyClientConf,
+            ObReaderConfig obReaderConfig,
             DebeziumDeserializationSchema<T> deserializer) {
-        this.snapshot = snapshot;
-        this.username = username;
-        this.password = password;
-        this.tenantName = tenantName;
-        this.databaseName = databaseName;
-        this.tableName = tableName;
+        this.snapshot = checkNotNull(snapshot);
+        this.username = checkNotNull(username);
+        this.password = checkNotNull(password);
+        this.tenantName = checkNotNull(tenantName);
+        this.databaseName = checkNotNull(databaseName);
+        this.tableName = checkNotNull(tableName);
+        this.zoneOffset = checkNotNull(zoneOffset);
+        this.connectTimeout = checkNotNull(connectTimeout);
         this.hostname = hostname;
         this.port = port;
-        this.connectTimeout = connectTimeout;
-        this.rsList = rsList;
-        this.logProxyHost = logProxyHost;
-        this.logProxyPort = logProxyPort;
-        this.startTimestamp = startTimestamp;
-        this.zoneOffset = serverTimeZone.getRules().getOffset(Instant.now());
-        this.deserializer = deserializer;
+        this.logProxyHost = checkNotNull(logProxyHost);
+        this.logProxyPort = checkNotNull(logProxyPort);
+        this.logProxyClientConf = checkNotNull(logProxyClientConf);
+        this.obReaderConfig = checkNotNull(obReaderConfig);
+        this.deserializer = checkNotNull(deserializer);
     }
 
     @Override
@@ -198,12 +200,12 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             LOG.error("Query database and table name failed", e);
             throw new FlinkRuntimeException(e);
         }
+        LOG.info("Tables matched in snapshot read: {}", JsonUtil.toJsonString(tableMap));
         tableMap.forEach(this::readSnapshotFromTable);
         snapshotCompleted.set(true);
     }
 
     private void readSnapshotFromTable(String databaseName, String tableName) {
-        // TODO make topic name configurable
         String topicName = getDefaultTopicName(tenantName, databaseName, tableName);
         Map<String, String> partition = getSourcePartition(tenantName, databaseName, tableName);
         // the offset here is useless
@@ -212,6 +214,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         String fullName = String.format("`%s`.`%s`", databaseName, tableName);
         String selectSql = "SELECT * FROM " + fullName;
         try {
+            LOG.info("Start to read snapshot from {}", fullName);
             snapshotConnection.query(
                     selectSql,
                     rs -> {
@@ -271,33 +274,23 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                             }
                         }
                     });
+            LOG.info("Read snapshot from {} finished", fullName);
         } catch (SQLException e) {
             LOG.error("Read snapshot from table " + fullName + " failed", e);
             throw new FlinkRuntimeException(e);
         }
     }
 
-    protected void readChangeEvents() throws InterruptedException {
-        String tableWhiteList = String.format("%s.%s.%s", tenantName, databaseName, tableName);
-        ObReaderConfig obReaderConfig = new ObReaderConfig();
-        obReaderConfig.setRsList(rsList);
-        obReaderConfig.setUsername(username);
-        obReaderConfig.setPassword(password);
-        obReaderConfig.setTableWhiteList(tableWhiteList);
-
+    protected void readChangeEvents() throws InterruptedException, TimeoutException {
         if (resolvedTimestamp > 0) {
-            obReaderConfig.setStartTimestamp(resolvedTimestamp);
+            obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
             LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
-        } else {
-            obReaderConfig.setStartTimestamp(startTimestamp);
-            LOG.info("Read change events from startTimestamp: {}", startTimestamp);
         }
 
-        final CountDownLatch latch = new CountDownLatch(1);
+        logProxyClient =
+                new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig, logProxyClientConf);
 
-        // avoid client id duplication when starting multiple connectors in one etl
-        ClientConf.USER_DEFINED_CLIENTID = ClientIdGenerator.generate() + tableWhiteList;
-        logProxyClient = new LogProxyClient(logProxyHost, logProxyPort, obReaderConfig);
+        final CountDownLatch latch = new CountDownLatch(1);
 
         logProxyClient.addListener(
                 new RecordListener() {
@@ -336,7 +329,10 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                                 }
                                             });
                                     logMessageBuffer.clear();
-                                    resolvedTimestamp = Long.parseLong(message.getTimestamp());
+                                    long timestamp = getCheckpointTimestamp(message);
+                                    if (timestamp > resolvedTimestamp) {
+                                        resolvedTimestamp = timestamp;
+                                    }
                                 }
                                 break;
                             case DDL:
@@ -360,13 +356,14 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
         logProxyClient.start();
         LOG.info("LogProxyClient started");
-        latch.await();
+        if (!latch.await(connectTimeout.getSeconds(), TimeUnit.SECONDS)) {
+            throw new TimeoutException("Timeout to receive messages in RecordListener");
+        }
         LOG.info("LogProxyClient packet processing started");
     }
 
-    private SourceRecord getRecordFromLogMessage(LogMessage message) throws Exception {
+    private SourceRecord getRecordFromLogMessage(LogMessage message) {
         String databaseName = message.getDbName().replace(tenantName + ".", "");
-        // TODO make topic name configurable
         String topicName = getDefaultTopicName(tenantName, databaseName, message.getTableName());
 
         if (tableSchemaMap.get(topicName) == null) {
@@ -392,7 +389,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                         tenantName,
                         databaseName,
                         message.getTableName(),
-                        message.getTimestamp(),
+                        String.valueOf(getCheckpointTimestamp(message)),
                         message.getOB10UniqueId());
         Struct struct;
         switch (message.getOpt()) {
@@ -436,7 +433,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         }
         return new SourceRecord(
                 getSourcePartition(tenantName, databaseName, message.getTableName()),
-                getSourceOffset(Long.parseLong(message.getTimestamp())),
+                getSourceOffset(getCheckpointTimestamp(message)),
                 topicName,
                 null,
                 null,
@@ -494,6 +491,27 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             }
         }
         return value;
+    }
+
+    /**
+     * Get log message checkpoint timestamp in seconds. Refer to 'globalSafeTimestamp' in {@link
+     * LogMessage}.
+     *
+     * @param message Log message.
+     * @return Timestamp in seconds.
+     */
+    private long getCheckpointTimestamp(LogMessage message) {
+        long timestamp = -1;
+        try {
+            if (DataMessage.Record.Type.HEARTBEAT.equals(message.getOpt())) {
+                timestamp = Long.parseLong(message.getTimestamp());
+            } else {
+                timestamp = message.getFileNameOffset();
+            }
+        } catch (Throwable t) {
+            LOG.error("Failed to get checkpoint from log message", t);
+        }
+        return timestamp;
     }
 
     @Override

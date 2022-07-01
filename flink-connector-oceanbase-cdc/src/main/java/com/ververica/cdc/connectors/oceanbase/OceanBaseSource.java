@@ -21,12 +21,18 @@ package com.ververica.cdc.connectors.oceanbase;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
+import com.oceanbase.clogproxy.client.config.ClientConf;
+import com.oceanbase.clogproxy.client.config.ObReaderConfig;
+import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -43,31 +49,33 @@ public class OceanBaseSource {
     /** Builder class of {@link OceanBaseSource}. */
     public static class Builder<T> {
 
+        // common config
         private StartupMode startupMode;
-        private Long startupTimestamp;
-
         private String username;
         private String password;
         private String tenantName;
         private String databaseName;
         private String tableName;
+        private String serverTimeZone;
+        private Duration connectTimeout;
+
+        // snapshot reading config
         private String hostname;
         private Integer port;
-        private Duration connectTimeout;
-        private String rsList;
+
+        // incremental reading config
         private String logProxyHost;
         private Integer logProxyPort;
-        private ZoneId serverTimeZone = ZoneId.of("UTC");
+        private String logProxyClientId;
+        private Long startupTimestamp;
+        private String rsList;
+        private String configUrl;
+        private String workingMode;
 
         private DebeziumDeserializationSchema<T> deserializer;
 
         public Builder<T> startupMode(StartupMode startupMode) {
             this.startupMode = startupMode;
-            return this;
-        }
-
-        public Builder<T> startupTimestamp(Long startupTimestamp) {
-            this.startupTimestamp = startupTimestamp;
             return this;
         }
 
@@ -96,13 +104,8 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> hostname(String hostname) {
-            this.hostname = hostname;
-            return this;
-        }
-
-        public Builder<T> port(int port) {
-            this.port = port;
+        public Builder<T> serverTimeZone(String serverTimeZone) {
+            this.serverTimeZone = serverTimeZone;
             return this;
         }
 
@@ -111,8 +114,13 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> rsList(String rsList) {
-            this.rsList = rsList;
+        public Builder<T> hostname(String hostname) {
+            this.hostname = hostname;
+            return this;
+        }
+
+        public Builder<T> port(int port) {
+            this.port = port;
             return this;
         }
 
@@ -126,8 +134,28 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> serverTimeZone(ZoneId serverTimeZone) {
-            this.serverTimeZone = serverTimeZone;
+        public Builder<T> logProxyClientId(String logProxyClientId) {
+            this.logProxyClientId = logProxyClientId;
+            return this;
+        }
+
+        public Builder<T> startupTimestamp(Long startupTimestamp) {
+            this.startupTimestamp = startupTimestamp;
+            return this;
+        }
+
+        public Builder<T> rsList(String rsList) {
+            this.rsList = rsList;
+            return this;
+        }
+
+        public Builder<T> configUrl(String configUrl) {
+            this.configUrl = configUrl;
+            return this;
+        }
+
+        public Builder<T> workingMode(String workingMode) {
+            this.workingMode = workingMode;
             return this;
         }
 
@@ -139,33 +167,80 @@ public class OceanBaseSource {
         public SourceFunction<T> build() {
             switch (startupMode) {
                 case INITIAL:
+                    checkNotNull(hostname, "hostname shouldn't be null on startup mode 'initial'");
+                    checkNotNull(port, "port shouldn't be null on startup mode 'initial'");
+                    startupTimestamp = 0L;
+                    break;
                 case LATEST_OFFSET:
                     startupTimestamp = 0L;
                     break;
                 case TIMESTAMP:
-                    checkNotNull(startupTimestamp, "startupTimestamp shouldn't be null");
+                    checkNotNull(
+                            startupTimestamp,
+                            "startupTimestamp shouldn't be null on startup mode 'timestamp'");
                     break;
                 default:
                     throw new UnsupportedOperationException(
                             startupMode + " mode is not supported.");
             }
 
+            if (serverTimeZone == null) {
+                serverTimeZone = "UTC";
+            }
+            ZoneOffset zoneOffset = ZoneId.of(serverTimeZone).getRules().getOffset(Instant.now());
+
+            if (connectTimeout == null) {
+                connectTimeout = Duration.ofSeconds(30);
+            }
+
+            String tableWhiteList =
+                    String.format(
+                            "%s.%s.%s",
+                            checkNotNull(tenantName),
+                            checkNotNull(databaseName),
+                            checkNotNull(tableName));
+
+            if (logProxyClientId == null) {
+                logProxyClientId = ClientIdGenerator.generate() + "_" + tableWhiteList;
+            }
+            ClientConf clientConf =
+                    ClientConf.builder()
+                            .clientId(logProxyClientId)
+                            .connectTimeoutMs((int) connectTimeout.toMillis())
+                            .build();
+
+            ObReaderConfig obReaderConfig = new ObReaderConfig();
+            if (StringUtils.isNotEmpty(rsList)) {
+                obReaderConfig.setRsList(rsList);
+            }
+            if (StringUtils.isNotEmpty(configUrl)) {
+                obReaderConfig.setClusterUrl(configUrl);
+            }
+            if (StringUtils.isNotEmpty(workingMode)) {
+                obReaderConfig.setWorkingMode(workingMode);
+            }
+            obReaderConfig.setUsername(username);
+            obReaderConfig.setPassword(password);
+            obReaderConfig.setTableWhiteList(tableWhiteList);
+            obReaderConfig.setStartTimestamp(startupTimestamp);
+            obReaderConfig.setTimezone(zoneOffset.getId());
+
             return new OceanBaseRichSourceFunction<T>(
-                    startupMode.equals(StartupMode.INITIAL),
-                    checkNotNull(startupTimestamp),
-                    checkNotNull(username),
-                    checkNotNull(password),
-                    checkNotNull(tenantName),
-                    checkNotNull(databaseName),
-                    checkNotNull(tableName),
+                    StartupMode.INITIAL.equals(startupMode),
+                    username,
+                    password,
+                    tenantName,
+                    databaseName,
+                    tableName,
+                    zoneOffset,
+                    connectTimeout,
                     hostname,
                     port,
-                    connectTimeout,
-                    checkNotNull(rsList),
-                    checkNotNull(logProxyHost),
-                    checkNotNull(logProxyPort),
-                    checkNotNull(serverTimeZone),
-                    checkNotNull(deserializer));
+                    logProxyHost,
+                    logProxyPort,
+                    clientConf,
+                    obReaderConfig,
+                    deserializer);
         }
     }
 }

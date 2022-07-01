@@ -41,13 +41,19 @@ Setup OceanBase and LogProxy Server
 
 3. Create a user in the tenant you want to monitor, this is used to read data for snapshot and change event.
 
-4. Get the `rootservice_list`. You can use the following command to get the value:
+4. For users of OceanBase Community Edition, you need to get the `rootserver-list`. You can use the following command to get the value:
 
     ```shell
     mysql> show parameters like 'rootservice_list';
     ```
 
-5. Setup OceanBase LogProxy following the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
+   For users of OceanBase Enterprise Edition, you need to get the `config-url`. You can use the following command to get the value:
+
+    ```shell
+    mysql> show parameters like 'obconfig_url';
+    ```
+
+6. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
 
 How to create a OceanBase CDC table
 ----------------
@@ -168,7 +174,7 @@ Connector Options
             <tr>
                 <td>port</td>
                 <td>optional</td>
-                <td style="word-wrap: break-word;">(none))</td>
+                <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Integer port number to connect to OceanBase. It can be the SQL port of OceanBase server, which is 2881 by default, or the port of OceanBase proxy service, which is 2883 by default.</td>
             </tr>
@@ -187,13 +193,6 @@ Connector Options
                 <td>The session time zone in database server, e.g. "Asia/Shanghai". It controls how the TIMESTAMP type in OceanBase converted to STRING in snapshot reading, please make sure to set it same with the timezone of `oblogproxy` deployment. </td>
             </tr>
             <tr>
-                <td>rootserver-list</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
-                <td>String</td>
-                <td>The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`.</td>
-            </tr>
-            <tr>
                 <td>logproxy.host</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
@@ -206,6 +205,34 @@ Connector Options
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Port number of OceanBase log proxy service.</td>
+            </tr>
+            <tr>
+                <td>logproxy.client.id</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">By rule.</td>
+                <td>String</td>
+                <td>Id of a log proxy client connection, will be in format {flink_ip}_{process_id}_{timestamp}_{tenant}.{db}.{table} by default.</td>
+            </tr>
+            <tr>
+                <td>rootserver-list</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`, required for OceanBase CE.</td>
+            </tr>
+            <tr>
+                <td>config-url</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>The url to get the server info from the config server, required for OceanBase EE.</td>
+            </tr>
+            <tr>
+                <td>working-mode</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">storage</td>
+                <td>String</td>
+                <td>Working mode of `obcdc` in LogProxy, can be `storage` or `memory`.</td>
             </tr>
         </tbody>
     </table>
