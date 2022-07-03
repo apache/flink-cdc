@@ -79,6 +79,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
         this.currentStreamSplit = fetchTask.getSplit().asStreamSplit();
         configureFilter();
         taskContext.configure(currentStreamSplit);
+        this.capturedTableFilter = taskContext.getRelationalTableFilters().dataCollectionFilter();
         this.queue = taskContext.getQueue();
         executor.submit(
                 () -> {
