@@ -136,12 +136,14 @@ public class MySqlDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public MySqlSourceFetchTaskContext createFetchTaskContext(SourceSplitBase sourceSplitBase) {
+    public MySqlSourceFetchTaskContext createFetchTaskContext(
+            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         final MySqlConnection jdbcConnection =
-                createMySqlConnection(sourceConfig.getDbzConfiguration());
+                createMySqlConnection(taskSourceConfig.getDbzConfiguration());
         final BinaryLogClient binaryLogClient =
-                createBinaryClient(sourceConfig.getDbzConfiguration());
-        return new MySqlSourceFetchTaskContext(sourceConfig, this, jdbcConnection, binaryLogClient);
+                createBinaryClient(taskSourceConfig.getDbzConfiguration());
+        return new MySqlSourceFetchTaskContext(
+                taskSourceConfig, this, jdbcConnection, binaryLogClient);
     }
 
     @Override
