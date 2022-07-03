@@ -113,6 +113,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
             boolean reachBinlogEnd = false;
             final List<SourceRecord> sourceRecords = new ArrayList<>();
             while (!reachBinlogEnd) {
+                checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
                 for (DataChangeEvent event : batch) {
                     sourceRecords.add(event.getRecord());
