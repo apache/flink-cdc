@@ -39,6 +39,7 @@ import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
@@ -68,6 +69,7 @@ import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINL
 public class StatefulTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
+    private static final int DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN = 1024;
     private static final Clock clock = Clock.SYSTEM;
 
     private final MySqlSourceConfig sourceConfig;
@@ -84,6 +86,7 @@ public class StatefulTaskContext {
     private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
+    private EventDispatcher.SnapshotReceiver snapshotReceiver;
     private SignalEventDispatcher signalEventDispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
@@ -120,7 +123,7 @@ public class StatefulTaskContext {
 
         final int queueSize =
                 mySqlSplit.isSnapshotSplit()
-                        ? Integer.MAX_VALUE
+                        ? sourceConfig.getSplitSize() + DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN
                         : connectorConfig.getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
@@ -145,6 +148,8 @@ public class StatefulTaskContext {
                         DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster);
+
+        this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
 
         this.signalEventDispatcher =
                 new SignalEventDispatcher(
@@ -350,6 +355,10 @@ public class StatefulTaskContext {
 
     public EventDispatcherImpl<TableId> getDispatcher() {
         return dispatcher;
+    }
+
+    public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
+        return snapshotReceiver;
     }
 
     public SignalEventDispatcher getSignalEventDispatcher() {

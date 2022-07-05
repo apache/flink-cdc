@@ -76,6 +76,7 @@ public class MySqlSnapshotSplitReadTask
     private final Clock clock;
     private final MySqlSnapshotSplit snapshotSplit;
     private final TopicSelector<TableId> topicSelector;
+    private final EventDispatcher.SnapshotReceiver snapshotReceiver;
     private final SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
 
     public MySqlSnapshotSplitReadTask(
@@ -85,6 +86,7 @@ public class MySqlSnapshotSplitReadTask
             MySqlConnection jdbcConnection,
             EventDispatcherImpl<TableId> dispatcher,
             TopicSelector<TableId> topicSelector,
+            EventDispatcher.SnapshotReceiver snapshotReceiver,
             Clock clock,
             MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
@@ -95,6 +97,7 @@ public class MySqlSnapshotSplitReadTask
         this.clock = clock;
         this.snapshotSplit = snapshotSplit;
         this.topicSelector = topicSelector;
+        this.snapshotReceiver = snapshotReceiver;
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
     }
 
@@ -188,8 +191,6 @@ public class MySqlSnapshotSplitReadTask
             RelationalSnapshotChangeEventSource.RelationalSnapshotContext snapshotContext,
             TableId tableId)
             throws Exception {
-        EventDispatcher.SnapshotReceiver snapshotReceiver =
-                dispatcher.getSnapshotChangeEventReceiver();
         LOG.debug("Snapshotting table {}", tableId);
         createDataEventsForTable(
                 snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
