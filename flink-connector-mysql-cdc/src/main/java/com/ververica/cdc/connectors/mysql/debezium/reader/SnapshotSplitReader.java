@@ -252,7 +252,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                     SourceRecord record = event.getRecord();
                     if (lowWatermark == null) {
                         lowWatermark = record;
-                        checkLowWatermark(lowWatermark);
+                        assertLowWatermark(lowWatermark);
                         continue;
                     }
 
@@ -272,7 +272,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                     if (!reachBinlogStart) {
                         snapshotRecords.put((Struct) record.key(), record);
                     } else {
-                        if (checkValidBinlogRecord(record)) {
+                        if (isRequiredBinlogRecord(record)) {
                             // upsert binlog events through the record key
                             upsertBinlog(snapshotRecords, record);
                         }
@@ -303,15 +303,15 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         }
     }
 
-    private void checkLowWatermark(SourceRecord lowWatermark) {
+    private void assertLowWatermark(SourceRecord lowWatermark) {
         checkState(
                 isLowWatermarkEvent(lowWatermark),
                 String.format(
-                        "The first record should be low watermark signal event, but is %s",
+                        "The first record should be low watermark signal event, but actual is %s",
                         lowWatermark));
     }
 
-    private boolean checkValidBinlogRecord(SourceRecord record) {
+    private boolean isRequiredBinlogRecord(SourceRecord record) {
         if (isDataChangeRecord(record)) {
             Object[] key =
                     getSplitKey(currentSnapshotSplit.getSplitKeyType(), record, nameAdjuster);

@@ -69,6 +69,7 @@ import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINL
 public class StatefulTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
+    private static final int DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN = 1024;
     private static final Clock clock = Clock.SYSTEM;
 
     private final MySqlSourceConfig sourceConfig;
@@ -122,7 +123,7 @@ public class StatefulTaskContext {
 
         final int queueSize =
                 mySqlSplit.isSnapshotSplit()
-                        ? sourceConfig.getSplitSize() + 1024
+                        ? sourceConfig.getSplitSize() + DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN
                         : connectorConfig.getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
