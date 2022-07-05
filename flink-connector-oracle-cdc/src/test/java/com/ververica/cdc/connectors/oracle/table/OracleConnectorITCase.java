@@ -478,9 +478,12 @@ public class OracleConnectorITCase extends AbstractTestBase {
         waitForSinkSize("test_xmltype_sink", 1);
 
         String lineSeparator = System.getProperty("line.separator");
-        String expectedResult = String.format("+I[11, <name>%s"
-            + "   <a id=\"1\" value=\"some values\">test xmlType</a>%s"
-            + "</name>]", lineSeparator, lineSeparator);
+        String expectedResult =
+                String.format(
+                        "+I[11, <name>%s"
+                                + "   <a id=\"1\" value=\"some values\">test xmlType</a>%s"
+                                + "</name>]",
+                        lineSeparator, lineSeparator);
 
         List<String> expected = Arrays.asList(expectedResult);
 
