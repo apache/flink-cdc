@@ -80,6 +80,13 @@ under the License.
             <artifactId>ojdbc8</artifactId>
             <version>19.3.0.0</version>
         </dependency>
+
+        <dependency>
+          <groupId>com.oracle.database.xml</groupId>
+          <artifactId>xdb</artifactId>
+          <version>19.3.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-test-utils_${scala.binary.version}</artifactId>

@@ -418,6 +418,77 @@ public class OracleConnectorITCase extends AbstractTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testXmlType() throws Exception {
+        // Prepare xml type data
+        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE debezium.xmltype_table ("
+                            + " ID NUMBER(4),"
+                            + " T15VARCHAR sys.xmltype,"
+                            + " PRIMARY KEY (ID))");
+            statement.execute(
+                    "INSERT INTO debezium.xmltype_table "
+                            + "VALUES (11, sys.xmlType.createXML('<name><a id=\"1\" value=\"some values\">test xmlType</a></name>'))");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE test_xmltype_table ("
+                                + " ID INT,"
+                                + " T15VARCHAR STRING,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        "debezium",
+                        "xmltype_table");
+        String sinkDDL =
+                "CREATE TABLE test_xmltype_sink ("
+                        + " id INT,"
+                        + " T15VARCHAR STRING,"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '1'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql("INSERT INTO test_xmltype_sink SELECT * FROM test_xmltype_table");
+
+        waitForSnapshotStarted("test_xmltype_sink");
+
+        // waiting for change events finished.
+        waitForSinkSize("test_xmltype_sink", 1);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I[11, <name>\r\n"
+                                + "   <a id=\"1\" value=\"some values\">test xmlType</a>\r\n"
+                                + "</name>]");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("test_xmltype_sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
     // ------------------------------------------------------------------------------------
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
