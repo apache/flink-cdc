@@ -21,7 +21,6 @@ import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,17 +52,17 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path oracleCdcJar = TestUtils.getResource("oracle-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @Rule
-    public final OracleContainer oracle =
-            new OracleContainer(ORACLE_IMAGE)
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(INTER_CONTAINER_ORACLE_ALIAS)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    public OracleContainer oracle;
 
     @Before
     public void before() {
         super.before();
         LOG.info("Starting containers...");
+        oracle =
+                new OracleContainer(ORACLE_IMAGE)
+                        .withNetwork(NETWORK)
+                        .withNetworkAliases(INTER_CONTAINER_ORACLE_ALIAS)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
         Startables.deepStart(Stream.of(oracle)).join();
         LOG.info("Containers are started.");
     }
