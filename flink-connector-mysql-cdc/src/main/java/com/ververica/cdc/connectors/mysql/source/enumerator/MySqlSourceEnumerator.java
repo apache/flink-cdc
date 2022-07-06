@@ -30,6 +30,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssig
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.connection.JdbcConnectionPools;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
@@ -182,6 +183,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void close() {
+        LOG.info("Closing JdbcConnectionPools...");
+        JdbcConnectionPools.getInstance().close();
         LOG.info("Closing enumerator...");
         splitAssigner.close();
     }

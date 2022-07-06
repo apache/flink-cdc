@@ -53,4 +53,12 @@ public class JdbcConnectionPools implements ConnectionPools {
             return pools.get(poolId);
         }
     }
+
+    public void close() {
+        for (HikariDataSource hikariDataSource : pools.values()) {
+            if (hikariDataSource != null && !hikariDataSource.isClosed()) {
+                hikariDataSource.close();
+            }
+        }
+    }
 }
