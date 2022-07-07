@@ -174,8 +174,7 @@ public class MySqlChangeEventSourceExampleTest {
                     "+I[106, hammer, 16oz carpenter's hammer, 1.0]",
                     "+I[107, rocks, box of assorted rocks, 5.3]",
                     "+I[108, jacket, water resistent black wind breaker, 0.1]",
-                    "+I[109, spare tire, 24 inch spare tire, 22.2]",
-                    "+I[110, spare tire, 28 inch spare tire, 26.2]"
+                    "+I[109, spare tire, 24 inch spare tire, 22.2]"
                 };
 
         // step-1: consume snapshot data
@@ -194,8 +193,8 @@ public class MySqlChangeEventSourceExampleTest {
                 new String[] {
                     "-U[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]",
                     "+U[103, cart, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]",
-                    "-D[110, spare tire, 28 inch spare tire, 26.2]",
                     "+I[110, spare tire, 28 inch spare tire, 26.2]",
+                    "-D[110, spare tire, 28 inch spare tire, 26.2]",
                     "-U[103, cart, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]",
                     "+U[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]"
                 };
@@ -250,10 +249,10 @@ public class MySqlChangeEventSourceExampleTest {
             // make binlog events
             connection.execute(
                     "UPDATE " + tableId + " SET name = 'cart' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 110",
                     "INSERT INTO "
                             + tableId
                             + " VALUES(110,'spare tire','28 inch spare tire','26.2')",
+                    "DELETE FROM " + tableId + " where id = 110",
                     "UPDATE " + tableId + " SET name = '12-pack drill bits' where id = 103");
             connection.commit();
         } finally {
