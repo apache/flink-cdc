@@ -18,7 +18,7 @@
 
 package com.ververica.cdc.connectors.vitess;
 
-import org.apache.flink.shaded.guava18.com.google.common.collect.Maps;
+import org.apache.flink.shaded.guava30.com.google.common.collect.Maps;
 
 import com.ververica.cdc.debezium.Validator;
 import io.debezium.connector.vitess.VitessConnector;
