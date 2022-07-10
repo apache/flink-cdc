@@ -411,6 +411,10 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         if (binaryLogClient != null) {
             binaryLogClient.disconnect();
         }
+        snapshotSplitReader.close();
+
+        assertExecutorIsTerminated(snapshotSplitReader);
+
         return formatResult(result, dataType);
     }
 

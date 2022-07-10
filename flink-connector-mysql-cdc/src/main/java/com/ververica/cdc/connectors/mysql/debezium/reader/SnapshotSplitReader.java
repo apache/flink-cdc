@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.formatMessageTimestamp;
@@ -328,6 +329,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
+            executor.shutdown();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
         } catch (Exception e) {
             LOG.error("Close snapshot reader error", e);
         }

@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
@@ -176,6 +177,11 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
+            // set currentTaskRunning to false to terminate the
+            // while loop in MySqlStreamingChangeEventSource's execute method
+            currentTaskRunning = false;
+            executor.shutdown();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
         }

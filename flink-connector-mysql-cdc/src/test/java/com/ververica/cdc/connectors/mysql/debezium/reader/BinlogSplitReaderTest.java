@@ -441,6 +441,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 }
             }
         }
+        snapshotSplitReader.close();
 
         // step-2: create binlog split according the finished snapshot splits
         List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
@@ -483,6 +484,10 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                             pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord),
                             dataType));
         }
+        binlogReader.close();
+
+        assertExecutorIsTerminated(binlogReader);
+
         return actual;
     }
 
