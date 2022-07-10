@@ -16,12 +16,12 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
-import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
+import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.junit.BeforeClass;
@@ -96,5 +96,4 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         ExecutorService executorService = (ExecutorService) executorField.get(reader);
         assertTrue(executorService.isTerminated());
     }
-
 }
