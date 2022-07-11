@@ -18,7 +18,7 @@
 
 package com.ververica.cdc.connectors.oracle.source;
 
-import org.apache.flink.annotation.Experimental;
+import org.apache.flink.annotation.Internal;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
@@ -38,7 +38,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * <p>Check the Java docs of each individual method to learn more about the settings to build a
  * {@link OracleIncrementalSource}.
  */
-@Experimental
+@Internal
 public class OracleSourceBuilder<T> {
     private final OracleSourceConfigFactory configFactory = new OracleSourceConfigFactory();
     private RedoLogOffsetFactory offsetFactory;
@@ -218,6 +218,10 @@ public class OracleSourceBuilder<T> {
                 RedoLogOffsetFactory offsetFactory,
                 OracleDialect dataSourceDialect) {
             super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+        }
+
+        public static <T> OracleSourceBuilder<T> builder() {
+            return new OracleSourceBuilder<>();
         }
     }
 }

@@ -91,7 +91,6 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
         return OracleConnectionUtils.createOracleConnection(
                 sourceConfig.getDbzConnectorConfig().getJdbcConfig());
-        //        return JdbcDataSourceDialect.super.openJdbcConnection(sourceConfig);
     }
 
     @Override

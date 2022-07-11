@@ -27,15 +27,10 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
-import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 import org.apache.flink.util.ExceptionUtils;
 
-import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -45,7 +40,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -81,6 +75,7 @@ public class OracleTableSourceFactoryTest {
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
+    private static final int MY_PORT = 1521;
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
@@ -91,41 +86,23 @@ public class OracleTableSourceFactoryTest {
 
     @Test
     public void testRequiredProperties() {
-        try {
-            Map<String, String> properties = getAllRequiredOptions();
-
-            // validation for source
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "hostname is required when url is not configured")
-                            .isPresent());
-        }
-    }
-
-    @Test
-    public void testRequiredPropertiesWithUrl() {
-        String url = "jdbc:oracle:thin:@" + MY_LOCALHOST + ":1521" + ":" + MY_DATABASE;
         Map<String, String> properties = getAllRequiredOptions();
-        properties.put("url", url);
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
-                        url,
-                        1521,
-                        null,
+                        MY_PORT,
+                        MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
                         PROPERTIES,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -138,8 +115,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
-                        null,
-                        1521,
+                        MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
@@ -147,7 +123,8 @@ public class OracleTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         PROPERTIES,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -156,7 +133,6 @@ public class OracleTableSourceFactoryTest {
         Map<String, String> options = getAllRequiredOptions();
         options.put("port", "1521");
         options.put("hostname", MY_LOCALHOST);
-        options.put("url", "jdbc:oracle:thin:@" + MY_LOCALHOST + ":1521" + ":" + MY_DATABASE);
         options.put("debezium.snapshot.mode", "initial");
 
         DynamicTableSource actualSource = createTableSource(options);
@@ -165,8 +141,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
-                        "jdbc:oracle:thin:@" + MY_LOCALHOST + ":1521" + ":" + MY_DATABASE,
-                        1521,
+                        MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
@@ -174,7 +149,8 @@ public class OracleTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         dbzProperties,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -188,8 +164,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
-                        null,
-                        1521,
+                        MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
@@ -197,7 +172,8 @@ public class OracleTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         PROPERTIES,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -211,8 +187,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
-                        null,
-                        1521,
+                        MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
@@ -220,13 +195,14 @@ public class OracleTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         PROPERTIES,
-                        StartupOptions.latest());
+                        StartupOptions.latest(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
     @Test
     public void testMetadataColumns() {
-        Map<String, String> properties = getAllRequiredOptionsWithHost();
+        Map<String, String> properties = getAllRequiredOptions();
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
@@ -238,8 +214,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA_WITH_METADATA,
-                        null,
-                        1521,
+                        MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
@@ -247,19 +222,13 @@ public class OracleTableSourceFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         new Properties(),
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        true);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
 
         assertEquals(expectedSource, actualSource);
-
-        ScanTableSource.ScanRuntimeProvider provider =
-                oracleTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
-        DebeziumSourceFunction<RowData> debeziumSourceFunction =
-                (DebeziumSourceFunction<RowData>)
-                        ((SourceFunctionProvider) provider).createSourceFunction();
-        assertProducedTypeOfSourceFunction(debeziumSourceFunction, expectedSource.producedDataType);
     }
 
     @Test
@@ -329,6 +298,8 @@ public class OracleTableSourceFactoryTest {
     private Map<String, String> getAllRequiredOptions() {
         Map<String, String> options = new HashMap<>();
         options.put("connector", "oracle-cdc");
+        options.put("port", "1521");
+        options.put("hostname", MY_LOCALHOST);
         options.put("database-name", MY_DATABASE);
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
