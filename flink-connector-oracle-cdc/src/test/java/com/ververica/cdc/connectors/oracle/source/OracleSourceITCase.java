@@ -138,7 +138,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                 + " PHONE_NUMBER STRING,"
                                 + " primary key (ID) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oracle-cdc-new',"
+                                + " 'connector' = 'oracle-cdc',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
@@ -263,7 +263,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         while (size > 0 && iter.hasNext()) {
             Row row = iter.next();
             rows.add(row.toString());
-            LOG.info("fetch row:{}", row.toString());
+            LOG.info("fetch row:{}", row);
             size--;
         }
         return rows;

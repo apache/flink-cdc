@@ -22,19 +22,20 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
+import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.OracleSource;
+import com.ververica.cdc.connectors.oracle.source.OracleSourceBuilder;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
-
-import javax.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -53,8 +54,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
-    private final String url;
-    private final Integer port;
+    private final int port;
     private final String hostname;
     private final String database;
     private final String username;
@@ -63,6 +63,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final String schemaName;
     private final Properties dbzProperties;
     private final StartupOptions startupOptions;
+    private final boolean enableParallelRead;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -76,20 +77,19 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
 
     public OracleTableSource(
             ResolvedSchema physicalSchema,
-            @Nullable String url,
-            @Nullable Integer port,
-            @Nullable String hostname,
+            int port,
+            String hostname,
             String database,
             String tableName,
             String schemaName,
             String username,
             String password,
             Properties dbzProperties,
-            StartupOptions startupOptions) {
+            StartupOptions startupOptions,
+            boolean enableParallelRead) {
         this.physicalSchema = physicalSchema;
-        this.url = url;
         this.port = port;
-        this.hostname = hostname;
+        this.hostname = checkNotNull(hostname);
         this.database = checkNotNull(database);
         this.tableName = checkNotNull(tableName);
         this.schemaName = checkNotNull(schemaName);
@@ -99,6 +99,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
+        this.enableParallelRead = enableParallelRead;
     }
 
     @Override
@@ -113,6 +114,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
+
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();
@@ -126,22 +128,39 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         .setUserDefinedConverterFactory(
                                 OracleDeserializationConverterFactory.instance())
                         .build();
-        OracleSource.Builder<RowData> builder =
-                OracleSource.<RowData>builder()
-                        .url(url)
-                        .hostname(hostname)
-                        .port(port)
-                        .database(database)
-                        .tableList(schemaName + "." + tableName)
-                        .schemaList(schemaName)
-                        .username(username)
-                        .password(password)
-                        .debeziumProperties(dbzProperties)
-                        .startupOptions(startupOptions)
-                        .deserializer(deserializer);
-        DebeziumSourceFunction<RowData> sourceFunction = builder.build();
 
-        return SourceFunctionProvider.of(sourceFunction, false);
+        if (enableParallelRead) {
+            JdbcIncrementalSource<RowData> oracleChangeEventSource =
+                    OracleSourceBuilder.OracleIncrementalSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .databaseList(database)
+                            .schemaList(schemaName)
+                            .tableList(schemaName + "." + tableName)
+                            .username(username)
+                            .password(password)
+                            .deserializer(deserializer)
+                            .debeziumProperties(dbzProperties)
+                            .build();
+
+            return SourceProvider.of(oracleChangeEventSource);
+        } else {
+            OracleSource.Builder<RowData> builder =
+                    OracleSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .database(database)
+                            .tableList(schemaName + "." + tableName)
+                            .schemaList(schemaName)
+                            .username(username)
+                            .password(password)
+                            .debeziumProperties(dbzProperties)
+                            .startupOptions(startupOptions)
+                            .deserializer(deserializer);
+            DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+
+            return SourceFunctionProvider.of(sourceFunction, false);
+        }
     }
 
     private MetadataConverter[] getMetadataConverters() {
@@ -165,7 +184,6 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         OracleTableSource source =
                 new OracleTableSource(
                         physicalSchema,
-                        url,
                         port,
                         hostname,
                         database,
@@ -174,7 +192,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         username,
                         password,
                         dbzProperties,
-                        startupOptions);
+                        startupOptions,
+                        enableParallelRead);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -191,7 +210,6 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         OracleTableSource that = (OracleTableSource) o;
         return Objects.equals(port, that.port)
                 && Objects.equals(physicalSchema, that.physicalSchema)
-                && Objects.equals(url, that.url)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
                 && Objects.equals(username, that.username)
@@ -201,14 +219,14 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(dbzProperties, that.dbzProperties)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
-                && Objects.equals(metadataKeys, that.metadataKeys);
+                && Objects.equals(metadataKeys, that.metadataKeys)
+                && Objects.equals(enableParallelRead, that.enableParallelRead);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(
                 physicalSchema,
-                url,
                 port,
                 hostname,
                 database,

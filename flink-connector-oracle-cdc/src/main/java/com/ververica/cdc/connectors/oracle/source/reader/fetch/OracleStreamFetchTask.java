@@ -143,7 +143,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 offsetContext.getPartition(),
                                 redoLogSplit,
                                 currentRedoLogOffset,
-                                JdbcSourceEventDispatcher.WatermarkKind.BINLOG_END);
+                                JdbcSourceEventDispatcher.WatermarkKind.END);
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
                         errorHandler.setProducerThrowable(

@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.oracle.source.meta.events;
+package com.ververica.cdc.connectors.oracle.source.config;
 
-import org.apache.flink.api.connector.source.SourceEvent;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
 
-import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.options.JdbcSourceOptions;
+import com.ververica.cdc.connectors.oracle.OracleSource;
 
-/**
- * The {@link SourceEvent} that {@link JdbcIncrementalSourceReader} sends to {@link
- * IncrementalSourceEnumerator} to ask the latest finished snapshot splits size.
- */
-public class LatestFinishedSplitsSizeRequestEvent implements SourceEvent {
+/** Configurations for {@link OracleSource}. */
+public class OracleSourceOptions extends JdbcSourceOptions {
 
-    private static final long serialVersionUID = 1L;
-
-    public LatestFinishedSplitsSizeRequestEvent() {}
+    public static final ConfigOption<String> SCHEMA_NAME =
+            ConfigOptions.key("schema-name")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Schema name of the Oracle database to monitor.");
 }

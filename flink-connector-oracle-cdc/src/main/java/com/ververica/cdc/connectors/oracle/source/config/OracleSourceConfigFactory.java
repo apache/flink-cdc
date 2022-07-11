@@ -88,7 +88,6 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         return new OracleSourceConfig(
                 startupOptions,
                 databaseList,
-                schemaList,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,

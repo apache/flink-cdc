@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.oracle.table;
 
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -30,75 +29,26 @@ import com.ververica.cdc.debezium.table.DebeziumOptions;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PORT;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_MODE;
+import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.SCHEMA_NAME;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
-import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
-/**
- * Factory for creating configured instance of {@link
- * com.ververica.cdc.connectors.oracle.table.OracleTableSource}.
- */
+/** Factory for creating configured instance of {@link OracleTableSource}. */
 public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "oracle-cdc";
-
-    private static final ConfigOption<String> HOSTNAME =
-            ConfigOptions.key("hostname")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("IP address or hostname of the Oracle database server.");
-
-    private static final ConfigOption<Integer> PORT =
-            ConfigOptions.key("port")
-                    .intType()
-                    .defaultValue(1521)
-                    .withDescription("Integer port number of the Oracle database server.");
-
-    private static final ConfigOption<String> URL =
-            ConfigOptions.key("url")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Complete JDBC URL as an alternative to specifying hostname, port and database provided  as a way to support alternative connection scenarios.");
-
-    private static final ConfigOption<String> USERNAME =
-            ConfigOptions.key("username")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Name of the Oracle database to use when connecting to the Oracle database server.");
-
-    private static final ConfigOption<String> PASSWORD =
-            ConfigOptions.key("password")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Password to use when connecting to the oracle database server.");
-
-    private static final ConfigOption<String> DATABASE_NAME =
-            ConfigOptions.key("database-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Database name of the Oracle server to monitor.");
-
-    private static final ConfigOption<String> SCHEMA_NAME =
-            ConfigOptions.key("schema-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Schema name of the Oracle database to monitor.");
-
-    private static final ConfigOption<String> TABLE_NAME =
-            ConfigOptions.key("table-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Table name of the Oracle database to monitor.");
-
-    public static final ConfigOption<String> SCAN_STARTUP_MODE =
-            ConfigOptions.key("scan.startup.mode")
-                    .stringType()
-                    .defaultValue("initial")
-                    .withDescription(
-                            "Optional startup mode for Oracle CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"latest-offset\"");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -113,17 +63,25 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
-        String url = config.get(URL);
-        Integer port = config.get(PORT);
+        int port = config.get(PORT);
         StartupOptions startupOptions = getStartupOptions(config);
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
-        if (url == null) {
-            checkNotNull(hostname, "hostname is required when url is not configured");
-            checkNotNull(port, "port is required when url is not configured");
+
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
+        int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
+        int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+
+        if (enableParallelRead) {
+            validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
+            validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
+            validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
+            validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
         }
+
         return new OracleTableSource(
                 physicalSchema,
-                url,
                 port,
                 hostname,
                 databaseName,
@@ -132,7 +90,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 username,
                 password,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
-                startupOptions);
+                startupOptions,
+                enableParallelRead);
     }
 
     @Override
@@ -143,6 +102,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(HOSTNAME);
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(DATABASE_NAME);
@@ -154,11 +114,12 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(HOSTNAME);
         options.add(PORT);
-        options.add(URL);
         options.add(SCAN_STARTUP_MODE);
-
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(CONNECT_MAX_RETRIES);
+        options.add(CONNECTION_POOL_SIZE);
         return options;
     }
 
@@ -184,5 +145,15 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 modeString));
         }
+    }
+
+    /** Checks the value of given integer option is valid. */
+    private void validateIntegerOption(
+            ConfigOption<Integer> option, int optionValue, int exclusiveMin) {
+        checkState(
+                optionValue > exclusiveMin,
+                String.format(
+                        "The value of option '%s' must larger than %d, but is %d",
+                        option.key(), exclusiveMin, optionValue));
     }
 }
