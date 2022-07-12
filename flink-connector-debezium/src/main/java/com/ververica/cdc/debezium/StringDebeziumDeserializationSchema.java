@@ -18,6 +18,7 @@
 
 package com.ververica.cdc.debezium;
 
+import com.ververica.cdc.debezium.utils.SourceRecordUtil;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.util.Collector;
@@ -30,10 +31,20 @@ import org.apache.kafka.connect.source.SourceRecord;
  */
 public class StringDebeziumDeserializationSchema implements DebeziumDeserializationSchema<String> {
     private static final long serialVersionUID = -3168848963265670603L;
+    private final int timeZoneOffset;
+
+    public StringDebeziumDeserializationSchema() {
+        this.timeZoneOffset = 8;
+    }
+
+    public StringDebeziumDeserializationSchema(int timeZoneOffset) {
+        this.timeZoneOffset = timeZoneOffset;
+    }
 
     @Override
-    public void deserialize(SourceRecord record, Collector<String> out) throws Exception {
-        out.collect(record.toString());
+    public void deserialize(SourceRecord record, Collector<String> out) {
+        SourceRecord sourceRecord = SourceRecordUtil.correctTimeZoneSourceRecord(record, timeZoneOffset);
+        out.collect(sourceRecord.toString());
     }
 
     @Override
