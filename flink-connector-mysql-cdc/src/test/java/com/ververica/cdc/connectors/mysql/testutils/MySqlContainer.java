@@ -33,7 +33,7 @@ import java.util.Set;
 @SuppressWarnings("rawtypes")
 public class MySqlContainer extends JdbcDatabaseContainer {
 
-    public static final String IMAGE = "mysql";
+    public static final String IMAGE = "mysql/mysql-server";
     public static final Integer MYSQL_PORT = 3306;
 
     private static final String MY_CNF_CONFIG_OVERRIDE_PARAM_NAME = "MY_CNF";
