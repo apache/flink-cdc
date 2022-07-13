@@ -148,21 +148,21 @@ Connector Options
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Tenant name of OceanBase to monitor.</td>
+                <td>Tenant name of OceanBase to monitor, should be exact value.</td>
             </tr>
             <tr>
                 <td>database-name</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Database name of OceanBase to monitor.</td>
+                <td>Database name of OceanBase to monitor, should be regular expression.</td>
             </tr>
             <tr>
                 <td>table-name</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Table name of OceanBase to monitor.</td>
+                <td>Table name of OceanBase to monitor, should be regular expression.</td>
             </tr>
             <tr>
                 <td>hostname</td>

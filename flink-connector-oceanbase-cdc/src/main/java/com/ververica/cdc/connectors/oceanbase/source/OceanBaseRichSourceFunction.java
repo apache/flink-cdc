@@ -62,6 +62,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -94,6 +95,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final ClientConf logProxyClientConf;
     private final ObReaderConfig obReaderConfig;
     private final DebeziumDeserializationSchema<T> deserializer;
+    private final Pattern databaseNamePattern;
+    private final Pattern tableNamePattern;
 
     private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
     private final List<LogMessage> logMessageBuffer = new LinkedList<>();
@@ -136,6 +139,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.logProxyClientConf = checkNotNull(logProxyClientConf);
         this.obReaderConfig = checkNotNull(obReaderConfig);
         this.deserializer = checkNotNull(deserializer);
+        this.databaseNamePattern = Pattern.compile(databaseName);
+        this.tableNamePattern = Pattern.compile(tableName);
     }
 
     @Override
@@ -313,7 +318,14 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                 if (!started) {
                                     break;
                                 }
-                                logMessageBuffer.add(message);
+                                if (databaseNamePattern
+                                                .matcher(getDbName(message.getDbName()))
+                                                .matches()
+                                        && tableNamePattern
+                                                .matcher(message.getTableName())
+                                                .matches()) {
+                                    logMessageBuffer.add(message);
+                                }
                                 break;
                             case COMMIT:
                                 // flush buffer after snapshot completed
@@ -363,7 +375,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     }
 
     private SourceRecord getRecordFromLogMessage(LogMessage message) {
-        String databaseName = message.getDbName().replace(tenantName + ".", "");
+        String databaseName = getDbName(message.getDbName());
         String topicName = getDefaultTopicName(tenantName, databaseName, message.getTableName());
 
         if (tableSchemaMap.get(topicName) == null) {
@@ -444,6 +456,13 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     private boolean shouldReadSnapshot() {
         return resolvedTimestamp == -1 && snapshot;
+    }
+
+    private String getDbName(String origin) {
+        if (origin == null) {
+            return null;
+        }
+        return origin.replace(tenantName + ".", "");
     }
 
     private String getDefaultTopicName(String tenantName, String databaseName, String tableName) {

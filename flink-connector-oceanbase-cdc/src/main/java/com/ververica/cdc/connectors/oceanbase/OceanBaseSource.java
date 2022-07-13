@@ -193,15 +193,14 @@ public class OceanBaseSource {
                 connectTimeout = Duration.ofSeconds(30);
             }
 
-            String tableWhiteList =
-                    String.format(
-                            "%s.%s.%s",
-                            checkNotNull(tenantName),
-                            checkNotNull(databaseName),
-                            checkNotNull(tableName));
-
             if (logProxyClientId == null) {
-                logProxyClientId = ClientIdGenerator.generate() + "_" + tableWhiteList;
+                logProxyClientId =
+                        String.format(
+                                "%s_%s.%s.%s",
+                                ClientIdGenerator.generate(),
+                                checkNotNull(tenantName),
+                                checkNotNull(databaseName),
+                                checkNotNull(tableName));
             }
             ClientConf clientConf =
                     ClientConf.builder()
@@ -221,7 +220,7 @@ public class OceanBaseSource {
             }
             obReaderConfig.setUsername(username);
             obReaderConfig.setPassword(password);
-            obReaderConfig.setTableWhiteList(tableWhiteList);
+            obReaderConfig.setTableWhiteList(String.format("%s.*.*", tenantName));
             obReaderConfig.setStartTimestamp(startupTimestamp);
             obReaderConfig.setTimezone(zoneOffset.getId());
 
