@@ -314,7 +314,7 @@ public class MySqlSnapshotSplitReadTask
         else if ("CHAR".equals(actualColumn.typeName())
                 || "VARCHAR".equals(actualColumn.typeName())
                 || "TEXT".equals(actualColumn.typeName())) {
-            return rs.getBytes(fieldNo);
+            return rs.getString(fieldNo);
         } else {
             return rs.getObject(fieldNo);
         }
