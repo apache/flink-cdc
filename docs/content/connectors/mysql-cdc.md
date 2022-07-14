@@ -529,7 +529,7 @@ The following operations show how to enable this feature to resolve above scenar
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .scanNewlyAddedTableEnabled(true) // eanbel scan the newly added tables fature
+        .scanNewlyAddedTableEnabled(true) // enable scan the newly added tables fature
         .databaseList("db") // set captured database
         .tableList("db.product, db.user, db.address") // set captured tables [product, user, address]
         .username("yourUsername")
