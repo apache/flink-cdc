@@ -529,7 +529,7 @@ The following operations show how to enable this feature to resolve above scenar
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .scanNewlyAddedTableEnabled(true) // eanbel scan the newly added tables fature
+        .scanNewlyAddedTableEnabled(true) // enable scan the newly added tables feature
         .databaseList("db") // set captured database
         .tableList("db.product, db.user, db.address") // set captured tables [product, user, address]
         .username("yourUsername")
@@ -581,9 +581,9 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
-        <th class="text-left">NOTE</th>
+        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
     <tbody>
@@ -595,7 +595,9 @@ Data Type Mapping
     <tr>
       <td>
         SMALLINT<br>
-        TINYINT UNSIGNED</td>
+        TINYINT UNSIGNED<br>
+        TINYINT UNSIGNED ZEROFILL
+      </td>
       <td>SMALLINT</td>
       <td></td>
     </tr>
@@ -603,33 +605,52 @@ Data Type Mapping
       <td>
         INT<br>
         MEDIUMINT<br>
-        SMALLINT UNSIGNED</td>
+        SMALLINT UNSIGNED<br>
+        SMALLINT UNSIGNED ZEROFILL
+      </td>
       <td>INT</td>
       <td></td>
     </tr>
     <tr>
       <td>
         BIGINT<br>
-        INT UNSIGNED</td>
+        INT UNSIGNED<br>
+        INT UNSIGNED ZEROFILL<br>
+        MEDIUMINT UNSIGNED<br>
+        MEDIUMINT UNSIGNED ZEROFILL
+      </td>
       <td>BIGINT</td>
       <td></td>
     </tr>
    <tr>
-      <td>BIGINT UNSIGNED</td>
+      <td>
+        BIGINT UNSIGNED<br>
+        BIGINT UNSIGNED ZEROFILL<br>
+        SERIAL
+      </td>
       <td>DECIMAL(20, 0)</td>
       <td></td>
     </tr>
     <tr>
       <td>
-        REAL<br>
         FLOAT<br>
+        FLOAT UNSIGNED<br>
+        FLOAT UNSIGNED ZEROFILL
         </td>
       <td>FLOAT</td>
       <td></td>
     </tr>
     <tr>
       <td>
-        DOUBLE
+        REAL<br>
+        REAL UNSIGNED<br>
+        REAL UNSIGNED ZEROFILL<br>
+        DOUBLE<br>
+        DOUBLE UNSIGNED<br>
+        DOUBLE UNSIGNED ZEROFILL<br>
+        DOUBLE PRECISION<br>
+        DOUBLE PRECISION UNSIGNED<br>
+        DOUBLE PRECISION UNSIGNED ZEROFILL
       </td>
       <td>DOUBLE</td>
       <td></td>
@@ -637,7 +658,14 @@ Data Type Mapping
     <tr>
       <td>
         NUMERIC(p, s)<br>
+        NUMERIC(p, s) UNSIGNED<br>
+        NUMERIC(p, s) UNSIGNED ZEROFILL<br>
         DECIMAL(p, s)<br>
+        DECIMAL(p, s) UNSIGNED<br>
+        DECIMAL(p, s) UNSIGNED ZEROFILL<br>
+        FIXED(p, s)<br>
+        FIXED(p, s) UNSIGNED<br>
+        FIXED(p, s) UNSIGNED ZEROFILL<br>
         where p <= 38<br>
       </td>
       <td>DECIMAL(p, s)</td>
@@ -646,7 +674,14 @@ Data Type Mapping
     <tr>
       <td>
         NUMERIC(p, s)<br>
+        NUMERIC(p, s) UNSIGNED<br>
+        NUMERIC(p, s) UNSIGNED ZEROFILL<br>
         DECIMAL(p, s)<br>
+        DECIMAL(p, s) UNSIGNED<br>
+        DECIMAL(p, s) UNSIGNED ZEROFILL<br>
+        FIXED(p, s)<br>
+        FIXED(p, s) UNSIGNED<br>
+        FIXED(p, s) UNSIGNED ZEROFILL<br>
         where 38 < p <= 65<br>
       </td>
       <td>STRING</td>
