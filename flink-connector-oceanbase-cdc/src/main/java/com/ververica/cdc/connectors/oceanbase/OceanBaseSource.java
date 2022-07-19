@@ -196,11 +196,10 @@ public class OceanBaseSource {
             if (logProxyClientId == null) {
                 logProxyClientId =
                         String.format(
-                                "%s_%s.%s.%s",
+                                "%s_%s_%s",
                                 ClientIdGenerator.generate(),
-                                checkNotNull(tenantName),
-                                checkNotNull(databaseName),
-                                checkNotNull(tableName));
+                                Thread.currentThread().getId(),
+                                checkNotNull(tenantName));
             }
             ClientConf clientConf =
                     ClientConf.builder()

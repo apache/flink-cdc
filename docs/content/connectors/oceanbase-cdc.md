@@ -211,7 +211,7 @@ Connector Options
                 <td>optional</td>
                 <td style="word-wrap: break-word;">By rule.</td>
                 <td>String</td>
-                <td>Id of a log proxy client connection, will be in format {flink_ip}_{process_id}_{timestamp}_{tenant}.{db}.{table} by default.</td>
+                <td>Id of a log proxy client connection, will be in format {flink_ip}_{process_id}_{timestamp}_{thread_id}_{tenant} by default.</td>
             </tr>
             <tr>
                 <td>rootserver-list</td>
