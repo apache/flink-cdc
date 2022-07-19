@@ -220,7 +220,12 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
         while (ObjectUtils.compare(chunkEnd, max) <= 0) {
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             chunkStart = chunkEnd;
-            chunkEnd = ObjectUtils.plus(chunkEnd, chunkSize);
+            try {
+                chunkEnd = ObjectUtils.plus(chunkEnd, chunkSize);
+            } catch (ArithmeticException e) {
+                // Stop chunk split to avoid dead loop when number overflows.
+                break;
+            }
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
