@@ -563,7 +563,7 @@ public class MongoDBConnectorDeserializationSchema
         }
         if (docObj.isDocument()) {
             // convert document to json string
-            return StringData.fromString(docObj.toString());
+            return StringData.fromString(docObj.asDocument().toJson());
         }
         if (docObj.isBinary()) {
             BsonBinary bsonBinary = docObj.asBinary();
