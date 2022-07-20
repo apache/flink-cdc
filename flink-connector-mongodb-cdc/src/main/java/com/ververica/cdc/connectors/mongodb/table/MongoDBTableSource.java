@@ -71,6 +71,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String copyExistingPipeline;
     private final Integer copyExistingMaxThreads;
     private final Integer copyExistingQueueSize;
+    private final Integer batchSize;
     private final Integer pollMaxBatchSize;
     private final Integer pollAwaitTimeMillis;
     private final Integer heartbeatIntervalMillis;
@@ -100,6 +101,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String copyExistingPipeline,
             @Nullable Integer copyExistingMaxThreads,
             @Nullable Integer copyExistingQueueSize,
+            @Nullable Integer batchSize,
             @Nullable Integer pollMaxBatchSize,
             @Nullable Integer pollAwaitTimeMillis,
             @Nullable Integer heartbeatIntervalMillis,
@@ -117,6 +119,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.copyExistingPipeline = copyExistingPipeline;
         this.copyExistingMaxThreads = copyExistingMaxThreads;
         this.copyExistingQueueSize = copyExistingQueueSize;
+        this.batchSize = batchSize;
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
@@ -177,6 +180,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         Optional.ofNullable(copyExistingPipeline).ifPresent(builder::copyExistingPipeline);
         Optional.ofNullable(copyExistingMaxThreads).ifPresent(builder::copyExistingMaxThreads);
         Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
+        Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
         Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
         Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
         Optional.ofNullable(heartbeatIntervalMillis).ifPresent(builder::heartbeatIntervalMillis);
@@ -234,6 +238,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         copyExistingPipeline,
                         copyExistingMaxThreads,
                         copyExistingQueueSize,
+                        batchSize,
                         pollMaxBatchSize,
                         pollAwaitTimeMillis,
                         heartbeatIntervalMillis,
@@ -265,6 +270,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(copyExistingPipeline, that.copyExistingPipeline)
                 && Objects.equals(copyExistingMaxThreads, that.copyExistingMaxThreads)
                 && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
+                && Objects.equals(batchSize, that.batchSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
                 && Objects.equals(heartbeatIntervalMillis, that.heartbeatIntervalMillis)
@@ -289,6 +295,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,
+                batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,

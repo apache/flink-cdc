@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mongodb.MongoDBSource.BATCH_SIZE_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_ALL;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
@@ -112,6 +113,7 @@ public class MongoDBTableFactoryTest {
                         null,
                         null,
                         null,
+                        BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
                         null,
@@ -129,6 +131,7 @@ public class MongoDBTableFactoryTest {
         options.put("copy.existing.pipeline", "[ { \"$match\": { \"closed\": \"false\" } } ]");
         options.put("copy.existing.max.threads", "1");
         options.put("copy.existing.queue.size", "101");
+        options.put("batch.size", "101");
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
         options.put("heartbeat.interval.ms", "104");
@@ -148,6 +151,7 @@ public class MongoDBTableFactoryTest {
                         false,
                         "[ { \"$match\": { \"closed\": \"false\" } } ]",
                         1,
+                        101,
                         101,
                         102,
                         103,
@@ -183,6 +187,7 @@ public class MongoDBTableFactoryTest {
                         null,
                         null,
                         null,
+                        BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
                         null,
