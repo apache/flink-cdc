@@ -1,10 +1,8 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
+// Copyright 2022 Ververica
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //   http://www.apache.org/licenses/LICENSE-2.0
 // Unless required by applicable law or agreed to in writing,
 // software distributed under the License is distributed on an
@@ -14,7 +12,12 @@
 // under the License.
 
 db.getCollection('products').insertMany([
-{"_id": ObjectId("100000000000000000000101"), "name": "scooter", "description": "Small 2-wheel scooter", "weight": 3.14},
+    {
+        "_id": ObjectId("100000000000000000000101"),
+        "name": "scooter",
+        "description": "Small 2-wheel scooter",
+        "weight": 3.14
+    },
 {"_id": ObjectId("100000000000000000000102"), "name": "car battery", "description": "12V car battery", "weight": 8.1},
 {"_id": ObjectId("100000000000000000000103"), "name": "12-pack drill bits", "description": "12-pack of drill bits with sizes ranging from #40 to #3", "weight": 0.8},
 {"_id": ObjectId("100000000000000000000104"), "name": "hammer", "description": "12oz carpenter''s hammer", "weight": 0.75},
