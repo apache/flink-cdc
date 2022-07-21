@@ -159,7 +159,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                             "Change stream cursor batch size. "
                                     + "Specifies the maximum number of change events to return in each batch "
                                     + "of the response from the MongoDB cluster."
-                                    + "Defaults to 0 meaning it uses the servers default.");
+                                    + "Defaults to 0 meaning it uses the servers default value.");
 
     private static final ConfigOption<Integer> POLL_MAX_BATCH_SIZE =
             ConfigOptions.key("poll.max.batch.size")
