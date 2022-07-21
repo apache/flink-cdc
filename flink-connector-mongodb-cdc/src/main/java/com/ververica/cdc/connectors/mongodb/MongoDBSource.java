@@ -192,7 +192,7 @@ public class MongoDBSource {
          *
          * <p>The change stream cursor batch size. Specifies the maximum number of change events to
          * return in each batch of the response from the MongoDB cluster. The default is 0 meaning
-         * it uses the servers default value. Default: 0
+         * it uses the server's default value. Default: 0
          */
         public Builder<T> batchSize(int batchSize) {
             checkArgument(batchSize >= 0);
