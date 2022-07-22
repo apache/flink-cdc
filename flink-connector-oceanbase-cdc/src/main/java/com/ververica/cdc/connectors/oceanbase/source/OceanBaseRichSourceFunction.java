@@ -52,9 +52,11 @@ import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -97,7 +99,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
     private final List<LogMessage> logMessageBuffer = new LinkedList<>();
 
-    private transient Map<String, List<String>> tableMap;
+    private transient Set<String> tableSet;
     private transient Map<String, TableSchema> tableSchemaMap;
     private transient volatile long resolvedTimestamp;
     private transient volatile OceanBaseConnection snapshotConnection;
@@ -152,7 +154,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     public void run(SourceContext<T> ctx) throws Exception {
         outputCollector.context = ctx;
 
-        LOG.info("Find tables in database");
+        LOG.info("Start to initial table whitelist");
         initTableWhiteList();
 
         LOG.info("Start readChangeEvents process");
@@ -200,19 +202,17 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     }
 
     private void initTableWhiteList() {
-        if (tableMap != null && !tableMap.isEmpty()) {
+        if (tableSet != null && !tableSet.isEmpty()) {
             return;
         }
 
-        final Map<String, List<String>> localTableMap = new HashMap<>();
+        final Set<String> localTableSet = new HashSet<>();
 
         if (StringUtils.isNotBlank(tableList)) {
             for (String s : tableList.split(",")) {
                 if (StringUtils.isNotBlank(s)) {
                     String[] schema = s.split("\\.");
-                    localTableMap
-                            .computeIfAbsent(schema[0].trim(), k -> new ArrayList<>())
-                            .add(schema[1].trim());
+                    localTableSet.add(String.format("%s.%s", schema[0].trim(), schema[1].trim()));
                 }
             }
         }
@@ -231,10 +231,9 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                 sql,
                                 rs -> {
                                     while (rs.next()) {
-                                        localTableMap
-                                                .computeIfAbsent(
-                                                        rs.getString(1), k -> new ArrayList<>())
-                                                .add(rs.getString(2));
+                                        localTableSet.add(
+                                                String.format(
+                                                        "%s.%s", rs.getString(1), rs.getString(2)));
                                     }
                                 });
             } catch (SQLException e) {
@@ -243,29 +242,22 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             }
         }
 
-        this.tableMap = localTableMap;
+        if (localTableSet.isEmpty()) {
+            throw new FlinkRuntimeException("No valid table found");
+        }
+
+        this.tableSet = localTableSet;
         this.obReaderConfig.setTableWhiteList(
-                localTableMap.entrySet().stream()
-                        .map(
-                                entry ->
-                                        entry.getValue().stream()
-                                                .map(
-                                                        table ->
-                                                                String.format(
-                                                                        "%s.%s.%s",
-                                                                        tenantName,
-                                                                        entry.getKey(),
-                                                                        table))
-                                                .collect(Collectors.joining("|")))
+                localTableSet.stream()
+                        .map(table -> String.format("%s.%s", tenantName, table))
                         .collect(Collectors.joining("|")));
     }
 
     protected void readSnapshot() {
-        tableMap.forEach(
-                (db, tableList) -> {
-                    for (String table : tableList) {
-                        readSnapshotFromTable(db, table);
-                    }
+        tableSet.forEach(
+                table -> {
+                    String[] schema = table.split("\\.");
+                    readSnapshotFromTable(schema[0], schema[1]);
                 });
         snapshotCompleted.set(true);
     }
