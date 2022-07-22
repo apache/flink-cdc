@@ -77,6 +77,16 @@ under the License.
                                     <include>com.github.luben:zstd-jni</include>
                                 </includes>
                             </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>io.grpc</pattern>
+                                    <shadedPattern>vitess.shaded.io.grpc</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>io.netty</pattern>
+                                    <shadedPattern>vitess.shaded.io.netty</shadedPattern>
+                                </relocation>
+                            </relocations>
                             <filters>
                                 <filter>
                                     <artifact>org.apache.kafka:*</artifact>
