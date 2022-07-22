@@ -155,14 +155,21 @@ Connector Options
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Database name of OceanBase to monitor, should be regular expression.</td>
+                <td>Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
             </tr>
             <tr>
                 <td>table-name</td>
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Table name of OceanBase to monitor, should be regular expression.</td>
+                <td>Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+            </tr>
+            <tr>
+                <td>table-list</td>
+                <td>required</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>List of full names of tables, separated by commas, e.g. "db1.table1, db2.table2".</td>
             </tr>
             <tr>
                 <td>hostname</td>

@@ -54,6 +54,7 @@ public class OceanBaseSource {
         private String tenantName;
         private String databaseName;
         private String tableName;
+        private String tableList;
         private String serverTimeZone;
         private Duration connectTimeout;
 
@@ -99,6 +100,11 @@ public class OceanBaseSource {
 
         public Builder<T> tableName(String tableName) {
             this.tableName = tableName;
+            return this;
+        }
+
+        public Builder<T> tableList(String tableList) {
+            this.tableList = tableList;
             return this;
         }
 
@@ -217,7 +223,6 @@ public class OceanBaseSource {
             }
             obReaderConfig.setUsername(username);
             obReaderConfig.setPassword(password);
-            obReaderConfig.setTableWhiteList(String.format("%s.*.*", tenantName));
             obReaderConfig.setStartTimestamp(startupTimestamp);
             obReaderConfig.setTimezone(zoneOffset.getId());
 
@@ -228,6 +233,7 @@ public class OceanBaseSource {
                     tenantName,
                     databaseName,
                     tableName,
+                    tableList,
                     zoneOffset,
                     connectTimeout,
                     hostname,

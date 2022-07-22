@@ -64,13 +64,22 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
             ConfigOptions.key("database-name")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Database name of OceanBase to monitor.");
+                    .withDescription(
+                            "Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.");
 
     public static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("table-name")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Table name of OceanBase to monitor.");
+                    .withDescription(
+                            "Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.");
+
+    public static final ConfigOption<String> TABLE_LIST =
+            ConfigOptions.key("table-list")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "List of full names of tables, separated by commas, e.g. \"db1.table1, db2.table2\".");
 
     public static final ConfigOption<String> SERVER_TIME_ZONE =
             ConfigOptions.key("server-time-zone")
@@ -163,6 +172,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         String tenantName = config.get(TENANT_NAME);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
+        String tableList = config.get(TABLE_LIST);
+
         String serverTimeZone = config.get(SERVER_TIME_ZONE);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
@@ -185,6 +196,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 tenantName,
                 databaseName,
                 tableName,
+                tableList,
                 serverTimeZone,
                 connectTimeout,
                 hostname,
