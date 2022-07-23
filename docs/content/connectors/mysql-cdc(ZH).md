@@ -76,7 +76,7 @@ Notes
 - `wait_timeout`: 服务器在关闭非交互连接之前等待活动的秒数。 更多信息请参考 [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_wait_timeout).
 
 
-How to create a MySQL CDC table
+如何创建 MySQL CDC 表
 ----------------
 
 MySQL CDC表 可以定义如下：
