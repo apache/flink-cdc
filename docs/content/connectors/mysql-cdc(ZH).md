@@ -69,7 +69,7 @@ Notes
 假设 Source 并行度为 4, 我们可以使用 `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` 来为 4 个 Source Readers 中的每一个分配唯一的服务器 id。
 
 
-### 设置 MySQL 会话 timeout
+### 设置 MySQL 会话超时时间
 
 当为大型数据库创建初始一致快照时，您建立的连接可能会在读取表时超时。您可以通过在MySQL配置文件中配置 interactive_timeout 和 wait_timeout 来防止这种行为。
 - `interactive_timeout`: 服务器在关闭交互连接之前等待活动的秒数。 更多信息请参考 [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_interactive_timeout).
