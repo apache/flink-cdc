@@ -26,6 +26,40 @@ Download [flink-sql-connector-sqlserver-cdc-2.3-SNAPSHOT.jar](https://repo1.mave
 
 **Note:** flink-sql-connector-sqlserver-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-sqlserver-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-sqlserver-cdc), the released version will be available in the Maven central warehouse.
 
+Setup SQLServer Database
+----------------
+A SQL Server administrator must enable change data capture on the source tables that you want to capture. The database must already be enabled for CDC. To enable CDC on a table, a SQL Server administrator runs the stored procedure ```sys.sp_cdc_enable_table``` for the table.
+
+**Prerequisites:**
+* CDC is enabled on the SQL Server database.
+* The SQL Server Agent is running.
+* You are a member of the db_owner fixed database role for the database.
+
+**Procedure:**
+* Connect to the SQL Server database by database management studio.
+* Run the following SQL statement to enable CDC on the table.
+```sql
+USE MyDB
+GO
+
+EXEC sys.sp_cdc_enable_table
+@source_schema = N'dbo',     -- Specifies the schema of the source table.
+@source_name   = N'MyTable', -- Specifies the name of the table that you want to capture.
+@role_name     = N'MyRole',  -- Specifies a role MyRole to which you can add users to whom you want to grant SELECT permission on the captured columns of the source table. Users in the sysadmin or db_owner role also have access to the specified change tables. Set the value of @role_name to NULL, to allow only members in the sysadmin or db_owner to have full access to captured information.
+@filegroup_name = N'MyDB_CT',-- Specifies the filegroup where SQL Server places the change table for the captured table. The named filegroup must already exist. It is best not to locate change tables in the same filegroup that you use for source tables.
+@supports_net_changes = 0
+GO
+```
+* Verifying that the user has access to the CDC table
+```sql
+--The following example runs the stored procedure sys.sp_cdc_help_change_data_capture on the database MyDB:
+USE MyDB;
+GO
+EXEC sys.sp_cdc_help_change_data_capture
+GO
+```
+The query returns configuration information for each table in the database that is enabled for CDC and that contains change data that the caller is authorized to access. If the result is empty, verify that the user has privileges to access both the capture instance and the CDC tables.
+
 How to create a SQLServer CDC table
 ----------------
 
