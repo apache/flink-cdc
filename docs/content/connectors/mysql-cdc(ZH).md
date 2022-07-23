@@ -79,7 +79,7 @@ Notes
 如何创建 MySQL CDC 表
 ----------------
 
-MySQL CDC表 可以定义如下：
+MySQL CDC 表可以定义如下：
 
 ```sql
 -- 每 3000 毫秒做一次 checkpoint                      
