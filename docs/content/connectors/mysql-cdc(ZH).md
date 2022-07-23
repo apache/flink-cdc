@@ -37,7 +37,7 @@ Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.or
 
 您必须定义一个 MySQL 用户，该用户对 Debezium MySQL 连接器监视的所有数据库都应该具有适当的权限。
 
-1. 创建MySQL用户：
+1. 创建 MySQL 用户：
 
 ```sql
 mysql> CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
@@ -48,7 +48,7 @@ mysql> CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
 ```sql
 mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'user' IDENTIFIED BY 'password';
 ```
-**Note:** 在以下情况下不再需要重新加载权限即： `scan.incremental.snapshot.enabled` 参数已启用（默认情况下已启用）.
+**Note:** 在以下情况下不再需要重新加载权限即： `scan.incremental.snapshot.enabled` 参数已启用时（默认情况下已启用）.
 
 3. 最终确定用户权限：
 
@@ -62,14 +62,14 @@ mysql> FLUSH PRIVILEGES;
 Notes
 ----------------
 
-### 为每个 reader 设置不同的服务器ID
+### 为每个 reader 设置不同的服务器 ID
 
 每个用于读取 binlog 的 MySQL 数据库客户端都应该有一个唯一的 id，称为服务器 id。 MySQL 服务器将使用此 id 来维护网络连接和 binlog 位置。 因此，如果不同的作业共享相同的服务器 id， 则可能导致从错误的 binlog 位置读取数据。
-因此，建议通过为每个 Readers 设置不同的服务器 id  [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html),
+因此，建议通过为每个 Reader 设置不同的服务器 id  [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html),
 假设 Source 并行度为 4, 我们可以使用 `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` 来为 4 个 Source Readers 中的每一个分配唯一的服务器 id。
 
 
-### 设置 MySQL 会话超时时间
+### 设置 MySQL 会话 timeout
 
 当为大型数据库创建初始一致快照时，您建立的连接可能会在读取表时超时。您可以通过在MySQL配置文件中配置 interactive_timeout 和 wait_timeout 来防止这种行为。
 - `interactive_timeout`: 服务器在关闭交互连接之前等待活动的秒数。 更多信息请参考 [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_interactive_timeout).
@@ -189,8 +189,8 @@ Connector Options
           <td>增量快照是一种读取表快照的新机制。 与旧的快照机制相比，
               增量快照有许多优点，包括：
               （1） 在快照读取期间，Source 可以是并行的，
-              （2） Source 可以在快照读取期间在区块粒度中执行检查点，
-              （3） 在快照读取之前，源不需要获取全局读取锁（使用读取锁刷新表）。
+              （2） Source 可以在快照读取期间在区块粒度中执行 checkpoint，
+              （3） 在快照读取之前，Source 不需要获取全局读取锁（使用读取锁刷新表）。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的服务器 id，所以
               服务器 id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
               请查阅 <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a> 章节了解更多详细信息。
@@ -201,7 +201,7 @@ Connector Options
           <td>optional</td>
           <td style="word-wrap: break-word;">8096</td>
           <td>Integer</td>
-          <td>表快照的块大小（行数）， 读取表的快照时，捕获的表被拆分为多个块。</td>
+          <td>表快照的块大小（行数），读取表的快照时，捕获的表被拆分为多个块。</td>
     </tr>
     <tr>
           <td>scan.snapshot.fetch.size</td>
@@ -302,17 +302,17 @@ Connector Options
     <tr>
       <td>table_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the table that contain the row.</td>
+      <td>包含行的表的名称。</td>
     </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the database that contain the row.</td>
+      <td>包含行的数据库的名称。</td>
     </tr>
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the binlog, the value is always 0.</td>
+      <td>它表示在数据库中进行更改的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
     </tr>
   </tbody>
 </table>
@@ -347,9 +347,9 @@ Features
 ### Incremental Snapshot Reading
 
 增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
-* （1）MySQL CDC源可以在快照读取期间并行
-* （2）MySQL CDC源可以在快照读取期间在区块粒度中执行检查点
-* （3）MySQL CDC源不需要在快照读取之前获取全局读取锁（使用读取锁刷新表）
+* （1）MySQL CDC Source 可以在快照读取期间并行
+* （2）MySQL CDC Source 可以在快照读取期间在区块粒度中执行检查点
+* （3）MySQL CDC Source 不需要在快照读取之前获取全局读取锁（使用读取锁刷新表）
 
 如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的服务器 id，因此“服务器 id”的范围必须类似于 “5400-6400”，
 且范围必须大于并行度。
@@ -360,7 +360,7 @@ Features
 #### 控制作业并行度
 
 增量快照读取提供了并行读取快照数据的能力。
-你可以通过设置作业并行度的方式来控制 source 的并行度 `parallelism.default`. For example, in SQL CLI:
+你可以通过设置作业并行度的方式来控制 Source 的并行度 `parallelism.default`. For example, in SQL CLI:
 
 ```sql
 Flink SQL> SET 'parallelism.default' = 8;
@@ -376,7 +376,7 @@ The MySQL CDC source 使用 **增量快照算法**, 避免获取全局读锁（�
 
 #### MySQL高可用性支持
 
-```mysql cdc``` 连接器通过使用[GTID](https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-concepts.html)提供 MySQL 高可用集群的高可用性信息。为了获得高可用性， MySQL集群需要启用 GTID 模式，MySQL 配置文件中的 GTID 模式应该包含以下设置：
+```mysql cdc``` 连接器通过使用 [GTID](https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-concepts.html) 提供 MySQL 高可用集群的高可用性信息。为了获得高可用性， MySQL集群需要启用 GTID 模式，MySQL 配置文件中的 GTID 模式应该包含以下设置：
 
 ```yaml
 gtid_mode = on
@@ -391,14 +391,14 @@ enforce_gtid_consistency = on
 log-slave-updates = 1
 ```
 
-MySQL 集群中你监控的服务器出现故障后, 你只需将受监视的服务器地址更改为其他可用服务器，然后从最新的检查点/保存点重新启动作业, 作业将从检查点/保存点恢复，不会丢失任何记录。
+MySQL 集群中你监控的服务器出现故障后, 你只需将受监视的服务器地址更改为其他可用服务器，然后从最新的检查点/保存点重新启动作业, 作业将从 checkpoint/savepoint 恢复，不会丢失任何记录。
 
 建议为 MySQL 集群配置 DNS（域名服务）或 VIP（虚拟 IP 地址）， 使用```mysql cdc```连接器的 DNS 或 VIP 地址， DNS或VIP将自动将网络请求路由到活动MySQL服务器。 这样，你就不再需要修改地址和重新启动管道。
 
 #### MySQL心跳事件支持
 
-如果表不经常更新，则binlog文件或GTID集可能已在其最后提交的binlog位置被清理。
-在这种情况下，CDC作业可能会重新启动失败。因此心跳事件将帮助更新binlog位置。 默认情况下，MySQL CDC Source 启用心跳事件，间隔设置为30秒。 可以使用表选项```heartbeat```指定间隔。或将选项设置为```0s```以禁用心跳事件。
+如果表不经常更新，则 binlog 文件或 GTID 集可能已在其最后提交的 binlog 位置被清理。
+在这种情况下，CDC 作业可能会重新启动失败。因此心跳事件将帮助更新 binlog 位置。 默认情况下，MySQL CDC Source 启用心跳事件，间隔设置为30秒。 可以使用表选项```heartbeat```指定间隔。或将选项设置为```0s```以禁用心跳事件。
 
 #### 增量快照读取的工作原理
 
@@ -410,8 +410,7 @@ Source 会管理块的进程状态（完成或未完成），因此快照阶段�
 如果发生故障，可以恢复 Source 并继续从最后完成的块中读取块。
 
 所有快照块完成后，Source 将继续在单个任务中读取 binlog。
-为了保证快照记录和 binlog 记录的全局数据顺序，binlog reader 将开始读取数据
-直到快照块完成后并有一个完整的 checkpoint，以确保所有快照数据已被下游消费。
+为了保证快照记录和 binlog 记录的全局数据顺序，binlog reader 将开始读取数据直到快照块完成后并有一个完整的 checkpoint，以确保所有快照数据已被下游消费。
 binlog reader 在状态中跟踪所使用的 binlog 位置，因此 binlog 阶段的 Source 可以支持行级别的 checkpoint。
 
 Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业将重新启动并从最后一个成功的 checkpoint 状态恢复，并保证只执行一次语义。
@@ -420,10 +419,10 @@ Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业�
 
 在执行增量快照读取时，MySQL CDC source 需要一个用于拆分表的标准。
 MySQL CDC Source 使用拆分列将表拆分为多个拆分（块）。 默认情况下，MySQL CDC source 将标识表的主键列，并使用主键中的第一列作为拆分列。
-如果表中没有主键， 增量快照读取将失败，您可以禁用 `scan.incremental.snapshot.enabled` 来回退到旧的快照读取机制。
+如果表中没有主键， 增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 来回退到旧的快照读取机制。
 
 对于数值和自动增量拆分列，MySQL CDC Source 按固定步长高效地拆分块。
-例如，如果您有一个主键列为`id`的表，它是自动增量BIGINT类型，最小值为`0`，最大值为`100`，
+例如，如果你有一个主键列为`id`的表，它是自动增量 BIGINT 类型，最小值为`0`，最大值为`100`，
 和表选项 `scan.incremental.snapshot.chunk`。大小`value`为`25`，表将被拆分为以下块：
 
 ```
@@ -447,17 +446,17 @@ MySQL CDC Source 使用拆分列将表拆分为多个拆分（块）。 默认�
 
 ##### Chunk Reading Algorithm
 
-对于上面的示例`MyTable`，如果 MySQL CDC Source 并行度设置为 4，MySQL CDC Source 将在每一个 executes 运行 4 个 Readers**通过偏移信号算法**
+对于上面的示例`MyTable`，如果 MySQL CDC Source 并行度设置为 4，MySQL CDC Source 将在每一个 executes 运行 4 个 Readers **通过偏移信号算法**
 获取快照区块的最终一致输出。 **偏移信号算法**简单描述如下：
 
-* (1) 将当前binlog位置记录为`LOW`偏移量
+* (1) 将当前 binlog 位置记录为`LOW`偏移量
 * (2) 通过执行语句读取并缓冲快照区块记录 `SELECT * FROM MyTable WHERE id > chunk_low AND id <= chunk_high`
-* (3) 将当前binlog位置记录为`HIGH`偏移量
+* (3) 将当前 binlog 位置记录为`HIGH`偏移量
 * (4) 从`LOW`偏移量到`HIGH`偏移量读取属于快照区块的 binlog 记录
 * (5) 将读取的 binlog 记录向上插入缓冲区块记录，并发出缓冲区中的所有记录作为快照区块的最终输出（全部作为插入记录）
-* (6) 继续读取并发出属于 *单个binlog读取器* 中`HIGH`偏移量之后的区块的 binlog 记录。
+* (6) 继续读取并发出属于 *单个 binlog reader* 中`HIGH`偏移量之后的区块的 binlog 记录。
 
-T该算法的灵感来自 [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf), 请参考它了解更多详细信息。
+该算法的灵感来自 [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf), 请参考它了解更多详细信息。
 
 **Note:** 如果主键的实际值在其范围内分布不均匀，则在增量快照读取时可能会导致任务不平衡。
 
@@ -488,7 +487,7 @@ public class MySqlSourceExample {
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .databaseList("yourDatabaseName") // 设置捕获的数据库， 如果需要同步整个数据库， Please set tableList to ".*".
+        .databaseList("yourDatabaseName") // 设置捕获的数据库， 如果需要同步整个数据库，请将 tableList 设置为 ".*".
         .tableList("yourDatabaseName.yourTableName") // 设置捕获的表
         .username("yourUsername")
         .password("yourPassword")
@@ -530,7 +529,7 @@ public class MySqlSourceExample {
         .tableList("db.product, db.user, db.address") // 设置捕获的表 [product, user, address]
         .username("yourUsername")
         .password("yourPassword")
-        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
         .build();
    // your business code
 ```
@@ -681,8 +680,7 @@ Data Type Mapping
         where 38 < p <= 65<br>
       </td>
       <td>STRING</td>
-      <td>The precision for DECIMAL data type is up to 65 in MySQL, but the precision for DECIMAL is limited to 38 in Flink.
-  So if you define a decimal column whose precision is greater than 38, you should map it to STRING to avoid precision loss.</td>
+      <td>在 MySQL 中，十进制数据类型的精度高达 65，但在 Flink 中，十进制数据类型的精度仅限于 38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。在 MySQL 中，十进制数据类型的精度高达65，但在Flink中，十进制数据类型的精度仅限于38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。</td>
     </tr>
     <tr>
       <td>
@@ -819,7 +817,7 @@ Data Type Mapping
 </table>
 </div>
 
-### MySQL Spatial Data Types Mapping
+### MySQL 空间数据类型映射
 The spatial data types except for `GEOMETRYCOLLECTION` in MySQL will be converted into Json String with a fixed format like:<br>
 ```json
 {"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
@@ -880,7 +878,7 @@ The example for different spatial data types mapping is as follows:
 </table>
 </div>
 
-FAQ
+常见问题
 --------
 * [FAQ(English)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
 * [FAQ(中文)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
