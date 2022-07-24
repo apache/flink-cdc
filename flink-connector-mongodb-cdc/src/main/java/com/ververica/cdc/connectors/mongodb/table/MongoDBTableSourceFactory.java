@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -32,6 +30,7 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.ververica.cdc.connectors.mongodb.MongoDBSource.BATCH_SIZE_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.ERROR_TOLERANCE_NONE;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_AWAIT_TIME_MILLIS_DEFAULT;
 import static com.ververica.cdc.connectors.mongodb.MongoDBSource.POLL_MAX_BATCH_SIZE_DEFAULT;
@@ -150,6 +149,16 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The max size of the queue to use when copying data. Defaults to 16000.");
 
+    private static final ConfigOption<Integer> BATCH_SIZE =
+            ConfigOptions.key("batch.size")
+                    .intType()
+                    .defaultValue(BATCH_SIZE_DEFAULT)
+                    .withDescription(
+                            "Change stream cursor batch size. "
+                                    + "Specifies the maximum number of change events to return in each batch "
+                                    + "of the response from the MongoDB cluster."
+                                    + "Defaults to 0 meaning it uses the server's default value.");
+
     private static final ConfigOption<Integer> POLL_MAX_BATCH_SIZE =
             ConfigOptions.key("poll.max.batch.size")
                     .intType()
@@ -198,6 +207,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         String errorsTolerance = config.get(ERRORS_TOLERANCE);
         Boolean errorsLogEnable = config.get(ERRORS_LOG_ENABLE);
 
+        Integer batchSize = config.get(BATCH_SIZE);
         Integer pollMaxBatchSize = config.get(POLL_MAX_BATCH_SIZE);
         Integer pollAwaitTimeMillis = config.get(POLL_AWAIT_TIME_MILLIS);
 
@@ -234,6 +244,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 copyExistingPipeline,
                 copyExistingMaxThreads,
                 copyExistingQueueSize,
+                batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,
@@ -272,6 +283,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(COPY_EXISTING_PIPELINE);
         options.add(COPY_EXISTING_MAX_THREADS);
         options.add(COPY_EXISTING_QUEUE_SIZE);
+        options.add(BATCH_SIZE);
         options.add(POLL_MAX_BATCH_SIZE);
         options.add(POLL_AWAIT_TIME_MILLIS);
         options.add(HEARTBEAT_INTERVAL_MILLIS);
