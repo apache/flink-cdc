@@ -84,12 +84,11 @@ under the License.
                                 </relocation>
                                 <relocation>
                                     <pattern>io.netty</pattern>
-                                    <shadedPattern>vitess.shaded.io.netty</shadedPattern>
-                                    <shadedPattern>com.ververica.cdc.connectors.shaded.io.grpc</shadedPattern>
+                                    <shadedPattern>com.ververica.cdc.connectors.shaded.io.netty</shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>io.netty</pattern>
-                                    <shadedPattern>com.ververica.cdc.connectors.shaded.io.netty</shadedPattern>
+                                    <pattern>com.google</pattern>
+                                    <shadedPattern>com.ververica.cdc.connectors.shaded.com.google</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
