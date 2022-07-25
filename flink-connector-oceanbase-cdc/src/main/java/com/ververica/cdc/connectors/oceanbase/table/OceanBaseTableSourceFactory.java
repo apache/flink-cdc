@@ -222,10 +222,6 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(TENANT_NAME);
-        options.add(DATABASE_NAME);
-        options.add(TABLE_NAME);
-        options.add(SERVER_TIME_ZONE);
-        options.add(CONNECT_TIMEOUT);
         options.add(LOG_PROXY_HOST);
         options.add(LOG_PROXY_PORT);
         return options;
@@ -234,12 +230,18 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(SCAN_STARTUP_TIMESTAMP);
+        options.add(DATABASE_NAME);
+        options.add(TABLE_NAME);
+        options.add(TABLE_LIST);
         options.add(HOSTNAME);
         options.add(PORT);
+        options.add(CONNECT_TIMEOUT);
+        options.add(SERVER_TIME_ZONE);
         options.add(LOG_PROXY_CLIENT_ID);
-        options.add(SCAN_STARTUP_TIMESTAMP);
         options.add(RS_LIST);
         options.add(CONFIG_URL);
+        options.add(WORKING_MODE);
         return options;
     }
 }

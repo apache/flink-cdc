@@ -108,8 +108,8 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.databaseName = databaseName;
         this.tableName = tableName;
         this.tableList = tableList;
-        this.serverTimeZone = checkNotNull(serverTimeZone);
-        this.connectTimeout = checkNotNull(connectTimeout);
+        this.serverTimeZone = serverTimeZone;
+        this.connectTimeout = connectTimeout;
         this.hostname = hostname;
         this.port = port;
         this.logProxyHost = checkNotNull(logProxyHost);
