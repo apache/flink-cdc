@@ -28,6 +28,8 @@ import org.apache.flink.util.Preconditions;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -65,6 +67,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
 public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MySqlTableSourceFactory.class);
 
     private static final String IDENTIFIER = "mysql-cdc";
 
@@ -309,8 +312,16 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
     /** Replaces the default timezone placeholder with local timezone, if applicable. */
     private static ZoneId getServerTimeZone(ReadableConfig config) {
         String timeZone = config.get(SERVER_TIME_ZONE);
-        return MySqlSourceOptions.SERVER_TIME_ZONE.defaultValue().equals(timeZone)
-                ? ZoneId.systemDefault()
-                : ZoneId.of(timeZone);
+        if (SERVER_TIME_ZONE.defaultValue().equals(timeZone)) {
+            LOGGER.warn(
+                    "Server time zone is not configured, using local time zone '{}'. " +
+                            "You can explicitly set server time zone using '{}' option.",
+                    ZoneId.systemDefault(),
+                    SERVER_TIME_ZONE.key()
+            );
+            return ZoneId.systemDefault();
+        } else {
+            return ZoneId.of(timeZone);
+        }
     }
 }
