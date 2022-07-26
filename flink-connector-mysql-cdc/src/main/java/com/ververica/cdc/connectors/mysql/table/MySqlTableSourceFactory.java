@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -311,17 +312,16 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
 
     /** Replaces the default timezone placeholder with local timezone, if applicable. */
     private static ZoneId getServerTimeZone(ReadableConfig config) {
-        String timeZone = config.get(SERVER_TIME_ZONE);
-        if (SERVER_TIME_ZONE.defaultValue().equals(timeZone)) {
-            LOGGER.warn(
-                    "Server time zone is not configured, using local time zone '{}'. " +
-                            "You can explicitly set server time zone using '{}' option.",
-                    ZoneId.systemDefault(),
-                    SERVER_TIME_ZONE.key()
-            );
-            return ZoneId.systemDefault();
+        Optional<String> timeZoneOptional = config.getOptional(SERVER_TIME_ZONE);
+        if (timeZoneOptional.isPresent()) {
+            return ZoneId.of(timeZoneOptional.get());
         } else {
-            return ZoneId.of(timeZone);
+            LOGGER.warn(
+                    "Server time zone is not configured, using local time zone '{}'. "
+                            + "You can explicitly set server time zone using '{}' option.",
+                    ZoneId.systemDefault(),
+                    SERVER_TIME_ZONE.key());
+            return ZoneId.systemDefault();
         }
     }
 }

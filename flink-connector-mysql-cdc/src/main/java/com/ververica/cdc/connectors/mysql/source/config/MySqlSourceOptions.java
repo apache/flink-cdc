@@ -68,9 +68,9 @@ public class MySqlSourceOptions {
     public static final ConfigOption<String> SERVER_TIME_ZONE =
             ConfigOptions.key("server-time-zone")
                     .stringType()
-                    .defaultValue("default")
+                    .noDefaultValue()
                     .withDescription(
-                            "The session time zone in database server. If set to 'default', then "
+                            "The session time zone in database server. If not set, then "
                                     + "ZoneId.systemDefault() is used to determine the server time zone.");
 
     public static final ConfigOption<String> SERVER_ID =
