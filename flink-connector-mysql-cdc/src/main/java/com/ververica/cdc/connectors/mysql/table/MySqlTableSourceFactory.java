@@ -87,7 +87,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
-        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+        ZoneId serverTimeZone = getServerTimeZone(config);
 
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
@@ -304,5 +304,13 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /** Replaces the default timezone placeholder with local timezone, if applicable. */
+    private static ZoneId getServerTimeZone(ReadableConfig config) {
+        String timeZone = config.get(SERVER_TIME_ZONE);
+        return MySqlSourceOptions.SERVER_TIME_ZONE.defaultValue().equals(timeZone)
+                ? ZoneId.systemDefault()
+                : ZoneId.of(timeZone);
     }
 }
