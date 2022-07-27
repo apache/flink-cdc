@@ -50,6 +50,7 @@ under the License.
                         </goals>
                         <configuration>
                             <shadeTestJar>false</shadeTestJar>
+                            <promoteTransitiveDependencies>true</promoteTransitiveDependencies>
                             <artifactSet>
                                 <includes>
                                     <include>io.debezium:debezium-api</include>
