@@ -89,22 +89,24 @@ public class SourceOptions {
                             "The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.");
 
     public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
-            ConfigOptions.key("split-key.even-distribution.factor.upper-bound")
+            ConfigOptions.key("chunk-key.even-distribution.factor.upper-bound")
                     .doubleType()
                     .defaultValue(1000.0d)
+                    .withFallbackKeys("split-key.even-distribution.factor.upper-bound")
                     .withDescription(
-                            "The upper bound of split key distribution factor. The distribution factor is used to determine whether the"
+                            "The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query MySQL for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
     public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
-            ConfigOptions.key("split-key.even-distribution.factor.lower-bound")
+            ConfigOptions.key("chunk-key.even-distribution.factor.lower-bound")
                     .doubleType()
                     .defaultValue(0.05d)
+                    .withFallbackKeys("split-key.even-distribution.factor.lower-bound")
                     .withDescription(
-                            "The lower bound of split key distribution factor. The distribution factor is used to determine whether the"
+                            "The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query MySQL for splitting would happen when it is uneven."

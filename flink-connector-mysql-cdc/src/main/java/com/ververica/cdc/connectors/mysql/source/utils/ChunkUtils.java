@@ -24,7 +24,11 @@ import com.ververica.cdc.connectors.mysql.schema.MySqlTypeUtils;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
@@ -54,7 +58,7 @@ public class ChunkUtils {
                         .getLogicalType();
     }
 
-    public static Column getSplitColumn(Table table) {
+    public static Column getSplitColumn(Table table, @Nullable String chunkKey) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty()) {
             throw new ValidationException(
@@ -64,7 +68,21 @@ public class ChunkUtils {
                             table.id()));
         }
 
-        // use first field in primary key as the split key
+        if (chunkKey != null) {
+            Optional<Column> targetPkColumn =
+                    primaryKeys.stream().filter(col -> chunkKey.equals(col.name())).findFirst();
+            if (targetPkColumn.isPresent()) {
+                return targetPkColumn.get();
+            }
+            throw new ValidationException(
+                    String.format(
+                            "Chunk key '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            chunkKey,
+                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
+                            table.id()));
+        }
+
+        // use first field in primary key as the split key by default
         return primaryKeys.get(0);
     }
 

@@ -120,6 +120,15 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * The chunk key of table snapshot, captured tables are split into multiple splits by the chunk
+     * key when read the snapshot of table.
+     */
+    public MySqlSourceBuilder<T> chunkKey(String chunkKey) {
+        this.configFactory.chunkKey(chunkKey);
+        return this;
+    }
+
+    /**
      * The split size (number of rows) of table snapshot, captured tables are split into multiple
      * splits when read the snapshot of table.
      */

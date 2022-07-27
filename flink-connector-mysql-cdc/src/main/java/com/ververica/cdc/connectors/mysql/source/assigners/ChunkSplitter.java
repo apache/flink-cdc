@@ -78,7 +78,7 @@ class ChunkSplitter {
             long start = System.currentTimeMillis();
 
             Table table = mySqlSchema.getTableSchema(jdbc, tableId).getTable();
-            Column splitColumn = ChunkUtils.getSplitColumn(table);
+            Column splitColumn = ChunkUtils.getSplitColumn(table, sourceConfig.getChunkKey());
             final List<ChunkRange> chunks;
             try {
                 chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
