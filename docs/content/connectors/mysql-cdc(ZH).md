@@ -48,7 +48,7 @@ mysql> CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
 ```sql
 mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'user' IDENTIFIED BY 'password';
 ```
-**Note:** 在以下情况下不再需要重新加载权限即： `scan.incremental.snapshot.enabled` 参数已启用时（默认情况下已启用）.
+**注意:** 在 `scan.incremental.snapshot.enabled` 参数已启用时（默认情况下已启用）时，不再需要授予 reload 权限。
 
 3. 最终确定用户权限：
 
