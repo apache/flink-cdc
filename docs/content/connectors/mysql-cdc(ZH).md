@@ -510,7 +510,7 @@ public class MySqlSourceExample {
 }
 ```
 
-**Note:** 请参考 [Deserialization](../about.html#deserialization) 有关 JSON 反序列化的更多详细信息。
+**注意:** 请参考 [Deserialization](../about.html#deserialization) 有关 JSON 反序列化的更多详细信息。
 
 ### 扫描新添加的表
 
