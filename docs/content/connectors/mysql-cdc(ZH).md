@@ -188,9 +188,9 @@ Connector Options
           <td>Boolean</td>
           <td>增量快照是一种读取表快照的新机制。 与旧的快照机制相比，
               增量快照有许多优点，包括：
-              （1） 在快照读取期间，Source 可以是并行的，
-              （2） Source 可以在快照读取期间在区块粒度中执行 checkpoint，
-              （3） 在快照读取之前，Source 不需要获取全局读取锁（使用读取锁刷新表）。
+              （1） 在快照读取期间，Source 支持并发读取，
+              （2）在快照读取期间， Source 支持进行 chunk 粒度的checkpoint，
+              （3）在快照读取之前，Source 不需要数据库锁权限。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的服务器 id，所以
               服务器 id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
               请查阅 <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a> 章节了解更多详细信息。
