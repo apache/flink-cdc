@@ -43,9 +43,11 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -74,6 +76,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
+    private final Set<TableId> pureBinlogPhaseTables;
     private Tables.TableFilter capturedTableFilter;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
@@ -82,6 +85,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
+        this.pureBinlogPhaseTables = new HashSet<>();
     }
 
     public void submitSplit(MySqlSplit mySqlSplit) {
@@ -226,9 +230,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
+        if (pureBinlogPhaseTables.contains(tableId)) {
+            return true;
+        }
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
+            pureBinlogPhaseTables.add(tableId);
             return true;
         }
         // capture dynamically new added tables
@@ -269,6 +277,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
+        this.pureBinlogPhaseTables.clear();
     }
 
     public void stopBinlogReadTask() {
