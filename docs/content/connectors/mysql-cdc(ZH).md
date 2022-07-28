@@ -35,7 +35,7 @@ Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.or
 安装 MySQL 服务器
 ----------------
 
-您必须定义一个 MySQL 用户，该用户对 Debezium MySQL 连接器监视的所有数据库都应该具有适当的权限。
+您必须定义一个 MySQL 用户，该用户对 MySQL CDC 连接器监视的所有数据库都应该具有所需的权限。
 
 1. 创建 MySQL 用户：
 
