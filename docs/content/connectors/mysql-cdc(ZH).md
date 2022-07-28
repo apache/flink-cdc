@@ -59,7 +59,7 @@ mysql> FLUSH PRIVILEGES;
 查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-creating-user).
 
 
-Notes
+注意事项
 ----------------
 
 ### 为每个 reader 设置不同的服务器 ID
