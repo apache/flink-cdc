@@ -103,7 +103,7 @@ Flink SQL> CREATE TABLE orders (
      'database-name' = 'mydb',
      'table-name' = 'orders');
   
--- 从订单表读取快照和 binlog
+-- 从订单表读取全量数据(快照)和增量数据(binlog)
 Flink SQL> SELECT * FROM orders;
 ```
 
