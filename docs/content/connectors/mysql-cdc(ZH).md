@@ -50,7 +50,7 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 ```
 **注意:** 在 `scan.incremental.snapshot.enabled` 参数已启用时（默认情况下已启用）时，不再需要授予 reload 权限。
 
-3. 最终确定用户权限：
+3. 刷新用户权限：
 
 ```sql
 mysql> FLUSH PRIVILEGES;
