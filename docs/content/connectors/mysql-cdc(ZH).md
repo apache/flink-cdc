@@ -82,7 +82,7 @@ mysql> FLUSH PRIVILEGES;
 MySQL CDC 表可以定义如下：
 
 ```sql
--- 每 3000 毫秒做一次 checkpoint                      
+-- 每 3 秒做一次 checkpoint，用于测试，生产配置建议5到10分钟                      
 Flink SQL> SET 'execution.checkpointing.interval' = '3s';   
 
 -- 在 Flink SQL中注册 MySQL 表 'orders'
