@@ -50,7 +50,9 @@ under the License.
                         </goals>
                         <configuration>
                             <shadeTestJar>false</shadeTestJar>
-                            <promoteTransitiveDependencies>true</promoteTransitiveDependencies>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
                             <artifactSet>
                                 <includes>
                                     <include>io.debezium:debezium-api</include>
@@ -64,6 +66,14 @@ under the License.
                                     <include>com.google.guava:*</include>
                                     <include>io.vitess:vitess-grpc-client</include>
                                     <include>io.vitess:vitess-client</include>
+                                    <include>io.netty:netty-handler</include>
+                                    <include>io.netty:netty-resolver</include>
+                                    <include>io.netty:netty-transport</include>
+                                    <include>io.netty:netty-buffer</include>
+                                    <include>io.netty:netty-codec-http2</include>
+                                    <include>io.netty:netty-codec-http</include>
+                                    <include>io.netty:netty-codec</include>
+                                    <include>io.netty:netty-common</include>
                                     <include>io.grpc:grpc-core</include>
                                     <include>io.grpc:grpc-netty</include>
                                     <include>io.grpc:grpc-stub</include>
