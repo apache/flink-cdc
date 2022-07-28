@@ -32,7 +32,7 @@ Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.or
 
 **注意:** flink-sql-connector-mysql-cdc-XXX 快照版本是开发分支对应的代码。用户需要下载源代码并编译相应的 jar。用户应使用发布的版本，例如 [flink-sql-connector-mysql-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mysql-cdc)，当前已发布的所有版本都已在 Maven 中央仓库中提供。
 
-安装MySQL服务器
+安装 MySQL 服务器
 ----------------
 
 您必须定义一个 MySQL 用户，该用户对 Debezium MySQL 连接器监视的所有数据库都应该具有适当的权限。
