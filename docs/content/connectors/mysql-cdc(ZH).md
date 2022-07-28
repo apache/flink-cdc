@@ -460,7 +460,7 @@ MySQL CDC Source 使用拆分列将表拆分为多个拆分（块）。 默认�
 
 **Note:** 如果主键的实际值在其范围内分布不均匀，则在增量快照读取时可能会导致任务不平衡。
 
-### Exactly-Once Processing
+### Exactly-Once 处理
 
 MySQL CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照块，然后继续读取 binlog，
 无论是在快照阶段还是读取 binlog 阶段，MySQL CDC 连接器都会在处理时**准确读取数据**，即使任务出现了故障。
