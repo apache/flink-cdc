@@ -288,7 +288,7 @@ Connector Options
 可用元数据
 ----------------
 
-以下格式元数据可以在表定义中作为只读（虚拟）列公开。
+下表中的元数据可以在 DDL 中作为只读（虚拟）meta 列声明。
 
 <table class="colwidths-auto docutils">
   <thead>
