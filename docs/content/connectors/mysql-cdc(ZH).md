@@ -26,11 +26,11 @@ Dependencies
 
 ### SQL Client JAR
 
-```下载链接仅适用于稳定版本。```
+```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
 Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**注意:** flink-sql-connector-mysql-cdc-XXX 快照版本是开发分支对应的代码。用户需要下载源代码并编译相应的 jar。用户应使用发布的版本，例如 [flink-sql-connector-mysql-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mysql-cdc)，当前已发布的所有版本都已在 Maven 中央仓库中提供。
+**注意:** flink-sql-connector-mysql-cdc-XXX 快照版本是开发分支对应的代码。用户需要下载源代码并编译相应的 jar。用户应使用发布的版本，例如 [flink-sql-connector-mysql-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都已在 Maven 中央仓库中提供。
 
 安装 MySQL 服务器
 ----------------
@@ -56,22 +56,22 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 mysql> FLUSH PRIVILEGES;
 ```
 
-查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-creating-user).
+查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-creating-user).
 
 
 注意事项
 ----------------
 
-### 为每个 reader 设置不同的服务器 ID
+### 为每个 Reader 设置不同的 Server id
 
-每个用于读取 binlog 的 MySQL 数据库客户端都应该有一个唯一的 id，称为服务器 id。 MySQL 服务器将使用此 id 来维护网络连接和 binlog 位置。 因此，如果不同的作业共享相同的服务器 id， 则可能导致从错误的 binlog 位置读取数据。
-因此，建议通过为每个 Reader 设置不同的服务器 id  [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html),
-假设 Source 并行度为 4, 我们可以使用 `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` 来为 4 个 Source Readers 中的每一个分配唯一的服务器 id。
+每个用于读取 binlog 的 MySQL 数据库客户端都应该有一个唯一的 id，称为 Server id。 MySQL 服务器将使用此 id 来维护网络连接和 binlog 位置。 因此，如果不同的作业共享相同的 Server id， 则可能导致从错误的 binlog 位置读取数据。
+因此，建议通过为每个 Reader 设置不同的 Server id  [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html),
+假设 Source 并行度为 4, 我们可以使用 `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` 来为 4 个 Source readers 中的每一个分配唯一的 Server id。
 
 
 ### 设置 MySQL 会话超时时间
 
-当为大型数据库创建初始一致快照时，您建立的连接可能会在读取表时碰到超时问题。您可以通过在 MySQL 侧配置 interactive_timeout 和 wait_timeout 来缓解此类问题。
+当为大型数据库创建初始一致快照时，你建立的连接可能会在读取表时碰到超时问题。你可以通过在 MySQL 侧配置 interactive_timeout 和 wait_timeout 来缓解此类问题。
 - `interactive_timeout`: 服务器在关闭交互连接之前等待活动的秒数。 更多信息请参考 [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_interactive_timeout).
 - `wait_timeout`: 服务器在关闭非交互连接之前等待活动的秒数。 更多信息请参考 [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_wait_timeout).
 
@@ -107,7 +107,7 @@ Flink SQL> CREATE TABLE orders (
 Flink SQL> SELECT * FROM orders;
 ```
 
-Connector Options
+连接器选项
 ----------------
 
 <div class="highlight">
@@ -176,9 +176,9 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
-      <td>当前数据库客户端的数字 ID 或数字 ID 范围，数字 ID 语法类似于 “5400”，数字 ID 范围语法类似于 “5400-5408”, 
-      建议在以下情况下使用数字ID范围语法：即 'scan.incremental.snapshot.enabled' 参数为启用时。
-          因为在 MySQL 集群中当前运行的所有数据库进程中，每个 ID 都必须是唯一的。 所以当连接器加入 MySQL 集群作为另一个服务器（并且具有唯一 ID 的情况下），它就可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 server ID。
+      <td>当前数据库客户端的数字 id 或数字 id 范围，数字 id 语法类似于 “5400”，数字 id 范围语法类似于 “5400-5408”, 
+      建议在以下情况下使用数字 id 范围语法：即 'scan.incremental.snapshot.enabled' 参数为启用时。
+          因为在 MySQL 集群中当前运行的所有数据库进程中，每个 id 都必须是唯一的。 所以当连接器加入 MySQL 集群作为另一个服务器（并且具有唯一 id 的情况下），它就可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
       </td>
     </tr>
     <tr>
@@ -188,12 +188,12 @@ Connector Options
           <td>Boolean</td>
           <td>增量快照是一种读取表快照的新机制。 与旧的快照机制相比，
               增量快照有许多优点，包括：
-              （1） 在快照读取期间，Source 支持并发读取，
-              （2）在快照读取期间， Source 支持进行 chunk 粒度的checkpoint，
+              （1）在快照读取期间，Source 支持并发读取，
+              （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
               （3）在快照读取之前，Source 不需要数据库锁权限。
-              如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的服务器 id，所以
-              服务器 id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
-              请查阅 <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a> 章节了解更多详细信息。
+              如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
+              Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
+              请查阅 <a href="#增量快照读取 ">增量快照读取</a> 章节了解更多详细信息。
           </td>
     </tr>
     <tr>
@@ -217,7 +217,7 @@ Connector Options
       <td>String</td>
       <td> MySQL CDC 消费者的可选启动模式， 有效枚举为 "initial"
          合法的模式为 "initial" 和 "latest-offset"。
-           请查阅 <a href="#startup-reading-position">Startup Reading Position</a> 章节了解更多详细信息。</td>
+           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr> 
     <tr>
       <td>server-time-zone</td>
@@ -285,7 +285,7 @@ Connector Options
 </table>
 </div>
 
-可用元数据
+支持的元数据
 ----------------
 
 下表中的元数据可以在 DDL 中作为只读（虚拟）meta 列声明。
@@ -302,12 +302,12 @@ Connector Options
     <tr>
       <td>table_name</td>
       <td>STRING NOT NULL</td>
-      <td>包含行的表的名称。</td>
+      <td>当前记录所属的表名称。</td>
     </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
-      <td>包含行的数据库的名称。</td>
+      <td>当前记录所属的库名称。</td>
     </tr>
     <tr>
       <td>op_ts</td>
@@ -341,23 +341,22 @@ CREATE TABLE products (
 );
 ```
 
-Features
+支持的特性
 --------
 
-### Incremental Snapshot Reading
+### 增量快照读取
 
 增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
-* （1）MySQL CDC Source 可以在快照读取期间并行
-* （2）MySQL CDC Source 可以在快照读取期间在区块粒度中执行检查点
-* （3）MySQL CDC Source 不需要在快照读取之前获取全局读取锁（使用读取锁刷新表）
+*（1）在快照读取期间，Source 支持并发读取，
+*（2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
+*（3）在快照读取之前，Source 不需要数据库锁权限。
 
-如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的服务器 id，因此“服务器 id”的范围必须类似于 “5400-6400”，
+如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此“server id”的范围必须类似于 “5400-6400”，
 且范围必须大于并行度。
-
 在增量快照读取过程中，MySQL CDC Source 首先通过表的主键拆分快照块（splits），
 然后 MySQL CDC Source 将区块分配给多个 reader 以读取快照区块的数据。
 
-#### 控制作业并行度
+#### 支持并发读取
 
 增量快照读取提供了并行读取快照数据的能力。
 你可以通过设置作业并行度的方式来控制 Source 的并行度 `parallelism.default`. For example, in SQL CLI:
@@ -366,13 +365,13 @@ Features
 Flink SQL> SET 'parallelism.default' = 8;
 ```
 
-#### Checkpoint
+#### 全量阶段支持 checkpoint
 
 增量快照读取提供了在区块级别执行检查点的能力。它使用旧的快照读取机制解决了以前版本中的检查点超时问题。
 
 #### 无锁
 
-The MySQL CDC source 使用 **增量快照算法**, 避免获取全局读锁（使用读锁刷新表），因此不需要 “RELOAD” 权限。
+MySQL CDC source 使用 增量快照算法, 避免了数据库锁的使用，因此不需要 “RELOAD” 权限。
 
 #### MySQL高可用性支持
 
@@ -444,7 +443,7 @@ MySQL CDC Source 使用拆分列将表拆分为多个拆分（块）。 默认�
  [uuid-def, +∞).
 ```
 
-##### Chunk Reading Algorithm
+##### Chunk 读取算法
 
 对于上面的示例`MyTable`，如果 MySQL CDC Source 并行度设置为 4，MySQL CDC Source 将在每一个 executes 运行 4 个 Readers **通过偏移信号算法**
 获取快照区块的最终一致输出。 **偏移信号算法**简单描述如下：
@@ -458,14 +457,14 @@ MySQL CDC Source 使用拆分列将表拆分为多个拆分（块）。 默认�
 
 该算法的灵感来自 [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf), 请参考它了解更多详细信息。
 
-**Note:** 如果主键的实际值在其范围内分布不均匀，则在增量快照读取时可能会导致任务不平衡。
+**注意:** 如果主键的实际值在其范围内分布不均匀，则在增量快照读取时可能会导致任务不平衡。
 
 ### Exactly-Once 处理
 
 MySQL CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照块，然后继续读取 binlog，
 无论是在快照阶段还是读取 binlog 阶段，MySQL CDC 连接器都会在处理时**准确读取数据**，即使任务出现了故障。
 
-### Startup Reading Position
+### 启动模式
 
 配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
 
@@ -512,7 +511,7 @@ public class MySqlSourceExample {
 
 **注意:** 请参考 [Deserialization](../about.html#deserialization) 有关 JSON 反序列化的更多详细信息。
 
-### 扫描新添加的表
+### 动态加表
 
 扫描新添加的表功能使您可以添加新表以监视现有正在运行的管道，新添加的表将首先读取其快照数据，然后自动读取其变更日志。
 
@@ -567,9 +566,9 @@ $ ./bin/flink run \
       --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
-Data Type Mapping
+数据类型映射
 ----------------
 
 <div class="wy-table-responsive">
@@ -810,7 +809,7 @@ Data Type Mapping
       </td>
       <td>
       The spatial data types in MySQL will be converted into STRING with a fixed Json format.
-      Please see <a href="#mysql-spatial-data-types-mapping ">MySQL Spatial Data Types Mapping</a> section for more detailed information.
+      Please see <a href="#空间数据类型映射 ">空间数据类型映射</a> section for more detailed information.
       </td>
     </tr>
     </tbody>
