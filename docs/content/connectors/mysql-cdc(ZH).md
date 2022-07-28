@@ -312,7 +312,7 @@ Connector Options
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>它表示在数据库中进行更改的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
     </tr>
   </tbody>
 </table>
