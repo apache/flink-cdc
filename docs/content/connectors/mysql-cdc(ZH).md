@@ -317,7 +317,7 @@ Connector Options
   </tbody>
 </table>
 
-扩展创建表示例演示了公开这些元数据字段的语法：
+下述创建表示例展示元数据列的用法：
 ```sql
 CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
