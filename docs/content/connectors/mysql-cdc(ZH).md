@@ -216,7 +216,7 @@ Connector Options
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> MySQL CDC 消费者的可选启动模式， 有效枚举为 "initial"
-           and "latest-offset". 
+         合法的模式为 "initial" 和 "latest-offset"。
            请查阅 <a href="#startup-reading-position">Startup Reading Position</a> 章节了解更多详细信息。</td>
     </tr> 
     <tr>
