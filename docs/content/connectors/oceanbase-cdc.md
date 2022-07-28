@@ -97,7 +97,7 @@ Connector Options
 The OceanBase CDC Connector contains some options for both sql and stream api as the following sheet. 
 
 *Note*: The connector supports two ways to specify the table list to listen to, and will get the union of the results when both way are used at the same time.
-1. Use `database-name` and `table-name` to match database and table names in regex. Can only be used in `initial` startup mode.
+1. Use `database-name` and `table-name` to match database and table names in regex. As the `obcdc` (former `liboblog`) only supports `fnmatch` now, we can't use regex directly to filter change events, so these two options can only be used in `initial` startup mode.
 2. Use `table-list` to match the exact value of database and table names.
 
 <div class="highlight">

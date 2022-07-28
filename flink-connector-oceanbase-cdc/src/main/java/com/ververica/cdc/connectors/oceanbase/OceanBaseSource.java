@@ -188,6 +188,17 @@ public class OceanBaseSource {
                             startupMode + " mode is not supported.");
             }
 
+            if (StringUtils.isNotEmpty(databaseName) || StringUtils.isNotEmpty(tableName)) {
+                if (StringUtils.isEmpty(databaseName) || StringUtils.isEmpty(tableName)) {
+                    throw new IllegalArgumentException(
+                            "'database-name' and 'table-name' should be configured at the same time");
+                }
+            } else {
+                checkNotNull(
+                        tableList,
+                        "'database-name', 'table-name' or 'table-list' should be configured");
+            }
+
             if (serverTimeZone == null) {
                 serverTimeZone = "UTC";
             }
