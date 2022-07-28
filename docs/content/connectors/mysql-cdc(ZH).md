@@ -19,7 +19,7 @@ Dependencies
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <!-- 依赖关系仅适用于稳定版本，快照依赖关系需要自行构建。 -->
+  <!-- 请使用已发布的版本依赖，snapshot版本的依赖需要本地自行编译。 -->
   <version>2.3-SNAPSHOT</version>
 </dependency>
 ```
