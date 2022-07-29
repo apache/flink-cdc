@@ -193,7 +193,7 @@ Flink SQL> SELECT * FROM orders;
               （3）在快照读取之前，Source 不需要数据库锁权限。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
               Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
-              请查阅 <a href="#增量快照读取 ">增量快照读取</a> 章节了解更多详细信息。
+              请查阅 <a href="#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
           </td>
     </tr>
     <tr>
