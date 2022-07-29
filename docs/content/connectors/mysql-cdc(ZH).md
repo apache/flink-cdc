@@ -347,9 +347,9 @@ CREATE TABLE products (
 ### 增量快照读取
 
 增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
-*（1）在快照读取期间，Source 支持并发读取，
-*（2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
-*（3）在快照读取之前，Source 不需要数据库锁权限。
+* （1）在快照读取期间，Source 支持并发读取，
+* （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
+* （3）在快照读取之前，Source 不需要数据库锁权限。
 
 如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此“server id”的范围必须类似于 “5400-6400”，
 且范围必须大于并行度。
