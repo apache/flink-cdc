@@ -167,7 +167,7 @@ class ChunkSplitter {
      * and tumble chunks in step size.
      */
     @VisibleForTesting
-    private List<ChunkRange> splitEvenlySizedChunks(
+    public List<ChunkRange> splitEvenlySizedChunks(
             TableId tableId,
             Object min,
             Object max,
