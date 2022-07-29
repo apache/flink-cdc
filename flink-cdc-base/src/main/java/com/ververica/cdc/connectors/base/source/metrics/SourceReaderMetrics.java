@@ -51,13 +51,13 @@ public class SourceReaderMetrics {
 
     public void registerMetrics() {
         metricGroup.gauge(
-                SoureReaderMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
+                SourceReaderMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
                 (Gauge<Long>) this::getFetchDelay);
         metricGroup.gauge(
-                SoureReaderMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
+                SourceReaderMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
                 (Gauge<Long>) this::getEmitDelay);
         metricGroup.gauge(
-                SoureReaderMetricConstants.SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
+                SourceReaderMetricConstants.SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
     }
 
     public long getFetchDelay() {

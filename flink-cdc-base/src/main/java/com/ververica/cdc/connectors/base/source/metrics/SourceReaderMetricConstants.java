@@ -17,7 +17,7 @@
 package com.ververica.cdc.connectors.base.source.metrics;
 
 /** A collection of Source Reader metrics related constant strings. */
-public class SoureReaderMetricConstants {
+public class SourceReaderMetricConstants {
 
     public static final String SOURCE_IDLE_TIME = "sourceIdleTime";
     public static final String CURRENT_FETCH_EVENT_TIME_LAG = "currentFetchEventTimeLag";

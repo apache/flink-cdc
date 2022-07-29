@@ -38,6 +38,7 @@ import org.tikv.cdc.CDCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.RowKey;
+import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Kvrpcpb;
@@ -99,7 +100,12 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     public void open(final Configuration config) throws Exception {
         super.open(config);
         session = TiSession.create(tiConf);
-        long tableId = session.getCatalog().getTable(database, tableName).getId();
+        TiTableInfo tableInfo = session.getCatalog().getTable(database, tableName);
+        if (tableInfo == null) {
+            throw new RuntimeException(
+                    String.format("Table %s.%s does not exist.", database, tableName));
+        }
+        long tableId = tableInfo.getId();
         keyRange =
                 TableKeyRangeUtils.getTableKeyRange(
                         tableId,
