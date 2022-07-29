@@ -38,6 +38,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
@@ -47,6 +49,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
@@ -57,8 +60,6 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
@@ -100,8 +101,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
-        double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
-        double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        double distributionFactorUpper = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
 
@@ -141,7 +142,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 startupOptions,
                 scanNewlyAddedTableEnabled,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
-                heartbeatInterval);
+                heartbeatInterval,
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));
     }
 
     @Override
@@ -176,11 +178,12 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
         options.add(CONNECTION_POOL_SIZE);
-        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
-        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         return options;
     }
 
@@ -292,7 +295,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 doubleCompare(distributionFactorUpper, 1.0d) >= 0,
                 String.format(
                         "The value of option '%s' must larger than or equals %s, but is %s",
-                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
                         1.0d,
                         distributionFactorUpper));
     }
@@ -304,7 +307,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         && doubleCompare(distributionFactorLower, 1.0d) <= 0,
                 String.format(
                         "The value of option '%s' must between %s and %s inclusively, but is %s",
-                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
                         0.0d,
                         1.0d,
                         distributionFactorLower));

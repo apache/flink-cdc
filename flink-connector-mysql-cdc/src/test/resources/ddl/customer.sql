@@ -231,6 +231,29 @@ VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
        (404, 'KIND_008', 'user_5', 'leo list'),
        (600, 'KIND_009', 'user_6', 'my shopping cart');
 
+-- table has combined primary key and one of the primary key is evenly
+CREATE TABLE evenly_shopping_cart (
+  product_no INT NOT NULL,
+  product_kind VARCHAR(255),
+  user_id VARCHAR(255) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  PRIMARY KEY(product_kind, product_no, user_id)
+);
+
+insert into evenly_shopping_cart
+VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
+       (102, 'KIND_002', 'user_1', 'my shopping cart'),
+       (103, 'KIND_007', 'user_1', 'my shopping cart'),
+       (104, 'KIND_008', 'user_1', 'my shopping cart'),
+       (105, 'KIND_100', 'user_2', 'my shopping list'),
+       (105, 'KIND_999', 'user_3', 'my shopping list'),
+       (107, 'KIND_010', 'user_4', 'my shopping list'),
+       (108, 'KIND_009', 'user_4', 'my shopping list'),
+       (109, 'KIND_002', 'user_5', 'leo list'),
+       (111, 'KIND_007', 'user_5', 'leo list'),
+       (111, 'KIND_008', 'user_5', 'leo list'),
+       (112, 'KIND_009', 'user_6', 'my shopping cart');
+
 -- table has bigint unsigned auto increment primary key
 CREATE TABLE shopping_cart_big (
   product_no BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,

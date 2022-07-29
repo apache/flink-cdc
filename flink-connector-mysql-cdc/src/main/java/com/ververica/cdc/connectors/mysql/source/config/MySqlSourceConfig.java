@@ -55,6 +55,7 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
     private final Properties jdbcProperties;
+    @Nullable private final String chunkKeyColumn;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -84,7 +85,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
             Properties dbzProperties,
-            Properties jdbcProperties) {
+            Properties jdbcProperties,
+            @Nullable String chunkKeyColumn) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -108,6 +110,7 @@ public class MySqlSourceConfig implements Serializable {
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
         this.jdbcProperties = jdbcProperties;
+        this.chunkKeyColumn = chunkKeyColumn;
     }
 
     public String getHostname() {
@@ -205,5 +208,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public Properties getJdbcProperties() {
         return jdbcProperties;
+    }
+
+    @Nullable
+    public String getChunkKeyColumn() {
+        return chunkKeyColumn;
     }
 }
