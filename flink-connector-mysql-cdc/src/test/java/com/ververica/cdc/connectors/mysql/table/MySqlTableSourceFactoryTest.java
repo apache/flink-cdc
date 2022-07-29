@@ -138,7 +138,7 @@ public class MySqlTableSourceFactoryTest {
         properties.put("chunk-key.even-distribution.factor.lower-bound", "0.01");
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
-        properties.put("scan.incremental.snapshot.chunk.key", "testCol");
+        properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
@@ -259,7 +259,7 @@ public class MySqlTableSourceFactoryTest {
         options.put("debezium.snapshot.mode", "never");
         options.put("jdbc.properties.useSSL", "false");
         options.put("heartbeat.interval", "15213ms");
-        options.put("scan.incremental.snapshot.chunk.key", "testCol");
+        options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
