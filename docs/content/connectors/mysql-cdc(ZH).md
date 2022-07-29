@@ -215,7 +215,7 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td> MySQL CDC 消费者的可选启动模式， 有效枚举为 "initial"
+      <td> MySQL CDC 消费者可选的启动模式，
          合法的模式为 "initial" 和 "latest-offset"。
            请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr> 
