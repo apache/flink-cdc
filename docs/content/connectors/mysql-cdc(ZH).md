@@ -761,7 +761,7 @@ $ ./bin/flink run \
         LONGBLOB<br>
       </td>
       <td>BYTES</td>
-      <td>Currently, for BLOB data type in MySQL, only the blob whose length isn't greater than 2,147,483,647(2 ** 31 - 1) is supported. </td>
+      <td>目前，对于 MySQL 中的 BLOB 数据类型，仅支持长度不大于 2147483647（2**31-1）的 blob。 </td>
     </tr>
     <tr>
       <td>
@@ -782,15 +782,15 @@ $ ./bin/flink run \
         JSON
       </td>
       <td>STRING</td>
-      <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
+      <td> JSON 数据类型将在 Flink 中转换为 JSON 格式的字符串。</td>
     </tr>
     <tr>
       <td>
         SET
       </td>
       <td>ARRAY&lt;STRING&gt;</td>
-      <td>As the SET data type in MySQL is a string object that can have zero or more values, 
-          it should always be mapped to an array of string
+      <td>因为 MySQL 中的 SET 数据类型是一个字符串对象，可以有零个或多个值 
+          它应该始终映射到字符串数组。
       </td>
     </tr>
     <tr>
@@ -808,8 +808,8 @@ $ ./bin/flink run \
         STRING
       </td>
       <td>
-      The spatial data types in MySQL will be converted into STRING with a fixed Json format.
-      Please see <a href="#空间数据类型映射 ">空间数据类型映射</a> section for more detailed information.
+      MySQL 中的空间数据类型将转换为具有固定 Json 格式的字符串。
+      请参考 <a href="#空间数据类型映射 ">空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
@@ -817,25 +817,26 @@ $ ./bin/flink run \
 </div>
 
 ### MySQL 空间数据类型映射
-The spatial data types except for `GEOMETRYCOLLECTION` in MySQL will be converted into Json String with a fixed format like:<br>
+
+MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都将转换为 Json 字符串，格式固定，如：<br>
 ```json
 {"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
 ```
-The field `srid` identifies the SRS in which the geometry is defined, SRID 0 is the default for new geometry values if no SRID is specified.
-As only MySQL 8+ support to specific SRID when define spatial data type, the field `srid` will always be 0 in MySQL with a lower version.
+字段`srid`标识定义几何体的 SRS，如果未指定 SRID，则 SRID 0 是新几何体值的默认值。
+由于 MySQL 8+ 在定义空间数据类型时只支持特定的 SRID，因此在版本较低的MySQL中，字段`srid`将始终为 0。
 
-The field `type` identifies the spatial data type, such as `POINT`/`LINESTRING`/`POLYGON`.
+字段`type`标识空间数据类型，例如`POINT`/`LINESTRING`/`POLYGON`。
 
-The field `coordinates` represents the `coordinates` of the spatial data.
+字段`coordinates`表示空间数据的`坐标`。
 
-For `GEOMETRYCOLLECTION`, it will be converted into Json String with a fixed format like:<br>
+对于`GEOMETRYCOLLECTION`，它将转换为 Json 字符串，格式固定，如：<br>
 ```json
 {"srid": 0 , "type": "GeometryCollection", "geometries": [{"type":"Point","coordinates":[10,10]}]}
 ```
 
-The field `geometries` is an array contains all spatial data.
+`Geometrics`字段是一个包含所有空间数据的数组。
 
-The example for different spatial data types mapping is as follows:
+不同空间数据类型映射的示例如下：
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
