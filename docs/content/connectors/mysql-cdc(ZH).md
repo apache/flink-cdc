@@ -414,7 +414,7 @@ binlog reader 在状态中跟踪所使用的 binlog 位置，因此 binlog 阶�
 
 Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业将重新启动并从最后一个成功的 checkpoint 状态恢复，并保证只执行一次语义。
 
-##### Snapshot Chunk Splitting
+##### 全量阶段分片算法
 
 在执行增量快照读取时，MySQL CDC source 需要一个用于分片的的算法。
 MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认情况下，MySQL CDC source 会识别表的主键列，并使用主键中的第一列作为用作分片列。
