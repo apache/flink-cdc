@@ -47,13 +47,10 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
-    private static final UniqueDatabase compositePkDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "composite_pk", "mysqluser", "mysqlpw");
 
     @BeforeClass
     public static void init() {
         customerDatabase.createAndInitialize();
-        compositePkDatabase.createAndInitialize();
     }
 
     @Test
@@ -107,63 +104,59 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testAssignCompositePkTableSplitsUnevenly() {
+    public void testAssignCompositePkTableSplitsUnevenlyWithChunkKeyColumn() {
         List<String> expected =
                 Arrays.asList(
-                        "composite_pk_table null [name2]",
-                        "composite_pk_table [name2] [name3]",
-                        "composite_pk_table [name3] [name4]",
-                        "composite_pk_table [name4] null");
+                        "shopping_cart null [KIND_007]",
+                        "shopping_cart [KIND_007] [KIND_008]",
+                        "shopping_cart [KIND_008] [KIND_009]",
+                        "shopping_cart [KIND_009] [KIND_100]",
+                        "shopping_cart [KIND_100] null");
         List<String> splits =
                 getTestAssignSnapshotSplits(
-                        compositePkDatabase,
+                        customerDatabase,
                         4,
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        new String[] {
-                            compositePkDatabase.getDatabaseName() + ".composite_pk_table"
-                        },
-                        "name");
+                        new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"},
+                        "product_kind");
         assertEquals(expected, splits);
     }
 
     @Test
-    public void testAssignCompositePkTableSplitsEvenly() {
+    public void testAssignCompositePkTableSplitsEvenlyWithChunkKeyColumn() {
         List<String> expected =
                 Arrays.asList(
-                        "composite_pk_table null [5]",
-                        "composite_pk_table [5] [9]",
-                        "composite_pk_table [9] [13]",
-                        "composite_pk_table [13] null");
+                        "evenly_shopping_cart null [105]",
+                        "evenly_shopping_cart [105] [109]",
+                        "evenly_shopping_cart [109] null");
         List<String> splits =
                 getTestAssignSnapshotSplits(
-                        compositePkDatabase,
+                        customerDatabase,
                         4,
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        new String[] {
-                            compositePkDatabase.getDatabaseName() + ".composite_pk_table"
-                        },
-                        "id");
+                        new String[] {customerDatabase.getDatabaseName() + ".evenly_shopping_cart"},
+                        "product_no");
         assertEquals(expected, splits);
     }
 
     @Test
-    public void testAssignCompositePkTableWithWrongChunkKey() {
+    public void testAssignCompositePkTableWithWrongChunkKeyColumn() {
         try {
             getTestAssignSnapshotSplits(
-                    compositePkDatabase,
+                    customerDatabase,
                     4,
                     CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                     CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                    new String[] {compositePkDatabase.getDatabaseName() + ".composite_pk_table"},
+                    new String[] {customerDatabase.getDatabaseName() + ".customer_card"},
                     "errorCol");
             fail("exception expected");
         } catch (Throwable t) {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    "Chunk key 'errorCol' doesn't exist in the primary key [nickname,id,name] of the table")
+                                    "Chunk key column 'errorCol' doesn't exist in the primary key [card_no,level] of the table")
                             .isPresent());
         }
     }
@@ -449,7 +442,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             double distributionFactorUpper,
             double distributionFactorLower,
             String[] captureTables,
-            String chunkKey) {
+            String chunkKeyColumn) {
         MySqlSourceConfig configuration =
                 getConfig(
                         database,
@@ -457,7 +450,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         distributionFactorUpper,
                         distributionFactorLower,
                         captureTables,
-                        chunkKey);
+                        chunkKeyColumn);
         List<TableId> remainingTables =
                 Arrays.stream(captureTables).map(TableId::parse).collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
@@ -497,7 +490,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             double distributionFactorUpper,
             double distributionLower,
             String[] captureTables,
-            String chunkKey) {
+            String chunkKeyColumn) {
         return new MySqlSourceConfigFactory()
                 .startupOptions(StartupOptions.initial())
                 .databaseList(database.getDatabaseName())
@@ -511,7 +504,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 .username(database.getUsername())
                 .password(database.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
-                .chunkKey(chunkKey)
+                .chunkKeyColumn(chunkKeyColumn)
                 .createConfig(0);
     }
 }

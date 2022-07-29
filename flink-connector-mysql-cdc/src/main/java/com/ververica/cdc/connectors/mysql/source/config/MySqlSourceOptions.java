@@ -215,8 +215,8 @@ public class MySqlSourceOptions {
                             "Whether capture the scan the newly added tables or not, by default is false.");
 
     @Experimental
-    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY =
-            ConfigOptions.key("scan.incremental.snapshot.chunk.key")
+    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
+            ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(

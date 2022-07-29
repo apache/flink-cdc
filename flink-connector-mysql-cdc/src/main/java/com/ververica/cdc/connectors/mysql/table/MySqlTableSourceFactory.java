@@ -46,7 +46,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
@@ -139,7 +139,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 scanNewlyAddedTableEnabled,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
-                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY).orElse(null));
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));
     }
 
     @Override
@@ -179,7 +179,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CONNECT_MAX_RETRIES);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
-        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         return options;
     }
 

@@ -206,8 +206,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
                 RowType splitKeyType =
-                        ChunkUtils.getSplitType(
-                                statefulTaskContext.getDatabaseSchema().tableFor(tableId));
+                        ChunkUtils.getChunkKeyColumnType(
+                                statefulTaskContext.getDatabaseSchema().tableFor(tableId),
+                                statefulTaskContext.getSourceConfig().getChunkKeyColumn());
                 Object[] key =
                         getSplitKey(
                                 splitKeyType,

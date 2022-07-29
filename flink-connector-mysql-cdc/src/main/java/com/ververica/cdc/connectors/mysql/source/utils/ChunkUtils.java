@@ -38,27 +38,17 @@ public class ChunkUtils {
 
     private ChunkUtils() {}
 
-    public static RowType getSplitType(Table table) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
-        }
-
-        // use first field in primary key as the split key
-        return getSplitType(primaryKeys.get(0));
+    public static RowType getChunkKeyColumnType(Table table, @Nullable String chunkKeyColumn) {
+        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumn));
     }
 
-    public static RowType getSplitType(Column splitColumn) {
+    public static RowType getChunkKeyColumnType(Column chunkKeyColumn) {
         return (RowType)
-                ROW(FIELD(splitColumn.name(), MySqlTypeUtils.fromDbzColumn(splitColumn)))
+                ROW(FIELD(chunkKeyColumn.name(), MySqlTypeUtils.fromDbzColumn(chunkKeyColumn)))
                         .getLogicalType();
     }
 
-    public static Column getSplitColumn(Table table, @Nullable String chunkKey) {
+    public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty()) {
             throw new ValidationException(
@@ -68,21 +58,23 @@ public class ChunkUtils {
                             table.id()));
         }
 
-        if (chunkKey != null) {
+        if (chunkKeyColumn != null) {
             Optional<Column> targetPkColumn =
-                    primaryKeys.stream().filter(col -> chunkKey.equals(col.name())).findFirst();
+                    primaryKeys.stream()
+                            .filter(col -> chunkKeyColumn.equals(col.name()))
+                            .findFirst();
             if (targetPkColumn.isPresent()) {
                 return targetPkColumn.get();
             }
             throw new ValidationException(
                     String.format(
-                            "Chunk key '%s' doesn't exist in the primary key [%s] of the table %s.",
-                            chunkKey,
+                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            chunkKeyColumn,
                             primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
                             table.id()));
         }
 
-        // use first field in primary key as the split key by default
+        // use the first column of primary key columns as the chunk key column by default
         return primaryKeys.get(0);
     }
 

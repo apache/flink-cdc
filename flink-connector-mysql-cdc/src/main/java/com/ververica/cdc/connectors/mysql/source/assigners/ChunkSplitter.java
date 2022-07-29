@@ -78,17 +78,18 @@ class ChunkSplitter {
             long start = System.currentTimeMillis();
 
             Table table = mySqlSchema.getTableSchema(jdbc, tableId).getTable();
-            Column splitColumn = ChunkUtils.getSplitColumn(table, sourceConfig.getChunkKey());
+            Column chunkKeyColumn =
+                    ChunkUtils.getChunkKeyColumn(table, sourceConfig.getChunkKeyColumn());
             final List<ChunkRange> chunks;
             try {
-                chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
+                chunks = splitTableIntoChunks(jdbc, tableId, chunkKeyColumn);
             } catch (SQLException e) {
                 throw new FlinkRuntimeException("Failed to split chunks for table " + tableId, e);
             }
 
             // convert chunks into splits
             List<MySqlSnapshotSplit> splits = new ArrayList<>();
-            RowType splitType = ChunkUtils.getSplitType(splitColumn);
+            RowType chunkKeyColumnType = ChunkUtils.getChunkKeyColumnType(chunkKeyColumn);
             for (int i = 0; i < chunks.size(); i++) {
                 ChunkRange chunk = chunks.get(i);
                 MySqlSnapshotSplit split =
@@ -96,7 +97,7 @@ class ChunkSplitter {
                                 jdbc,
                                 tableId,
                                 i,
-                                splitType,
+                                chunkKeyColumnType,
                                 chunk.getChunkStart(),
                                 chunk.getChunkEnd());
                 splits.add(split);

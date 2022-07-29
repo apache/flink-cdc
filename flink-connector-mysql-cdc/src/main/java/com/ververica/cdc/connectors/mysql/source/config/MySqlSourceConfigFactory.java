@@ -71,7 +71,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
-    private String chunkKey;
+    private String chunkKeyColumn;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -142,11 +142,11 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /**
-     * The chunk key of table snapshot, captured tables are split into multiple splits by the chunk
-     * key when read the snapshot of table.
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
      */
-    public MySqlSourceConfigFactory chunkKey(String chunkKey) {
-        this.chunkKey = chunkKey;
+    public MySqlSourceConfigFactory chunkKeyColumn(String chunkKeyColumn) {
+        this.chunkKeyColumn = chunkKeyColumn;
         return this;
     }
 
@@ -340,6 +340,6 @@ public class MySqlSourceConfigFactory implements Serializable {
                 scanNewlyAddedTableEnabled,
                 props,
                 jdbcProperties,
-                chunkKey);
+                chunkKeyColumn);
     }
 }
