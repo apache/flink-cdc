@@ -416,7 +416,7 @@ Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业�
 
 ##### Snapshot Chunk Splitting
 
-在执行增量快照读取时，MySQL CDC source 需要一个用于拆分表的标准。
+在执行增量快照读取时，MySQL CDC source 需要一个用于分片的的算法。
 MySQL CDC Source 使用拆分列将表拆分为多个拆分（块）。 默认情况下，MySQL CDC source 将标识表的主键列，并使用主键中的第一列作为拆分列。
 如果表中没有主键， 增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 来回退到旧的快照读取机制。
 
