@@ -351,7 +351,7 @@ CREATE TABLE products (
 * （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
 * （3）在快照读取之前，Source 不需要数据库锁权限。
 
-如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此“server id”的范围必须类似于 “5400-6400”，
+如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此`server id`的范围必须类似于 `5400-6400`，
 且范围必须大于并行度。
 在增量快照读取过程中，MySQL CDC Source 首先通过表的主键拆分快照块（splits），
 然后 MySQL CDC Source 将区块分配给多个 reader 以读取快照区块的数据。
@@ -809,14 +809,14 @@ $ ./bin/flink run \
       </td>
       <td>
       MySQL 中的空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 <a href="#空间数据类型映射 ">空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 MySQL<a href="# 空间数据类型映射">MySQL 空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
 </table>
 </div>
 
-### MySQL 空间数据类型映射
+### 空间数据类型映射
 
 MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都将转换为 Json 字符串，格式固定，如：<br>
 ```json
