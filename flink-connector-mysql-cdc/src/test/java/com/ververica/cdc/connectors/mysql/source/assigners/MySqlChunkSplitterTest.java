@@ -35,6 +35,7 @@ public class MySqlChunkSplitterTest {
                         Integer.MAX_VALUE - 19,
                         Integer.MAX_VALUE,
                         20,
+                        10,
                         10);
         assertEquals(2, res.size());
         assertEquals(ChunkRange.of(null, 2147483638), res.get(0));
@@ -50,6 +51,7 @@ public class MySqlChunkSplitterTest {
                         Integer.MAX_VALUE - 20,
                         Integer.MAX_VALUE,
                         20,
+                        10,
                         10);
         assertEquals(3, res.size());
         assertEquals(ChunkRange.of(null, 2147483637), res.get(0));
