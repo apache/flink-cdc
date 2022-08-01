@@ -28,11 +28,11 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** flink-sql-connector-mysql-cdc-XXX 快照版本是开发分支对应的代码。用户需要下载源代码并编译相应的 jar。用户应使用发布的版本，例如 [flink-sql-connector-mysql-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都已在 Maven 中央仓库中提供。
+**注意:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-mysql-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-安装 MySQL 服务器
+配置 MySQL 服务器
 ----------------
 
 您必须定义一个 MySQL 用户，该用户对 MySQL CDC 连接器监视的所有数据库都应该具有所需的权限。
@@ -176,9 +176,8 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
-      <td>当前数据库客户端的数字 id 或数字 id 范围，数字 id 语法类似于 “5400”，数字 id 范围语法类似于 “5400-5408”, 
-      建议在以下情况下使用数字 id 范围语法：即 'scan.incremental.snapshot.enabled' 参数为启用时。
-          因为在 MySQL 集群中当前运行的所有数据库进程中，每个 id 都必须是唯一的。 所以当连接器加入 MySQL 集群作为另一个服务器（并且具有唯一 id 的情况下），它就可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
+      <td>读取数据使用的 server id，server id 可以是个整数或者一个整数范围，比如 '5400' 或 '5400-5408', 
+      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。因为在当前 MySQL 集群中运行的所有 slave 节点，标记每个 salve 节点的 id 都必须是唯一的。 所以当连接器加入 MySQL 集群作为另一个 slave 节点（并且具有唯一 id 的情况下），它就可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
       </td>
     </tr>
     <tr>
@@ -186,7 +185,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">true</td>
           <td>Boolean</td>
-          <td>增量快照是一种读取表快照的新机制。 与旧的快照机制相比，
+          <td>增量快照是一种读取表快照的新机制，与旧的快照机制相比，
               增量快照有许多优点，包括：
               （1）在快照读取期间，Source 支持并发读取，
               （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
@@ -208,7 +207,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">1024</td>
           <td>Integer</td>
-          <td>读取表快照时每次轮询的最大获取大小。</td>
+          <td>读取表快照时每次读取数据的最大条数。</td>
     </tr>
     <tr>
       <td>scan.startup.mode</td>
@@ -279,7 +278,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     </tbody>
 </table>
@@ -352,11 +351,10 @@ CREATE TABLE products (
 * （3）在快照读取之前，Source 不需要数据库锁权限。
 
 如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此`server id`的范围必须类似于 `5400-6400`，
-且范围必须大于并行度。
-在增量快照读取过程中，MySQL CDC Source 首先通过表的主键拆分快照块（splits），
-然后 MySQL CDC Source 将区块分配给多个 reader 以读取快照区块的数据。
+且范围必须大于并行度。在增量快照读取过程中，MySQL CDC Source 首先通过表的主键将表划分成多个块（chunk），
+然后 MySQL CDC Source 将多个块分配给多个 reader 以并行读取表的数据。
 
-#### 支持并发读取
+#### 并发读取
 
 增量快照读取提供了并行读取快照数据的能力。
 你可以通过设置作业并行度的方式来控制 Source 的并行度 `parallelism.default`. For example, in SQL CLI:
@@ -367,9 +365,9 @@ Flink SQL> SET 'parallelism.default' = 8;
 
 #### 全量阶段支持 checkpoint
 
-增量快照读取提供了在区块级别执行检查点的能力。它使用旧的快照读取机制解决了以前版本中的检查点超时问题。
+增量快照读取提供了在区块级别执行检查点的能力。它使用新的快照读取机制解决了以前版本中的检查点超时问题。
 
-#### 无锁
+#### 无锁算法
 
 MySQL CDC source 使用 增量快照算法, 避免了数据库锁的使用，因此不需要 “RELOAD” 权限。
 
@@ -455,7 +453,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
 * (5) 将读取的 binlog 记录向上插入缓冲区块记录，并发出缓冲区中的所有记录作为快照区块的最终输出（全部作为插入记录）
 * (6) 继续读取并发出属于 *单个 binlog reader* 中`HIGH`偏移量之后的区块的 binlog 记录。
 
-该算法的灵感来自 [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf), 请参考它了解更多详细信息。
+该算法的是基于 [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf) 并结合 Flink 的一个变种, 请参考它了解更多详细信息。
 
 **注意:** 如果主键的实际值在其范围内分布不均匀，则在增量快照读取时可能会导致任务不平衡。
 
@@ -495,14 +493,14 @@ public class MySqlSourceExample {
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-    // enable checkpoint
+    // 设置 3s 的 checkpoint 间隔
     env.enableCheckpointing(3000);
 
     env
       .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
-      // set 4 parallel source tasks
+      // 设置 source 节点的并行度为 4
       .setParallelism(4)
-      .print().setParallelism(1); // 对 sink 设置并行度 1 以保持消息产出顺序
+      .print().setParallelism(1); // 设置 sink 节点并行度为 1 
 
     env.execute("Print MySQL Snapshot + Binlog");
   }
@@ -513,9 +511,9 @@ public class MySqlSourceExample {
 
 ### 动态加表
 
-扫描新添加的表功能使您可以添加新表以监视现有正在运行的管道，新添加的表将首先读取其快照数据，然后自动读取其变更日志。
+扫描新添加的表功能使您可以添加新表到正在运行的作业中，新添加的表将首先读取其快照数据，然后自动读取其变更日志。
 
-想象一下这个场景：一开始， Flink 作业监视表 `[product, user, address]`, 但几天后，我们希望这项工作还可以监视表 `[order, custom]` 包含历史数据， 我们需要作业仍然可以复用作业的现有状态，此功能可以优雅地解决此问题。
+想象一下这个场景：一开始， Flink 作业监控表 `[product, user, address]`, 但几天后，我们希望这个作业还可以监控表 `[order, custom]`，这些表包含历史数据，我们需要作业仍然可以复用作业的已有状态，动态加表功能可以优雅地解决此问题。
 
 以下操作显示了如何启用此功能来解决上述场景。 使用现有的 Flink CDC Source 作业，如下：
 
@@ -530,10 +528,10 @@ public class MySqlSourceExample {
         .password("yourPassword")
         .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
         .build();
-   // your business code
+   // 你的业务代码
 ```
 
-如果我们想添加新表 `[order, custom]` 对于现有的 Flink 作业，只需更新 `tableList()` 里面的值新增表 `[order, custom]` 并从以前的 savepoint 恢复作业。
+如果我们想添加新表 `[order, custom]` 对于现有的 Flink 作业，只需更新 `tableList()` 将新增表 `[order, custom]` 加入并从已有的 savepoint 恢复作业。
 
 _Step 1_: 使用 savepoint 停止现有的 Flink 作业。
 ```shell
@@ -544,8 +542,8 @@ Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
 Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
 ```
 _Step 2_: 更新现有 Flink 作业的表列表选项。
-1. update `tableList()` value.
-2. build the jar of updated job.
+1. 更新 `tableList()` 参数.
+2. 编译更新后的作业，示例如下：
 ```java
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
@@ -557,7 +555,7 @@ _Step 2_: 更新现有 Flink 作业的表列表选项。
         .password("yourPassword")
         .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
         .build();
-   // your business code
+   // 你的业务代码
 ```
 _Step 3_: 从 savepoint 还原更新后的 Flink 作业。
 ```shell
@@ -809,7 +807,7 @@ $ ./bin/flink run \
       </td>
       <td>
       MySQL 中的空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 MySQL<a href="# 空间数据类型映射">MySQL 空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 <a href="# 空间数据类型映射">MySQL 空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
@@ -818,7 +816,7 @@ $ ./bin/flink run \
 
 ### 空间数据类型映射
 
-MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都将转换为 Json 字符串，格式固定，如：<br>
+MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json
 {"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
 ```
