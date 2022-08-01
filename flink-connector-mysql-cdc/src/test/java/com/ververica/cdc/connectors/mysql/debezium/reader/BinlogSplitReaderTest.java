@@ -443,6 +443,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         }
         snapshotSplitReader.close();
 
+        assertExecutorIsTerminated(snapshotSplitReader);
+
         // step-2: create binlog split according the finished snapshot splits
         List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
                 getFinishedSplitsInfo(sqlSplits, snapshotRecords);

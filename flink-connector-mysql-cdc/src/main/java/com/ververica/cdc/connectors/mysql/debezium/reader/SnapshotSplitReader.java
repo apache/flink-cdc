@@ -87,6 +87,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     public AtomicBoolean hasNextElement;
     public AtomicBoolean reachEnd;
 
+    private static final long EXECUTOR_AWAIT_TERMINATION_TIMEOUT_SECONDS = 5;
+
     public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
@@ -330,7 +332,12 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
             executor.shutdown();
-            executor.awaitTermination(5, TimeUnit.SECONDS);
+            boolean isShutdown =
+                    executor.awaitTermination(
+                            EXECUTOR_AWAIT_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!isShutdown) {
+                LOG.warn("The thread executor of SnapshotSplitReader wasn't shutdown properly.");
+            }
         } catch (Exception e) {
             LOG.error("Close snapshot reader error", e);
         }

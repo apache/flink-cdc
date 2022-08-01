@@ -80,6 +80,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private final Set<TableId> pureBinlogPhaseTables;
     private Tables.TableFilter capturedTableFilter;
 
+    private static final long EXECUTOR_AWAIT_TERMINATION_TIMEOUT_SECONDS = 5;
+
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
@@ -181,7 +183,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             // while loop in MySqlStreamingChangeEventSource's execute method
             currentTaskRunning = false;
             executor.shutdown();
-            executor.awaitTermination(5, TimeUnit.SECONDS);
+            boolean isShutdown =
+                    executor.awaitTermination(
+                            EXECUTOR_AWAIT_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!isShutdown) {
+                LOG.warn("The thread executor of BinlogSplitReader wasn't shutdown properly.");
+            }
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
         }
