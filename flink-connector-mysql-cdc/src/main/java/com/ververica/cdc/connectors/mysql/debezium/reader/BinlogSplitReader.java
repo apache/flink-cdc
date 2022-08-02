@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -51,6 +52,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
@@ -65,7 +67,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
-    private final ExecutorService executor;
+    private final ExecutorService executorService;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -79,11 +81,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private final Set<TableId> pureBinlogPhaseTables;
     private Tables.TableFilter capturedTableFilter;
 
+    private static final long READER_CLOSE_TIMEOUT = 30L;
+
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
     }
@@ -108,7 +112,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
                         currentBinlogSplit);
 
-        executor.submit(
+        executorService.submit(
                 () -> {
                     try {
                         binlogSplitReadTask.execute(
@@ -175,6 +179,17 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             }
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
+            }
+            // set currentTaskRunning to false to terminate the
+            // while loop in MySqlStreamingChangeEventSource's execute method
+            currentTaskRunning = false;
+            if (executorService != null) {
+                executorService.shutdown();
+                if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                    LOG.warn(
+                            "Failed to close the binlog split reader in {} seconds.",
+                            READER_CLOSE_TIMEOUT);
+                }
             }
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
@@ -283,5 +298,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     public void stopBinlogReadTask() {
         this.currentTaskRunning = false;
+    }
+
+    @VisibleForTesting
+    public ExecutorService getExecutorService() {
+        return executorService;
     }
 }

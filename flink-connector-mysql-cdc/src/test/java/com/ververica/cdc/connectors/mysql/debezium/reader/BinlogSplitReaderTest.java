@@ -65,6 +65,8 @@ import java.util.stream.Collectors;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link BinlogSplitReader}. */
 public class BinlogSplitReaderTest extends MySqlSourceTestBase {
@@ -441,6 +443,10 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 }
             }
         }
+        snapshotSplitReader.close();
+
+        assertNotNull(snapshotSplitReader.getExecutorService());
+        assertTrue(snapshotSplitReader.getExecutorService().isTerminated());
 
         // step-2: create binlog split according the finished snapshot splits
         List<FinishedSnapshotSplitInfo> finishedSplitsInfo =
@@ -483,6 +489,11 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                             pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord),
                             dataType));
         }
+        binlogReader.close();
+
+        assertNotNull(snapshotSplitReader.getExecutorService());
+        assertTrue(snapshotSplitReader.getExecutorService().isTerminated());
+
         return actual;
     }
 
