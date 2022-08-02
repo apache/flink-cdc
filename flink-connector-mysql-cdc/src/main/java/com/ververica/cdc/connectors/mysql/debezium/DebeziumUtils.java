@@ -42,6 +42,8 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
@@ -63,6 +65,16 @@ public class DebeziumUtils {
             throw new FlinkRuntimeException(e);
         }
         return jdbc;
+    }
+
+    /** Get current filter tables num. */
+    public static Integer getFilterTablesNum(List<String> tableList) {
+        Pattern p = Pattern.compile("\\.\\*?(?<t>.*)\\)?");
+        Matcher matcher = p.matcher(tableList.get(0));
+        if (matcher.find()) {
+            return matcher.group(1).split("\\|").length;
+        }
+        return 0;
     }
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */

@@ -135,11 +135,27 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testNewlyAddedIncrementTableForExistsPipelineSingleParallelismWithAheadBinlog()
+            throws Exception {
+        testNewlyAddedTableOneByOne(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                true,
+                true,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai",
+                "address_guangzhou");
+    }
+
+    @Test
     public void testNewlyAddedTableForExistsPipelineOnce() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                false,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -152,6 +168,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 true,
+                false,
                 "address_hangzhou",
                 "address_beijing");
     }
@@ -162,6 +179,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                false,
                 false,
                 "address_hangzhou",
                 "address_beijing",
@@ -175,6 +193,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 true,
+                false,
                 "address_hangzhou",
                 "address_beijing",
                 "address_shanghai");
@@ -186,6 +205,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                false,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -199,6 +219,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 true,
+                false,
                 "address_hangzhou",
                 "address_beijing");
     }
@@ -209,6 +230,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
+                false,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -221,6 +243,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
                 true,
+                false,
                 "address_hangzhou",
                 "address_beijing");
     }
@@ -232,6 +255,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
                 false,
+                false,
                 "address_hangzhou",
                 "address_beijing");
     }
@@ -242,6 +266,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
+                false,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -394,6 +419,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             boolean makeBinlogBeforeCapture,
+            boolean onlyBinlogCapture,
             String... captureAddressTables)
             throws Exception {
 
@@ -421,8 +447,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             StreamExecutionEnvironment env =
                     getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
             StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-
-            String createTableStatement = getCreateTableStatement(captureTablesThisRound);
+            String createTableStatement =
+                    getCreateTableStatement(onlyBinlogCapture, captureTablesThisRound);
             tEnv.executeSql(createTableStatement);
             tEnv.executeSql(
                     "CREATE TABLE sink ("
@@ -441,19 +467,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
             // step 2: assert fetched snapshot data in this round
             String cityName = newlyAddedTable.split("_")[1];
-            List<String> expectedSnapshotDataThisRound =
-                    Arrays.asList(
-                            format(
-                                    "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
-                                    newlyAddedTable, cityName, cityName),
-                            format(
-                                    "+I[%s, 416927583791428523, China, %s, %s West Town address 2]",
-                                    newlyAddedTable, cityName, cityName),
-                            format(
-                                    "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
-                                    newlyAddedTable, cityName, cityName));
-            if (makeBinlogBeforeCapture) {
-                expectedSnapshotDataThisRound =
+            if (!onlyBinlogCapture) {
+                List<String> expectedSnapshotDataThisRound =
                         Arrays.asList(
                                 format(
                                         "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
@@ -463,49 +478,79 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                         newlyAddedTable, cityName, cityName),
                                 format(
                                         "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
+                                        newlyAddedTable, cityName, cityName));
+                if (makeBinlogBeforeCapture) {
+                    expectedSnapshotDataThisRound =
+                            Arrays.asList(
+                                    format(
+                                            "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
+                                            newlyAddedTable, cityName, cityName),
+                                    format(
+                                            "+I[%s, 416927583791428523, China, %s, %s West Town address 2]",
+                                            newlyAddedTable, cityName, cityName),
+                                    format(
+                                            "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
+                                            newlyAddedTable, cityName, cityName),
+                                    format(
+                                            "+I[%s, 417022095255614381, China, %s, %s West Town address 5]",
+                                            newlyAddedTable, cityName, cityName));
+                }
+
+                // trigger failover after some snapshot data read finished
+                if (failoverPhase == FailoverPhase.SNAPSHOT) {
+                    triggerFailover(
+                            failoverType,
+                            jobClient.getJobID(),
+                            miniClusterResource.getMiniCluster(),
+                            () -> sleepMs(100));
+                }
+                fetchedDataList.addAll(expectedSnapshotDataThisRound);
+                waitForSinkSize("sink", fetchedDataList.size());
+                assertEqualsInAnyOrder(
+                        fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+
+                // step 3: make some binlog data for this round
+                makeFirstPartBinlogForAddressTable(getConnection(), newlyAddedTable);
+                if (failoverPhase == FailoverPhase.BINLOG) {
+                    triggerFailover(
+                            failoverType,
+                            jobClient.getJobID(),
+                            miniClusterResource.getMiniCluster(),
+                            () -> sleepMs(100));
+                }
+                makeSecondPartBinlogForAddressTable(getConnection(), newlyAddedTable);
+
+                // step 4: assert fetched binlog data in this round
+                List<String> expectedBinlogDataThisRound =
+                        Arrays.asList(
+                                format(
+                                        "+U[%s, 416874195632735147, CHINA, %s, %s West Town address 1]",
                                         newlyAddedTable, cityName, cityName),
+                                format(
+                                        "+I[%s, 417022095255614380, China, %s, %s West Town address 4]",
+                                        newlyAddedTable, cityName, cityName));
+
+                // step 5: assert fetched binlog data in this round
+                fetchedDataList.addAll(expectedBinlogDataThisRound);
+                waitForSinkSize("sink", fetchedDataList.size());
+                assertEqualsInAnyOrder(
+                        fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            } else {
+                // step 4: assert fetched binlog data in this round
+                List<String> expectedBinlogDataThisRound =
+                        Arrays.asList(
                                 format(
                                         "+I[%s, 417022095255614381, China, %s, %s West Town address 5]",
                                         newlyAddedTable, cityName, cityName));
+                // step 5: assert fetched binlog data in this round
+                fetchedDataList.addAll(expectedBinlogDataThisRound);
+                Thread.sleep(1000);
+                waitForSinkSize("sink", fetchedDataList.size() - 1);
+                fetchedDataList.stream().forEach(System.out::println);
+                assertEqualsInAnyOrder(
+                        fetchedDataList.subList(1, round + 1),
+                        TestValuesTableFactory.getRawResults("sink"));
             }
-
-            // trigger failover after some snapshot data read finished
-            if (failoverPhase == FailoverPhase.SNAPSHOT) {
-                triggerFailover(
-                        failoverType,
-                        jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
-                        () -> sleepMs(100));
-            }
-            fetchedDataList.addAll(expectedSnapshotDataThisRound);
-            waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
-
-            // step 3: make some binlog data for this round
-            makeFirstPartBinlogForAddressTable(getConnection(), newlyAddedTable);
-            if (failoverPhase == FailoverPhase.BINLOG) {
-                triggerFailover(
-                        failoverType,
-                        jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
-                        () -> sleepMs(100));
-            }
-            makeSecondPartBinlogForAddressTable(getConnection(), newlyAddedTable);
-
-            // step 4: assert fetched binlog data in this round
-            List<String> expectedBinlogDataThisRound =
-                    Arrays.asList(
-                            format(
-                                    "+U[%s, 416874195632735147, CHINA, %s, %s West Town address 1]",
-                                    newlyAddedTable, cityName, cityName),
-                            format(
-                                    "+I[%s, 417022095255614380, China, %s, %s West Town address 4]",
-                                    newlyAddedTable, cityName, cityName));
-
-            // step 5: assert fetched binlog data in this round
-            fetchedDataList.addAll(expectedBinlogDataThisRound);
-            waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
 
             // step 6: trigger savepoint
             if (round != captureAddressTables.length - 1) {
@@ -515,7 +560,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
     }
 
-    private String getCreateTableStatement(String... captureTableNames) {
+    private String getCreateTableStatement(boolean onlyBinlogCapture, String... captureTableNames) {
         return format(
                 "CREATE TABLE address ("
                         + " table_name STRING METADATA VIRTUAL,"
@@ -535,7 +580,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         + " 'table-name' = '%s',"
                         + " 'scan.incremental.snapshot.chunk.size' = '2',"
                         + " 'server-id' = '%s',"
-                        + " 'scan.newly-added-table.enabled' = 'true'"
+                        + " 'scan.newly-added-table.enabled' = 'true',"
+                        + " 'scan.startup.mode' = '%s'"
                         + ")",
                 MYSQL_CONTAINER.getHost(),
                 MYSQL_CONTAINER.getDatabasePort(),
@@ -543,7 +589,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 customDatabase.getPassword(),
                 customDatabase.getDatabaseName(),
                 getTableNameRegex(captureTableNames),
-                getServerId());
+                getServerId(),
+                onlyBinlogCapture ? "latest-offset" : "initial");
     }
 
     private StreamExecutionEnvironment getStreamExecutionEnvironment(
