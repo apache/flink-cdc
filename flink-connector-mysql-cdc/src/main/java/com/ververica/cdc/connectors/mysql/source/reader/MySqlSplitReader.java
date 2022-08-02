@@ -135,10 +135,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                     currentReader = null;
                 }
                 if (currentReader == null) {
-                    final MySqlConnection jdbcConnection =
-                            createMySqlConnection(
-                                    sourceConfig.getDbzConfiguration(),
-                                    sourceConfig.getJdbcProperties());
+                    final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
                     final BinaryLogClient binaryLogClient =
                             createBinaryClient(sourceConfig.getDbzConfiguration());
                     final StatefulTaskContext statefulTaskContext =
@@ -151,10 +148,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
                     LOG.info("It's turn to read binlog split, close current snapshot reader");
                     currentReader.close();
                 }
-                final MySqlConnection jdbcConnection =
-                        createMySqlConnection(
-                                sourceConfig.getDbzConfiguration(),
-                                sourceConfig.getJdbcProperties());
+                final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
                 final BinaryLogClient binaryLogClient =
                         createBinaryClient(sourceConfig.getDbzConfiguration());
                 final StatefulTaskContext statefulTaskContext =

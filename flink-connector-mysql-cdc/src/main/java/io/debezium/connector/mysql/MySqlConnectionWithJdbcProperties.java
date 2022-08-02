@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -16,11 +14,9 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source.connection;
+package io.debezium.connector.mysql;
 
 import io.debezium.config.Configuration;
-import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.jdbc.JdbcConnection;
 
 import java.util.Properties;
@@ -49,7 +45,7 @@ public class MySqlConnectionWithJdbcProperties extends MySqlConnection {
      * MySqlConnectionWithJdbcProperties}.
      */
     public static class MySqlConnectionConfigurationWithCustomUrl
-            extends io.debezium.connector.mysql.MySqlConnection.MySqlConnectionConfiguration {
+            extends MySqlConnectionConfiguration {
         private static final Properties DEFAULT_JDBC_PROPERTIES = initializeDefaultJdbcProperties();
         private static final String JDBC_URL_PATTERN =
                 "jdbc:mysql://${hostname}:${port}/?useSSL=${useSSL}&connectTimeout=${connectTimeout}";
@@ -103,7 +99,6 @@ public class MySqlConnectionWithJdbcProperties extends MySqlConnection {
             defaultJdbcProperties.setProperty("zeroDateTimeBehavior", "CONVERT_TO_NULL");
             defaultJdbcProperties.setProperty("characterEncoding", "UTF-8");
             defaultJdbcProperties.setProperty("characterSetResults", "UTF-8");
-            defaultJdbcProperties.setProperty("useSSL", "false");
             return defaultJdbcProperties;
         }
 

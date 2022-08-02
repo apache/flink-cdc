@@ -92,9 +92,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         MySqlSplit binlogSplit;
-        try (MySqlConnection jdbc =
-                DebeziumUtils.createMySqlConnection(
-                        sourceConfig.getDbzConfiguration(), sourceConfig.getJdbcProperties())) {
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
             binlogSplit =

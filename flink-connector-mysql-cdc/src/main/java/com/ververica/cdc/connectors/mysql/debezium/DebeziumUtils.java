@@ -21,10 +21,10 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.connection.JdbcConnectionFactory;
-import com.ververica.cdc.connectors.mysql.source.connection.MySqlConnectionWithJdbcProperties;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlConnectionWithJdbcProperties;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
@@ -65,6 +65,12 @@ public class DebeziumUtils {
             throw new FlinkRuntimeException(e);
         }
         return jdbc;
+    }
+
+    /** Creates a new {@link MySqlConnection}, but not open the connection. */
+    public static MySqlConnection createMySqlConnection(MySqlSourceConfig sourceConfig) {
+        return createMySqlConnection(
+                sourceConfig.getDbzConfiguration(), sourceConfig.getJdbcProperties());
     }
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
