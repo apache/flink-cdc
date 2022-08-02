@@ -77,7 +77,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
     }
 
     @Test
-    public void testConsumingAllEvents() throws Exception {
+    public void testTableList() throws Exception {
         initializeTable("inventory");
 
         String sourceDDL =
@@ -94,8 +94,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'tenant-name' = '%s',"
-                                + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s',"
+                                + " 'table-list' = '%s',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
                                 + " 'logproxy.host' = '%s',"
@@ -105,8 +104,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         getUsername(),
                         getPassword(),
                         getTenant(),
-                        "inventory",
-                        "products",
+                        "inventory.products",
                         getObServerHost(),
                         getObServerSqlPort(),
                         getLogProxyHost(),
@@ -229,8 +227,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         getUsername(),
                         getPassword(),
                         getTenant(),
-                        "inventory_meta",
-                        "products",
+                        "^inventory_meta$",
+                        "^products$",
                         getObServerHost(),
                         getObServerSqlPort(),
                         getLogProxyHost(),
@@ -352,8 +350,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         getUsername(),
                         getPassword(),
                         getTenant(),
-                        "column_type_test",
-                        "full_types",
+                        "^column_type_test$",
+                        "^full_types$",
                         serverTimeZone,
                         getObServerHost(),
                         getObServerSqlPort(),

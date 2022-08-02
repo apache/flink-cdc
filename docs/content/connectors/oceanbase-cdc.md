@@ -94,6 +94,12 @@ Flink SQL> SELECT * FROM orders;
 Connector Options
 ----------------
 
+The OceanBase CDC Connector contains some options for both sql and stream api as the following sheet. 
+
+*Note*: The connector supports two ways to specify the table list to listen to, and will get the union of the results when both way are used at the same time.
+1. Use `database-name` and `table-name` to match database and table names in regex. As the `obcdc` (former `liboblog`) only supports `fnmatch` now, we can't use regex directly to filter change events, so these two options can only be used in `initial` startup mode.
+2. Use `table-list` to match the exact value of database and table names.
+
 <div class="highlight">
     <table class="colwidths-auto docutils">
         <thead>
@@ -148,21 +154,28 @@ Connector Options
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Tenant name of OceanBase to monitor.</td>
+                <td>Tenant name of OceanBase to monitor, should be exact value.</td>
             </tr>
             <tr>
                 <td>database-name</td>
-                <td>required</td>
+                <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Database name of OceanBase to monitor.</td>
+                <td>Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
             </tr>
             <tr>
                 <td>table-name</td>
-                <td>required</td>
+                <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Table name of OceanBase to monitor.</td>
+                <td>Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+            </tr>
+            <tr>
+                <td>table-list</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>List of full names of tables, separated by commas, e.g. "db1.table1, db2.table2".</td>
             </tr>
             <tr>
                 <td>hostname</td>
@@ -211,7 +224,7 @@ Connector Options
                 <td>optional</td>
                 <td style="word-wrap: break-word;">By rule.</td>
                 <td>String</td>
-                <td>Id of a log proxy client connection, will be in format {flink_ip}_{process_id}_{timestamp}_{tenant}.{db}.{table} by default.</td>
+                <td>Id of a log proxy client connection, will be in format {flink_ip}_{process_id}_{timestamp}_{thread_id}_{tenant} by default.</td>
             </tr>
             <tr>
                 <td>rootserver-list</td>

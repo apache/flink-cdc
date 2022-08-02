@@ -75,8 +75,9 @@ public class OceanBaseTableFactoryTest {
     private static final String USERNAME = "user@sys";
     private static final String PASSWORD = "pswd";
     private static final String TENANT_NAME = "sys";
-    private static final String DATABASE_NAME = "db";
-    private static final String TABLE_NAME = "table";
+    private static final String DATABASE_NAME = "db[0-9]";
+    private static final String TABLE_NAME = "table[0-9]";
+    private static final String TABLE_LIST = "db.table";
     private static final String SERVER_TIME_ZONE = "UTC";
     private static final String CONNECT_TIMEOUT = "30s";
     private static final String HOSTNAME = "127.0.0.1";
@@ -90,6 +91,9 @@ public class OceanBaseTableFactoryTest {
     @Test
     public void testCommonProperties() {
         Map<String, String> options = getRequiredOptions();
+        options.put("database-name", DATABASE_NAME);
+        options.put("table-name", TABLE_NAME);
+        options.put("table-list", TABLE_LIST);
         options.put("rootserver-list", RS_LIST);
 
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
@@ -102,6 +106,7 @@ public class OceanBaseTableFactoryTest {
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
                         null,
@@ -120,6 +125,9 @@ public class OceanBaseTableFactoryTest {
     public void testOptionalProperties() {
         Map<String, String> options = getRequiredOptions();
         options.put("scan.startup.mode", "initial");
+        options.put("database-name", DATABASE_NAME);
+        options.put("table-name", TABLE_NAME);
+        options.put("table-list", TABLE_LIST);
         options.put("hostname", HOSTNAME);
         options.put("port", String.valueOf(PORT));
         options.put("logproxy.client.id", LOG_PROXY_CLIENT_ID);
@@ -135,6 +143,7 @@ public class OceanBaseTableFactoryTest {
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
                         "127.0.0.1",
@@ -152,6 +161,9 @@ public class OceanBaseTableFactoryTest {
     @Test
     public void testMetadataColumns() {
         Map<String, String> options = getRequiredOptions();
+        options.put("database-name", DATABASE_NAME);
+        options.put("table-name", TABLE_NAME);
+        options.put("table-list", TABLE_LIST);
         options.put("rootserver-list", RS_LIST);
 
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, options);
@@ -170,6 +182,7 @@ public class OceanBaseTableFactoryTest {
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
                         null,
@@ -210,10 +223,6 @@ public class OceanBaseTableFactoryTest {
         options.put("username", USERNAME);
         options.put("password", PASSWORD);
         options.put("tenant-name", TENANT_NAME);
-        options.put("database-name", DATABASE_NAME);
-        options.put("table-name", TABLE_NAME);
-        options.put("server-time-zone", SERVER_TIME_ZONE);
-        options.put("connect.timeout", CONNECT_TIMEOUT);
         options.put("logproxy.host", LOG_PROXY_HOST);
         options.put("logproxy.port", String.valueOf(LOG_PROXY_PORT));
         return options;
