@@ -21,7 +21,6 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
-import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.junit.BeforeClass;
@@ -31,9 +30,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.lang.reflect.Field;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -88,12 +85,5 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         assertTrue(expected != null && actual != null);
         assertEquals(expected.size(), actual.size());
         assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
-    }
-
-    public static void assertExecutorIsTerminated(DebeziumReader<?, ?> reader) throws Exception {
-        Field executorField = reader.getClass().getDeclaredField("executor");
-        executorField.setAccessible(true);
-        ExecutorService executorService = (ExecutorService) executorField.get(reader);
-        assertTrue(executorService.isTerminated());
     }
 }
