@@ -336,7 +336,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                 executorService.shutdown();
                 if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                     LOG.warn(
-                            "Failed to close the snapshot split reader in {} ms.",
+                            "Failed to close the snapshot split reader in {} seconds.",
                             READER_CLOSE_TIMEOUT);
                 }
             }

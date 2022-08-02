@@ -187,7 +187,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 executorService.shutdown();
                 if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                     LOG.warn(
-                            "Failed to close the binlog split reader in {} ms.",
+                            "Failed to close the binlog split reader in {} seconds.",
                             READER_CLOSE_TIMEOUT);
                 }
             }
