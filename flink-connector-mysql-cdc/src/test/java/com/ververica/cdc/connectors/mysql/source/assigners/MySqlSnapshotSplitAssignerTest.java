@@ -266,7 +266,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 getTestAssignSnapshotSplits(
                         8,
                         10d,
-                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {
                             customerDatabase.getDatabaseName() + ".customers_sparse_dist"
                         });
