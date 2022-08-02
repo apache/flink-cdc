@@ -53,7 +53,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -414,7 +414,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         }
         snapshotSplitReader.close();
 
-        assertNull(snapshotSplitReader.getExecutorService());
+        assertNotNull(snapshotSplitReader.getExecutorService());
         assertTrue(snapshotSplitReader.getExecutorService().isTerminated());
 
         return formatResult(result, dataType);
