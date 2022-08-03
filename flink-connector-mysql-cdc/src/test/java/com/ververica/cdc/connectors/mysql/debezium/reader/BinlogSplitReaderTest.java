@@ -84,7 +84,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
-        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -123,7 +123,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
-        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -171,7 +171,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
-        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -207,7 +207,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         MySqlSourceConfig sourceConfig =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
-        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -264,7 +264,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         MySqlSourceConfig sourceConfig =
                 getConfig(StartupOptions.latest(), new String[] {"customers"});
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
-        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -316,7 +316,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         .debeziumProperties(dbzProps)
                         .createConfig(0);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
-        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
 
         // Create binlog reader and submit split
         BinlogSplitReader binlogReader = createBinlogReader(sourceConfig);
@@ -351,8 +351,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
             throws Exception {
         MySqlBinlogSplitAssigner binlogSplitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
         binlogSplitAssigner.open();
-        try (MySqlConnection jdbc =
-                DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
             return MySqlBinlogSplit.fillTableSchemas(
