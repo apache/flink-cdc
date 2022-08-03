@@ -26,9 +26,13 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ### SQL Client JAR
 
-```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
+```
+下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。
+```
 下载 [flink-sql-connector-mysql-cdc-2.2.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.2.1/flink-sql-connector-mysql-cdc-2.2.1.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+
 **注意:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-mysql-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+
 配置 MySQL 服务器
 ----------------
 你必须定义一个 MySQL 用户，该用户对 MySQL CDC 连接器监视的所有数据库都应该具有所需的权限。
@@ -185,7 +189,7 @@ Flink SQL> SELECT * FROM orders;
               （3）在快照读取之前，Source 不需要数据库锁权限。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
               Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
-              请查阅 <a href="#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
+              请查阅 <a href="#a-name-id-001-a">增量快照读取</a> 章节了解更多详细信息。
           </td>
     </tr>
     <tr>
@@ -209,7 +213,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
          合法的模式为 "initial" 和 "latest-offset"。
-           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
+           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
     </tr> 
     <tr>
       <td>server-time-zone</td>
@@ -336,7 +340,7 @@ CREATE TABLE products (
 支持的特性
 --------
 
-### 增量快照读取
+### 增量快照读取<a name="增量快照读取" id="001" ></a>
 
 增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
 * （1）在快照读取期间，Source 支持并发读取，
@@ -454,7 +458,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
 MySQL CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照块，然后继续读取 binlog，
 无论是在快照阶段还是读取 binlog 阶段，MySQL CDC 连接器都会在处理时**准确读取数据**，即使任务出现了故障。
 
-### 启动模式
+### 启动模式<a name="启动模式" id="002" ></a>
 
 配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
 
@@ -794,14 +798,14 @@ $ ./bin/flink run \
       </td>
       <td>
       MySQL 中的空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 MySQL <a href="#空间数据类型映射">空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 MySQL <a href="#a-name-id-003-a">空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
 </table>
 </div>
 
-### 空间数据类型映射
+### 空间数据类型映射<a name="空间数据类型映射" id="003"></a>
 
 MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json
