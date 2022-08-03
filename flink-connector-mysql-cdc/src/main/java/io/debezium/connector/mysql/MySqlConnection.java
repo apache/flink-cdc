@@ -57,7 +57,7 @@ import java.util.Properties;
  */
 public class MySqlConnection extends JdbcConnection {
 
-    private static Logger LOGGER = LoggerFactory.getLogger(MySqlConnection.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(MySqlConnection.class);
 
     private static final String SQL_SHOW_SYSTEM_VARIABLES = "SHOW VARIABLES";
     private static final String SQL_SHOW_SYSTEM_VARIABLES_CHARACTER_SET =
@@ -246,12 +246,12 @@ public class MySqlConnection extends JdbcConnection {
      * @return the session variables that are related to sessions ssl version
      */
     protected String getSessionVariableForSslVersion() {
-        final String SSL_VERSION = "Ssl_version";
+        final String sslVersion = "Ssl_version";
         LOGGER.debug("Reading MySQL Session variable for Ssl Version");
         Map<String, String> sessionVariables =
                 querySystemVariables(SQL_SHOW_SESSION_VARIABLE_SSL_VERSION);
-        if (!sessionVariables.isEmpty() && sessionVariables.containsKey(SSL_VERSION)) {
-            return sessionVariables.get(SSL_VERSION);
+        if (!sessionVariables.isEmpty() && sessionVariables.containsKey(sslVersion)) {
+            return sessionVariables.get(sslVersion);
         }
         return null;
     }
@@ -327,7 +327,7 @@ public class MySqlConnection extends JdbcConnection {
     }
 
     /**
-     * Get the purged GTID values from MySQL (gtid_purged value)
+     * Get the purged GTID values from MySQL (gtid_purged value).
      *
      * @return A GTID set; may be empty if not using GTIDs or none have been purged yet
      */
@@ -552,6 +552,7 @@ public class MySqlConnection extends JdbcConnection {
         return connectionString(urlPattern);
     }
 
+    /** Connection configuration to create a {@link MySqlConnection}. */
     public static class MySqlConnectionConfiguration {
 
         protected static final String JDBC_PROPERTY_LEGACY_DATETIME = "useLegacyDatetimeCode";
