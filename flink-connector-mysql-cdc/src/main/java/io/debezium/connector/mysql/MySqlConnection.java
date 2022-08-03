@@ -41,19 +41,19 @@ import java.util.Properties;
  * parameter {@code jdbcProperties} in the constructor of {@link MySqlConnectionConfiguration} will
  * be used to generate the jdbc url pattern, and may overwrite the default value.
  *
- * <p>Line 80: Add field {@code urlPattern} in {@link MySqlConnection} and remove old pattern.
+ * <p>Line 71: Add field {@code urlPattern} in {@link MySqlConnection} and remove old pattern.
  *
- * <p>Line 93: Init {@code urlPattern} using the url pattern from {@link
+ * <p>Line 84: Init {@code urlPattern} using the url pattern from {@link
  * MySqlConnectionConfiguration}.
  *
- * <p>Line 561: Generate the connection string by the new field {@code urlPattern}.
+ * <p>Line 552: Generate the connection string by the new field {@code urlPattern}.
  *
- * <p>Line 574 ~ 581: Add new constant and field {@code urlPattern} to {@link
+ * <p>Line 566 ~ 577: Add new constant and field {@code urlPattern} to {@link
  * MySqlConnectionConfiguration}.
  *
- * <p>Line 626 ~ 629: Init new field {@code urlPattern} in {@link MySqlConnectionConfiguration}.
+ * <p>Line 622 ~ 625: Init new field {@code urlPattern} in {@link MySqlConnectionConfiguration}.
  *
- * <p>Line 690 ~ 720: Add some methods helping to generate the url pattern and add default values.
+ * <p>Line 686 ~ 716: Add some methods helping to generate the url pattern and add default values.
  */
 public class MySqlConnection extends JdbcConnection {
 
@@ -569,6 +569,10 @@ public class MySqlConnection extends JdbcConnection {
         private static final String JDBC_URL_PATTERN_WITH_CUSTOM_USE_SSL =
                 "jdbc:mysql://${hostname}:${port}/?connectTimeout=${connectTimeout}";
         private final String urlPattern;
+
+        public MySqlConnectionConfiguration(Configuration config) {
+            this(config, new Properties());
+        }
 
         public MySqlConnectionConfiguration(Configuration config, Properties jdbcProperties) {
             // Set up the JDBC connection without actually connecting, with extra MySQL-specific
