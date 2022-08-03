@@ -156,8 +156,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 throw new FlinkRuntimeException(
                         "Failed to discover remaining tables to capture", e);
             }
+        } else {
+            captureNewlyAddedTables();
         }
-        captureNewlyAddedTables();
         startAsynchronouslySplit();
     }
 
