@@ -24,7 +24,6 @@ import com.ververica.cdc.connectors.mysql.source.connection.JdbcConnectionFactor
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.MySqlConnectionWithJdbcProperties;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
@@ -76,9 +75,8 @@ public class DebeziumUtils {
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
     public static MySqlConnection createMySqlConnection(
             Configuration dbzConfiguration, Properties jdbcProperties) {
-        return new MySqlConnectionWithJdbcProperties(
-                new MySqlConnectionWithJdbcProperties.MySqlConnectionConfigurationWithCustomUrl(
-                        dbzConfiguration, jdbcProperties));
+        return new MySqlConnection(
+                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration, jdbcProperties));
     }
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */
