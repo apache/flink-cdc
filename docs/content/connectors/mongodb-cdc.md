@@ -14,7 +14,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mongodb-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.2.0</version>
+  <version>2.2.1</version>
 </dependency>
 ```
 
@@ -22,9 +22,9 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-mongodb-cdc-2.2.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.2.0/flink-sql-connector-mongodb-cdc-2.2.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mongodb-cdc-2.2.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.2.1/flink-sql-connector-mongodb-cdc-2.2.1.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-mongodb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mongodb-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mongodb-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-mongodb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mongodb-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mongodb-cdc), the released version will be available in the Maven central warehouse.
 
 Setup MongoDB
 ----------------
