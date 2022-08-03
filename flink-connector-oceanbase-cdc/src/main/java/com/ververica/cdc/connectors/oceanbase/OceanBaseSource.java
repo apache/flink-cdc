@@ -200,7 +200,7 @@ public class OceanBaseSource {
             }
 
             if (serverTimeZone == null) {
-                serverTimeZone = "UTC";
+                serverTimeZone = "+00:00";
             }
             ZoneOffset zoneOffset = ZoneId.of(serverTimeZone).getRules().getOffset(Instant.now());
 
@@ -235,7 +235,7 @@ public class OceanBaseSource {
             obReaderConfig.setUsername(username);
             obReaderConfig.setPassword(password);
             obReaderConfig.setStartTimestamp(startupTimestamp);
-            obReaderConfig.setTimezone(zoneOffset.getId());
+            obReaderConfig.setTimezone(serverTimeZone);
 
             return new OceanBaseRichSourceFunction<T>(
                     StartupMode.INITIAL.equals(startupMode),

@@ -84,7 +84,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public static final ConfigOption<String> SERVER_TIME_ZONE =
             ConfigOptions.key("server-time-zone")
                     .stringType()
-                    .defaultValue("UTC")
+                    .defaultValue("+00:00")
                     .withDescription("The session time zone in database server.");
 
     public static final ConfigOption<Duration> CONNECT_TIMEOUT =

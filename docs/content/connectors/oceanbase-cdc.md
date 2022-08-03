@@ -201,9 +201,9 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
             <tr>
                 <td>server-time-zone</td>
                 <td>optional</td>
-                <td style="word-wrap: break-word;">UTC</td>
+                <td style="word-wrap: break-word;">+00:00</td>
                 <td>String</td>
-                <td>The session time zone in database server, e.g. "Asia/Shanghai". It controls how the TIMESTAMP type in OceanBase converted to STRING in snapshot reading, please make sure to set it same with the timezone of `oblogproxy` deployment. </td>
+                <td>The session timezone which controls how temporal types are converted to STRING in OceanBase. Can be UTC offset in format "±hh:mm" or tz database name like "Asia/Shanghai".</td>
             </tr>
             <tr>
                 <td>logproxy.host</td>
