@@ -42,7 +42,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -557,9 +557,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             Class<?> clazz =
                     classLoader.loadClass(
                             "org.apache.flink.streaming.api.environment.StreamExecutionEnvironment");
-            Method getConfigurationMethod = clazz.getDeclaredMethod("getConfiguration");
-            getConfigurationMethod.setAccessible(true);
-            Configuration configuration = (Configuration) getConfigurationMethod.invoke(env);
+            Field field = clazz.getDeclaredField("configuration");
+            field.setAccessible(true);
+            Configuration configuration = (Configuration) field.get(env);
             configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         env.setParallelism(parallelism);
