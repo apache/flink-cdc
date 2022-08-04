@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -54,6 +55,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.formatMessageTimestamp;
@@ -73,7 +75,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
-    private final ExecutorService executor;
+    private final ExecutorService executorService;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -86,11 +88,13 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     public AtomicBoolean hasNextElement;
     public AtomicBoolean reachEnd;
 
+    private static final long READER_CLOSE_TIMEOUT = 30L;
+
     public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subtaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
         this.reachEnd = new AtomicBoolean(false);
@@ -114,7 +118,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit);
-        executor.submit(
+        executorService.submit(
                 () -> {
                     try {
                         currentTaskRunning = true;
@@ -328,9 +332,22 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
+            if (executorService != null) {
+                executorService.shutdown();
+                if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                    LOG.warn(
+                            "Failed to close the snapshot split reader in {} seconds.",
+                            READER_CLOSE_TIMEOUT);
+                }
+            }
         } catch (Exception e) {
             LOG.error("Close snapshot reader error", e);
         }
+    }
+
+    @VisibleForTesting
+    public ExecutorService getExecutorService() {
+        return executorService;
     }
 
     /**

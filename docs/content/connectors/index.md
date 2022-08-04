@@ -5,6 +5,7 @@
 
 mongodb-cdc
 mysql-cdc
+mysql-cdc(ZH)
 oceanbase-cdc
 oracle-cdc
 postgres-cdc

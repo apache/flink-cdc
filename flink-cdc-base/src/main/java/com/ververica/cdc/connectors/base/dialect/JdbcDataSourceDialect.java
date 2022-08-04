@@ -75,5 +75,6 @@ public interface JdbcDataSourceDialect
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
 
     @Override
-    JdbcSourceFetchTaskContext createFetchTaskContext(SourceSplitBase sourceSplitBase);
+    JdbcSourceFetchTaskContext createFetchTaskContext(
+            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig);
 }
