@@ -64,13 +64,22 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
             ConfigOptions.key("database-name")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Database name of OceanBase to monitor.");
+                    .withDescription(
+                            "Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.");
 
     public static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("table-name")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Table name of OceanBase to monitor.");
+                    .withDescription(
+                            "Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.");
+
+    public static final ConfigOption<String> TABLE_LIST =
+            ConfigOptions.key("table-list")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "List of full names of tables, separated by commas, e.g. \"db1.table1, db2.table2\".");
 
     public static final ConfigOption<String> SERVER_TIME_ZONE =
             ConfigOptions.key("server-time-zone")
@@ -163,6 +172,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         String tenantName = config.get(TENANT_NAME);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
+        String tableList = config.get(TABLE_LIST);
+
         String serverTimeZone = config.get(SERVER_TIME_ZONE);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
 
@@ -185,6 +196,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 tenantName,
                 databaseName,
                 tableName,
+                tableList,
                 serverTimeZone,
                 connectTimeout,
                 hostname,
@@ -210,10 +222,6 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(TENANT_NAME);
-        options.add(DATABASE_NAME);
-        options.add(TABLE_NAME);
-        options.add(SERVER_TIME_ZONE);
-        options.add(CONNECT_TIMEOUT);
         options.add(LOG_PROXY_HOST);
         options.add(LOG_PROXY_PORT);
         return options;
@@ -222,12 +230,18 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(SCAN_STARTUP_TIMESTAMP);
+        options.add(DATABASE_NAME);
+        options.add(TABLE_NAME);
+        options.add(TABLE_LIST);
         options.add(HOSTNAME);
         options.add(PORT);
+        options.add(CONNECT_TIMEOUT);
+        options.add(SERVER_TIME_ZONE);
         options.add(LOG_PROXY_CLIENT_ID);
-        options.add(SCAN_STARTUP_TIMESTAMP);
         options.add(RS_LIST);
         options.add(CONFIG_URL);
+        options.add(WORKING_MODE);
         return options;
     }
 }

@@ -55,6 +55,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String tenantName;
     private final String databaseName;
     private final String tableName;
+    private final String tableList;
     private final Duration connectTimeout;
     private final String serverTimeZone;
 
@@ -87,6 +88,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             String tenantName,
             String databaseName,
             String tableName,
+            String tableList,
             String serverTimeZone,
             Duration connectTimeout,
             String hostname,
@@ -103,10 +105,11 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
         this.tenantName = checkNotNull(tenantName);
-        this.databaseName = checkNotNull(databaseName);
-        this.tableName = checkNotNull(tableName);
-        this.serverTimeZone = checkNotNull(serverTimeZone);
-        this.connectTimeout = checkNotNull(connectTimeout);
+        this.databaseName = databaseName;
+        this.tableName = tableName;
+        this.tableList = tableList;
+        this.serverTimeZone = serverTimeZone;
+        this.connectTimeout = connectTimeout;
         this.hostname = hostname;
         this.port = port;
         this.logProxyHost = checkNotNull(logProxyHost);
@@ -154,6 +157,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .tenantName(tenantName)
                         .databaseName(databaseName)
                         .tableName(tableName)
+                        .tableList(tableList)
                         .serverTimeZone(serverTimeZone)
                         .connectTimeout(connectTimeout)
                         .hostname(hostname)
@@ -210,6 +214,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         tenantName,
                         databaseName,
                         tableName,
+                        tableList,
                         serverTimeZone,
                         connectTimeout,
                         hostname,
@@ -242,6 +247,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.tenantName, that.tenantName)
                 && Objects.equals(this.databaseName, that.databaseName)
                 && Objects.equals(this.tableName, that.tableName)
+                && Objects.equals(this.tableList, that.tableList)
                 && Objects.equals(this.serverTimeZone, that.serverTimeZone)
                 && Objects.equals(this.connectTimeout, that.connectTimeout)
                 && Objects.equals(this.hostname, that.hostname)
@@ -267,6 +273,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 tenantName,
                 databaseName,
                 tableName,
+                tableList,
                 serverTimeZone,
                 connectTimeout,
                 hostname,

@@ -109,7 +109,7 @@ public class JdbcIncrementalSource<T>
         Supplier<JdbcSourceSplitReader> splitReaderSupplier =
                 () ->
                         new JdbcSourceSplitReader(
-                                readerContext.getIndexOfSubtask(), dataSourceDialect);
+                                readerContext.getIndexOfSubtask(), dataSourceDialect, sourceConfig);
         return new JdbcIncrementalSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,

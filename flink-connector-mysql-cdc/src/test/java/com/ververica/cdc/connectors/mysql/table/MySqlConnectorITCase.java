@@ -133,6 +133,18 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     @Test
     public void testConsumingAllEvents() throws Exception {
+        runConsumingAllEventsTest("");
+    }
+
+    @Test
+    public void testConsumingAllEventsUseSSL() throws Exception {
+        runConsumingAllEventsTest(
+                ", 'jdbc.properties.useSSL'= 'true',"
+                        + " 'jdbc.properties.requireSSL'= 'true',"
+                        + " 'jdbc.properties.verifyServerCerticate'= 'false'");
+    }
+
+    private void runConsumingAllEventsTest(String otherTableOptions) throws Exception {
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -154,6 +166,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + " %s"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -164,7 +177,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         getDezImplementation(),
                         incrementalSnapshot,
                         getServerId(),
-                        getSplitSize());
+                        getSplitSize(),
+                        otherTableOptions);
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
