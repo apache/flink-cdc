@@ -164,7 +164,15 @@ public class MySqlValidator implements Validator {
 
     /** Check whether the server timezone matches the configured timezone. */
     private void checkTimeZone(JdbcConnection connection) throws SQLException {
-        ZoneId timeZone = ZoneId.of(this.sourceConfig.getServerTimeZone());
+        String timeZoneProperty = dbzProperties.getProperty("database.serverTimezone");
+        if (timeZoneProperty == null) {
+            LOG.warn(
+                    "{} is not set, which might cause data inconsistencies for time-related fields.",
+                    SERVER_TIME_ZONE.key());
+            return;
+        }
+
+        ZoneId timeZone = ZoneId.of(timeZoneProperty);
         int timeZoneOffsetInSeconds =
                 timeZone.getRules().getOffset(LocalDateTime.now()).getTotalSeconds();
 

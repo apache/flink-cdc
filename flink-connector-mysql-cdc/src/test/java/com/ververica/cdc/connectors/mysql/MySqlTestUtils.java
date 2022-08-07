@@ -59,6 +59,7 @@ public class MySqlTestUtils {
                 .username(database.getUsername())
                 .password(database.getPassword())
                 .deserializer(new ForwardDeserializeSchema())
+                .serverTimeZone("UTC")
                 .debeziumProperties(debeziumProps);
     }
 

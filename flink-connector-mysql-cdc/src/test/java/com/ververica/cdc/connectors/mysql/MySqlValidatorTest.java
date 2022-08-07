@@ -42,7 +42,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -139,8 +138,8 @@ public class MySqlValidatorTest {
                         "The MySQL server has a timezone offset (%d seconds ahead of UTC) which does not match "
                                 + "the configured timezone %s. Specify the right %s to avoid inconsistencies "
                                 + "for time-related fields.",
-                        45240, // +12:34 is 45240 seconds ahead of UTC,
-                        ZoneId.systemDefault().getId(),
+                        45240, // +12:34 is 45240 seconds ahead of UTC
+                        "UTC",
                         SERVER_TIME_ZONE.key());
         doValidate(V5_7, buildMySqlConfigFile("[mysqld]\ndefault-time-zone=+12:34"), message);
     }
@@ -177,6 +176,7 @@ public class MySqlValidatorTest {
                             .databaseList(database.getDatabaseName())
                             .tableList(database.getDatabaseName() + ".products")
                             .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
+                            .serverTimeZone("UTC")
                             .build();
 
             mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
