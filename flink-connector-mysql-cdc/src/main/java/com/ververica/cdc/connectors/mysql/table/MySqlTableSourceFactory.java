@@ -316,15 +316,6 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
     /** Replaces the default timezone placeholder with local timezone, if applicable. */
     private static ZoneId getServerTimeZone(ReadableConfig config) {
         Optional<String> timeZoneOptional = config.getOptional(SERVER_TIME_ZONE);
-        if (timeZoneOptional.isPresent()) {
-            return ZoneId.of(timeZoneOptional.get());
-        } else {
-            LOGGER.warn(
-                    "Server time zone is not configured, using local time zone '{}'. "
-                            + "You can explicitly set server time zone using '{}' option.",
-                    ZoneId.systemDefault(),
-                    SERVER_TIME_ZONE.key());
-            return ZoneId.systemDefault();
-        }
+        return timeZoneOptional.map(ZoneId::of).orElseGet(ZoneId::systemDefault);
     }
 }

@@ -28,9 +28,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static io.debezium.config.Configuration.from;
 
 /**
@@ -71,6 +74,7 @@ public class MySqlValidator implements Validator {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);
+            checkTimeZone(connection);
         } catch (SQLException ex) {
             throw new TableException(
                     "Unexpected error while connecting to MySQL and validating", ex);
@@ -154,6 +158,30 @@ public class MySqlValidator implements Validator {
                                     + "required for this connector to work properly. Change the MySQL configuration to use a "
                                     + "binlog_row_image=FULL and restart the connector.",
                             rowImage, BINLOG_FORMAT_IMAGE_FULL));
+        }
+    }
+
+    /** Check whether the server timezone matches the configured timezone. */
+    private void checkTimeZone(JdbcConnection connection) throws SQLException {
+        ZoneId timeZone = ZoneId.of(this.sourceConfig.getServerTimeZone());
+        int timeZoneOffsetInSeconds =
+                timeZone.getRules().getOffset(LocalDateTime.now()).getTotalSeconds();
+
+        int timeDiffInSeconds =
+                connection.queryAndMap(
+                        "SELECT TIME_TO_SEC(TIMEDIFF(NOW(), UTC_TIMESTAMP))",
+                        rs -> rs.next() ? rs.getInt(1) : -1);
+
+        if (timeDiffInSeconds != timeZoneOffsetInSeconds) {
+            throw new ValidationException(
+                    String.format(
+                            "The MySQL server has a timezone offset (%d seconds %s UTC) which does not match "
+                                    + "the configured timezone %s. Specify the right %s to avoid inconsistencies "
+                                    + "for time-related fields.",
+                            Math.abs(timeDiffInSeconds),
+                            timeDiffInSeconds >= 0 ? "ahead of" : "behind",
+                            timeZone.getId(),
+                            SERVER_TIME_ZONE.key()));
         }
     }
 }
