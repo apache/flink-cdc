@@ -854,7 +854,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 "+I[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
                                 "+U[%s, user_table_1_1, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
                                 "+U[%s, user_table_1_2, 121, user_121, Shanghai, 88888888, null, null]",
-                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]")
+                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "-U[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "-U[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null, null]")
                         .map(s -> String.format(s, userDatabase1.getDatabaseName()))
                         .sorted()
                         .collect(Collectors.toList());
