@@ -527,10 +527,6 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
                     } else {
                         int offset = columnInfo.getOffset();
                         org.tikv.common.types.DataType type = columnInfo.getType();
-                        if (type.isUnsigned()) {
-                            ((Object[]) object)[offset] =
-                                    dealUnsignedColumnValue(type, ((Object[]) object)[offset]);
-                        }
                         Object convertedField =
                                 convertField(
                                         fieldConverters[i],
@@ -554,6 +550,9 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         if (fieldValue == null) {
             return null;
         } else {
+            if (dataType.isUnsigned()) {
+                fieldValue = dealUnsignedColumnValue(dataType, fieldValue);
+            }
             return fieldConverter.convert(fieldValue, tableInfo, dataType);
         }
     }
