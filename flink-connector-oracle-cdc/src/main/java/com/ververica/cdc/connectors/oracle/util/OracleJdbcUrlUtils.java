@@ -20,8 +20,8 @@ package com.ververica.cdc.connectors.oracle.util;
 
 import java.util.Properties;
 
-/** Get the JDBC configuration utility class according to debezium properties. */
-public class JdbcConfigurationUtil {
+/** The utils to build the JDBC connection url for Oracle data source. */
+public class OracleJdbcUrlUtils {
 
     /**
      * Gets the URL in SID format.
