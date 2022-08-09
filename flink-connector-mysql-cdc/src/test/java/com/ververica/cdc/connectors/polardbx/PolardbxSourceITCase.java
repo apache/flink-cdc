@@ -77,7 +77,7 @@ public class PolardbxSourceITCase extends AbstractTestBase {
     private static final String USER_NAME = "polardbx_root";
     private static final String PASSWORD = "123456";
     private static final String DATABASE = "polardbx_ddl_test";
-    private static final String IMAGE_VERSION = "2.0.1";
+    private static final String IMAGE_VERSION = "2.1.0";
     private static final DockerImageName POLARDBX_IMAGE =
             DockerImageName.parse("polardbx/polardb-x:" + IMAGE_VERSION);
 
