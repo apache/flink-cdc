@@ -38,6 +38,8 @@ import java.util.Map;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer.readTableSchemas;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer.writeTableSchemas;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
 
 /**
@@ -105,6 +107,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 return deserializeLegacyPendingSplitsState(serialized);
             case 3:
             case 4:
+            case 5:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -159,6 +162,14 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeTableIds(state.getRemainingTables(), out);
         out.writeBoolean(state.isTableIdCaseSensitive());
         writeTableSchemas(state.getTableSchemas(), out);
+
+        boolean isSplittingChunks = state.getSplittingTableId() != null;
+        out.writeBoolean(isSplittingChunks);
+        if (isSplittingChunks) {
+            out.writeUTF(state.getSplittingTableId().toString());
+            out.writeUTF(rowToSerializedString(new Object[] {state.getChunkStart()}));
+            out.writeInt(state.getChunkId());
+        }
     }
 
     private void serializeHybridPendingSplitsState(
@@ -218,7 +229,10 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 new ArrayList<>(),
                 false,
-                false);
+                false,
+                null,
+                null,
+                null);
     }
 
     private HybridPendingSplitsState deserializeLegacyHybridPendingSplitsState(
@@ -269,6 +283,18 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         if (version >= 4) {
             tableSchemas.putAll(readTableSchemas(splitVersion, in));
         }
+
+        TableId splittingTableId = null;
+        Object chunkStart = null;
+        Integer chunkId = null;
+        if (splitVersion > 4) {
+            boolean isSplittingChunks = in.readBoolean();
+            if (isSplittingChunks) {
+                splittingTableId = TableId.parse(in.readUTF());
+                chunkStart = serializedStringToRow(in.readUTF())[0];
+                chunkId = in.readInt();
+            }
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
@@ -278,7 +304,10 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 remainingTableIds,
                 isTableIdCaseSensitive,
-                true);
+                true,
+                splittingTableId,
+                chunkStart,
+                chunkId);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

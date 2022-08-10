@@ -24,6 +24,8 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSp
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,6 +68,12 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     private final Map<TableId, TableChange> tableSchemas;
 
+    /** Record split chunk process. */
+    @Nullable private final TableId splittingTableId;
+
+    @Nullable private final Object chunkStart;
+    @Nullable private final Integer chunkId;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<MySqlSchemalessSnapshotSplit> remainingSplits,
@@ -75,7 +83,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            boolean isRemainingTablesCheckpointed) {
+            boolean isRemainingTablesCheckpointed,
+            @Nullable TableId splittingTableId,
+            @Nullable Object chunkStart,
+            @Nullable Integer chunkId) {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
@@ -85,6 +96,9 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.tableSchemas = tableSchemas;
+        this.splittingTableId = splittingTableId;
+        this.chunkStart = chunkStart;
+        this.chunkId = chunkId;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
@@ -123,6 +137,21 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return isRemainingTablesCheckpointed;
     }
 
+    @Nullable
+    public Integer getChunkId() {
+        return chunkId;
+    }
+
+    @Nullable
+    public TableId getSplittingTableId() {
+        return splittingTableId;
+    }
+
+    @Nullable
+    public Object getChunkStart() {
+        return chunkStart;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -139,7 +168,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
-                && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets);
+                && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets)
+                && Objects.equals(splittingTableId, that.splittingTableId)
+                && Objects.equals(chunkStart, that.chunkStart)
+                && Objects.equals(chunkId, that.chunkId);
     }
 
     @Override
@@ -152,7 +184,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 splitFinishedOffsets,
                 assignerStatus,
                 isTableIdCaseSensitive,
-                isRemainingTablesCheckpointed);
+                isRemainingTablesCheckpointed,
+                splittingTableId,
+                chunkStart,
+                chunkId);
     }
 
     @Override
@@ -174,6 +209,12 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + isTableIdCaseSensitive
                 + ", isRemainingTablesCheckpointed="
                 + isRemainingTablesCheckpointed
+                + ", splittingTableId="
+                + (splittingTableId == null ? "null" : splittingTableId.toString())
+                + ", chunkStart="
+                + (chunkStart == null ? "null" : chunkStart.toString())
+                + ", chunkId="
+                + (chunkId == null ? "null" : chunkId.toString())
                 + '}';
     }
 }

@@ -99,7 +99,10 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         AssignerStatus.INITIAL_ASSIGNING_FINISHED,
                         new ArrayList<>(),
                         false,
-                        true);
+                        true,
+                        null,
+                        null,
+                        null);
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
         final MySqlHybridSplitAssigner assigner =
