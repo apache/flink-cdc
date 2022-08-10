@@ -16,6 +16,9 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
+import io.debezium.data.Envelope;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -36,6 +39,9 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import org.apache.flink.util.Preconditions;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +74,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executorService;
+    private final boolean checkTimestamp;
+    private final StartupOptions startupOptions;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -90,6 +98,11 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
+        this.startupOptions = statefulTaskContext.getSourceConfig().getStartupOptions();
+        this.checkTimestamp = startupOptions.startupMode.equals(StartupMode.TIMESTAMP);
+        if (checkTimestamp) {
+            Preconditions.checkNotNull(startupOptions.startupTimestampMillis);
+        }
     }
 
     public void submitSplit(MySqlSplit mySqlSplit) {
@@ -212,6 +225,17 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
      * </pre>
      */
     private boolean shouldEmit(SourceRecord sourceRecord) {
+        if (checkTimestamp) {
+            Schema valueSchema = sourceRecord.valueSchema();
+            Struct value = (Struct) sourceRecord.value();
+            if (valueSchema.field(Envelope.FieldName.TIMESTAMP) != null) {
+                long ts = value.getInt64(Envelope.FieldName.TIMESTAMP);
+                if (startupOptions.startupTimestampMillis < ts) {
+                    return false;
+                }
+            }
+        }
+
         if (isDataChangeRecord(sourceRecord)) {
             TableId tableId = getTableId(sourceRecord);
             BinlogOffset position = getBinlogPosition(sourceRecord);
