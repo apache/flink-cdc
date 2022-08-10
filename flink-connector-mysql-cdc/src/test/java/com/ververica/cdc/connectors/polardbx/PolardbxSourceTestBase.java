@@ -24,6 +24,7 @@ import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
 import org.apache.commons.lang3.StringUtils;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,6 +93,13 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
             // here should wait 10s that make sure the polardbx is ready
             Thread.sleep(10 * 1000);
         }
+    }
+
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping Polardbx containers...");
+        POLARDBX_CONTAINER.stop();
+        LOG.info("Polardbx containers are stopped.");
     }
 
     protected static String getJdbcUrl() {

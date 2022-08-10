@@ -23,6 +23,7 @@ import org.apache.flink.util.TestLogger;
 
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.slf4j.Logger;
@@ -61,6 +62,13 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
+    }
+
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping containers...");
+        MYSQL_CONTAINER.stop();
+        LOG.info("Containers are stopped.");
     }
 
     protected static MySqlContainer createMySqlContainer(MySqlVersion version) {
