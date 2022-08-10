@@ -35,9 +35,7 @@ import org.junit.Test;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 
@@ -286,13 +284,12 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
     @Test
     public void testAllDataTypes() throws Exception {
-        ZoneId serverTimeZone = ZoneId.systemDefault();
-        ZoneOffset zoneOffset = serverTimeZone.getRules().getOffset(Instant.now());
+        String serverTimeZone = "+00:00";
         try (Connection connection = getJdbcConnection("");
                 Statement statement = connection.createStatement()) {
-            statement.execute(String.format("SET GLOBAL time_zone = '%s';", zoneOffset.getId()));
+            statement.execute(String.format("SET GLOBAL time_zone = '%s';", serverTimeZone));
         }
-        tEnv.getConfig().setLocalTimeZone(serverTimeZone);
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
         initializeTable("column_type_test");
         String sourceDDL =
                 String.format(
