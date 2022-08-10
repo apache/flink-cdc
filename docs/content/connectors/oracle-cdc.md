@@ -240,10 +240,10 @@ Connector Options
     </tr>
     <tr>
       <td>hostname</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>IP address or hostname of the Oracle database server.</td>
+      <td>IP address or hostname of the Oracle database server. If the url is not empty, hostname may not be configured, otherwise hostname can not be empty</td>
     </tr>
     <tr>
       <td>username</td>
@@ -286,6 +286,13 @@ Connector Options
       <td style="word-wrap: break-word;">1521</td>
       <td>Integer</td>
       <td>Integer port number of the Oracle database server.</td>
+    </tr>
+  <tr>
+      <td>url</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">jdbc:oracle:thin:@{hostname}:{port}:{database-name}</td>
+      <td>String</td>
+      <td>JdbcUrl of the oracle database server . If the hostname and port parameter is configured, the URL is concatenated by hostname port database-name in SID format by default. Otherwise, you need to configure the URL parameter</td>
     </tr>
     <tr>
       <td>scan.startup.mode</td>
@@ -419,7 +426,7 @@ import com.ververica.cdc.connectors.oracle.OracleSource;
 public class OracleSourceExample {
   public static void main(String[] args) throws Exception {
      SourceFunction<String> sourceFunction = OracleSource.<String>builder()
-             .hostname()
+             .url("jdbc:oracle:thin:@{hostname}:{port}:{database}")
              .port(1521)
              .database("XE") // monitor XE database
              .schemaList("inventory") // monitor inventory schema

@@ -348,7 +348,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'hostname' = '%s',"
@@ -431,6 +432,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "-D(postgres,inventory,products,111,scooter,Big 2-wheel scooter ,5.170)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         Collections.sort(actual);
+        Collections.sort(expected);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
     }

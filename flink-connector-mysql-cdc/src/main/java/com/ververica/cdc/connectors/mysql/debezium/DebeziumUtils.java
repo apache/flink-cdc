@@ -42,6 +42,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
@@ -66,9 +67,16 @@ public class DebeziumUtils {
     }
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
-    public static MySqlConnection createMySqlConnection(Configuration dbzConfiguration) {
+    public static MySqlConnection createMySqlConnection(MySqlSourceConfig sourceConfig) {
+        return createMySqlConnection(
+                sourceConfig.getDbzConfiguration(), sourceConfig.getJdbcProperties());
+    }
+
+    /** Creates a new {@link MySqlConnection}, but not open the connection. */
+    public static MySqlConnection createMySqlConnection(
+            Configuration dbzConfiguration, Properties jdbcProperties) {
         return new MySqlConnection(
-                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration));
+                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration, jdbcProperties));
     }
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */

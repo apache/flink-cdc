@@ -392,7 +392,8 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
                         "+I(inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
                         "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
-                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)",
+                        "-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();

@@ -170,7 +170,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " ID INT NOT NULL,"
                                 + " NAME STRING,"
                                 + " DESCRIPTION STRING,"
-                                + " WEIGHT DECIMAL(10,3)"
+                                + " WEIGHT DECIMAL(10,3),"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'oracle-cdc',"
                                 + " 'hostname' = '%s',"
@@ -249,6 +250,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         "-D[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(expected);
         Collections.sort(actual);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
