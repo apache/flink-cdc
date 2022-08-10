@@ -155,9 +155,8 @@ public class PendingSplitsStateSerializerTest {
                     remainingTables,
                     false,
                     true,
-                    tableId1,
-                    "test",
-                    3);
+                    new ChunkSplitterState(
+                            tableId1, ChunkSplitterState.ChunkBound.middleOf("test"), 3));
         } else {
             return new SnapshotPendingSplitsState(
                     alreadyProcessedTables,
@@ -169,9 +168,7 @@ public class PendingSplitsStateSerializerTest {
                     remainingTables,
                     false,
                     true,
-                    null,
-                    null,
-                    null);
+                    ChunkSplitterState.EMPTY_STATE);
         }
     }
 

@@ -1,0 +1,151 @@
+/*
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.ververica.cdc.connectors.mysql.source.assigners.state;
+
+import io.debezium.relational.TableId;
+
+import javax.annotation.Nullable;
+
+import java.util.Objects;
+
+/** The state of the chunk splitter. */
+public class ChunkSplitterState {
+    public static final ChunkSplitterState EMPTY_STATE = new ChunkSplitterState(null, null, null);
+
+    /** Record current splitting table id in the chunk splitter. */
+    @Nullable private final TableId currentSplittingTableId;
+
+    @Nullable private final ChunkBound nextChunkStart;
+    /** Record next chunk id. */
+    @Nullable private final Integer chunkId;
+
+    public ChunkSplitterState(
+            @Nullable TableId currentSplittingTableId,
+            @Nullable ChunkBound nextChunkStart,
+            @Nullable Integer chunkId) {
+        this.currentSplittingTableId = currentSplittingTableId;
+        this.nextChunkStart = nextChunkStart;
+        this.chunkId = chunkId;
+    }
+
+    @Nullable
+    public TableId getCurrentSplittingTableId() {
+        return currentSplittingTableId;
+    }
+
+    @Nullable
+    public ChunkBound getNextChunkStart() {
+        return nextChunkStart;
+    }
+
+    @Nullable
+    public Integer getChunkId() {
+        return chunkId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ChunkSplitterState)) {
+            return false;
+        }
+        ChunkSplitterState that = (ChunkSplitterState) o;
+        return Objects.equals(currentSplittingTableId, that.currentSplittingTableId)
+                && Objects.equals(nextChunkStart, that.nextChunkStart)
+                && Objects.equals(chunkId, that.chunkId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(currentSplittingTableId, nextChunkStart, chunkId);
+    }
+
+    @Override
+    public String toString() {
+        return "ChunkSplitterState{"
+                + "currentSplittingTableId="
+                + (currentSplittingTableId == null ? "null" : currentSplittingTableId)
+                + ", nextChunkStart="
+                + (nextChunkStart == null ? "null" : nextChunkStart)
+                + ", chunkId="
+                + (chunkId == null ? "null" : String.valueOf(chunkId))
+                + '}';
+    }
+
+    /** The definition of the chunk bound. */
+    public static class ChunkBound {
+        public static final ChunkBound START_BOUND = new ChunkBound(ChunkBoundType.START, null);
+        public static final ChunkBound END_BOUND = new ChunkBound(ChunkBoundType.END, null);
+
+        private final ChunkBoundType boundType;
+        @Nullable private final Object value;
+
+        public ChunkBound(ChunkBoundType boundType, @Nullable Object value) {
+            this.boundType = boundType;
+            this.value = value;
+        }
+
+        public ChunkBoundType getBoundType() {
+            return boundType;
+        }
+
+        @Nullable
+        public Object getValue() {
+            return value;
+        }
+
+        public static ChunkBound middleOf(Object obj) {
+            return new ChunkBound(ChunkBoundType.MIDDLE, obj);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ChunkBound)) {
+                return false;
+            }
+            ChunkBound that = (ChunkBound) o;
+            return boundType == that.boundType && Objects.equals(value, that.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(boundType, value);
+        }
+
+        @Override
+        public String toString() {
+            return "ChunkBound{"
+                    + "boundType="
+                    + boundType
+                    + ", value="
+                    + (value == null ? "null" : value.toString())
+                    + '}';
+        }
+    }
+
+    /** The type of the chunk bound. */
+    public enum ChunkBoundType {
+        START,
+        MIDDLE,
+        END
+    }
+}
