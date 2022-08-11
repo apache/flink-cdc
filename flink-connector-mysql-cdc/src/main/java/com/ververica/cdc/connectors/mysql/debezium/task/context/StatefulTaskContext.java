@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -22,11 +20,13 @@ import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
+import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.GtidSet;
 import io.debezium.connector.mysql.MySqlChangeEventSourceMetricsFactory;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -37,6 +37,7 @@ import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
@@ -66,6 +67,7 @@ import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINL
 public class StatefulTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
+    private static final int DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN = 1024;
     private static final Clock clock = Clock.SYSTEM;
 
     private final MySqlSourceConfig sourceConfig;
@@ -82,6 +84,8 @@ public class StatefulTaskContext {
     private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
+    private EventDispatcher.SnapshotReceiver snapshotReceiver;
+    private SignalEventDispatcher signalEventDispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
 
@@ -114,9 +118,10 @@ public class StatefulTaskContext {
 
         this.taskContext =
                 new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
+
         final int queueSize =
                 mySqlSplit.isSnapshotSplit()
-                        ? Integer.MAX_VALUE
+                        ? sourceConfig.getSplitSize() + DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN
                         : connectorConfig.getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
@@ -141,6 +146,12 @@ public class StatefulTaskContext {
                         DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster);
+
+        this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
+
+        this.signalEventDispatcher =
+                new SignalEventDispatcher(
+                        offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
@@ -184,6 +195,59 @@ public class StatefulTaskContext {
     }
 
     private boolean isBinlogAvailable(MySqlOffsetContext offset) {
+        String gtidStr = offset.gtidSet();
+        if (gtidStr != null) {
+            return checkGtidSet(offset);
+        }
+
+        return checkBinlogFilename(offset);
+    }
+
+    private boolean checkGtidSet(MySqlOffsetContext offset) {
+        String gtidStr = offset.gtidSet();
+
+        if (gtidStr.trim().isEmpty()) {
+            return true; // start at beginning ...
+        }
+
+        String availableGtidStr = connection.knownGtidSet();
+        if (availableGtidStr == null || availableGtidStr.trim().isEmpty()) {
+            // Last offsets had GTIDs but the server does not use them ...
+            LOG.warn(
+                    "Connector used GTIDs previously, but MySQL does not know of any GTIDs or they are not enabled");
+            return false;
+        }
+        // GTIDs are enabled
+        GtidSet gtidSet = new GtidSet(gtidStr);
+        // Get the GTID set that is available in the server ...
+        GtidSet availableGtidSet = new GtidSet(availableGtidStr);
+        if (gtidSet.isContainedWithin(availableGtidSet)) {
+            LOG.info(
+                    "MySQL current GTID set {} does contain the GTID set {} required by the connector.",
+                    availableGtidSet,
+                    gtidSet);
+            // The replication is concept of mysql master-slave replication protocol ...
+            final GtidSet gtidSetToReplicate =
+                    connection.subtractGtidSet(availableGtidSet, gtidSet);
+            final GtidSet purgedGtidSet = connection.purgedGtidSet();
+            LOG.info("Server has already purged {} GTIDs", purgedGtidSet);
+            final GtidSet nonPurgedGtidSetToReplicate =
+                    connection.subtractGtidSet(gtidSetToReplicate, purgedGtidSet);
+            LOG.info(
+                    "GTID set {} known by the server but not processed yet, for replication are available only GTID set {}",
+                    gtidSetToReplicate,
+                    nonPurgedGtidSetToReplicate);
+            if (!gtidSetToReplicate.equals(nonPurgedGtidSetToReplicate)) {
+                LOG.warn("Some of the GTIDs needed to replicate have been already purged");
+                return false;
+            }
+            return true;
+        }
+        LOG.info("Connector last known GTIDs are {}, but MySQL has {}", gtidSet, availableGtidSet);
+        return false;
+    }
+
+    private boolean checkBinlogFilename(MySqlOffsetContext offset) {
         String binlogFilename = offset.getSourceInfo().getString(BINLOG_FILENAME_OFFSET_KEY);
         if (binlogFilename == null) {
             return true; // start at current position
@@ -289,6 +353,14 @@ public class StatefulTaskContext {
 
     public EventDispatcherImpl<TableId> getDispatcher() {
         return dispatcher;
+    }
+
+    public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
+        return snapshotReceiver;
+    }
+
+    public SignalEventDispatcher getSignalEventDispatcher() {
+        return signalEventDispatcher;
     }
 
     public ChangeEventQueue<DataChangeEvent> getQueue() {

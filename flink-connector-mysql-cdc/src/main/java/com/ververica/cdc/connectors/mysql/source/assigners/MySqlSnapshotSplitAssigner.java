@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,7 +19,7 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
@@ -75,13 +73,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final int currentParallelism;
     private final List<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
+    private final Object lock = new Object();
 
+    private volatile Throwable uncaughtSplitterException;
     private AssignerStatus assignerStatus;
     private ChunkSplitter chunkSplitter;
     private boolean isTableIdCaseSensitive;
-
     private ExecutorService executor;
-    private Object lock;
 
     @Nullable private Long checkpointIdToFinish;
 
@@ -145,7 +143,6 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void open() {
-        lock = new Object();
         chunkSplitter = createChunkSplitter(sourceConfig, isTableIdCaseSensitive);
 
         // the legacy state didn't snapshot remaining tables, discovery remaining table here
@@ -159,8 +156,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 throw new FlinkRuntimeException(
                         "Failed to discover remaining tables to capture", e);
             }
+        } else {
+            captureNewlyAddedTables();
         }
-        captureNewlyAddedTables();
         startAsynchronouslySplit();
     }
 
@@ -198,26 +196,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 this.executor = Executors.newSingleThreadExecutor(threadFactory);
             }
 
-            executor.submit(
-                    () -> {
-                        Iterator<TableId> iterator = remainingTables.iterator();
-                        while (iterator.hasNext()) {
-                            TableId nextTable = iterator.next();
-                            // split the given table into chunks (snapshot splits)
-                            Collection<MySqlSnapshotSplit> splits =
-                                    chunkSplitter.generateSplits(nextTable);
-                            synchronized (lock) {
-                                remainingSplits.addAll(splits);
-                                remainingTables.remove(nextTable);
-                                lock.notify();
-                            }
-                        }
-                    });
+            executor.submit(this::splitChunksForRemainingTables);
         }
     }
 
     @Override
     public Optional<MySqlSplit> getNext() {
+        checkSplitterErrors();
         synchronized (lock) {
             if (!remainingSplits.isEmpty()) {
                 // return remaining splits firstly
@@ -395,6 +380,37 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
      */
     private boolean allSplitsFinished() {
         return noMoreSplits() && assignedSplits.size() == splitFinishedOffsets.size();
+    }
+
+    private void splitChunksForRemainingTables() {
+        try {
+            for (TableId nextTable : remainingTables) {
+                // split the given table into chunks (snapshot splits)
+                Collection<MySqlSnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
+                synchronized (lock) {
+                    remainingSplits.addAll(splits);
+                    remainingTables.remove(nextTable);
+                    lock.notify();
+                }
+            }
+        } catch (Exception e) {
+            if (uncaughtSplitterException == null) {
+                uncaughtSplitterException = e;
+            } else {
+                uncaughtSplitterException.addSuppressed(e);
+            }
+            // Release the potential waiting getNext() call
+            synchronized (lock) {
+                lock.notify();
+            }
+        }
+    }
+
+    private void checkSplitterErrors() {
+        if (uncaughtSplitterException != null) {
+            throw new FlinkRuntimeException(
+                    "Chunk splitting has encountered exception", uncaughtSplitterException);
+        }
     }
 
     private static ChunkSplitter createChunkSplitter(

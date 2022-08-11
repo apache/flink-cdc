@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,7 +19,7 @@ package com.ververica.cdc.connectors.base.source.reader.external;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
@@ -79,6 +77,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
     public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
         this.streamFetchTask = fetchTask;
         this.currentStreamSplit = fetchTask.getSplit().asStreamSplit();
+        configureFilter();
         taskContext.configure(currentStreamSplit);
         this.queue = taskContext.getQueue();
         executor.submit(
@@ -88,7 +87,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
                     } catch (Exception e) {
                         LOG.error(
                                 String.format(
-                                        "Execute binlog read task for mysql split %s fail",
+                                        "Execute binlog read task for stream split %s fail",
                                         currentStreamSplit),
                                 e);
                         readException = e;

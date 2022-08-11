@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -394,7 +392,8 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
                         "+I(inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
                         "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
-                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)",
+                        "-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();

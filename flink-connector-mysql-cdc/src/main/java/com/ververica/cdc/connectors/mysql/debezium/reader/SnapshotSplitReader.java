@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -18,9 +16,10 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
@@ -41,6 +40,7 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,14 +48,24 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.normalizedSplitRecords;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.formatMessageTimestamp;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isLowWatermarkEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.splitKeyRangeContains;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.upsertBinlog;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
@@ -65,7 +75,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
-    private final ExecutorService executor;
+    private final ExecutorService executorService;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -78,11 +88,13 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
     public AtomicBoolean hasNextElement;
     public AtomicBoolean reachEnd;
 
+    private static final long READER_CLOSE_TIMEOUT = 30L;
+
     public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subtaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
         this.reachEnd = new AtomicBoolean(false);
@@ -98,15 +110,15 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         this.splitSnapshotReadTask =
                 new MySqlSnapshotSplitReadTask(
                         statefulTaskContext.getConnectorConfig(),
-                        statefulTaskContext.getOffsetContext(),
                         statefulTaskContext.getSnapshotChangeEventSourceMetrics(),
                         statefulTaskContext.getDatabaseSchema(),
                         statefulTaskContext.getConnection(),
                         statefulTaskContext.getDispatcher(),
                         statefulTaskContext.getTopicSelector(),
+                        statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit);
-        executor.submit(
+        executorService.submit(
                 () -> {
                     try {
                         currentTaskRunning = true;
@@ -114,7 +126,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         final SnapshotSplitChangeEventSourceContextImpl sourceContext =
                                 new SnapshotSplitChangeEventSourceContextImpl();
                         SnapshotResult snapshotResult =
-                                splitSnapshotReadTask.execute(sourceContext);
+                                splitSnapshotReadTask.execute(
+                                        sourceContext, statefulTaskContext.getOffsetContext());
 
                         final MySqlBinlogSplit backfillBinlogSplit =
                                 createBackfillBinlogSplit(sourceContext);
@@ -134,8 +147,16 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
                         if (snapshotResult.isCompletedOrSkipped()) {
                             final MySqlBinlogSplitReadTask backfillBinlogReadTask =
                                     createBackfillBinlogReadTask(backfillBinlogSplit);
+                            final MySqlOffsetContext.Loader loader =
+                                    new MySqlOffsetContext.Loader(
+                                            statefulTaskContext.getConnectorConfig());
+                            final MySqlOffsetContext mySqlOffsetContext =
+                                    loader.load(
+                                            backfillBinlogSplit.getStartingOffset().getOffset());
+
                             backfillBinlogReadTask.execute(
-                                    new SnapshotBinlogSplitChangeEventSourceContextImpl());
+                                    new SnapshotBinlogSplitChangeEventSourceContextImpl(),
+                                    mySqlOffsetContext);
                         } else {
                             readException =
                                     new IllegalStateException(
@@ -168,11 +189,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
 
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(
             MySqlBinlogSplit backfillBinlogSplit) {
-        final MySqlOffsetContext.Loader loader =
-                new MySqlOffsetContext.Loader(statefulTaskContext.getConnectorConfig());
-        final MySqlOffsetContext mySqlOffsetContext =
-                (MySqlOffsetContext)
-                        loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
         // we should only capture events for the current table,
         // otherwise, we may can't find corresponding schema
         Configuration dezConf =
@@ -187,15 +203,14 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         // task to read binlog and backfill for current split
         return new MySqlBinlogSplitReadTask(
                 new MySqlConnectorConfig(dezConf),
-                mySqlOffsetContext,
                 statefulTaskContext.getConnection(),
                 statefulTaskContext.getDispatcher(),
+                statefulTaskContext.getSignalEventDispatcher(),
                 statefulTaskContext.getErrorHandler(),
                 StatefulTaskContext.getClock(),
                 statefulTaskContext.getTaskContext(),
                 (MySqlStreamingChangeEventSourceMetrics)
                         statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                statefulTaskContext.getTopicSelector().getPrimaryTopic(),
                 backfillBinlogSplit);
     }
 
@@ -227,22 +242,53 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             // data input: [low watermark event][snapshot events][high watermark event][binlog
             // events][binlog-end event]
             // data output: [low watermark event][normalized events][high watermark event]
+            boolean reachBinlogStart = false;
             boolean reachBinlogEnd = false;
-            final List<SourceRecord> sourceRecords = new ArrayList<>();
+            SourceRecord lowWatermark = null;
+            SourceRecord highWatermark = null;
+            Map<Struct, SourceRecord> snapshotRecords = new HashMap<>();
             while (!reachBinlogEnd) {
+                checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
                 for (DataChangeEvent event : batch) {
-                    sourceRecords.add(event.getRecord());
-                    if (RecordUtils.isEndWatermarkEvent(event.getRecord())) {
+                    SourceRecord record = event.getRecord();
+                    if (lowWatermark == null) {
+                        lowWatermark = record;
+                        assertLowWatermark(lowWatermark);
+                        continue;
+                    }
+
+                    if (highWatermark == null && isHighWatermarkEvent(record)) {
+                        highWatermark = record;
+                        // snapshot events capture end and begin to capture binlog events
+                        reachBinlogStart = true;
+                        continue;
+                    }
+
+                    if (reachBinlogStart && RecordUtils.isEndWatermarkEvent(record)) {
+                        // capture to end watermark events, stop the loop
                         reachBinlogEnd = true;
                         break;
+                    }
+
+                    if (!reachBinlogStart) {
+                        snapshotRecords.put((Struct) record.key(), record);
+                    } else {
+                        if (isRequiredBinlogRecord(record)) {
+                            // upsert binlog events through the record key
+                            upsertBinlog(snapshotRecords, record);
+                        }
                     }
                 }
             }
             // snapshot split return its data once
             hasNextElement.set(false);
-            return normalizedSplitRecords(currentSnapshotSplit, sourceRecords, nameAdjuster)
-                    .iterator();
+
+            final List<SourceRecord> normalizedRecords = new ArrayList<>();
+            normalizedRecords.add(lowWatermark);
+            normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
+            normalizedRecords.add(highWatermark);
+            return normalizedRecords.iterator();
         }
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
@@ -259,6 +305,24 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
         }
     }
 
+    private void assertLowWatermark(SourceRecord lowWatermark) {
+        checkState(
+                isLowWatermarkEvent(lowWatermark),
+                String.format(
+                        "The first record should be low watermark signal event, but actual is %s",
+                        lowWatermark));
+    }
+
+    private boolean isRequiredBinlogRecord(SourceRecord record) {
+        if (isDataChangeRecord(record)) {
+            Object[] key =
+                    getSplitKey(currentSnapshotSplit.getSplitKeyType(), record, nameAdjuster);
+            return splitKeyRangeContains(
+                    key, currentSnapshotSplit.getSplitStart(), currentSnapshotSplit.getSplitEnd());
+        }
+        return false;
+    }
+
     @Override
     public void close() {
         try {
@@ -268,9 +332,22 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecord, MySqlSp
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
+            if (executorService != null) {
+                executorService.shutdown();
+                if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                    LOG.warn(
+                            "Failed to close the snapshot split reader in {} seconds.",
+                            READER_CLOSE_TIMEOUT);
+                }
+            }
         } catch (Exception e) {
             LOG.error("Close snapshot reader error", e);
         }
+    }
+
+    @VisibleForTesting
+    public ExecutorService getExecutorService() {
+        return executorService;
     }
 
     /**

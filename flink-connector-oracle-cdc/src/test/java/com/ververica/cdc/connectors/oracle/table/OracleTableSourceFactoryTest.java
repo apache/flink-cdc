@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -92,14 +90,55 @@ public class OracleTableSourceFactoryTest {
     private static final Properties PROPERTIES = new Properties();
 
     @Test
-    public void testCommonProperties() {
-        Map<String, String> properties = getAllOptions();
+    public void testRequiredProperties() {
+        try {
+            Map<String, String> properties = getAllRequiredOptions();
+
+            // validation for source
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "hostname is required when url is not configured")
+                            .isPresent());
+        }
+    }
+
+    @Test
+    public void testRequiredPropertiesWithUrl() {
+        String url = "jdbc:oracle:thin:@" + MY_LOCALHOST + ":1521" + ":" + MY_DATABASE;
+        Map<String, String> properties = getAllRequiredOptions();
+        properties.put("url", url);
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        url,
+                        1521,
+                        null,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        PROPERTIES,
+                        StartupOptions.initial());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testCommonProperties() {
+        Map<String, String> properties = getAllRequiredOptionsWithHost();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        SCHEMA,
+                        null,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -114,8 +153,10 @@ public class OracleTableSourceFactoryTest {
 
     @Test
     public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
+        Map<String, String> options = getAllRequiredOptions();
         options.put("port", "1521");
+        options.put("hostname", MY_LOCALHOST);
+        options.put("url", "jdbc:oracle:thin:@" + MY_LOCALHOST + ":1521" + ":" + MY_DATABASE);
         options.put("debezium.snapshot.mode", "initial");
 
         DynamicTableSource actualSource = createTableSource(options);
@@ -124,6 +165,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        "jdbc:oracle:thin:@" + MY_LOCALHOST + ":1521" + ":" + MY_DATABASE,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -138,7 +180,7 @@ public class OracleTableSourceFactoryTest {
 
     @Test
     public void testStartupFromInitial() {
-        Map<String, String> properties = getAllOptions();
+        Map<String, String> properties = getAllRequiredOptionsWithHost();
         properties.put("scan.startup.mode", "initial");
 
         // validation for source
@@ -146,6 +188,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        null,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -160,7 +203,7 @@ public class OracleTableSourceFactoryTest {
 
     @Test
     public void testStartupFromLatestOffset() {
-        Map<String, String> properties = getAllOptions();
+        Map<String, String> properties = getAllRequiredOptionsWithHost();
         properties.put("scan.startup.mode", "latest-offset");
 
         // validation for source
@@ -168,6 +211,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        null,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -182,7 +226,7 @@ public class OracleTableSourceFactoryTest {
 
     @Test
     public void testMetadataColumns() {
-        Map<String, String> properties = getAllOptions();
+        Map<String, String> properties = getAllRequiredOptionsWithHost();
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
@@ -194,6 +238,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA_WITH_METADATA,
+                        null,
                         1521,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -221,7 +266,7 @@ public class OracleTableSourceFactoryTest {
     public void testValidation() {
         // validate illegal port
         try {
-            Map<String, String> properties = getAllOptions();
+            Map<String, String> properties = getAllRequiredOptionsWithHost();
             properties.put("port", "123b");
 
             createTableSource(properties);
@@ -236,7 +281,7 @@ public class OracleTableSourceFactoryTest {
         // validate missing required
         Factory factory = new OracleTableSourceFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
-            Map<String, String> properties = getAllOptions();
+            Map<String, String> properties = getAllRequiredOptionsWithHost();
             properties.remove(requiredOption.key());
 
             try {
@@ -253,7 +298,7 @@ public class OracleTableSourceFactoryTest {
 
         // validate unsupported option
         try {
-            Map<String, String> properties = getAllOptions();
+            Map<String, String> properties = getAllRequiredOptionsWithHost();
             properties.put("unknown", "abc");
 
             createTableSource(properties);
@@ -266,7 +311,7 @@ public class OracleTableSourceFactoryTest {
 
         // validate unsupported option
         try {
-            Map<String, String> properties = getAllOptions();
+            Map<String, String> properties = getAllRequiredOptionsWithHost();
             properties.put("scan.startup.mode", "abc");
 
             createTableSource(properties);
@@ -281,15 +326,20 @@ public class OracleTableSourceFactoryTest {
         }
     }
 
-    private Map<String, String> getAllOptions() {
+    private Map<String, String> getAllRequiredOptions() {
         Map<String, String> options = new HashMap<>();
         options.put("connector", "oracle-cdc");
-        options.put("hostname", MY_LOCALHOST);
         options.put("database-name", MY_DATABASE);
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);
         options.put("schema-name", MY_SCHEMA);
+        return options;
+    }
+
+    private Map<String, String> getAllRequiredOptionsWithHost() {
+        Map<String, String> options = getAllRequiredOptions();
+        options.put("hostname", MY_LOCALHOST);
         return options;
     }
 

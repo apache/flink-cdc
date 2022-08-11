@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -48,6 +46,7 @@ import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispat
 import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.SIGNAL_EVENT_VALUE_SCHEMA_NAME;
 import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.WATERMARK_KIND;
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
+import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -139,8 +138,17 @@ public class SourceRecordUtils {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String dbName = source.getString(DATABASE_NAME_KEY);
+        // Oracle need schemaName
+        String schemaName = getSchemaName(source);
         String tableName = source.getString(TABLE_NAME_KEY);
-        return new TableId(dbName, null, tableName);
+        return new TableId(dbName, schemaName, tableName);
+    }
+
+    public static String getSchemaName(Struct source) {
+        if (source.schema().fields().stream().anyMatch(r -> SCHEMA_NAME_KEY.equals(r.name()))) {
+            return source.getString(SCHEMA_NAME_KEY);
+        }
+        return null;
     }
 
     public static Object[] getSplitKey(
@@ -312,7 +320,7 @@ public class SourceRecordUtils {
                         case READ:
                             throw new IllegalStateException(
                                     String.format(
-                                            "Binlog record shouldn't use READ operation, the the record is %s.",
+                                            "Binlog record shouldn't use READ operation, the record is %s.",
                                             binlog));
                     }
                 }

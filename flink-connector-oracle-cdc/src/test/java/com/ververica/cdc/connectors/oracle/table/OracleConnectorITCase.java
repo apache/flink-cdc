@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -172,7 +170,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " ID INT NOT NULL,"
                                 + " NAME STRING,"
                                 + " DESCRIPTION STRING,"
-                                + " WEIGHT DECIMAL(10,3)"
+                                + " WEIGHT DECIMAL(10,3),"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'oracle-cdc',"
                                 + " 'hostname' = '%s',"
@@ -251,6 +250,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         "-D[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(expected);
         Collections.sort(actual);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -413,6 +413,81 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         "+I[11000000001, true, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965]");
 
         List<String> actual = TestValuesTableFactory.getRawResults("test_numeric_sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testXmlType() throws Exception {
+        // Prepare xml type data
+        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE debezium.xmltype_table ("
+                            + " ID NUMBER(4),"
+                            + " T15VARCHAR sys.xmltype,"
+                            + " PRIMARY KEY (ID))");
+            statement.execute(
+                    "INSERT INTO debezium.xmltype_table "
+                            + "VALUES (11, sys.xmlType.createXML('<name><a id=\"1\" value=\"some values\">test xmlType</a></name>'))");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE test_xmltype_table ("
+                                + " ID INT,"
+                                + " T15VARCHAR STRING,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        "debezium",
+                        "xmltype_table");
+        String sinkDDL =
+                "CREATE TABLE test_xmltype_sink ("
+                        + " id INT,"
+                        + " T15VARCHAR STRING,"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '1'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql("INSERT INTO test_xmltype_sink SELECT * FROM test_xmltype_table");
+
+        waitForSnapshotStarted("test_xmltype_sink");
+
+        // waiting for change events finished.
+        waitForSinkSize("test_xmltype_sink", 1);
+
+        String lineSeparator = System.getProperty("line.separator");
+        String expectedResult =
+                String.format(
+                        "+I[11, <name>%s"
+                                + "   <a id=\"1\" value=\"some values\">test xmlType</a>%s"
+                                + "</name>]",
+                        lineSeparator, lineSeparator);
+
+        List<String> expected = Arrays.asList(expectedResult);
+
+        List<String> actual = TestValuesTableFactory.getRawResults("test_xmltype_sink");
         Collections.sort(actual);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();

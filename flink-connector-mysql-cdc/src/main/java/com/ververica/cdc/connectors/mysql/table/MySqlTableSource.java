@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -81,6 +79,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final boolean scanNewlyAddedTableEnabled;
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
+    private final String chunkKeyColumn;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -137,7 +136,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 startupOptions,
                 false,
                 new Properties(),
-                heartbeatInterval);
+                heartbeatInterval,
+                null);
     }
 
     public MySqlTableSource(
@@ -163,7 +163,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             StartupOptions startupOptions,
             boolean scanNewlyAddedTableEnabled,
             Properties jdbcProperties,
-            Duration heartbeatInterval) {
+            Duration heartbeatInterval,
+            @Nullable String chunkKeyColumn) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -190,6 +191,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
+        this.chunkKeyColumn = chunkKeyColumn;
     }
 
     @Override
@@ -244,6 +246,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
+                            .chunkKeyColumn(chunkKeyColumn)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -322,7 +325,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         startupOptions,
                         scanNewlyAddedTableEnabled,
                         jdbcProperties,
-                        heartbeatInterval);
+                        heartbeatInterval,
+                        chunkKeyColumn);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -360,7 +364,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
-                && Objects.equals(jdbcProperties, that.jdbcProperties);
+                && Objects.equals(jdbcProperties, that.jdbcProperties)
+                && Objects.equals(heartbeatInterval, that.heartbeatInterval)
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
     }
 
     @Override
@@ -389,7 +395,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 producedDataType,
                 metadataKeys,
                 scanNewlyAddedTableEnabled,
-                jdbcProperties);
+                jdbcProperties,
+                heartbeatInterval,
+                chunkKeyColumn);
     }
 
     @Override

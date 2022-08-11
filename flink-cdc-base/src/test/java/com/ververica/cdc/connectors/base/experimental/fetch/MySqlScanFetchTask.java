@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -107,7 +105,9 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                         split);
         SnapshotSplitChangeEventSourceContext changeEventSourceContext =
                 new SnapshotSplitChangeEventSourceContext();
-        SnapshotResult snapshotResult = snapshotSplitReadTask.execute(changeEventSourceContext);
+        SnapshotResult snapshotResult =
+                snapshotSplitReadTask.execute(
+                        changeEventSourceContext, sourceFetchContext.getOffsetContext());
 
         final StreamSplit backfillBinlogSplit = createBackfillBinlogSplit(changeEventSourceContext);
         // optimization that skip the binlog read when the low watermark equals high
@@ -128,7 +128,9 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
         if (snapshotResult.isCompletedOrSkipped()) {
             final MySqlBinlogSplitReadTask backfillBinlogReadTask =
                     createBackfillBinlogReadTask(backfillBinlogSplit, sourceFetchContext);
-            backfillBinlogReadTask.execute(new SnapshotBinlogSplitChangeEventSourceContext());
+            backfillBinlogReadTask.execute(
+                    new SnapshotBinlogSplitChangeEventSourceContext(),
+                    sourceFetchContext.getOffsetContext());
         } else {
             taskRunning = false;
             throw new IllegalStateException(
@@ -213,7 +215,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 MySqlConnection jdbcConnection,
                 JdbcSourceEventDispatcher dispatcher,
                 SnapshotSplit snapshotSplit) {
-            super(connectorConfig, previousOffset, snapshotProgressListener);
+            super(connectorConfig, snapshotProgressListener);
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
@@ -225,7 +227,8 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public SnapshotResult execute(ChangeEventSourceContext context)
+        public SnapshotResult execute(
+                ChangeEventSourceContext context, OffsetContext previousOffset)
                 throws InterruptedException {
             SnapshottingTask snapshottingTask = getSnapshottingTask(previousOffset);
             final SnapshotContext ctx;
@@ -236,7 +239,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 throw new RuntimeException(e);
             }
             try {
-                return doExecute(context, ctx, snapshottingTask);
+                return doExecute(context, previousOffset, ctx, snapshottingTask);
             } catch (InterruptedException e) {
                 LOG.warn("Snapshot was interrupted before completion");
                 throw e;
@@ -248,6 +251,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
         @Override
         protected SnapshotResult doExecute(
                 ChangeEventSourceContext context,
+                OffsetContext previousOffset,
                 SnapshotContext snapshotContext,
                 SnapshottingTask snapshottingTask)
                 throws Exception {

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,8 +22,8 @@ import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnum
 import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to pull binlog meta data, i.e. sending {@link StreamSplitMetaEvent}.
+ * The {@link SourceEvent} that {@link JdbcIncrementalSourceReader} sends to {@link
+ * IncrementalSourceEnumerator} to pull binlog metadata, i.e. sending {@link StreamSplitMetaEvent}.
  */
 public class StreamSplitMetaRequestEvent implements SourceEvent {
 

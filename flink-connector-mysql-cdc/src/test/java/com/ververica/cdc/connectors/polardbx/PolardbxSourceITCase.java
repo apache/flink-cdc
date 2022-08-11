@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -71,15 +69,15 @@ import static org.junit.Assert.assertTrue;
  * we added fallback in {@link MySqlSchema} when parsing ddl failed and provided these cases to
  * test.
  */
-public class PolardbxSourceTCase extends AbstractTestBase {
-    private static final Logger LOG = LoggerFactory.getLogger(PolardbxSourceTCase.class);
+public class PolardbxSourceITCase extends AbstractTestBase {
+    private static final Logger LOG = LoggerFactory.getLogger(PolardbxSourceITCase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     private static final Integer PORT = 8527;
     private static final String HOST_NAME = "127.0.0.1";
     private static final String USER_NAME = "polardbx_root";
     private static final String PASSWORD = "123456";
     private static final String DATABASE = "polardbx_ddl_test";
-    private static final String IMAGE_VERSION = "2.0.1";
+    private static final String IMAGE_VERSION = "2.1.0";
     private static final DockerImageName POLARDBX_IMAGE =
             DockerImageName.parse("polardbx/polardb-x:" + IMAGE_VERSION);
 
@@ -133,7 +131,7 @@ public class PolardbxSourceTCase extends AbstractTestBase {
     protected static void initializePolardbxTables(String databaseName)
             throws InterruptedException {
         final String ddlFile = String.format("ddl/%s.sql", databaseName);
-        final URL ddlTestFile = PolardbxSourceTCase.class.getClassLoader().getResource(ddlFile);
+        final URL ddlTestFile = PolardbxSourceITCase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         // need to sleep 1s, make sure the jdbc connection can be created
         Thread.sleep(1000);
