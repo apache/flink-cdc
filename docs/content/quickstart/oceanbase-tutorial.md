@@ -139,7 +139,9 @@ Flink SQL> CREATE TABLE orders (
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = 'localhost',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+ );
 
 -- create products table
 Flink SQL> CREATE TABLE products (
@@ -159,7 +161,9 @@ Flink SQL> CREATE TABLE products (
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = 'localhost',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+ );
 
 -- create flat table enriched_orders
 Flink SQL> CREATE TABLE enriched_orders (

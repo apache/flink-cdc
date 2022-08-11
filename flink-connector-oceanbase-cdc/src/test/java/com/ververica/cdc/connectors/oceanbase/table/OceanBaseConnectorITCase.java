@@ -97,7 +97,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'port' = '%s',"
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
-                                + " 'rootserver-list' = '%s'"
+                                + " 'rootserver-list' = '%s',"
+                                + " 'working-mode' = 'memory'"
                                 + ")",
                         getUsername(),
                         getPassword(),
@@ -220,7 +221,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'port' = '%s',"
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
-                                + " 'rootserver-list' = '%s'"
+                                + " 'rootserver-list' = '%s',"
+                                + " 'working-mode' = 'memory'"
                                 + ")",
                         getUsername(),
                         getPassword(),
@@ -342,7 +344,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'port' = '%s',"
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
-                                + " 'rootserver-list' = '%s'"
+                                + " 'rootserver-list' = '%s',"
+                                + " 'working-mode' = 'memory'"
                                 + ")",
                         getUsername(),
                         getPassword(),

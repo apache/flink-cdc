@@ -54,6 +54,7 @@ public class OceanBaseTestBase extends TestLogger {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseTestBase.class);
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+    private static final Duration CONTAINER_STARTUP_TIMEOUT = Duration.ofMinutes(4);
 
     public static final int OB_SERVER_SQL_PORT = 2881;
     public static final int OB_SERVER_RPC_PORT = 2882;
@@ -112,7 +113,7 @@ public class OceanBaseTestBase extends TestLogger {
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofSeconds(120))
+                    .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
@@ -123,7 +124,7 @@ public class OceanBaseTestBase extends TestLogger {
                     .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME)
                     .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofSeconds(120))
+                    .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass

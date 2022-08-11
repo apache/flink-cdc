@@ -137,7 +137,9 @@ Flink SQL> CREATE TABLE orders (
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = 'localhost',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+ );
 
 -- 创建商品表 
 Flink SQL> CREATE TABLE products (
@@ -157,7 +159,9 @@ Flink SQL> CREATE TABLE products (
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = 'localhost',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+  );
 
 -- 创建关联后的订单数据表
 Flink SQL> CREATE TABLE enriched_orders (
