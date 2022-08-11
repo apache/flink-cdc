@@ -66,6 +66,7 @@ import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -599,6 +600,13 @@ public class MongoDBConnectorDeserializationSchema
             Instant instant = convertToInstant(docObj.asTimestamp());
             return StringData.fromString(
                     convertInstantToZonedDateTime(instant).format(ISO_OFFSET_DATE_TIME));
+        }
+        if (docObj.isArray()) {
+            String doc =
+                    docObj.asArray().stream()
+                            .map(v -> convertToString(v).toString())
+                            .collect(Collectors.joining(", "));
+            return StringData.fromString("[" + doc + "]");
         }
         if (docObj.isRegularExpression()) {
             BsonRegularExpression regex = docObj.asRegularExpression();
