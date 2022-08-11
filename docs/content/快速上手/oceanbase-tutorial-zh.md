@@ -10,13 +10,13 @@
 version: '2.1'
 services:
   observer:
-    image: whhe/obce-mini:3.1.2_CE
+    image: oceanbase/oceanbase-ce:3.1.3_bp1
     container_name: observer
     environment:
       - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.0.0
+    image: whhe/oblogproxy:1.0.2
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
@@ -131,8 +131,8 @@ Flink SQL> CREATE TABLE orders (
     'username' = 'root',
     'password' = 'pswd',
     'tenant-name' = 'sys',
-    'database-name' = 'ob',
-    'table-name' = 'orders',
+    'database-name' = '^ob$',
+    'table-name' = '^orders$',
     'hostname' = 'localhost',
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
@@ -151,8 +151,8 @@ Flink SQL> CREATE TABLE products (
     'username' = 'root',
     'password' = 'pswd',
     'tenant-name' = 'sys',
-    'database-name' = 'ob',
-    'table-name' = 'products',
+    'database-name' = '^ob$',
+    'table-name' = '^products$',
     'hostname' = 'localhost',
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',

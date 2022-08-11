@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -44,7 +42,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -54,11 +52,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MySqlSource}. */
 public class MySqlSourceITCase extends MySqlSourceTestBase {
@@ -246,6 +246,22 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 false,
                 "address_hangzhou",
                 "address_beijing");
+    }
+
+    @Test
+    public void testConsumingTableWithoutPrimaryKey() {
+        try {
+            testMySqlParallelSource(
+                    1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers_no_pk"});
+        } catch (Exception e) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    e,
+                                    String.format(
+                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
+                                            customDatabase.getDatabaseName() + ".customers_no_pk"))
+                            .isPresent());
+        }
     }
 
     private void testMySqlParallelSource(
@@ -541,9 +557,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             Class<?> clazz =
                     classLoader.loadClass(
                             "org.apache.flink.streaming.api.environment.StreamExecutionEnvironment");
-            Method getConfigurationMethod = clazz.getDeclaredMethod("getConfiguration");
-            getConfigurationMethod.setAccessible(true);
-            Configuration configuration = (Configuration) getConfigurationMethod.invoke(env);
+            Field field = clazz.getDeclaredField("configuration");
+            field.setAccessible(true);
+            Configuration configuration = (Configuration) field.get(env);
             configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         env.setParallelism(parallelism);
@@ -738,7 +754,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
-        return DebeziumUtils.createMySqlConnection(configuration);
+        return DebeziumUtils.createMySqlConnection(configuration, new Properties());
     }
 
     // ------------------------------------------------------------------------

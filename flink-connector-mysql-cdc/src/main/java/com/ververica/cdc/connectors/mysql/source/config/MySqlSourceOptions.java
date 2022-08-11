@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -180,27 +178,29 @@ public class MySqlSourceOptions {
                     .intType()
                     .defaultValue(1000)
                     .withDescription(
-                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be will be divided into multiple groups.");
+                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.");
 
     @Experimental
-    public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
-            ConfigOptions.key("split-key.even-distribution.factor.upper-bound")
+    public static final ConfigOption<Double> CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
+            ConfigOptions.key("chunk-key.even-distribution.factor.upper-bound")
                     .doubleType()
                     .defaultValue(1000.0d)
+                    .withFallbackKeys("split-key.even-distribution.factor.upper-bound")
                     .withDescription(
-                            "The upper bound of split key distribution factor. The distribution factor is used to determine whether the"
+                            "The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query MySQL for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
     @Experimental
-    public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
-            ConfigOptions.key("split-key.even-distribution.factor.lower-bound")
+    public static final ConfigOption<Double> CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
+            ConfigOptions.key("chunk-key.even-distribution.factor.lower-bound")
                     .doubleType()
                     .defaultValue(0.05d)
+                    .withFallbackKeys("split-key.even-distribution.factor.lower-bound")
                     .withDescription(
-                            "The lower bound of split key distribution factor. The distribution factor is used to determine whether the"
+                            "The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query MySQL for splitting would happen when it is uneven."
@@ -213,4 +213,14 @@ public class MySqlSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether capture the scan the newly added tables or not, by default is false.");
+
+    @Experimental
+    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
+            ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
+                                    + "By default, the chunk key is the first column of the primary key."
+                                    + "This column must be a column of the primary key.");
 }

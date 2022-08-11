@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -529,10 +527,6 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
                     } else {
                         int offset = columnInfo.getOffset();
                         org.tikv.common.types.DataType type = columnInfo.getType();
-                        if (type.isUnsigned()) {
-                            ((Object[]) object)[offset] =
-                                    dealUnsignedColumnValue(type, ((Object[]) object)[offset]);
-                        }
                         Object convertedField =
                                 convertField(
                                         fieldConverters[i],
@@ -556,6 +550,9 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
         if (fieldValue == null) {
             return null;
         } else {
+            if (dataType.isUnsigned()) {
+                fieldValue = dealUnsignedColumnValue(dataType, fieldValue);
+            }
             return fieldConverter.convert(fieldValue, tableInfo, dataType);
         }
     }

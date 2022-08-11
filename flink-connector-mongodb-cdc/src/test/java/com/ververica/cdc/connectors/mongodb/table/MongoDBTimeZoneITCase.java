@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -130,6 +128,70 @@ public class MongoDBTimeZoneITCase extends MongoDBTestBase {
                         new String[] {
                             "+I[2019-08-11, 17:54:14, 2019-08-11T17:54:14.692, 2019-08-11T17:54:14.692Z, 2019-08-11T17:47:44, 2019-08-11T17:47:44Z]"
                         };
+                break;
+        }
+
+        List<String> actualSnapshot = fetchRows(iterator, expectedSnapshot.length);
+        assertThat(actualSnapshot, containsInAnyOrder(expectedSnapshot));
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testDateAndTimestampToStringWithTimeZone() throws Exception {
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of(localTimeZone));
+
+        String database = executeCommandFileInSeparateDatabase("column_type_test");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE full_types (\n"
+                                + "    _id STRING,\n"
+                                + "    dateToLocalTimestampField STRING,\n"
+                                + "    timestampToLocalTimestampField STRING,\n"
+                                + "    PRIMARY KEY (_id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'mongodb-cdc',"
+                                + " 'hosts' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database' = '%s',"
+                                + " 'collection' = '%s'"
+                                + ")",
+                        MONGODB_CONTAINER.getHostAndPort(),
+                        FLINK_USER,
+                        FLINK_USER_PASSWORD,
+                        database,
+                        "full_types",
+                        localTimeZone);
+
+        tEnv.executeSql(sourceDDL);
+
+        TableResult result =
+                tEnv.executeSql(
+                        "SELECT dateToLocalTimestampField,\n"
+                                + "timestampToLocalTimestampField\n"
+                                + "FROM full_types");
+
+        CloseableIterator<Row> iterator = result.collect();
+        String[] expectedSnapshot;
+
+        switch (localTimeZone) {
+            case "Asia/Shanghai":
+                expectedSnapshot =
+                        new String[] {
+                            "+I[2019-08-12T01:54:14.692+08:00, 2019-08-12T01:47:44+08:00]"
+                        };
+                break;
+            case "Europe/Berlin":
+                expectedSnapshot =
+                        new String[] {
+                            "+I[2019-08-11T19:54:14.692+02:00, 2019-08-11T19:47:44+02:00]"
+                        };
+                break;
+            default:
+                expectedSnapshot =
+                        new String[] {"+I[2019-08-11T17:54:14.692Z, 2019-08-11T17:47:44Z]"};
                 break;
         }
 

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -20,7 +18,7 @@ package com.ververica.cdc.connectors.base.source.reader.external;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -87,7 +85,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
                     } catch (Exception e) {
                         LOG.error(
                                 String.format(
-                                        "Execute snapshot read task for mysql split %s fail",
+                                        "Execute snapshot read task for snapshot split %s fail",
                                         currentSnapshotSplit),
                                 e);
                         readException = e;
@@ -113,6 +111,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
             boolean reachBinlogEnd = false;
             final List<SourceRecord> sourceRecords = new ArrayList<>();
             while (!reachBinlogEnd) {
+                checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
                 for (DataChangeEvent event : batch) {
                     sourceRecords.add(event.getRecord());

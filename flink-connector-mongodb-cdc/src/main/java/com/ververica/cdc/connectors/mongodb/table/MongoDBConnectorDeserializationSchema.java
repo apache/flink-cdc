@@ -62,6 +62,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -463,6 +464,10 @@ public class MongoDBConnectorDeserializationSchema
         return LocalDateTime.ofInstant(instant, localTimeZone);
     }
 
+    private ZonedDateTime convertInstantToZonedDateTime(Instant instant) {
+        return ZonedDateTime.ofInstant(instant, localTimeZone);
+    }
+
     private Instant convertToInstant(BsonTimestamp bsonTimestamp) {
         return Instant.ofEpochSecond(bsonTimestamp.getTime());
     }
@@ -556,6 +561,10 @@ public class MongoDBConnectorDeserializationSchema
         if (docObj.isString()) {
             return StringData.fromString(docObj.asString().getValue());
         }
+        if (docObj.isDocument()) {
+            // convert document to json string
+            return StringData.fromString(docObj.asDocument().toJson());
+        }
         if (docObj.isBinary()) {
             BsonBinary bsonBinary = docObj.asBinary();
             if (BsonBinarySubType.isUuid(bsonBinary.getType())) {
@@ -584,12 +593,12 @@ public class MongoDBConnectorDeserializationSchema
         if (docObj.isDateTime()) {
             Instant instant = convertToInstant(docObj.asDateTime());
             return StringData.fromString(
-                    convertInstantToLocalDateTime(instant).format(ISO_OFFSET_DATE_TIME));
+                    convertInstantToZonedDateTime(instant).format(ISO_OFFSET_DATE_TIME));
         }
         if (docObj.isTimestamp()) {
             Instant instant = convertToInstant(docObj.asTimestamp());
             return StringData.fromString(
-                    convertInstantToLocalDateTime(instant).format(ISO_OFFSET_DATE_TIME));
+                    convertInstantToZonedDateTime(instant).format(ISO_OFFSET_DATE_TIME));
         }
         if (docObj.isRegularExpression()) {
             BsonRegularExpression regex = docObj.asRegularExpression();

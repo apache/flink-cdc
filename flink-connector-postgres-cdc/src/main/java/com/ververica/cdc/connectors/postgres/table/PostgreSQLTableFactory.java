@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -32,6 +30,7 @@ import java.util.Set;
 
 import static com.ververica.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 
 /** Factory for creating configured instance of {@link PostgreSQLTableSource}. */
 public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
@@ -116,7 +115,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         int port = config.get(PORT);
         String pluginName = config.get(DECODING_PLUGIN_NAME);
         String slotName = config.get(SLOT_NAME);
-        ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
+        ResolvedSchema physicalSchema =
+                getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
         return new PostgreSQLTableSource(
                 physicalSchema,

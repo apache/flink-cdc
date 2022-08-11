@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -34,7 +32,6 @@ import org.apache.flink.util.ExceptionUtils;
 import org.junit.Test;
 
 import java.time.Duration;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -78,71 +75,98 @@ public class OceanBaseTableFactoryTest {
     private static final String USERNAME = "user@sys";
     private static final String PASSWORD = "pswd";
     private static final String TENANT_NAME = "sys";
-    private static final String DATABASE_NAME = "db";
-    private static final String TABLE_NAME = "table";
-    private static final String RS_LIST = "127.0.0.1:2882:2881";
+    private static final String DATABASE_NAME = "db[0-9]";
+    private static final String TABLE_NAME = "table[0-9]";
+    private static final String TABLE_LIST = "db.table";
+    private static final String SERVER_TIME_ZONE = "+00:00";
+    private static final String CONNECT_TIMEOUT = "30s";
+    private static final String HOSTNAME = "127.0.0.1";
+    private static final Integer PORT = 2881;
     private static final String LOG_PROXY_HOST = "127.0.0.1";
-    private static final String LOG_PROXY_PORT = "2983";
+    private static final Integer LOG_PROXY_PORT = 2983;
+    private static final String LOG_PROXY_CLIENT_ID = "clientId";
+    private static final String RS_LIST = "127.0.0.1:2882:2881";
+    private static final String WORKING_MODE = "storage";
 
     @Test
     public void testCommonProperties() {
-        Map<String, String> properties = getRequiredOptions();
+        Map<String, String> options = getRequiredOptions();
+        options.put("database-name", DATABASE_NAME);
+        options.put("table-name", TABLE_NAME);
+        options.put("table-list", TABLE_LIST);
+        options.put("rootserver-list", RS_LIST);
 
-        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, options);
         OceanBaseTableSource expectedSource =
                 new OceanBaseTableSource(
                         SCHEMA,
                         StartupMode.LATEST_OFFSET,
-                        null,
                         USERNAME,
                         PASSWORD,
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        TABLE_LIST,
+                        SERVER_TIME_ZONE,
+                        Duration.parse("PT" + CONNECT_TIMEOUT),
                         null,
                         null,
-                        Duration.ofSeconds(30),
-                        ZoneId.of("UTC"),
-                        RS_LIST,
                         LOG_PROXY_HOST,
-                        2983);
+                        LOG_PROXY_PORT,
+                        null,
+                        null,
+                        RS_LIST,
+                        null,
+                        WORKING_MODE);
         assertEquals(expectedSource, actualSource);
     }
 
     @Test
     public void testOptionalProperties() {
         Map<String, String> options = getRequiredOptions();
-        options.put("scan.startup.mode", "timestamp");
-        options.put("scan.startup.timestamp", "0");
-        options.put("hostname", "127.0.0.1");
-        options.put("port", "2881");
+        options.put("scan.startup.mode", "initial");
+        options.put("database-name", DATABASE_NAME);
+        options.put("table-name", TABLE_NAME);
+        options.put("table-list", TABLE_LIST);
+        options.put("hostname", HOSTNAME);
+        options.put("port", String.valueOf(PORT));
+        options.put("logproxy.client.id", LOG_PROXY_CLIENT_ID);
+        options.put("rootserver-list", RS_LIST);
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         OceanBaseTableSource expectedSource =
                 new OceanBaseTableSource(
                         SCHEMA,
-                        StartupMode.TIMESTAMP,
-                        0L,
+                        StartupMode.INITIAL,
                         USERNAME,
                         PASSWORD,
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        TABLE_LIST,
+                        SERVER_TIME_ZONE,
+                        Duration.parse("PT" + CONNECT_TIMEOUT),
                         "127.0.0.1",
                         2881,
-                        Duration.ofSeconds(30),
-                        ZoneId.of("UTC"),
-                        RS_LIST,
                         LOG_PROXY_HOST,
-                        2983);
+                        LOG_PROXY_PORT,
+                        LOG_PROXY_CLIENT_ID,
+                        null,
+                        RS_LIST,
+                        null,
+                        WORKING_MODE);
         assertEquals(expectedSource, actualSource);
     }
 
     @Test
     public void testMetadataColumns() {
-        Map<String, String> properties = getRequiredOptions();
+        Map<String, String> options = getRequiredOptions();
+        options.put("database-name", DATABASE_NAME);
+        options.put("table-name", TABLE_NAME);
+        options.put("table-list", TABLE_LIST);
+        options.put("rootserver-list", RS_LIST);
 
-        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, options);
         OceanBaseTableSource oceanBaseTableSource = (OceanBaseTableSource) actualSource;
         oceanBaseTableSource.applyReadableMetadata(
                 Arrays.asList("op_ts", "tenant_name", "database_name", "table_name"),
@@ -153,19 +177,23 @@ public class OceanBaseTableFactoryTest {
                 new OceanBaseTableSource(
                         SCHEMA_WITH_METADATA,
                         StartupMode.LATEST_OFFSET,
-                        null,
                         USERNAME,
                         PASSWORD,
                         TENANT_NAME,
                         DATABASE_NAME,
                         TABLE_NAME,
+                        TABLE_LIST,
+                        SERVER_TIME_ZONE,
+                        Duration.parse("PT" + CONNECT_TIMEOUT),
                         null,
                         null,
-                        Duration.ofSeconds(30),
-                        ZoneId.of("UTC"),
-                        RS_LIST,
                         LOG_PROXY_HOST,
-                        2983);
+                        LOG_PROXY_PORT,
+                        null,
+                        null,
+                        RS_LIST,
+                        null,
+                        WORKING_MODE);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "tenant_name", "database_name", "table_name");
@@ -195,11 +223,8 @@ public class OceanBaseTableFactoryTest {
         options.put("username", USERNAME);
         options.put("password", PASSWORD);
         options.put("tenant-name", TENANT_NAME);
-        options.put("database-name", DATABASE_NAME);
-        options.put("table-name", TABLE_NAME);
-        options.put("rootserver-list", RS_LIST);
         options.put("logproxy.host", LOG_PROXY_HOST);
-        options.put("logproxy.port", LOG_PROXY_PORT);
+        options.put("logproxy.port", String.valueOf(LOG_PROXY_PORT));
         return options;
     }
 

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -30,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
@@ -58,58 +55,108 @@ public class OceanBaseTestBase extends TestLogger {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    // Should be deprecated after official images are released.
-    public static final String DOCKER_IMAGE_NAME = "whhe/oblogproxy:obce_3.1.1";
-
-    // For details about config, see https://github.com/whhe/dockerfiles/tree/master/oblogproxy
-    public static final int OB_LOG_PROXY_PORT = 2983;
     public static final int OB_SERVER_SQL_PORT = 2881;
     public static final int OB_SERVER_RPC_PORT = 2882;
+    public static final int LOG_PROXY_PORT = 2983;
 
-    // Here we use root user of system tenant for testing, as the log proxy service needs
-    // a user of system tenant for authentication. It is not recommended for production.
     public static final String OB_SYS_USERNAME = "root";
     public static final String OB_SYS_PASSWORD = "pswd";
 
+    public static final String NETWORK_MODE = "host";
+
+    // --------------------------------------------------------------------------------------------
+    // Attributes about host and port when network is on 'host' mode.
+    // --------------------------------------------------------------------------------------------
+
+    protected static String getObServerHost() {
+        return "127.0.0.1";
+    }
+
+    protected static String getLogProxyHost() {
+        return "127.0.0.1";
+    }
+
+    protected static int getObServerSqlPort() {
+        return OB_SERVER_SQL_PORT;
+    }
+
+    protected static int getObServerRpcPort() {
+        return OB_SERVER_RPC_PORT;
+    }
+
+    protected static int getLogProxyPort() {
+        return LOG_PROXY_PORT;
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Attributes about user.
+    // Here we use the root user of 'sys' tenant, which is not recommended for production.
+    // --------------------------------------------------------------------------------------------
+
+    protected static String getTenant() {
+        return "sys";
+    }
+
+    protected static String getUsername() {
+        return OB_SYS_USERNAME;
+    }
+
+    protected static String getPassword() {
+        return OB_SYS_PASSWORD;
+    }
+
     @ClassRule
-    public static final GenericContainer<?> OB_WITH_LOG_PROXY =
-            new GenericContainer<>(DOCKER_IMAGE_NAME)
-                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT, OB_LOG_PROXY_PORT)
+    public static final GenericContainer<?> OB_SERVER =
+            new GenericContainer<>("oceanbase/oceanbase-ce:3.1.3_bp1")
+                    .withNetworkMode(NETWORK_MODE)
+                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
-                    .waitingFor(
-                            new WaitAllStrategy()
-                                    .withStrategy(Wait.forListeningPort())
-                                    .withStrategy(Wait.forLogMessage(".*boot success!.*", 1)))
+                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
+                    .withStartupTimeout(Duration.ofSeconds(120))
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    @ClassRule
+    public static final GenericContainer<?> LOG_PROXY =
+            new GenericContainer<>("whhe/oblogproxy:1.0.2")
+                    .withNetworkMode(NETWORK_MODE)
+                    .withExposedPorts(LOG_PROXY_PORT)
+                    .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME)
+                    .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD)
+                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass
     public static void startContainers() {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(OB_WITH_LOG_PROXY)).join();
+        Startables.deepStart(Stream.of(OB_SERVER, LOG_PROXY)).join();
         LOG.info("Containers are started.");
     }
 
     @AfterClass
     public static void stopContainers() {
         LOG.info("Stopping containers...");
-        Stream.of(OB_WITH_LOG_PROXY).forEach(GenericContainer::stop);
+        Stream.of(OB_SERVER, LOG_PROXY).forEach(GenericContainer::stop);
         LOG.info("Containers are stopped.");
     }
 
     public static String getJdbcUrl(String databaseName) {
         return "jdbc:mysql://"
-                + OB_WITH_LOG_PROXY.getContainerIpAddress()
+                + getObServerHost()
                 + ":"
-                + OB_WITH_LOG_PROXY.getMappedPort(OB_SERVER_SQL_PORT)
+                + getObServerSqlPort()
                 + "/"
                 + databaseName
                 + "?useSSL=false";
     }
 
+    public static String getRsList() {
+        return String.format(
+                "%s:%s:%s", getObServerHost(), getObServerRpcPort(), getObServerSqlPort());
+    }
+
     protected static Connection getJdbcConnection(String databaseName) throws SQLException {
-        return DriverManager.getConnection(
-                getJdbcUrl(databaseName), OB_SYS_USERNAME, OB_SYS_PASSWORD);
+        return DriverManager.getConnection(getJdbcUrl(databaseName), getUsername(), getPassword());
     }
 
     private static void dropTestDatabase(Connection connection, String databaseName) {

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -38,6 +36,7 @@ import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContex
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -150,7 +149,7 @@ public class PostgreSQLTableFactoryTest {
         actualSource = postgreSQLTableSource.copy();
         PostgreSQLTableSource expectedSource =
                 new PostgreSQLTableSource(
-                        SCHEMA_WITH_METADATA,
+                        ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
                         5432,
                         MY_LOCALHOST,
                         MY_DATABASE,

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -204,8 +202,7 @@ public class MySqlSourceReader<T>
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(MySqlBinlogSplit split) {
         final String splitId = split.splitId();
         if (split.getTableSchemas().isEmpty()) {
-            try (MySqlConnection jdbc =
-                    DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+            try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
                 Map<TableId, TableChanges.TableChange> tableSchemas =
                         TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
                 LOG.info("The table schema discovery for binlog split {} success", splitId);

@@ -24,7 +24,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 
 Download [flink-sql-connector-mongodb-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.3-SNAPSHOT/flink-sql-connector-mongodb-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-mongodb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mongodb-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mongodb-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-mongodb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mongodb-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mongodb-cdc), the released version will be available in the Maven central warehouse.
 
 Setup MongoDB
 ----------------
@@ -227,6 +227,13 @@ Connector Options
       <td>The max size of the queue to use when copying data.</td>
     </tr>
     <tr>
+      <td>batch.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">0</td>
+      <td>Integer</td>
+      <td>Change stream cursor batch size. Specifies the maximum number of change events to return in each batch of the response from the MongoDB cluster. The default is 0 meaning it uses the server's default value.</td>
+    </tr>
+    <tr>
       <td>poll.max.batch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
@@ -290,7 +297,7 @@ The extended CREATE TABLE example demonstrates the syntax for exposing these met
 ```sql
 CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
     _id STRING, // must be declared
     name STRING,
@@ -369,8 +376,8 @@ public class MongoDBSourceExample {
                 .hosts("localhost:27017")
                 .username("flink")
                 .password("flinkpw")
-                .database("inventory")
-                .collection("products")
+                .databaseList("inventory") // set captured database, support regex
+                .collectionList("inventory.products", "inventory.orders") //set captured collections, support regex
                 .deserializer(new JsonDebeziumDeserializationSchema())
                 .build();
 
@@ -383,6 +390,8 @@ public class MongoDBSourceExample {
     }
 }
 ```
+
+**Note:** If database regex is used, `readAnyDatabase` role is required.
 
 
 Data Type Mapping

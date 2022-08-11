@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -40,6 +38,7 @@ import org.tikv.cdc.CDCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.RowKey;
+import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Kvrpcpb;
@@ -101,7 +100,12 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     public void open(final Configuration config) throws Exception {
         super.open(config);
         session = TiSession.create(tiConf);
-        long tableId = session.getCatalog().getTable(database, tableName).getId();
+        TiTableInfo tableInfo = session.getCatalog().getTable(database, tableName);
+        if (tableInfo == null) {
+            throw new RuntimeException(
+                    String.format("Table %s.%s does not exist.", database, tableName));
+        }
+        long tableId = tableInfo.getId();
         keyRange =
                 TableKeyRangeUtils.getTableKeyRange(
                         tableId,

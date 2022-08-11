@@ -1,10 +1,8 @@
--- Licensed to the Apache Software Foundation (ASF) under one
--- or more contributor license agreements.  See the NOTICE file
--- distributed with this work for additional information
--- regarding copyright ownership.  The ASF licenses this file
--- to you under the Apache License, Version 2.0 (the
--- "License"); you may not use this file except in compliance
--- with the License.  You may obtain a copy of the License at
+-- Copyright 2022 Ververica Inc.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
 --   http://www.apache.org/licenses/LICENSE-2.0
 -- Unless required by applicable law or agreed to in writing,
 -- software distributed under the License is distributed on an
@@ -137,6 +135,36 @@ VALUES (1,'user_1','Shanghai','123567891234'),
        (3,'user_9','Shanghai','123567891234'),
        (3,'user_10','Shanghai','123567891234');
 
+CREATE TABLE customers_no_pk (
+   id INTEGER NOT NULL,
+   name VARCHAR(255) NOT NULL DEFAULT 'flink',
+   address VARCHAR(1024),
+   phone_number VARCHAR(512)
+);
+
+INSERT INTO customers_no_pk
+VALUES (101,"user_1","Shanghai","123567891234"),
+       (102,"user_2","Shanghai","123567891234"),
+       (103,"user_3","Shanghai","123567891234"),
+       (109,"user_4","Shanghai","123567891234"),
+       (110,"user_5","Shanghai","123567891234"),
+       (111,"user_6","Shanghai","123567891234"),
+       (118,"user_7","Shanghai","123567891234"),
+       (121,"user_8","Shanghai","123567891234"),
+       (123,"user_9","Shanghai","123567891234"),
+       (1009,"user_10","Shanghai","123567891234"),
+       (1010,"user_11","Shanghai","123567891234"),
+       (1011,"user_12","Shanghai","123567891234"),
+       (1012,"user_13","Shanghai","123567891234"),
+       (1013,"user_14","Shanghai","123567891234"),
+       (1014,"user_15","Shanghai","123567891234"),
+       (1015,"user_16","Shanghai","123567891234"),
+       (1016,"user_17","Shanghai","123567891234"),
+       (1017,"user_18","Shanghai","123567891234"),
+       (1018,"user_19","Shanghai","123567891234"),
+       (1019,"user_20","Shanghai","123567891234"),
+       (2000,"user_21","Shanghai","123567891234");
+
 -- table has combined primary key
 CREATE TABLE customer_card (
   card_no BIGINT NOT NULL,
@@ -202,6 +230,29 @@ VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
        (401, 'KIND_007', 'user_5', 'leo list'),
        (404, 'KIND_008', 'user_5', 'leo list'),
        (600, 'KIND_009', 'user_6', 'my shopping cart');
+
+-- table has combined primary key and one of the primary key is evenly
+CREATE TABLE evenly_shopping_cart (
+  product_no INT NOT NULL,
+  product_kind VARCHAR(255),
+  user_id VARCHAR(255) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  PRIMARY KEY(product_kind, product_no, user_id)
+);
+
+insert into evenly_shopping_cart
+VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
+       (102, 'KIND_002', 'user_1', 'my shopping cart'),
+       (103, 'KIND_007', 'user_1', 'my shopping cart'),
+       (104, 'KIND_008', 'user_1', 'my shopping cart'),
+       (105, 'KIND_100', 'user_2', 'my shopping list'),
+       (105, 'KIND_999', 'user_3', 'my shopping list'),
+       (107, 'KIND_010', 'user_4', 'my shopping list'),
+       (108, 'KIND_009', 'user_4', 'my shopping list'),
+       (109, 'KIND_002', 'user_5', 'leo list'),
+       (111, 'KIND_007', 'user_5', 'leo list'),
+       (111, 'KIND_008', 'user_5', 'leo list'),
+       (112, 'KIND_009', 'user_6', 'my shopping cart');
 
 -- table has bigint unsigned auto increment primary key
 CREATE TABLE shopping_cart_big (

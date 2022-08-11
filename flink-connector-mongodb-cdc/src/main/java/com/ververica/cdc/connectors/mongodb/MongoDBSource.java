@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -60,6 +58,8 @@ public class MongoDBSource {
     public static final String ERROR_TOLERANCE_ALL = ErrorTolerance.ALL.value();
 
     public static final String FULL_DOCUMENT_UPDATE_LOOKUP = FullDocument.UPDATE_LOOKUP.getValue();
+
+    public static final int BATCH_SIZE_DEFAULT = 0;
 
     public static final int POLL_MAX_BATCH_SIZE_DEFAULT = 1000;
 
@@ -130,9 +130,10 @@ public class MongoDBSource {
         private List<String> databaseList;
         private List<String> collectionList;
         private String connectionOptions;
-        private Integer batchSize;
+        private Integer batchSize = BATCH_SIZE_DEFAULT;
         private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS_DEFAULT;
         private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE_DEFAULT;
+        private Boolean updateLookup = true;
         private Boolean copyExisting = true;
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
@@ -188,7 +189,9 @@ public class MongoDBSource {
         /**
          * batch.size
          *
-         * <p>The cursor batch size. Default: 0
+         * <p>The change stream cursor batch size. Specifies the maximum number of change events to
+         * return in each batch of the response from the MongoDB cluster. The default is 0 meaning
+         * it uses the server's default value. Default: 0
          */
         public Builder<T> batchSize(int batchSize) {
             checkArgument(batchSize >= 0);
@@ -218,6 +221,19 @@ public class MongoDBSource {
         public Builder<T> pollMaxBatchSize(int pollMaxBatchSize) {
             checkArgument(pollMaxBatchSize > 0);
             this.pollMaxBatchSize = pollMaxBatchSize;
+            return this;
+        }
+
+        /**
+         * change.stream.full.document
+         *
+         * <p>Determines what to return for update operations when using a Change Stream. When set
+         * to true, the change stream for partial updates will include both a delta describing the
+         * changes to the document and a copy of the entire document that was changed from some time
+         * after the change occurred. Default: true
+         */
+        public Builder<T> updateLookup(boolean updateLookup) {
+            this.updateLookup = updateLookup;
             return this;
         }
 
@@ -362,7 +378,11 @@ public class MongoDBSource {
                 props.setProperty(COLLECTION_INCLUDE_LIST, String.join(",", collectionList));
             }
 
-            props.setProperty(MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
+            if (updateLookup) {
+                props.setProperty(
+                        MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
+            }
+
             props.setProperty(
                     MongoSourceConfig.PUBLISH_FULL_DOCUMENT_ONLY_CONFIG,
                     String.valueOf(Boolean.FALSE));
