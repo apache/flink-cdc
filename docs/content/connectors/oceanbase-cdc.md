@@ -85,7 +85,9 @@ Flink SQL> CREATE TABLE orders (
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = '127.0.0.1',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+);
 
 -- read snapshot and binlogs from orders table
 Flink SQL> SELECT * FROM orders;
@@ -316,7 +318,9 @@ CREATE TABLE products (
    'port' = '2881',
    'rootserver-list' = '127.0.0.1:2882:2881',
    'logproxy.host' = '127.0.0.1',
-   'logproxy.port' = '2983');
+   'logproxy.port' = '2983',
+   'working-mode' = 'memory'
+);
 ```
 
 Features
