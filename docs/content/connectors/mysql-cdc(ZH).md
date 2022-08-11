@@ -35,7 +35,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 配置 MySQL 服务器
 ----------------
 
-您必须定义一个 MySQL 用户，该用户对 MySQL CDC 连接器监视的所有数据库都应该具有所需的权限。
+你必须定义一个 MySQL 用户，该用户对 MySQL CDC 连接器监视的所有数据库都应该具有所需的权限。
 
 1. 创建 MySQL 用户：
 
@@ -192,7 +192,7 @@ Flink SQL> SELECT * FROM orders;
               （3）在快照读取之前，Source 不需要数据库锁权限。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
               Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
-              请查阅 <a href="#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
+              请查阅 <a href="#a-name-id-001-a">增量快照读取</a> 章节了解更多详细信息。
           </td>
     </tr>
     <tr>
@@ -216,7 +216,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
          合法的模式为 "initial" 和 "latest-offset"。
-           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
+           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
     </tr> 
     <tr>
       <td>server-time-zone</td>
@@ -343,7 +343,7 @@ CREATE TABLE products (
 支持的特性
 --------
 
-### 增量快照读取
+### 增量快照读取<a name="增量快照读取" id="001" ></a>
 
 增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
 * （1）在快照读取期间，Source 支持并发读取，
@@ -462,14 +462,14 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
 MySQL CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照块，然后继续读取 binlog，
 无论是在快照阶段还是读取 binlog 阶段，MySQL CDC 连接器都会在处理时**准确读取数据**，即使任务出现了故障。
 
-### 启动模式
+### 启动模式<a name="启动模式" id="002" ></a>
 
 配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
 
 - `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 binlog。
 - `latest-offset`: 首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 binlog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 
-_Note: 扫描启动机制的模式选项依赖于 Debezium 的快照模式配置。所以请不要同时使用它们。如果您同时指定了`scan.startup.mode`和` debezium.snapshot.mode`选项在表DDL中，它可能会使`scan.startup.mode`不起作用。_
+_Note: 扫描启动机制的模式选项依赖于 Debezium 的快照模式配置。所以请不要同时使用它们。如果你同时指定了`scan.startup.mode`和` debezium.snapshot.mode`选项在表DDL中，它可能会使`scan.startup.mode`不起作用。_
 
 ### DataStream Source
 
@@ -511,7 +511,7 @@ public class MySqlSourceExample {
 
 ### 动态加表
 
-扫描新添加的表功能使您可以添加新表到正在运行的作业中，新添加的表将首先读取其快照数据，然后自动读取其变更日志。
+扫描新添加的表功能使你可以添加新表到正在运行的作业中，新添加的表将首先读取其快照数据，然后自动读取其变更日志。
 
 想象一下这个场景：一开始， Flink 作业监控表 `[product, user, address]`, 但几天后，我们希望这个作业还可以监控表 `[order, custom]`，这些表包含历史数据，我们需要作业仍然可以复用作业的已有状态，动态加表功能可以优雅地解决此问题。
 
@@ -807,14 +807,14 @@ $ ./bin/flink run \
       </td>
       <td>
       MySQL 中的空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 <a href="# 空间数据类型映射">MySQL 空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 MySQL <a href="#a-name-id-003-a">空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
 </table>
 </div>
 
-### 空间数据类型映射
+### 空间数据类型映射<a name="空间数据类型映射" id="003"></a>
 
 MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json
