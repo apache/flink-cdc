@@ -602,11 +602,23 @@ public class MongoDBConnectorDeserializationSchema
                     convertInstantToZonedDateTime(instant).format(ISO_OFFSET_DATE_TIME));
         }
         if (docObj.isArray()) {
-            String doc =
-                    docObj.asArray().stream()
-                            .map(v -> convertToString(v).toString())
-                            .collect(Collectors.joining(", "));
-            return StringData.fromString("[" + doc + "]");
+            // convert bson array to json string
+            Writer writer = new StringWriter();
+            JsonWriter jsonArrayWriter = new JsonWriter(writer) {
+                @Override
+                public void writeStartArray() {
+                    doWriteStartArray();
+                    setState(State.VALUE);
+                }
+                @Override
+                public void writeEndArray() {
+                    doWriteEndArray();
+                    setState(getNextState());
+                }
+            };
+
+            new BsonArrayCodec().encode(jsonArrayWriter, docObj.asArray(), EncoderContext.builder().build());
+            return StringData.fromString(writer.toString());
         }
         if (docObj.isRegularExpression()) {
             BsonRegularExpression regex = docObj.asRegularExpression();
