@@ -52,9 +52,14 @@ import org.bson.BsonRegularExpression;
 import org.bson.BsonTimestamp;
 import org.bson.BsonUndefined;
 import org.bson.BsonValue;
+import org.bson.codecs.BsonArrayCodec;
+import org.bson.codecs.EncoderContext;
+import org.bson.json.JsonWriter;
 import org.bson.types.Decimal128;
 
 import java.io.Serializable;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -66,7 +71,6 @@ import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -604,20 +608,23 @@ public class MongoDBConnectorDeserializationSchema
         if (docObj.isArray()) {
             // convert bson array to json string
             Writer writer = new StringWriter();
-            JsonWriter jsonArrayWriter = new JsonWriter(writer) {
-                @Override
-                public void writeStartArray() {
-                    doWriteStartArray();
-                    setState(State.VALUE);
-                }
-                @Override
-                public void writeEndArray() {
-                    doWriteEndArray();
-                    setState(getNextState());
-                }
-            };
+            JsonWriter jsonArrayWriter =
+                    new JsonWriter(writer) {
+                        @Override
+                        public void writeStartArray() {
+                            doWriteStartArray();
+                            setState(State.VALUE);
+                        }
 
-            new BsonArrayCodec().encode(jsonArrayWriter, docObj.asArray(), EncoderContext.builder().build());
+                        @Override
+                        public void writeEndArray() {
+                            doWriteEndArray();
+                            setState(getNextState());
+                        }
+                    };
+
+            new BsonArrayCodec()
+                    .encode(jsonArrayWriter, docObj.asArray(), EncoderContext.builder().build());
             return StringData.fromString(writer.toString());
         }
         if (docObj.isRegularExpression()) {
