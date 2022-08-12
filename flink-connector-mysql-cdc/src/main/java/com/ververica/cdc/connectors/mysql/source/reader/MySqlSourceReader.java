@@ -325,7 +325,7 @@ public class MySqlSourceReader<T>
                         receivedMetaGroupId,
                         expectedMetaGroupId);
             }
-            requestBinlogSplitMetaIfNeeded(binlogSplit);
+            requestBinlogSplitMetaIfNeeded(uncompletedBinlogSplits.get(binlogSplit.splitId()));
         } else {
             LOG.warn(
                     "Received binlog meta event for split {}, but the uncompleted split map does not contain it",

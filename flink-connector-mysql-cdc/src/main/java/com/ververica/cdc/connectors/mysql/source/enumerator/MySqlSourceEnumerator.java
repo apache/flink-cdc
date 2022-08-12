@@ -285,7 +285,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else {
             LOG.error(
-                    "Received invalid request meta group id {}, the invalid meta group id range is [0, {}]",
+                    "Received invalid request meta group id {}, the valid meta group id range is [0, {}]",
                     requestMetaGroupId,
                     binlogSplitMeta.size() - 1);
         }
