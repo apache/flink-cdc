@@ -54,6 +54,8 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchemaWithRateLimit;
+import com.ververica.cdc.debezium.rate.GuavaRateLimiter;
 import io.debezium.jdbc.JdbcConnection;
 
 import java.lang.reflect.Method;
@@ -153,7 +155,8 @@ public class MySqlSource<T>
                 elementsQueue,
                 splitReaderSupplier,
                 new MySqlRecordEmitter<>(
-                        deserializationSchema,
+                        getActualDebeziumDeserializationSchema(
+                                sourceConfig.getOutputRateLimit(), readerContext),
                         sourceReaderMetrics,
                         sourceConfig.isIncludeSchemaChanges()),
                 readerContext.getConfiguration(),
@@ -226,5 +229,16 @@ public class MySqlSource<T>
     @Override
     public TypeInformation<T> getProducedType() {
         return deserializationSchema.getProducedType();
+    }
+
+    private DebeziumDeserializationSchema<T> getActualDebeziumDeserializationSchema(
+            long outputRateLimit, SourceReaderContext readerContext) {
+        if (outputRateLimit > 0) {
+            return new DebeziumDeserializationSchemaWithRateLimit(
+                    deserializationSchema,
+                    new GuavaRateLimiter(outputRateLimit, readerContext.currentParallelism()));
+        } else {
+            return deserializationSchema;
+        }
     }
 }

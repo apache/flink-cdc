@@ -50,6 +50,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.OUTPUT_RATE_LIMIT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
@@ -117,6 +118,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
@@ -161,6 +163,7 @@ public class MySqlTableSourceFactoryTest {
                         Duration.ofSeconds(45),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         40.5d,
                         0.01d,
                         StartupOptions.initial(),
@@ -201,6 +204,7 @@ public class MySqlTableSourceFactoryTest {
                         Duration.ofSeconds(45),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
@@ -239,6 +243,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
@@ -285,6 +290,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
@@ -329,6 +335,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.specificOffset(offsetFile, offsetPos),
@@ -365,6 +372,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
@@ -402,6 +410,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.earliest(),
@@ -440,6 +449,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.timestamp(0L),
@@ -476,6 +486,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
@@ -517,6 +528,7 @@ public class MySqlTableSourceFactoryTest {
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
+                        OUTPUT_RATE_LIMIT.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
@@ -637,6 +649,21 @@ public class MySqlTableSourceFactoryTest {
                     t,
                     containsMessage(
                             "The value of option 'connection.pool.size' must larger than 1, but is 1"));
+        }
+
+        // validate illegal output rate limit size
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("output.rate-limit", "-1");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertThat(
+                    t,
+                    containsMessage(
+                            "The value of option 'output.rate-limit' must larger than -1, but is -1"));
         }
 
         // validate illegal connect max retry times

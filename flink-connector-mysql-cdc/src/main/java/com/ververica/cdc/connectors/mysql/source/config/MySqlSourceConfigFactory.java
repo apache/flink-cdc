@@ -37,6 +37,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.OUTPUT_RATE_LIMIT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -62,6 +63,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Duration connectTimeout = CONNECT_TIMEOUT.defaultValue();
     private int connectMaxRetries = CONNECT_MAX_RETRIES.defaultValue();
     private int connectionPoolSize = CONNECTION_POOL_SIZE.defaultValue();
+    private long outputRateLimit = OUTPUT_RATE_LIMIT.defaultValue();
     private double distributionFactorUpper =
             CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue();
     private double distributionFactorLower =
@@ -213,6 +215,16 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Output record rate limit per second. You can set this parameter to prevent the normal use of
+     * the database from being affected during snapshot collection. It can also prevent traffic
+     * jitter and improve stability. Default unlimited.
+     */
+    public MySqlSourceConfigFactory outputRateLimit(long outputRateLimit) {
+        this.outputRateLimit = outputRateLimit;
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should output the schema changes or not. */
     public MySqlSourceConfigFactory includeSchemaChanges(boolean includeSchemaChanges) {
         this.includeSchemaChanges = includeSchemaChanges;
@@ -326,6 +338,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                outputRateLimit,
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,

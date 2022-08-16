@@ -295,6 +295,13 @@ Flink SQL> SELECT * FROM orders;
           <td>连接池大小。</td>
     </tr>
     <tr>
+          <td>output.rate-limit</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">0</td>
+          <td>Long</td>
+          <td>限制每秒输出记录数量。你可以通过设置此参数，以防止在快照期间影响数据库的正常使用。除此以外还可以防止流量抖动，提高稳定性。默认 0 (无限制)。</td>
+    </tr>
+    <tr>
           <td>jdbc.properties.*</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">20</td>

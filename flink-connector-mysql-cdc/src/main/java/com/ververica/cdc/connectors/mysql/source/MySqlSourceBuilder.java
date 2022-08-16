@@ -191,6 +191,16 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Output record rate limit per second. You can set this parameter to prevent normal use of the
+     * database from being affected during snapshot collection. It can also prevent traffic jitter
+     * and improve stability. Default unlimited.
+     */
+    public MySqlSourceBuilder<T> outputRateLimit(long outputRateLimit) {
+        this.configFactory.outputRateLimit(outputRateLimit);
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should output the schema changes or not. */
     public MySqlSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
         this.configFactory.includeSchemaChanges(includeSchemaChanges);

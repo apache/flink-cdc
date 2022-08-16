@@ -48,6 +48,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.OUTPUT_RATE_LIMIT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
@@ -105,6 +106,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        long outputRateLimit = config.get(OUTPUT_RATE_LIMIT);
         double distributionFactorUpper = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
@@ -117,6 +119,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
             validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
+            validateLongOption(OUTPUT_RATE_LIMIT, outputRateLimit, -1L);
             validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
@@ -140,6 +143,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                outputRateLimit,
                 distributionFactorUpper,
                 distributionFactorLower,
                 startupOptions,
@@ -184,6 +188,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
         options.add(CONNECTION_POOL_SIZE);
+        options.add(OUTPUT_RATE_LIMIT);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
@@ -295,6 +300,16 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
     /** Checks the value of given integer option is valid. */
     private void validateIntegerOption(
             ConfigOption<Integer> option, int optionValue, int exclusiveMin) {
+        checkState(
+                optionValue > exclusiveMin,
+                String.format(
+                        "The value of option '%s' must larger than %d, but is %d",
+                        option.key(), exclusiveMin, optionValue));
+    }
+
+    /** Checks the value of given Long option is valid. */
+    private void validateLongOption(
+            ConfigOption<Long> option, long optionValue, long exclusiveMin) {
         checkState(
                 optionValue > exclusiveMin,
                 String.format(

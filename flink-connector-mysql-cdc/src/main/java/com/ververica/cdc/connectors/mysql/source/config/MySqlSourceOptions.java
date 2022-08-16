@@ -127,6 +127,15 @@ public class MySqlSourceOptions {
                     .defaultValue(20)
                     .withDescription("The connection pool size.");
 
+    public static final ConfigOption<Long> OUTPUT_RATE_LIMIT =
+            ConfigOptions.key("output.rate-limit")
+                    .longType()
+                    .defaultValue(0L)
+                    .withDescription(
+                            "Output record rate limit per second. You can set this parameter to prevent normal use of the "
+                                    + "database from being affected during snapshot collection. It can also prevent traffic jitter "
+                                    + "and improve stability. Default unlimited.");
+
     public static final ConfigOption<Integer> CONNECT_MAX_RETRIES =
             ConfigOptions.key("connect.max-retries")
                     .intType()

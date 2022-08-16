@@ -298,6 +298,13 @@ During a snapshot operation, the connector will query each included table to pro
           <td>The connection pool size.</td>
     </tr>
     <tr>
+          <td>output.rate-limit</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">0</td>
+          <td>Long</td>
+          <td>Limits the number of output records per second. You can set this parameter to prevent the normal use of the database from being affected during the snapshot. In addition, it can also prevent traffic jitter and improve stability. default 0 (no limit).</td>
+    </tr>
+    <tr>
           <td>jdbc.properties.*</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">20</td>
