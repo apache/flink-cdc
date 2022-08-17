@@ -31,7 +31,10 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Properties;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static io.debezium.config.Configuration.from;
@@ -172,16 +175,18 @@ public class MySqlValidator implements Validator {
             return;
         }
 
-        ZoneId timeZone = ZoneId.of(timeZoneProperty);
-        int timeZoneOffsetInSeconds =
-                timeZone.getRules().getOffset(LocalDateTime.now()).getTotalSeconds();
-
         int timeDiffInSeconds =
                 connection.queryAndMap(
                         "SELECT TIME_TO_SEC(TIMEDIFF(NOW(), UTC_TIMESTAMP))",
                         rs -> rs.next() ? rs.getInt(1) : -1);
 
-        if (timeDiffInSeconds != timeZoneOffsetInSeconds) {
+        ZoneId zoneId = ZoneId.of(timeZoneProperty);
+        boolean inDayLightTime = TimeZone.getTimeZone(zoneId).inDaylightTime(new Date());
+        int timeZoneOffsetInSeconds =
+                zoneId.getRules().getOffset(LocalDateTime.now()).getTotalSeconds();
+
+        if (!timeDiffMatchesZoneOffset(
+                timeDiffInSeconds, timeZoneOffsetInSeconds, inDayLightTime)) {
             throw new ValidationException(
                     String.format(
                             "The MySQL server has a timezone offset (%d seconds %s UTC) which does not match "
@@ -189,8 +194,25 @@ public class MySqlValidator implements Validator {
                                     + "for time-related fields.",
                             Math.abs(timeDiffInSeconds),
                             timeDiffInSeconds >= 0 ? "ahead of" : "behind",
-                            timeZone.getId(),
+                            zoneId.getId(),
                             SERVER_TIME_ZONE.key()));
         }
+    }
+
+    private boolean timeDiffMatchesZoneOffset(
+            int timeDiffInSeconds, int timeZoneOffsetInSeconds, boolean inDayLightTime) {
+        // Trivial case for non-DST timezone
+        if (!inDayLightTime) {
+            return timeDiffInSeconds == timeZoneOffsetInSeconds;
+        }
+
+        // There are two cases when Daylight Saving Time is in effect,
+        // 1) MySQL timezone has been adjusted to DST, like using 'Pacific Daylight Time' when DST
+        // starts.
+        // 2) MySQL timezone has been fixed to non-DST, like using 'Pacific Standard Time' all year
+        // long.
+        // thus we need to accept both.
+        return timeDiffInSeconds == timeZoneOffsetInSeconds
+                || timeDiffInSeconds == timeZoneOffsetInSeconds - TimeUnit.HOURS.toSeconds(1);
     }
 }
