@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.oracle;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
 
+import com.ververica.cdc.connectors.oracle.util.OracleJdbcUrlUtils;
 import com.ververica.cdc.debezium.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,12 +64,9 @@ public class OracleValidator implements Validator {
 
     public static Connection openConnection(Properties properties) throws SQLException {
         DriverManager.registerDriver(new oracle.jdbc.OracleDriver());
-        String hostname = properties.getProperty("database.hostname");
-        String port = properties.getProperty("database.port");
-        String dbname = properties.getProperty("database.dbname");
+        String url = OracleJdbcUrlUtils.getConnectionUrlWithSid(properties);
         String userName = properties.getProperty("database.user");
         String userpwd = properties.getProperty("database.password");
-        return DriverManager.getConnection(
-                "jdbc:oracle:thin:@" + hostname + ":" + port + ":" + dbname, userName, userpwd);
+        return DriverManager.getConnection(url, userName, userpwd);
     }
 }

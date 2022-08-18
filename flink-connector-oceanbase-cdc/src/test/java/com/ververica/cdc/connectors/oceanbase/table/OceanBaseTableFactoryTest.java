@@ -78,7 +78,7 @@ public class OceanBaseTableFactoryTest {
     private static final String DATABASE_NAME = "db[0-9]";
     private static final String TABLE_NAME = "table[0-9]";
     private static final String TABLE_LIST = "db.table";
-    private static final String SERVER_TIME_ZONE = "UTC";
+    private static final String SERVER_TIME_ZONE = "+00:00";
     private static final String CONNECT_TIMEOUT = "30s";
     private static final String HOSTNAME = "127.0.0.1";
     private static final Integer PORT = 2881;

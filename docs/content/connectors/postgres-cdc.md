@@ -151,6 +151,30 @@ Connector Options
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
           See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td> 
     </tr>   
+    <tr>
+      <td>debezium.snapshot.select.statement.overrides</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>If you encounter a situation where there is a large amount of data in the table and you don't need all the historical data. You can try to specify the underlying configuration in debezium to select the data range you want to snapshot. This parameter only affects snapshots and does not affect subsequent data reading consumption.
+        <br/> Note: PostgreSQL must use schema name and table name.
+        <br/> For example: <code>'debezium.snapshot.select.statement.overrides' = 'schema.table'</code>.
+        <br/> After specifying the above attributes, you must also add the following attributes:
+        <code> debezium.snapshot.select.statement.overrides.[schema].[table] </code>
+      </td>
+    </tr>
+    <tr>
+      <td>debezium.snapshot.select.statement.overrides.[schema].[table]</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>You can specify SQL statements to limit the data range of snapshot.
+        <br/> Note1: Schema and table need to be specified in the SQL statement, and the SQL should conform to the syntax of the data source.Currently.
+        <br/> For example: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where 1 != 1'</code>.
+        <br/> Note2: The Flink SQL client submission task does not support functions with single quotation marks in the content.
+        <br/> For example: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where to_char(rq, 'yyyy-MM-dd')'</code>.
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>

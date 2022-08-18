@@ -85,6 +85,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private final UniqueDatabase userDatabase2 =
             new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
 
+    private final UniqueDatabase charsetTestDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "charset_test", TEST_USER, TEST_PASSWORD);
+
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
@@ -854,7 +857,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 "+I[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
                                 "+U[%s, user_table_1_1, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
                                 "+U[%s, user_table_1_2, 121, user_121, Shanghai, 88888888, null, null]",
-                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]")
+                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "-U[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "-U[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null, null]")
                         .map(s -> String.format(s, userDatabase1.getDatabaseName()))
                         .sorted()
                         .collect(Collectors.toList());

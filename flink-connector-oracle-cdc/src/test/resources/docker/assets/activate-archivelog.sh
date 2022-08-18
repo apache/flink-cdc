@@ -1,3 +1,4 @@
+#!/bin/bash
 #############################################################
 #  Copyright 2022 Ververica Inc.
 #
@@ -13,7 +14,6 @@
 # under the License.
 #############################################################
 
-#!/bin/bash
 LISTENER_ORA=/u01/app/oracle/product/11.2.0/xe/network/admin/listener.ora
 TNSNAMES_ORA=/u01/app/oracle/product/11.2.0/xe/network/admin/tnsnames.ora
 

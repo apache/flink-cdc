@@ -34,6 +34,8 @@ import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import javax.annotation.Nullable;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +53,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
-    private final int port;
+    private final String url;
+    private final Integer port;
     private final String hostname;
     private final String database;
     private final String username;
@@ -73,8 +76,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
 
     public OracleTableSource(
             ResolvedSchema physicalSchema,
-            int port,
-            String hostname,
+            @Nullable String url,
+            @Nullable Integer port,
+            @Nullable String hostname,
             String database,
             String tableName,
             String schemaName,
@@ -83,8 +87,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             Properties dbzProperties,
             StartupOptions startupOptions) {
         this.physicalSchema = physicalSchema;
+        this.url = url;
         this.port = port;
-        this.hostname = checkNotNull(hostname);
+        this.hostname = hostname;
         this.database = checkNotNull(database);
         this.tableName = checkNotNull(tableName);
         this.schemaName = checkNotNull(schemaName);
@@ -123,6 +128,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         .build();
         OracleSource.Builder<RowData> builder =
                 OracleSource.<RowData>builder()
+                        .url(url)
                         .hostname(hostname)
                         .port(port)
                         .database(database)
@@ -159,6 +165,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         OracleTableSource source =
                 new OracleTableSource(
                         physicalSchema,
+                        url,
                         port,
                         hostname,
                         database,
@@ -182,8 +189,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             return false;
         }
         OracleTableSource that = (OracleTableSource) o;
-        return port == that.port
+        return Objects.equals(port, that.port)
                 && Objects.equals(physicalSchema, that.physicalSchema)
+                && Objects.equals(url, that.url)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
                 && Objects.equals(username, that.username)
@@ -200,6 +208,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     public int hashCode() {
         return Objects.hash(
                 physicalSchema,
+                url,
                 port,
                 hostname,
                 database,

@@ -133,6 +133,7 @@ public class MongoDBSource {
         private Integer batchSize = BATCH_SIZE_DEFAULT;
         private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS_DEFAULT;
         private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE_DEFAULT;
+        private Boolean updateLookup = true;
         private Boolean copyExisting = true;
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
@@ -220,6 +221,19 @@ public class MongoDBSource {
         public Builder<T> pollMaxBatchSize(int pollMaxBatchSize) {
             checkArgument(pollMaxBatchSize > 0);
             this.pollMaxBatchSize = pollMaxBatchSize;
+            return this;
+        }
+
+        /**
+         * change.stream.full.document
+         *
+         * <p>Determines what to return for update operations when using a Change Stream. When set
+         * to true, the change stream for partial updates will include both a delta describing the
+         * changes to the document and a copy of the entire document that was changed from some time
+         * after the change occurred. Default: true
+         */
+        public Builder<T> updateLookup(boolean updateLookup) {
+            this.updateLookup = updateLookup;
             return this;
         }
 
@@ -364,7 +378,11 @@ public class MongoDBSource {
                 props.setProperty(COLLECTION_INCLUDE_LIST, String.join(",", collectionList));
             }
 
-            props.setProperty(MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
+            if (updateLookup) {
+                props.setProperty(
+                        MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
+            }
+
             props.setProperty(
                     MongoSourceConfig.PUBLISH_FULL_DOCUMENT_ONLY_CONFIG,
                     String.valueOf(Boolean.FALSE));

@@ -17,7 +17,7 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1. Thes test data :
+1. The test data :
 2. The test code :
 3. The error :
 
