@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 public class MySqlTestUtils {
 
     public static MySqlSource.Builder<SourceRecord> basicSourceBuilder(
-            UniqueDatabase database, boolean useLegacyImplementation) {
+            UniqueDatabase database, String serverTimezone, boolean useLegacyImplementation) {
         Properties debeziumProps = createDebeziumProperties(useLegacyImplementation);
         return MySqlSource.<SourceRecord>builder()
                 .hostname(database.getHost())
@@ -59,6 +59,7 @@ public class MySqlTestUtils {
                 .username(database.getUsername())
                 .password(database.getPassword())
                 .deserializer(new ForwardDeserializeSchema())
+                .serverTimeZone(serverTimezone)
                 .debeziumProperties(debeziumProps);
     }
 

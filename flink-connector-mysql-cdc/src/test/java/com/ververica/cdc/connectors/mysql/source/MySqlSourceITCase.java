@@ -302,6 +302,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -535,6 +536,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         + " 'database-name' = '%s',"
                         + " 'table-name' = '%s',"
                         + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                        + " 'server-time-zone' = 'UTC',"
                         + " 'server-id' = '%s',"
                         + " 'scan.newly-added-table.enabled' = 'true'"
                         + ")",

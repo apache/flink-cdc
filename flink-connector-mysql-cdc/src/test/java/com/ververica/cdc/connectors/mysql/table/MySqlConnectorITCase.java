@@ -167,6 +167,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + " %s"
@@ -287,6 +288,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -433,6 +435,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         mySqlContainer.getHost(),
@@ -643,6 +646,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -718,6 +722,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = 'big_table.*',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'chunk-meta.group.size' = '3',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -797,6 +802,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -894,6 +900,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = 'latest-offset',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
                                 + ")",
@@ -968,6 +975,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
@@ -1043,6 +1051,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
@@ -1114,6 +1123,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
@@ -1196,6 +1206,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.startup.mode' = 'specific-offset',"
                                 + " 'scan.startup.specific-offset.file' = '%s',"
                                 + " 'scan.startup.specific-offset.pos' = '%s',"
@@ -1276,6 +1287,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.startup.mode' = 'earliest-offset',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s'"
@@ -1361,6 +1373,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.startup.mode' = 'timestamp',"
                                 + " 'scan.startup.timestamp-millis' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
@@ -1434,6 +1447,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",

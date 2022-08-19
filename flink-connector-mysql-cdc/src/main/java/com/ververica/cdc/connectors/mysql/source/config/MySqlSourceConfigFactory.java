@@ -24,6 +24,7 @@ import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -38,7 +39,6 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
@@ -54,7 +54,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private ServerIdRange serverIdRange;
     private List<String> databaseList;
     private List<String> tableList;
-    private String serverTimeZone = SERVER_TIME_ZONE.defaultValue();
+    private String serverTimeZone = ZoneId.systemDefault().getId();
     private StartupOptions startupOptions = StartupOptions.initial();
     private int splitSize = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
     private int splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();

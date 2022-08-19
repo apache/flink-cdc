@@ -60,6 +60,7 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                         " 'password' = '" + MYSQL_TEST_PASSWORD + "',",
                         " 'database-name' = '" + mysqlInventoryDatabase.getDatabaseName() + "',",
                         " 'table-name' = 'products_source',",
+                        " 'server-time-zone' = 'UTC',",
                         " 'server-id' = '5800-5900',",
                         " 'scan.incremental.snapshot.chunk.size' = '4'",
                         ");",

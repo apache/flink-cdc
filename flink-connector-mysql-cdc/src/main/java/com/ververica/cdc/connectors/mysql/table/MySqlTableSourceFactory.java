@@ -28,10 +28,13 @@ import org.apache.flink.util.Preconditions;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -66,6 +69,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
 public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MySqlTableSourceFactory.class);
 
     private static final String IDENTIFIER = "mysql-cdc";
 
@@ -88,7 +92,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
-        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+        ZoneId serverTimeZone = getServerTimeZone(config);
 
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
@@ -307,5 +311,11 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /** Replaces the default timezone placeholder with local timezone, if applicable. */
+    private static ZoneId getServerTimeZone(ReadableConfig config) {
+        Optional<String> timeZoneOptional = config.getOptional(SERVER_TIME_ZONE);
+        return timeZoneOptional.map(ZoneId::of).orElseGet(ZoneId::systemDefault);
     }
 }
