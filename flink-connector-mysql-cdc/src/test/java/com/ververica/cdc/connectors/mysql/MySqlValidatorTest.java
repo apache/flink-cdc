@@ -182,7 +182,7 @@ public class MySqlValidatorTest {
             mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
         } else {
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder(database, false).build();
+                    basicSourceBuilder(database, "UTC", false).build();
             setupSource(source);
         }
     }

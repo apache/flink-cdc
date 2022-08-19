@@ -177,7 +177,7 @@ public class MySqlValidator implements Validator {
 
         int timeDiffInSeconds =
                 connection.queryAndMap(
-                        "SELECT TIME_TO_SEC(TIMEDIFF(NOW(), UTC_TIMESTAMP))",
+                        "SELECT TIME_TO_SEC(TIMEDIFF(NOW(), UTC_TIMESTAMP()))",
                         rs -> rs.next() ? rs.getInt(1) : -1);
 
         ZoneId zoneId = ZoneId.of(timeZoneProperty);

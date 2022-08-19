@@ -682,7 +682,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder(database, useLegacyImplementation)
+                    basicSourceBuilder(database, "UTC", useLegacyImplementation)
                             .tableList(database.getDatabaseName() + "." + "category")
                             .build();
             // we use blocking context to block the source to emit before last snapshot record
@@ -1038,13 +1038,13 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(
             String offsetFile, int offsetPos) {
-        return basicSourceBuilder(database, useLegacyImplementation)
+        return basicSourceBuilder(database, "UTC", useLegacyImplementation)
                 .startupOptions(StartupOptions.specificOffset(offsetFile, offsetPos))
                 .build();
     }
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
-        return basicSourceBuilder(database, useLegacyImplementation).build();
+        return basicSourceBuilder(database, "UTC", useLegacyImplementation).build();
     }
 
     private boolean waitForCheckpointLock(Object checkpointLock, Duration timeout)

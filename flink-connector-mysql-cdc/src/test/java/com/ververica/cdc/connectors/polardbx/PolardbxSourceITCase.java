@@ -79,6 +79,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         HOST_NAME,
@@ -227,6 +228,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         HOST_NAME,
@@ -292,6 +294,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         HOST_NAME,

@@ -154,6 +154,7 @@ public class MySqlCompatibilityITCase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
                         mySqlContainer.getHost(),
