@@ -60,6 +60,8 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_TABLE_AHEAD_NUMS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_TABLE_PROCESS_CONTROL_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
@@ -93,6 +95,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         ZoneId serverTimeZone = getServerTimeZone(config);
+        boolean splitTableProcessControlEnabled = config.get(SPLIT_TABLE_PROCESS_CONTROL_ENABLED);
+        int splitTableAheadNums = config.get(SPLIT_TABLE_AHEAD_NUMS);
 
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
@@ -134,6 +138,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 splitSize,
                 splitMetaGroupSize,
                 fetchSize,
+                splitTableProcessControlEnabled,
+                splitTableAheadNums,
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
@@ -184,6 +190,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(SPLIT_TABLE_PROCESS_CONTROL_ENABLED);
+        options.add(SPLIT_TABLE_AHEAD_NUMS);
         return options;
     }
 

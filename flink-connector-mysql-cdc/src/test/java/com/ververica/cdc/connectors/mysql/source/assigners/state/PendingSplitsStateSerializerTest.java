@@ -109,12 +109,16 @@ public class PendingSplitsStateSerializerTest {
         // the second table has 4 snapshot splits and has been assigned 2 splits
         // the third table has not assigned yet
         final List<TableId> alreadyProcessedTables = new ArrayList<>();
+        final List<TableId> alreadySplitTables = new ArrayList<>();
         final List<TableId> remainingTables = new ArrayList<>();
 
         final List<MySqlSchemaLessSnapshotSplit> remainingSplits = new ArrayList<>();
 
         alreadyProcessedTables.add(tableId0);
         alreadyProcessedTables.add(tableId1);
+
+        alreadySplitTables.add(tableId0);
+        alreadySplitTables.add(tableId1);
 
         remainingTables.add(tableId2);
 
@@ -142,6 +146,7 @@ public class PendingSplitsStateSerializerTest {
                 getTestTableSchema(tableId0, tableId1);
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
+                alreadySplitTables,
                 remainingSplits,
                 assignedSnapshotSplits,
                 tableSchemas,

@@ -53,6 +53,8 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_TABLE_AHEAD_NUMS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_TABLE_PROCESS_CONTROL_ENABLED;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -114,6 +116,8 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
@@ -158,6 +162,8 @@ public class MySqlTableSourceFactoryTest {
                         8000,
                         3000,
                         100,
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         Duration.ofSeconds(45),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
@@ -198,6 +204,8 @@ public class MySqlTableSourceFactoryTest {
                         8000,
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         100,
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         Duration.ofSeconds(45),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
@@ -236,6 +244,8 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
@@ -282,6 +292,8 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
@@ -342,6 +354,8 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
@@ -411,6 +425,8 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),
@@ -452,6 +468,8 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue(),
+                        SPLIT_TABLE_AHEAD_NUMS.defaultValue(),
                         CONNECT_TIMEOUT.defaultValue(),
                         CONNECT_MAX_RETRIES.defaultValue(),
                         CONNECTION_POOL_SIZE.defaultValue(),

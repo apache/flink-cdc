@@ -73,6 +73,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
         List<TableId> alreadyProcessedTables = Lists.newArrayList(tableId);
         List<MySqlSchemaLessSnapshotSplit> remainingSplits = new ArrayList<>();
+        List<TableId> alreadySplitTables = Lists.newArrayList(tableId);
 
         Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits = new HashMap<>();
         Map<String, BinlogOffset> splitFinishedOffsets = new HashMap<>();
@@ -92,6 +93,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         SnapshotPendingSplitsState snapshotPendingSplitsState =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
+                        alreadySplitTables,
                         remainingSplits,
                         assignedSplits,
                         new HashMap<>(),
