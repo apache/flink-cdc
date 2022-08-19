@@ -96,11 +96,8 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         env.enableCheckpointing(1000);
         StreamTableEnvironment tEnv =
                 StreamTableEnvironment.create(
-                        env,
-                        EnvironmentSettings.newInstance()
-                                .useBlinkPlanner()
-                                .inStreamingMode()
-                                .build());
+                        env, EnvironmentSettings.newInstance().inStreamingMode().build());
+
         final JSONObject expected =
                 JSONObject.parseObject(readLines(expectedFile), JSONObject.class);
         JSONObject expectSnapshot = expected.getJSONObject("expected_snapshot");
