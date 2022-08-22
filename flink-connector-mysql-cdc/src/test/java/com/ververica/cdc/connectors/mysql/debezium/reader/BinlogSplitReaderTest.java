@@ -34,6 +34,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
@@ -362,7 +363,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     private List<SourceRecord> pollRecordsFromReader(
             BinlogSplitReader reader, Predicate<SourceRecord> filter) {
         List<SourceRecord> records = new ArrayList<>();
-        Iterator<SourceRecord> recordIterator;
+        Iterator<SourceRecords> recordIterator;
         try {
             recordIterator = reader.pollSplitRecords();
         } catch (InterruptedException e) {
@@ -372,9 +373,12 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
             return records;
         }
         while (recordIterator.hasNext()) {
-            SourceRecord record = recordIterator.next();
-            if (filter.test(record)) {
-                records.add(record);
+            Iterator<SourceRecord> iterator = recordIterator.next().iterator();
+            while (iterator.hasNext()) {
+                SourceRecord record = iterator.next();
+                if (filter.test(record)) {
+                    records.add(record);
+                }
             }
         }
         LOG.debug("Records polled: {}", records);
@@ -434,11 +438,14 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
             if (snapshotSplitReader.isFinished()) {
                 snapshotSplitReader.submitSplit(sqlSplit);
             }
-            Iterator<SourceRecord> res;
+            Iterator<SourceRecords> res;
             while ((res = snapshotSplitReader.pollSplitRecords()) != null) {
                 while (res.hasNext()) {
-                    SourceRecord sourceRecord = res.next();
-                    snapshotRecords.add(sourceRecord);
+                    Iterator<SourceRecord> iterator = res.next().iterator();
+                    while (iterator.hasNext()) {
+                        SourceRecord sourceRecord = iterator.next();
+                        snapshotRecords.add(sourceRecord);
+                    }
                 }
             }
         }

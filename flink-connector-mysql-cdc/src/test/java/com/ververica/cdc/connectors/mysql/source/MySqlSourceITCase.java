@@ -17,26 +17,49 @@
 package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.minicluster.MiniCluster;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
+import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
+import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.UniqueConstraint;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.Row;
+import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
+import com.ververica.cdc.connectors.mysql.table.MySqlDeserializationConverterFactory;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.table.MetadataConverter;
+import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -44,17 +67,22 @@ import org.junit.rules.Timeout;
 
 import java.lang.reflect.Field;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -264,6 +292,132 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
     }
 
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void testSnapshotSplitReadingFailCrossCheckpoints() throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(5000L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
+        // The sleeping source will sleep awhile after send per record
+        MySqlSource<RowData> sleepingSource = buildSleepingSource();
+        DataStreamSource<RowData> source =
+                env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
+
+        String[] snapshotForSingleTable =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
+        TypeSerializer<RowData> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectSinkOperatorFactory<RowData> factory =
+                new CollectSinkOperatorFactory(serializer, accumulatorName);
+        CollectSinkOperator<RowData> operator = (CollectSinkOperator) factory.getOperator();
+        CollectResultIterator<RowData> iterator =
+                new CollectResultIterator(
+                        operator.getOperatorIdFuture(),
+                        serializer,
+                        accumulatorName,
+                        env.getCheckpointConfig());
+        CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
+        sink.name("Data stream collect sink");
+        env.addOperator(sink.getTransformation());
+        JobClient jobClient = env.executeAsync("snapshotSplitTest");
+        iterator.setJobClient(jobClient);
+        JobID jobId = jobClient.getJobID();
+
+        // Trigger failover once some snapshot records has been sent by sleeping source
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    FailoverType.JM,
+                    jobId,
+                    miniClusterResource.getMiniCluster(),
+                    () -> sleepMs(100));
+        }
+
+        List<String> expectedSnapshotData = new ArrayList<>(Arrays.asList(snapshotForSingleTable));
+
+        // Check all snapshot records are sent with exactly-once semantics
+        assertEqualsInAnyOrder(
+                expectedSnapshotData, fetchRowData(iterator, expectedSnapshotData.size()));
+        jobClient.cancel().get();
+    }
+
+    private MySqlSource<RowData> buildSleepingSource() {
+        ResolvedSchema physicalSchema =
+                new ResolvedSchema(
+                        Arrays.asList(
+                                Column.physical("id", DataTypes.BIGINT().notNull()),
+                                Column.physical("name", DataTypes.STRING()),
+                                Column.physical("address", DataTypes.STRING()),
+                                Column.physical("phone_number", DataTypes.STRING())),
+                        new ArrayList<>(),
+                        UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        MetadataConverter[] metadataConverters = new MetadataConverter[0];
+        final TypeInformation<RowData> typeInfo = InternalTypeInfo.of(physicalDataType);
+
+        SleepingRowDataDebeziumDeserializeSchema deserializer =
+                new SleepingRowDataDebeziumDeserializeSchema(
+                        RowDataDebeziumDeserializeSchema.newBuilder()
+                                .setPhysicalRowType(physicalDataType)
+                                .setMetadataConverters(metadataConverters)
+                                .setResultTypeInfo(typeInfo)
+                                .setServerTimeZone(ZoneId.of("UTC"))
+                                .setUserDefinedConverterFactory(
+                                        MySqlDeserializationConverterFactory.instance())
+                                .build(),
+                        1000L);
+        return MySqlSource.<RowData>builder()
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .databaseList(customDatabase.getDatabaseName())
+                .tableList(customDatabase.getDatabaseName() + ".customers")
+                .username(customDatabase.getUsername())
+                .password(customDatabase.getPassword())
+                .serverTimeZone("UTC")
+                .serverId(getServerId())
+                .splitSize(8096)
+                .splitMetaGroupSize(1000)
+                .distributionFactorUpper(1000.0d)
+                .distributionFactorLower(0.05d)
+                .fetchSize(1024)
+                .connectTimeout(Duration.ofSeconds(30))
+                .connectMaxRetries(3)
+                .connectionPoolSize(20)
+                .debeziumProperties(new Properties())
+                .startupOptions(StartupOptions.initial())
+                .deserializer(deserializer)
+                .scanNewlyAddedTableEnabled(false)
+                .jdbcProperties(new Properties())
+                .heartbeatInterval(Duration.ofSeconds(30))
+                .build();
+    }
+
     private void testMySqlParallelSource(
             FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
             throws Exception {
@@ -389,6 +543,28 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
         assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
         tableResult.getJobClient().get().cancel().get();
+    }
+
+    private static List<String> convertRowDataToRowString(List<RowData> rows) {
+        LinkedHashMap<String, Integer> map = new LinkedHashMap<>();
+        map.put("id", 0);
+        map.put("name", 1);
+        map.put("address", 2);
+        map.put("phone_number", 3);
+        return rows.stream()
+                .map(
+                        row ->
+                                RowUtils.createRowWithNamedPositions(
+                                                row.getRowKind(),
+                                                new Object[] {
+                                                    row.getLong(0),
+                                                    row.getString(1),
+                                                    row.getString(2),
+                                                    row.getString(3)
+                                                },
+                                                map)
+                                        .toString())
+                .collect(Collectors.toList());
     }
 
     private void testNewlyAddedTableOneByOne(
@@ -600,6 +776,16 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             size--;
         }
         return rows;
+    }
+
+    private static List<String> fetchRowData(Iterator<RowData> iter, int size) {
+        List<RowData> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            RowData row = iter.next();
+            rows.add(row);
+            size--;
+        }
+        return convertRowDataToRowString(rows);
     }
 
     private String getTableNameRegex(String[] captureCustomerTables) {
@@ -824,6 +1010,36 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 // job is not started yet
                 return 0;
             }
+        }
+    }
+
+    /**
+     * A {@link DebeziumDeserializationSchema} implementation which sleep given milliseconds after
+     * deserialize per record, this class is designed for test.
+     */
+    static class SleepingRowDataDebeziumDeserializeSchema
+            implements DebeziumDeserializationSchema<RowData> {
+
+        private static final long serialVersionUID = 1L;
+
+        private final RowDataDebeziumDeserializeSchema deserializeSchema;
+        private final long sleepMs;
+
+        public SleepingRowDataDebeziumDeserializeSchema(
+                RowDataDebeziumDeserializeSchema deserializeSchema, long sleepMs) {
+            this.deserializeSchema = deserializeSchema;
+            this.sleepMs = sleepMs;
+        }
+
+        @Override
+        public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
+            deserializeSchema.deserialize(record, out);
+            Thread.sleep(sleepMs);
+        }
+
+        @Override
+        public TypeInformation<RowData> getProducedType() {
+            return deserializeSchema.getProducedType();
         }
     }
 }

@@ -30,8 +30,8 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlRecords;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import io.debezium.connector.mysql.MySqlConnection;
-import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +46,7 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createBi
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
 
 /** The {@link SplitReader} implementation for the {@link MySqlSource}. */
-public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
+public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSplitReader.class);
     private final Queue<MySqlSplit> splits;
@@ -54,7 +54,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     private final int subtaskId;
     private final MySqlSourceReaderContext context;
 
-    @Nullable private DebeziumReader<SourceRecord, MySqlSplit> currentReader;
+    @Nullable private DebeziumReader<SourceRecords, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
 
     public MySqlSplitReader(
@@ -66,12 +66,12 @@ public class MySqlSplitReader implements SplitReader<SourceRecord, MySqlSplit> {
     }
 
     @Override
-    public RecordsWithSplitIds<SourceRecord> fetch() throws IOException {
+    public RecordsWithSplitIds<SourceRecords> fetch() throws IOException {
 
         checkSplitOrStartNext();
         checkNeedStopBinlogReader();
 
-        Iterator<SourceRecord> dataIt;
+        Iterator<SourceRecords> dataIt;
         try {
             dataIt = currentReader.pollSplitRecords();
         } catch (InterruptedException e) {
