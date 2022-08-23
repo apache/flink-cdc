@@ -33,6 +33,8 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -334,12 +336,30 @@ public class RecordUtils {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private static int compareObjects(Object o1, Object o2) {
         if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
             return ((Comparable) o1).compareTo(o2);
+        } else if (isNumericObject(o1) && isNumericObject(o2)) {
+            return toBigDecimal(o1).compareTo(toBigDecimal(o2));
         } else {
             return o1.toString().compareTo(o2.toString());
         }
+    }
+
+    private static boolean isNumericObject(Object obj) {
+        return obj instanceof Byte
+                || obj instanceof Short
+                || obj instanceof Integer
+                || obj instanceof Long
+                || obj instanceof Float
+                || obj instanceof Double
+                || obj instanceof BigInteger
+                || obj instanceof BigDecimal;
+    }
+
+    private static BigDecimal toBigDecimal(Object numericObj) {
+        return new BigDecimal(numericObj.toString());
     }
 
     public static HistoryRecord getHistoryRecord(SourceRecord schemaRecord) throws IOException {

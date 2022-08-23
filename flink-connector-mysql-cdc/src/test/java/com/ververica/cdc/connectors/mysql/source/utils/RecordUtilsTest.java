@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 
 import org.junit.Test;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.splitKeyRangeContains;
@@ -30,31 +31,75 @@ public class RecordUtilsTest {
     @Test
     public void testSplitKeyRangeContains() {
         // table with only one split
-        assertTrue(splitKeyRangeContains(new Object[] {100L}, null, null));
-
+        assertKeyRangeContains(new Object[] {100L}, null, null);
         // the last split
-        assertTrue(splitKeyRangeContains(new Object[] {101L}, new Object[] {100L}, null));
+        assertKeyRangeContains(new Object[] {101L}, new Object[] {100L}, null);
 
         // the first split
-        assertTrue(splitKeyRangeContains(new Object[] {101L}, null, new Object[] {1024L}));
+        assertKeyRangeContains(new Object[] {101L}, null, new Object[] {1024L});
 
         // general splits
-        assertTrue(
-                splitKeyRangeContains(
-                        new Object[] {100L}, new Object[] {1L}, new Object[] {1024L}));
+        assertKeyRangeContains(new Object[] {100L}, new Object[] {1L}, new Object[] {1024L});
         assertFalse(
                 splitKeyRangeContains(new Object[] {0L}, new Object[] {1L}, new Object[] {1024L}));
 
         // split key from binlog may have different type
-        assertTrue(
-                splitKeyRangeContains(
-                        new Object[] {BigInteger.valueOf(100L)},
-                        new Object[] {1L},
-                        new Object[] {1024L}));
+        assertKeyRangeContains(
+                new Object[] {BigInteger.valueOf(100L)}, new Object[] {1L}, new Object[] {1024L});
         assertFalse(
                 splitKeyRangeContains(
                         new Object[] {BigInteger.valueOf(0L)},
                         new Object[] {1L},
                         new Object[] {1024L}));
+    }
+
+    @Test
+    public void testDifferentKeyTypes() {
+        // first split
+        assertKeyRangeContains(new Object[] {5}, null, new Object[] {Byte.valueOf("6")});
+        assertKeyRangeContains(new Object[] {5}, null, new Object[] {Short.valueOf("6")});
+        assertKeyRangeContains(new Object[] {5}, null, new Object[] {Integer.valueOf("6")});
+        assertKeyRangeContains(new Object[] {5}, null, new Object[] {Long.valueOf("6")});
+        assertKeyRangeContains(new Object[] {5}, null, new Object[] {BigInteger.valueOf(6)});
+        assertKeyRangeContains(new Object[] {5}, null, new Object[] {BigDecimal.valueOf(6)});
+
+        // other splits
+        assertKeyRangeContains(
+                new Object[] {Byte.valueOf("6")},
+                new Object[] {Byte.valueOf("6")},
+                new Object[] {BigDecimal.valueOf(100000L)});
+        assertKeyRangeContains(
+                new Object[] {Short.valueOf("60")},
+                new Object[] {Short.valueOf("6")},
+                new Object[] {BigDecimal.valueOf(100000L)});
+        assertKeyRangeContains(
+                new Object[] {Integer.valueOf("600")},
+                new Object[] {Integer.valueOf("6")},
+                new Object[] {BigDecimal.valueOf(100000L)});
+        assertKeyRangeContains(
+                new Object[] {Long.valueOf("6000")},
+                new Object[] {Long.valueOf("6")},
+                new Object[] {BigDecimal.valueOf(100000L)});
+        assertKeyRangeContains(
+                new Object[] {BigInteger.valueOf(60000)},
+                new Object[] {BigInteger.valueOf(6)},
+                new Object[] {BigDecimal.valueOf(100000L)});
+        assertKeyRangeContains(
+                new Object[] {BigDecimal.valueOf(60000)},
+                new Object[] {BigDecimal.valueOf(6)},
+                new Object[] {BigDecimal.valueOf(100000L)});
+
+        // last split
+        assertKeyRangeContains(new Object[] {7}, new Object[] {Byte.valueOf("6")}, null);
+        assertKeyRangeContains(new Object[] {7}, new Object[] {Short.valueOf("6")}, null);
+        assertKeyRangeContains(new Object[] {7}, new Object[] {Integer.valueOf("6")}, null);
+        assertKeyRangeContains(new Object[] {7}, new Object[] {Long.valueOf("6")}, null);
+        assertKeyRangeContains(new Object[] {7}, new Object[] {BigInteger.valueOf(6)}, null);
+        assertKeyRangeContains(new Object[] {7}, new Object[] {BigDecimal.valueOf(6)}, null);
+    }
+
+    private void assertKeyRangeContains(
+            Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
+        assertTrue(splitKeyRangeContains(key, splitKeyStart, splitKeyEnd));
     }
 }
