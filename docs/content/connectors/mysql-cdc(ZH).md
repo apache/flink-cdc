@@ -221,11 +221,13 @@ Flink SQL> SELECT * FROM orders;
     <tr>
       <td>server-time-zone</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">UTC</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
           它控制 MYSQL 中的时间戳类型如何转换为字符串。
-          更多请参考 <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-temporal-types"> 这里</a>.</td>
+          更多请参考 <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
+          如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
+      </td>
     </tr>
     <tr>
       <td>debezium.min.row.
