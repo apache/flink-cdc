@@ -225,11 +225,13 @@ Connector Options
     <tr>
       <td>server-time-zone</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">UTC</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai". 
           It controls how the TIMESTAMP type in MYSQL converted to STRING.
-          See more <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-temporal-types">here</a>.</td>
+          See more <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-temporal-types">here</a>.
+          If not set, then ZoneId.systemDefault() is used to determine the server time zone.
+      </td>
     </tr>
     <tr>
       <td>debezium.min.row.
