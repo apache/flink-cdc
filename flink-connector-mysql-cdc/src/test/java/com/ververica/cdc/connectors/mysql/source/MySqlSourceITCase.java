@@ -306,7 +306,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
-        String[] snapshotForSingleTable =
+        String[] expectedSnapshotData =
                 new String[] {
                     "+I[101, user_1, Shanghai, 123567891234]",
                     "+I[102, user_2, Shanghai, 123567891234]",
@@ -358,11 +358,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     () -> sleepMs(100));
         }
 
-        List<String> expectedSnapshotData = new ArrayList<>(Arrays.asList(snapshotForSingleTable));
-
         // Check all snapshot records are sent with exactly-once semantics
         assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRowData(iterator, expectedSnapshotData.size()));
+                Arrays.asList(expectedSnapshotData),
+                fetchRowData(iterator, expectedSnapshotData.length));
         jobClient.cancel().get();
     }
 

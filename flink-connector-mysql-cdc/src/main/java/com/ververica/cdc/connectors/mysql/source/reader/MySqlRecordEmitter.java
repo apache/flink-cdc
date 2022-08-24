@@ -78,8 +78,7 @@ public final class MySqlRecordEmitter<T>
     public void emitRecord(
             SourceRecords sourceRecords, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
-        final Iterator<SourceRecord> elementIterator =
-                sourceRecords.getSourceRecordList().iterator();
+        final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
         while (elementIterator.hasNext()) {
             processElement(elementIterator.next(), output, splitState);
         }

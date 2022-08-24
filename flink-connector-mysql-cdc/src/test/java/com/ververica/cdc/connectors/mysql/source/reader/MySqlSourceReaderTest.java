@@ -162,66 +162,6 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testBinlogReadFailoverCrossCheckpoint() throws Exception {
-        customerDatabase.createAndInitialize();
-        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
-        final DataType dataType =
-                DataTypes.ROW(
-                        DataTypes.FIELD("id", DataTypes.BIGINT()),
-                        DataTypes.FIELD("name", DataTypes.STRING()),
-                        DataTypes.FIELD("address", DataTypes.STRING()),
-                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        MySqlSplit binlogSplit;
-        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
-            Map<TableId, TableChanges.TableChange> tableSchemas =
-                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
-            binlogSplit =
-                    MySqlBinlogSplit.fillTableSchemas(
-                            createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
-        }
-
-        // step-1: make 6 change events in one MySQL transaction
-        TableId tableId = binlogSplit.getTableSchemas().keySet().iterator().next();
-        makeBinlogEventsInOneTransaction(sourceConfig, tableId.toString());
-
-        // step-2: fetch the first 2 records belong to the snapshot split
-        String[] expectedRecords =
-                new String[] {
-                    "-U[103, user_3, Shanghai, 123567891234]",
-                    "+U[103, user_3, Hangzhou, 123567891234]"
-                };
-        // the 2 records are produced by 1 operations
-        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, 1);
-        reader.start();
-        reader.addSplits(Arrays.asList(binlogSplit));
-        List<String> actualRecords = consumeRecords(reader, dataType);
-        assertEqualsInOrder(Arrays.asList(expectedRecords), actualRecords);
-        List<MySqlSplit> splitsState = reader.snapshotState(1L);
-
-        // check the snapshot split state
-        assertEquals(1, splitsState.size());
-        reader.close();
-
-        // step-3: mock failover from a restored state
-        MySqlSourceReader<SourceRecord> restartReader = createReader(sourceConfig, 3);
-        restartReader.start();
-        restartReader.addSplits(splitsState);
-
-        // step-4: fetch all records belong to the snapshot split
-        String[] expectedRestRecords =
-                new String[] {
-                    "-D[102, user_2, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "-U[103, user_3, Hangzhou, 123567891234]",
-                    "+U[103, user_3, Shanghai, 123567891234]"
-                };
-        // the 4 records are produced by 3 operations
-        List<String> restRecords = consumeRecords(restartReader, dataType);
-        assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
-        restartReader.close();
-    }
-
-    @Test
     public void testNoDuplicateRecordsWhenKeepUpdating() throws Exception {
         inventoryDatabase.createAndInitialize();
         String tableName = inventoryDatabase.getDatabaseName() + ".products";
@@ -468,6 +408,10 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         }
     }
 
+    /**
+     * A implementation of {@link RecordEmitter} which only emit records in given limit number, this
+     * class is used for test purpose.
+     */
     private static class MysqlLimitedRecordEmitter
             implements RecordEmitter<SourceRecords, SourceRecord, MySqlSplitState> {
 
@@ -500,8 +444,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 SourceOutput<SourceRecord> output,
                 MySqlSplitState splitState)
                 throws Exception {
-            final Iterator<SourceRecord> elementIterator =
-                    sourceRecords.getSourceRecordList().iterator();
+            final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
             int sendCnt = 0;
             while (elementIterator.hasNext()) {
                 if (sendCnt >= limit) {
