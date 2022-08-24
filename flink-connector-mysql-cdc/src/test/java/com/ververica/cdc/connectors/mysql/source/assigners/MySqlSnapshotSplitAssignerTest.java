@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -420,6 +421,27 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         }
     }
 
+    @Test
+    public void testEnumerateTablesLazily() {
+        final MySqlSourceConfig configuration =
+                getConfig(
+                        customerDatabase,
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".customers_even_dist"},
+                        "id");
+
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(
+                        configuration, DEFAULT_PARALLELISM, new ArrayList<>(), false);
+
+        assertTrue(assigner.needToDiscoveryTables());
+        assigner.open();
+        assertTrue(assigner.getNext().isPresent());
+        assertFalse(assigner.needToDiscoveryTables());
+    }
+
     private List<String> getTestAssignSnapshotSplits(
             int splitSize,
             double distributionFactorUpper,
@@ -427,21 +449,6 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             String[] captureTables) {
         return getTestAssignSnapshotSplits(
                 customerDatabase,
-                splitSize,
-                distributionFactorUpper,
-                distributionFactorLower,
-                captureTables,
-                null);
-    }
-
-    private List<String> getTestAssignSnapshotSplits(
-            UniqueDatabase database,
-            int splitSize,
-            double distributionFactorUpper,
-            double distributionFactorLower,
-            String[] captureTables) {
-        return getTestAssignSnapshotSplits(
-                database,
                 splitSize,
                 distributionFactorUpper,
                 distributionFactorLower,

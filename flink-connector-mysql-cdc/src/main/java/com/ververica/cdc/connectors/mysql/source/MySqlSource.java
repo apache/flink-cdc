@@ -55,13 +55,11 @@ import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.relational.TableId;
 
 import java.lang.reflect.Method;
-import java.util.List;
+import java.util.ArrayList;
 import java.util.function.Supplier;
 
-import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.discoverCapturedTables;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 
 /**
@@ -174,13 +172,12 @@ public class MySqlSource<T>
         final MySqlSplitAssigner splitAssigner;
         if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-                final List<TableId> remainingTables = discoverCapturedTables(jdbc, sourceConfig);
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
                 splitAssigner =
                         new MySqlHybridSplitAssigner(
                                 sourceConfig,
                                 enumContext.currentParallelism(),
-                                remainingTables,
+                                new ArrayList<>(),
                                 isTableIdCaseSensitive);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(

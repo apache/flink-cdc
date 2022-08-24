@@ -151,9 +151,30 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void open() {
         chunkSplitter = createChunkSplitter(sourceConfig, isTableIdCaseSensitive);
+        discoveryCaptureTables();
+        captureNewlyAddedTables();
+        startAsynchronouslySplit();
+    }
 
-        // the legacy state didn't snapshot remaining tables, discovery remaining table here
-        if (!isRemainingTablesCheckpointed && !isAssigningFinished(assignerStatus)) {
+    private void discoveryCaptureTables() {
+        // discovery the tables lazily
+        if (needToDiscoveryTables()) {
+            long start = System.currentTimeMillis();
+            LOG.debug("The remainingTables is empty, start to discovery tables");
+            try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+                final List<TableId> discoverTables = discoverCapturedTables(jdbc, sourceConfig);
+                this.remainingTables.addAll(discoverTables);
+                this.isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+            } catch (Exception e) {
+                throw new FlinkRuntimeException("Failed to discovery tables to capture", e);
+            }
+            LOG.debug(
+                    "Discovery tables success, time cost: {} ms.",
+                    System.currentTimeMillis() - start);
+        }
+        // when restore the job from legacy savepoint, the legacy state may haven't snapshot
+        // remaining tables, discovery remaining table here
+        else if (!isRemainingTablesCheckpointed && !isAssigningFinished(assignerStatus)) {
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 final List<TableId> discoverTables = discoverCapturedTables(jdbc, sourceConfig);
                 discoverTables.removeAll(alreadyProcessedTables);
@@ -163,10 +184,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 throw new FlinkRuntimeException(
                         "Failed to discover remaining tables to capture", e);
             }
-        } else {
-            captureNewlyAddedTables();
         }
-        startAsynchronouslySplit();
     }
 
     private void captureNewlyAddedTables() {
@@ -210,6 +228,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public Optional<MySqlSplit> getNext() {
         checkSplitterErrors();
+        waitTableDiscoveryReady();
         synchronized (lock) {
             if (!remainingSplits.isEmpty()) {
                 // return remaining splits firstly
@@ -369,9 +388,27 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         }
     }
 
+    private void waitTableDiscoveryReady() {
+        while (needToDiscoveryTables()) {
+            LOG.debug("Current assigner is discovering tables, wait tables ready...");
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                // nothing to do
+            }
+        }
+    }
+
     /** Indicates there is no more splits available in this assigner. */
     public boolean noMoreSplits() {
-        return remainingTables.isEmpty() && remainingSplits.isEmpty();
+        return !needToDiscoveryTables() && remainingTables.isEmpty() && remainingSplits.isEmpty();
+    }
+
+    /** Indicates current assigner need to discovery tables or not. */
+    public boolean needToDiscoveryTables() {
+        return remainingTables.isEmpty()
+                && remainingSplits.isEmpty()
+                && alreadyProcessedTables.isEmpty();
     }
 
     public Map<String, MySqlSchemaLessSnapshotSplit> getAssignedSplits() {
