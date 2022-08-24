@@ -92,8 +92,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
-                    env,
-                    EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+                    env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
     // the debezium mysql connector use legacy implementation or not
     private final boolean useLegacyDezMySql;

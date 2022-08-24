@@ -51,8 +51,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                     .setParallelism(DEFAULT_PARALLELISM);
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
-                    env,
-                    EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+                    env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
