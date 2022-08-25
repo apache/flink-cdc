@@ -50,11 +50,9 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -292,7 +290,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
             normalizedRecords.add(highWatermark);
 
-            final Set<SourceRecords> sourceRecordsSet = new HashSet<>();
+            final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
             sourceRecordsSet.add(new SourceRecords(normalizedRecords));
             return sourceRecordsSet.iterator();
         }
