@@ -51,11 +51,11 @@ import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReaderContext
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
-import org.apache.kafka.connect.source.SourceRecord;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -133,7 +133,7 @@ public class MySqlSource<T>
         // create source config for the given subtask (e.g. unique server id)
         MySqlSourceConfig sourceConfig =
                 configFactory.createConfig(readerContext.getIndexOfSubtask());
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
+        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
 
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");

@@ -45,11 +45,11 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
-import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +71,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils.getNext
 /** The source reader for MySQL source splits. */
 public class MySqlSourceReader<T>
         extends SingleThreadMultiplexSourceReaderBase<
-                SourceRecord, T, MySqlSplit, MySqlSplitState> {
+                SourceRecords, T, MySqlSplit, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
 
@@ -83,9 +83,9 @@ public class MySqlSourceReader<T>
     private MySqlBinlogSplit suspendedBinlogSplit;
 
     public MySqlSourceReader(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
+            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<MySqlSplitReader> splitReaderSupplier,
-            RecordEmitter<SourceRecord, T, MySqlSplitState> recordEmitter,
+            RecordEmitter<SourceRecords, T, MySqlSplitState> recordEmitter,
             Configuration config,
             MySqlSourceReaderContext context,
             MySqlSourceConfig sourceConfig) {
