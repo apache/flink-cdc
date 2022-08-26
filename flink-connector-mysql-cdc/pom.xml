@@ -108,14 +108,14 @@ under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-runtime_${scala.binary.version}</artifactId>
+            <artifactId>flink-table-runtime${flink.submodule.postfix}</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-test-utils_${scala.binary.version}</artifactId>
+            <artifactId>flink-test-utils${flink.submodule.postfix}</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
         </dependency>
@@ -136,7 +136,7 @@ under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
+            <artifactId>flink-streaming-java${flink.submodule.postfix}</artifactId>
             <version>${flink.version}</version>
             <type>test-jar</type>
             <scope>test</scope>

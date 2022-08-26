@@ -71,7 +71,8 @@ under the License.
     </distributionManagement>
 
     <properties>
-        <flink.version>1.14.4</flink.version>
+        <flink.version>1.15.2</flink.version>
+        <flink.submodule.postfix></flink.submodule.postfix>
         <debezium.version>1.6.4.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
@@ -81,7 +82,7 @@ under the License.
           See more https://github.com/testcontainers/testcontainers-java/issues/4297. -->
         <testcontainers.version>1.15.3</testcontainers.version>
         <java.version>1.8</java.version>
-        <scala.binary.version>2.11</scala.binary.version>
+        <scala.binary.version>2.12</scala.binary.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <hamcrest.version>1.3</hamcrest.version>
@@ -107,7 +108,13 @@ under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-api-java-bridge_${scala.binary.version}</artifactId>
+            <artifactId>flink-connector-base</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-api-java-bridge${flink.submodule.postfix}</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -119,7 +126,7 @@ under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
+            <artifactId>flink-streaming-java${flink.submodule.postfix}</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -467,6 +474,14 @@ under the License.
     </build>
 
     <profiles>
+        <profile>
+            <id>flink-1.14</id>
+            <properties>
+                <flink.version>1.14.4</flink.version>
+                <scala.binary.version>2.11</scala.binary.version>
+                <flink.submodule.postfix>_${scala.binary.version}</flink.submodule.postfix>
+            </properties>
+        </profile>
         <profile>
             <id>release</id>
             <build>
