@@ -21,9 +21,13 @@ import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemaLessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
+import io.debezium.relational.Column;
+import io.debezium.relational.Table;
+import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -43,6 +47,10 @@ import static org.junit.Assert.assertSame;
 @RunWith(Parameterized.class)
 public class PendingSplitsStateSerializerTest {
 
+    private static final TableId tableId0 = TableId.parse("test_db.test_table");
+    private static final TableId tableId1 = TableId.parse("test_db.test_table1");
+    private static final TableId tableId2 = TableId.parse("test_db.test_table2");
+
     @Parameterized.Parameter public PendingSplitsState state;
 
     @Parameterized.Parameters(name = "PendingSplitsState = {index}")
@@ -56,6 +64,23 @@ public class PendingSplitsStateSerializerTest {
     @Test
     public void testsSerializeAndDeserialize() throws Exception {
         assertEquals(state, serializeAndDeserializeSourceEnumState(state));
+    }
+
+    @Test
+    public void testTableSchemasAfterSerializeAndDeserialize() throws Exception {
+        PendingSplitsState pendingSplitsState = serializeAndDeserializeSourceEnumState(state);
+        if (pendingSplitsState instanceof SnapshotPendingSplitsState) {
+            assertEquals(
+                    getTestTableSchema(tableId0, tableId1).keySet(),
+                    ((SnapshotPendingSplitsState) pendingSplitsState).getTableSchemas().keySet());
+        } else if (pendingSplitsState instanceof HybridPendingSplitsState) {
+            assertEquals(
+                    getTestTableSchema(tableId0, tableId1).keySet(),
+                    ((HybridPendingSplitsState) pendingSplitsState)
+                            .getSnapshotPendingSplits()
+                            .getTableSchemas()
+                            .keySet());
+        }
     }
 
     @Test
@@ -86,27 +111,23 @@ public class PendingSplitsStateSerializerTest {
         final List<TableId> alreadyProcessedTables = new ArrayList<>();
         final List<TableId> remainingTables = new ArrayList<>();
 
-        final List<MySqlSnapshotSplit> remainingSplits = new ArrayList<>();
-
-        final TableId tableId0 = TableId.parse("test_db.test_table");
-        final TableId tableId1 = TableId.parse("test_db.test_table1");
-        final TableId tableId2 = TableId.parse("test_db.test_table2");
+        final List<MySqlSchemaLessSnapshotSplit> remainingSplits = new ArrayList<>();
 
         alreadyProcessedTables.add(tableId0);
         alreadyProcessedTables.add(tableId1);
 
         remainingTables.add(tableId2);
 
-        remainingSplits.add(getTestSnapshotSplit(tableId1, 2));
-        remainingSplits.add(getTestSnapshotSplit(tableId1, 3));
+        remainingSplits.add(getTestSchemaLessSnapshotSplit(tableId1, 2));
+        remainingSplits.add(getTestSchemaLessSnapshotSplit(tableId1, 3));
 
-        final Map<String, MySqlSnapshotSplit> assignedSnapshotSplits = new HashMap<>();
+        final Map<String, MySqlSchemaLessSnapshotSplit> assignedSnapshotSplits = new HashMap<>();
         Arrays.asList(
-                        getTestSnapshotSplit(tableId0, 0),
-                        getTestSnapshotSplit(tableId0, 1),
-                        getTestSnapshotSplit(tableId0, 2),
-                        getTestSnapshotSplit(tableId1, 0),
-                        getTestSnapshotSplit(tableId1, 1))
+                        getTestSchemaLessSnapshotSplit(tableId0, 0),
+                        getTestSchemaLessSnapshotSplit(tableId0, 1),
+                        getTestSchemaLessSnapshotSplit(tableId0, 2),
+                        getTestSchemaLessSnapshotSplit(tableId1, 0),
+                        getTestSchemaLessSnapshotSplit(tableId1, 1))
                 .forEach(split -> assignedSnapshotSplits.put(split.splitId(), split));
 
         Map<String, BinlogOffset> finishedOffsets = new HashMap<>();
@@ -117,11 +138,13 @@ public class PendingSplitsStateSerializerTest {
                         getTestSplitInfo(tableId1, 1),
                         getTestSplitInfo(tableId0, 2))
                 .forEach(finishedOffsets::putAll);
-
+        Map<TableId, TableChanges.TableChange> tableSchemas =
+                getTestTableSchema(tableId0, tableId1);
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSplits,
                 assignedSnapshotSplits,
+                tableSchemas,
                 finishedOffsets,
                 AssignerStatus.INITIAL_ASSIGNING,
                 remainingTables,
@@ -137,9 +160,10 @@ public class PendingSplitsStateSerializerTest {
         return new BinlogPendingSplitsState(true);
     }
 
-    private static MySqlSnapshotSplit getTestSnapshotSplit(TableId tableId, int splitNo) {
+    private static MySqlSchemaLessSnapshotSplit getTestSchemaLessSnapshotSplit(
+            TableId tableId, int splitNo) {
         long restartSkipEvent = splitNo;
-        return new MySqlSnapshotSplit(
+        return new MySqlSchemaLessSnapshotSplit(
                 tableId,
                 tableId.toString() + "-" + splitNo,
                 new RowType(
@@ -147,8 +171,13 @@ public class PendingSplitsStateSerializerTest {
                 new Object[] {100L + splitNo * 1000},
                 new Object[] {999L + splitNo * 1000},
                 new BinlogOffset(
-                        "mysql-bin.000001", 78L + splitNo * 200, restartSkipEvent, 0L, 0L, null, 0),
-                new HashMap<>());
+                        "mysql-bin.000001",
+                        78L + splitNo * 200,
+                        restartSkipEvent,
+                        0L,
+                        0L,
+                        null,
+                        0));
     }
 
     private static Map<String, BinlogOffset> getTestSplitInfo(TableId tableId, int splitNo) {
@@ -156,5 +185,62 @@ public class PendingSplitsStateSerializerTest {
         final BinlogOffset highWatermark =
                 new BinlogOffset("mysql-bin.000001", (long) splitNo * 200);
         return Collections.singletonMap(splitId, highWatermark);
+    }
+
+    private static Map<TableId, TableChanges.TableChange> getTestTableSchema(TableId... tableIds) {
+        Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
+        for (TableId tableId : tableIds) {
+            tableSchemas.put(
+                    tableId,
+                    new TableChanges.TableChange(
+                            TableChanges.TableChangeType.CREATE, new TestTableImpl(tableId)));
+        }
+
+        return tableSchemas;
+    }
+
+    /** An implementation for {@link Table} which is used for tests. */
+    private static class TestTableImpl implements Table {
+
+        private final TableId tableId;
+
+        public TestTableImpl(TableId tableId) {
+            this.tableId = tableId;
+        }
+
+        @Override
+        public TableId id() {
+            return tableId;
+        }
+
+        @Override
+        public List<String> primaryKeyColumnNames() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<String> retrieveColumnNames() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<Column> columns() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Column columnWithName(String name) {
+            throw new UnsupportedOperationException("Not implemented.");
+        }
+
+        @Override
+        public String defaultCharsetName() {
+            return "UTF-8";
+        }
+
+        @Override
+        public TableEditor edit() {
+            throw new UnsupportedOperationException("Not implemented.");
+        }
     }
 }

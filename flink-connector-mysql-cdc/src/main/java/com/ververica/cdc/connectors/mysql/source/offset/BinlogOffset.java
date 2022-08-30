@@ -32,7 +32,7 @@ import java.util.Objects;
  * set etc.
  *
  * <p>This structure can also be used to deal the binlog event in transaction, a transaction may
- * contains multiple change events, and each change event may contain multiple rows. When restart
+ * contain multiple change events, and each change event may contain multiple rows. When restart
  * from a specific {@link BinlogOffset}, we need to skip the processed change events and the
  * processed rows.
  */
