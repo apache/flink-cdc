@@ -300,3 +300,10 @@ VALUES (416874195632735147, 'China', 'Beijing', 'West Town address 1'),
        (417272886855938987, 'America', 'New York', 'East Town address 3'),
        (417420106184475563, 'Germany', 'Berlin', 'West Town address 1'),
        (418161258277847979, 'Germany', 'Berlin', 'West Town address 2');
+
+CREATE TABLE default_value_test (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  address VARCHAR(1024),
+  phone_number INTEGER DEFAULT ' 123 '
+);
