@@ -65,6 +65,12 @@ public class MySqlSourceOptions {
                     .noDefaultValue()
                     .withDescription("Table name of the MySQL database to monitor.");
 
+    public static final ConfigOption<String> TABLE_SEPARATOR =
+            ConfigOptions.key("table-separator")
+                    .stringType()
+                    .defaultValue(",")
+                    .withDescription("The separator to distinguish different table.");
+
     public static final ConfigOption<String> SERVER_TIME_ZONE =
             ConfigOptions.key("server-time-zone")
                     .stringType()

@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final String database;
     private final String username;
     private final String password;
+    private final String tableSeparator;
     private final String serverId;
     private final String tableName;
     private final ZoneId serverTimeZone;
@@ -97,6 +99,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             String hostname,
             String database,
             String tableName,
+            String tableSeparator,
             String username,
             String password,
             ZoneId serverTimeZone,
@@ -119,6 +122,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 hostname,
                 database,
                 tableName,
+                tableSeparator,
                 username,
                 password,
                 serverTimeZone,
@@ -146,6 +150,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             String hostname,
             String database,
             String tableName,
+            String tableSeparator,
             String username,
             String password,
             ZoneId serverTimeZone,
@@ -170,6 +175,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.hostname = checkNotNull(hostname);
         this.database = checkNotNull(database);
         this.tableName = checkNotNull(tableName);
+        this.tableSeparator = tableSeparator;
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
         this.serverId = serverId;
@@ -227,7 +233,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)
-                            .tableList(database + "." + tableName)
+                            .tableList(getAllMonitorTables(database, tableName, tableSeparator))
                             .username(username)
                             .password(password)
                             .serverTimeZone(serverTimeZone.toString())
@@ -255,7 +261,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)
-                            .tableList(database + "." + tableName)
+                            .tableList(getAllMonitorTables(database, tableName, tableSeparator))
                             .username(username)
                             .password(password)
                             .serverTimeZone(serverTimeZone.toString())
@@ -299,6 +305,16 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.producedDataType = producedDataType;
     }
 
+    public String[] getAllMonitorTables(
+            String dataBaseName, String tableNames, String tableSeparator) {
+        String[] captureTables = tableNames.split(tableSeparator);
+        String[] captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> String.format("%s.%s", dataBaseName, tableName))
+                        .toArray(String[]::new);
+        return captureTableIds;
+    }
+
     @Override
     public DynamicTableSource copy() {
         MySqlTableSource source =
@@ -308,6 +324,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         hostname,
                         database,
                         tableName,
+                        tableSeparator,
                         username,
                         password,
                         serverTimeZone,

@@ -24,6 +24,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.Preconditions;
+import org.apache.flink.util.StringUtils;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -61,6 +63,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_NAME;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_SEPARATOR;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -86,8 +89,10 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
         validateRegex(DATABASE_NAME.key(), databaseName);
-        String tableName = config.get(TABLE_NAME);
-        validateRegex(TABLE_NAME.key(), tableName);
+        String tableSeparator = config.get(TABLE_SEPARATOR);
+        String[] tableNames = config.get(TABLE_NAME).split(tableSeparator);
+        validateTable(TABLE_NAME.key(), tableNames);
+        String tableName = String.join(tableSeparator, tableNames);
         int port = config.get(PORT);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
@@ -125,6 +130,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 hostname,
                 databaseName,
                 tableName,
+                tableSeparator,
                 username,
                 password,
                 serverTimeZone,
@@ -166,6 +172,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
+        options.add(TABLE_SEPARATOR);
         options.add(SERVER_TIME_ZONE);
         options.add(SERVER_ID);
         options.add(SCAN_STARTUP_MODE);
@@ -317,5 +324,11 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
     private static ZoneId getServerTimeZone(ReadableConfig config) {
         Optional<String> timeZoneOptional = config.getOptional(SERVER_TIME_ZONE);
         return timeZoneOptional.map(ZoneId::of).orElseGet(ZoneId::systemDefault);
+    }
+
+    private void validateTable(String tableKey, String[] tableNames) {
+        Arrays.stream(tableNames)
+                .filter(tableName -> !StringUtils.isNullOrWhitespaceOnly(tableName))
+                .peek(tableName -> validateRegex(tableKey, tableName));
     }
 }

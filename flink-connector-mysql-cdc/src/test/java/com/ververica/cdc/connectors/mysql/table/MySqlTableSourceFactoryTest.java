@@ -53,6 +53,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_SEPARATOR;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -90,6 +91,8 @@ public class MySqlTableSourceFactoryTest {
     private static final String MY_PASSWORD = "flinkpw";
     private static final String MY_DATABASE = "myDB";
     private static final String MY_TABLE = "myTable";
+    private static final String MY_TABLE_1 = "myTable1";
+    private static final String TABLE_SEPARATOR = ",";
     private static final Properties PROPERTIES = new Properties();
 
     @Test
@@ -105,6 +108,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.systemDefault(),
@@ -149,6 +153,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.systemDefault(),
@@ -189,6 +194,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.systemDefault(),
@@ -227,6 +233,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.systemDefault(),
@@ -273,6 +280,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("Asia/Shanghai"),
@@ -333,6 +341,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.systemDefault(),
@@ -402,6 +411,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.systemDefault(),
@@ -443,6 +453,7 @@ public class MySqlTableSourceFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
+                        TABLE_SEPARATOR,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.systemDefault(),
