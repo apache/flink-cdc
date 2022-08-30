@@ -20,7 +20,6 @@ import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.util.HashMap;
