@@ -26,6 +26,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.TableSchema;
 import io.debezium.relational.TableSchemaBuilder;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 
@@ -71,6 +72,9 @@ public class OceanBaseTableSchema {
             ZoneOffset zoneOffset) {
         TableEditor tableEditor = Table.editor().tableId(tableId(databaseName, tableName));
         for (int i = 0; i < columnNames.length; i++) {
+            if (StringUtils.isBlank(columnNames[i])) {
+                continue;
+            }
             tableEditor.addColumn(getColumn(columnNames[i], jdbcTypes[i]));
         }
         return tableSchemaBuilder(zoneOffset)
