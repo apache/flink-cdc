@@ -266,7 +266,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                             assignedSchemaLessSnapshotSplits.put(
                                     entry.getKey(), entry.getValue().toSchemaLessSnapshotSplit());
                         });
-        if (version == 4) {
+        if (version >= 4) {
             tableSchemas.putAll(readTableSchemas(splitVersion, in));
         }
         return new SnapshotPendingSplitsState(
