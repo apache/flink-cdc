@@ -88,6 +88,12 @@ public class MySqlSnapshotSplit extends MySqlSplit {
         return tableSchemas;
     }
 
+    /** Casts this split into a {@link MySqlSchemaLessSnapshotSplit}. */
+    public final MySqlSchemaLessSnapshotSplit toSchemaLessSnapshotSplit() {
+        return new MySqlSchemaLessSnapshotSplit(
+                tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

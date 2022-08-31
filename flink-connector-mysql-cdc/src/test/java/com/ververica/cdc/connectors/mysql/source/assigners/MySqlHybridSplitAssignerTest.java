@@ -29,12 +29,11 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemaLessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -73,9 +72,9 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
 
         List<TableId> alreadyProcessedTables = Lists.newArrayList(tableId);
-        List<MySqlSnapshotSplit> remainingSplits = new ArrayList<>();
+        List<MySqlSchemaLessSnapshotSplit> remainingSplits = new ArrayList<>();
 
-        Map<String, MySqlSnapshotSplit> assignedSplits = new HashMap<>();
+        Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits = new HashMap<>();
         Map<String, BinlogOffset> splitFinishedOffsets = new HashMap<>();
 
         for (int i = 0; i < 5; i++) {
@@ -83,17 +82,10 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
             Object[] splitStart = i == 0 ? null : new Object[] {i * 2};
             Object[] splitEnd = new Object[] {i * 2 + 2};
             BinlogOffset highWatermark = new BinlogOffset("mysql-bin.00001", i + 1);
-            Map<TableId, TableChange> tableSchemas = new HashMap<>();
-            MySqlSnapshotSplit sqlSnapshotSplit =
-                    new MySqlSnapshotSplit(
-                            tableId,
-                            splitId,
-                            splitKeyType,
-                            splitStart,
-                            splitEnd,
-                            highWatermark,
-                            tableSchemas);
-            assignedSplits.put(splitId, sqlSnapshotSplit);
+            MySqlSchemaLessSnapshotSplit mySqlSchemaLessSnapshotSplit =
+                    new MySqlSchemaLessSnapshotSplit(
+                            tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
+            assignedSplits.put(splitId, mySqlSchemaLessSnapshotSplit);
             splitFinishedOffsets.put(splitId, highWatermark);
         }
 
@@ -102,6 +94,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         alreadyProcessedTables,
                         remainingSplits,
                         assignedSplits,
+                        new HashMap<>(),
                         splitFinishedOffsets,
                         AssignerStatus.INITIAL_ASSIGNING_FINISHED,
                         new ArrayList<>(),
@@ -117,11 +110,11 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         MySqlBinlogSplit mySqlBinlogSplit = binlogSplit.get().asBinlogSplit();
 
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        final List<MySqlSnapshotSplit> assignedSnapshotSplit =
+        final List<MySqlSchemaLessSnapshotSplit> mySqlSchemaLessSnapshotSplits =
                 assignedSplits.values().stream()
                         .sorted(Comparator.comparing(MySqlSplit::splitId))
                         .collect(Collectors.toList());
-        for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
+        for (MySqlSchemaLessSnapshotSplit split : mySqlSchemaLessSnapshotSplits) {
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),

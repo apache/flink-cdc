@@ -20,8 +20,9 @@ import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemaLessSnapshotSplit;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.util.List;
 import java.util.Map;
@@ -40,13 +41,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final List<TableId> alreadyProcessedTables;
 
     /** The splits in the checkpoint. */
-    private final List<MySqlSnapshotSplit> remainingSplits;
+    private final List<MySqlSchemaLessSnapshotSplit> remainingSplits;
 
     /**
      * The snapshot splits that the {@link MySqlSourceEnumerator} has assigned to {@link
      * MySqlSplitReader}s.
      */
-    private final Map<String, MySqlSnapshotSplit> assignedSplits;
+    private final Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received
@@ -63,10 +64,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     /** Whether the remaining tables are keep when snapshot state. */
     private final boolean isRemainingTablesCheckpointed;
 
+    private final Map<TableId, TableChange> tableSchemas;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
-            List<MySqlSnapshotSplit> remainingSplits,
-            Map<String, MySqlSnapshotSplit> assignedSplits,
+            List<MySqlSchemaLessSnapshotSplit> remainingSplits,
+            Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChange> tableSchemas,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
@@ -80,18 +84,23 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.remainingTables = remainingTables;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
+        this.tableSchemas = tableSchemas;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
         return alreadyProcessedTables;
     }
 
-    public List<MySqlSnapshotSplit> getRemainingSplits() {
+    public List<MySqlSchemaLessSnapshotSplit> getRemainingSplits() {
         return remainingSplits;
     }
 
-    public Map<String, MySqlSnapshotSplit> getAssignedSplits() {
+    public Map<String, MySqlSchemaLessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
+    }
+
+    public Map<TableId, TableChange> getTableSchemas() {
+        return tableSchemas;
     }
 
     public Map<String, BinlogOffset> getSplitFinishedOffsets() {

@@ -28,10 +28,12 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemaLessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,8 +68,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitAssigner.class);
 
     private final List<TableId> alreadyProcessedTables;
-    private final List<MySqlSnapshotSplit> remainingSplits;
-    private final Map<String, MySqlSnapshotSplit> assignedSplits;
+    private final List<MySqlSchemaLessSnapshotSplit> remainingSplits;
+    private final Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits;
+    private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, BinlogOffset> splitFinishedOffsets;
     private final MySqlSourceConfig sourceConfig;
     private final int currentParallelism;
@@ -95,6 +98,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 new ArrayList<>(),
                 new HashMap<>(),
                 new HashMap<>(),
+                new HashMap<>(),
                 AssignerStatus.INITIAL_ASSIGNING,
                 remainingTables,
                 isTableIdCaseSensitive,
@@ -111,6 +115,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 checkpoint.getAlreadyProcessedTables(),
                 checkpoint.getRemainingSplits(),
                 checkpoint.getAssignedSplits(),
+                checkpoint.getTableSchemas(),
                 checkpoint.getSplitFinishedOffsets(),
                 checkpoint.getSnapshotAssignerStatus(),
                 checkpoint.getRemainingTables(),
@@ -122,8 +127,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
-            List<MySqlSnapshotSplit> remainingSplits,
-            Map<String, MySqlSnapshotSplit> assignedSplits,
+            List<MySqlSchemaLessSnapshotSplit> remainingSplits,
+            Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
@@ -134,6 +140,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
         this.assignedSplits = assignedSplits;
+        this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
         this.remainingTables = new CopyOnWriteArrayList<>(remainingTables);
@@ -206,12 +213,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         synchronized (lock) {
             if (!remainingSplits.isEmpty()) {
                 // return remaining splits firstly
-                Iterator<MySqlSnapshotSplit> iterator = remainingSplits.iterator();
-                MySqlSnapshotSplit split = iterator.next();
+                Iterator<MySqlSchemaLessSnapshotSplit> iterator = remainingSplits.iterator();
+                MySqlSchemaLessSnapshotSplit split = iterator.next();
                 remainingSplits.remove(split);
                 assignedSplits.put(split.splitId(), split);
                 addAlreadyProcessedTablesIfNotExists(split.getTableId());
-                return Optional.of(split);
+                return Optional.of(
+                        split.toMySqlSnapshotSplit(tableSchemas.get(split.getTableId())));
             } else if (!remainingTables.isEmpty()) {
                 try {
                     // wait for the asynchronous split to complete
@@ -241,12 +249,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             throw new FlinkRuntimeException(
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
-        final List<MySqlSnapshotSplit> assignedSnapshotSplit =
+        final List<MySqlSchemaLessSnapshotSplit> assignedSnapshotSplit =
                 assignedSplits.values().stream()
                         .sorted(Comparator.comparing(MySqlSplit::splitId))
                         .collect(Collectors.toList());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
+        for (MySqlSchemaLessSnapshotSplit split : assignedSnapshotSplit) {
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
@@ -279,7 +287,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void addSplits(Collection<MySqlSplit> splits) {
         for (MySqlSplit split : splits) {
-            remainingSplits.add(split.asSnapshotSplit());
+            tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
+            remainingSplits.add(split.asSnapshotSplit().toSchemaLessSnapshotSplit());
             // we should remove the add-backed splits from the assigned list,
             // because they are failed
             assignedSplits.remove(split.splitId());
@@ -294,6 +303,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         alreadyProcessedTables,
                         remainingSplits,
                         assignedSplits,
+                        tableSchemas,
                         splitFinishedOffsets,
                         assignerStatus,
                         remainingTables,
@@ -364,8 +374,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         return remainingTables.isEmpty() && remainingSplits.isEmpty();
     }
 
-    public Map<String, MySqlSnapshotSplit> getAssignedSplits() {
+    public Map<String, MySqlSchemaLessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
+    }
+
+    public Map<TableId, TableChanges.TableChange> getTableSchemas() {
+        return tableSchemas;
     }
 
     public Map<String, BinlogOffset> getSplitFinishedOffsets() {
@@ -387,8 +401,18 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             for (TableId nextTable : remainingTables) {
                 // split the given table into chunks (snapshot splits)
                 Collection<MySqlSnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
+
+                final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
+                if (!splits.isEmpty()) {
+                    tableSchema.putAll(splits.iterator().next().getTableSchemas());
+                }
+                final List<MySqlSchemaLessSnapshotSplit> schemaLessSnapshotSplits =
+                        splits.stream()
+                                .map(MySqlSnapshotSplit::toSchemaLessSnapshotSplit)
+                                .collect(Collectors.toList());
                 synchronized (lock) {
-                    remainingSplits.addAll(splits);
+                    tableSchemas.putAll(tableSchema);
+                    remainingSplits.addAll(schemaLessSnapshotSplits);
                     remainingTables.remove(nextTable);
                     lock.notify();
                 }
