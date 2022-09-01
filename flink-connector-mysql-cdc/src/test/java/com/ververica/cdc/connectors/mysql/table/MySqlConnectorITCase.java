@@ -16,7 +16,10 @@
 
 package com.ververica.cdc.connectors.mysql.table;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -43,6 +46,7 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -54,6 +58,7 @@ import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.runtime.testutils.CommonTestUtils.waitForJobStatus;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for MySQL Table source. */
@@ -1096,6 +1101,117 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 };
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testDdlWithDefaultStringValue() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE default_value_test ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number BIGINT,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.startup.mode' = 'latest-offset',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "default_value_test",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM default_value_test");
+        JobClient jobClient = result.getJobClient().get();
+        waitForJobStatus(
+                jobClient,
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(10)));
+        // wait the job totally finishes starting
+        Thread.sleep(10000);
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO default_value_test\n"
+                            + "        VALUES (101,\"user_1\",\"Shanghai\",123567),\n"
+                            + "                (102,\"user_2\",\"Shanghai\",123567);");
+        }
+        CloseableIterator<Row> iterator = result.collect();
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567]", "+I[102, user_2, Shanghai, 123567]"
+                };
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    " CREATE TABLE temp_default_value_test (\n"
+                            + "     id INTEGER NOT NULL PRIMARY KEY, \n"
+                            + "     tiny_c TINYINT DEFAULT ' 0 ', \n"
+                            + "     boolean_c BOOLEAN DEFAULT ' 1 ', \n"
+                            + "     tiny_un_z_c TINYINT UNSIGNED ZEROFILL DEFAULT ' 2 ', \n"
+                            + "     small_c SMALLINT DEFAULT ' 3 ', \n"
+                            + "     small_un_c SMALLINT UNSIGNED DEFAULT ' 4 ',\n"
+                            + "     small_un_z_c SMALLINT UNSIGNED ZEROFILL DEFAULT ' 5 ', \n"
+                            + "     medium_c MEDIUMINT DEFAULT ' 6 ', \n"
+                            + "     medium_un_c MEDIUMINT UNSIGNED DEFAULT ' 7 ', \n"
+                            + "     medium_un_z_c MEDIUMINT UNSIGNED ZEROFILL DEFAULT ' 8 ', \n"
+                            + "     int_c INTEGER DEFAULT ' 9 ', \n"
+                            + "     int_un_c INTEGER UNSIGNED DEFAULT ' 10 ', \n"
+                            + "     int_un_z_c INTEGER UNSIGNED ZEROFILL DEFAULT ' 11 ',\n"
+                            + "     int11_c INT(11) DEFAULT ' 12 ', \n"
+                            + "     big_c BIGINT DEFAULT ' 13 ', \n"
+                            + "     big_un_c BIGINT UNSIGNED DEFAULT ' 14 ', \n"
+                            + "     big_un_z_c BIGINT UNSIGNED ZEROFILL DEFAULT ' 15 ', \n"
+                            + "     decimal_c DECIMAL(8, 4) DEFAULT ' 16  ', \n"
+                            + "     decimal_un_c DECIMAL(8, 4) UNSIGNED DEFAULT ' 17 ', \n"
+                            + "     decimal_un_z_c DECIMAL(8, 4) UNSIGNED ZEROFILL DEFAULT ' 18 ', \n"
+                            + "     numeric_c NUMERIC(6, 0) DEFAULT ' 19 ', \n"
+                            + "     big_decimal_c DECIMAL(65, 1) DEFAULT ' 20 ',\n"
+                            + "     real_c REAL DEFAULT ' 21.0',\n"
+                            + "     float_c FLOAT DEFAULT ' 22.0',\n"
+                            + "     float_un_c FLOAT UNSIGNED DEFAULT ' 23',\n"
+                            + "     float_un_z_c FLOAT UNSIGNED ZEROFILL DEFAULT ' 24',\n"
+                            + "     double_c DOUBLE DEFAULT ' 25',\n"
+                            + "     double_un_c DOUBLE UNSIGNED DEFAULT ' 26',\n"
+                            + "     double_un_z_c DOUBLE UNSIGNED ZEROFILL DEFAULT ' 27',\n"
+                            + "     tiny_un_c TINYINT UNSIGNED DEFAULT ' 28 '"
+                            + " );");
+            statement.execute(
+                    "alter table temp_default_value_test alter column `small_c` SET DEFAULT ' 29 ';");
+            statement.execute(
+                    "alter table temp_default_value_test add column\n"
+                            + "    `new_col` smallint(1) unsigned DEFAULT ' 30 ';");
+            statement.execute(
+                    "alter table default_value_test add column\n"
+                            + "    `new_col` smallint(1) unsigned DEFAULT ' 31 ';");
+        }
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        jobClient.cancel().get();
     }
 
     @Test
