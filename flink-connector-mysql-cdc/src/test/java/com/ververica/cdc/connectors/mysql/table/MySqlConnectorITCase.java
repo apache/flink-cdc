@@ -1104,7 +1104,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testColumnDefaultValue() throws Exception {
+    public void testDdlWithDefaultStringValue() throws Exception {
         if (!incrementalSnapshot) {
             return;
         }
