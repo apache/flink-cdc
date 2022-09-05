@@ -1215,6 +1215,80 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testAlterWithDefaultStringValue() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE default_value_test ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number BIGINT,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.startup.mode' = 'latest-offset',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "default_value_test",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM default_value_test");
+        JobClient jobClient = result.getJobClient().get();
+        waitForJobStatus(
+                jobClient,
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(10)));
+        // wait the job totally finishes starting
+        Thread.sleep(10000);
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO default_value_test\n"
+                            + "        VALUES (101,\"user_1\",\"Shanghai\",123567),\n"
+                            + "                (102,\"user_2\",\"Shanghai\",123567);");
+        }
+        CloseableIterator<Row> iterator = result.collect();
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567]", "+I[102, user_2, Shanghai, 123567]"
+                };
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "alter table default_value_test add column `collate_test` INT DEFAULT ' 29 ' COLLATE 'utf8_general_ci';");
+            statement.execute(
+                    "alter table default_value_test add column `int_test` INT DEFAULT ' 30 ';");
+        }
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        jobClient.cancel().get();
+    }
+
+    @Test
     public void testShardingTablesWithInconsistentSchema() throws Exception {
         userDatabase1.createAndInitialize();
         userDatabase2.createAndInitialize();
