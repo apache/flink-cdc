@@ -244,8 +244,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         boolean hasRecordSchema = false;
         MySqlSnapshotSplit snapshotSplit;
         do {
-            snapshotSplit = chunkSplitter.splitOneUnevenlySizedChunk(tableId);
             synchronized (lock) {
+                snapshotSplit = chunkSplitter.splitOneUnevenlySizedChunk(tableId);
                 if (!hasRecordSchema) {
                     hasRecordSchema = true;
                     final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
