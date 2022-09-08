@@ -55,15 +55,14 @@ import static io.debezium.connector.oracle.logminer.LogMinerHelper.setNlsSession
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setRedoLogFilesForMining;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.startLogMining;
 
-
-
 /**
- * A {@link StreamingChangeEventSource} based on Oracle's LogMiner utility.
- * The event handler loop is executed in a separate executor.
+ * A {@link StreamingChangeEventSource} based on Oracle's LogMiner utility. The event handler loop
+ * is executed in a separate executor.
  */
 public class LogMinerStreamingChangeEventSource implements StreamingChangeEventSource {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(LogMinerStreamingChangeEventSource.class);
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(LogMinerStreamingChangeEventSource.class);
 
     private final OracleConnection jdbcConnection;
     private final EventDispatcher<TableId> dispatcher;
@@ -85,11 +84,17 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
     private Scn endScn;
     private List<BigInteger> currentRedoLogSequences;
 
-    public LogMinerStreamingChangeEventSource(OracleConnectorConfig connectorConfig, OracleOffsetContext offsetContext,
-                                              OracleConnection jdbcConnection, EventDispatcher<TableId> dispatcher,
-                                              ErrorHandler errorHandler, Clock clock, OracleDatabaseSchema schema,
-                                              OracleTaskContext taskContext, Configuration jdbcConfig,
-                                              OracleStreamingChangeEventSourceMetrics streamingMetrics) {
+    public LogMinerStreamingChangeEventSource(
+            OracleConnectorConfig connectorConfig,
+            OracleOffsetContext offsetContext,
+            OracleConnection jdbcConnection,
+            EventDispatcher<TableId> dispatcher,
+            ErrorHandler errorHandler,
+            Clock clock,
+            OracleDatabaseSchema schema,
+            OracleTaskContext taskContext,
+            Configuration jdbcConfig,
+            OracleStreamingChangeEventSourceMetrics streamingMetrics) {
         this.jdbcConnection = jdbcConnection;
         this.dispatcher = dispatcher;
         this.clock = clock;
@@ -104,7 +109,10 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
         this.jdbcConfiguration = JdbcConfiguration.adapt(jdbcConfig);
         this.isRac = connectorConfig.isRacSystem();
         if (this.isRac) {
-            this.racHosts.addAll(connectorConfig.getRacNodes().stream().map(String::toUpperCase).collect(Collectors.toSet()));
+            this.racHosts.addAll(
+                    connectorConfig.getRacNodes().stream()
+                            .map(String::toUpperCase)
+                            .collect(Collectors.toSet()));
             instantiateFlushConnections(jdbcConfiguration, racHosts);
         }
         this.archiveLogRetention = connectorConfig.getLogMiningArchiveLogRetention();
@@ -112,14 +120,20 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
 
     @Override
     public void execute(ChangeEventSourceContext context) {
-        try (TransactionalBuffer transactionalBuffer = new TransactionalBuffer(schema, clock, errorHandler, streamingMetrics)) {
+        try (TransactionalBuffer transactionalBuffer =
+                new TransactionalBuffer(schema, clock, errorHandler, streamingMetrics)) {
             try {
                 startScn = offsetContext.getScn();
                 // createFlushTable(jdbcConnection);
 
-                if (!isContinuousMining && startScn.compareTo(getFirstOnlineLogScn(jdbcConnection, archiveLogRetention)) < 0) {
+                if (!isContinuousMining
+                        && startScn.compareTo(
+                                        getFirstOnlineLogScn(jdbcConnection, archiveLogRetention))
+                                < 0) {
                     throw new DebeziumException(
-                            "Online REDO LOG files or archive log files do not contain the offset scn " + startScn + ".  Please perform a new snapshot.");
+                            "Online REDO LOG files or archive log files do not contain the offset scn "
+                                    + startScn
+                                    + ".  Please perform a new snapshot.");
                 }
 
                 setNlsSessionParameters(jdbcConnection);
@@ -130,45 +144,87 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
                 HistoryRecorder historyRecorder = connectorConfig.getLogMiningHistoryRecorder();
 
                 try {
-                    // todo: why can't OracleConnection be used rather than a Factory+JdbcConfiguration?
-                    historyRecorder.prepare(streamingMetrics, jdbcConfiguration, connectorConfig.getLogMinerHistoryRetentionHours());
+                    // todo: why can't OracleConnection be used rather than a
+                    // Factory+JdbcConfiguration?
+                    historyRecorder.prepare(
+                            streamingMetrics,
+                            jdbcConfiguration,
+                            connectorConfig.getLogMinerHistoryRetentionHours());
 
-                    final LogMinerQueryResultProcessor processor = new LogMinerQueryResultProcessor(context, jdbcConnection,
-                            connectorConfig, streamingMetrics, transactionalBuffer, offsetContext, schema, dispatcher,
-                            clock, historyRecorder);
+                    final LogMinerQueryResultProcessor processor =
+                            new LogMinerQueryResultProcessor(
+                                    context,
+                                    jdbcConnection,
+                                    connectorConfig,
+                                    streamingMetrics,
+                                    transactionalBuffer,
+                                    offsetContext,
+                                    schema,
+                                    dispatcher,
+                                    clock,
+                                    historyRecorder);
 
-                    final String query = SqlUtils.logMinerContentsQuery(connectorConfig, jdbcConnection.username());
-                    try (PreparedStatement miningView = jdbcConnection.connection().prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY,
-                            ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT)) {
+                    final String query =
+                            SqlUtils.logMinerContentsQuery(
+                                    connectorConfig, jdbcConnection.username());
+                    try (PreparedStatement miningView =
+                            jdbcConnection
+                                    .connection()
+                                    .prepareStatement(
+                                            query,
+                                            ResultSet.TYPE_FORWARD_ONLY,
+                                            ResultSet.CONCUR_READ_ONLY,
+                                            ResultSet.HOLD_CURSORS_OVER_COMMIT)) {
 
                         currentRedoLogSequences = getCurrentRedoLogSequences();
                         Stopwatch stopwatch = Stopwatch.reusable();
                         while (context.isRunning()) {
-                            // Calculate time difference before each mining session to detect time zone offset changes (e.g. DST) on database server
+                            // Calculate time difference before each mining session to detect time
+                            // zone offset changes (e.g. DST) on database server
                             streamingMetrics.calculateTimeDifference(getSystime(jdbcConnection));
 
                             Instant start = Instant.now();
-                            endScn = getEndScn(jdbcConnection, startScn, streamingMetrics, connectorConfig.getLogMiningBatchSizeDefault());
+                            endScn =
+                                    getEndScn(
+                                            jdbcConnection,
+                                            startScn,
+                                            streamingMetrics,
+                                            connectorConfig.getLogMiningBatchSizeDefault());
                             // flushLogWriter(jdbcConnection, jdbcConfiguration, isRac, racHosts);
 
                             if (hasLogSwitchOccurred()) {
                                 // This is the way to mitigate PGA leaks.
-                                // With one mining session, it grows and maybe there is another way to flush PGA.
+                                // With one mining session, it grows and maybe there is another way
+                                // to flush PGA.
                                 // At this point we use a new mining session
-                                LOGGER.trace("Ending log mining startScn={}, endScn={}, offsetContext.getScn={}, strategy={}, continuous={}",
-                                        startScn, endScn, offsetContext.getScn(), strategy, isContinuousMining);
+                                LOGGER.trace(
+                                        "Ending log mining startScn={}, endScn={}, offsetContext.getScn={}, strategy={}, continuous={}",
+                                        startScn,
+                                        endScn,
+                                        offsetContext.getScn(),
+                                        strategy,
+                                        isContinuousMining);
                                 endMining(jdbcConnection);
 
-                                initializeRedoLogsForMining(jdbcConnection, true, archiveLogRetention);
+                                initializeRedoLogsForMining(
+                                        jdbcConnection, true, archiveLogRetention);
 
                                 abandonOldTransactionsIfExist(jdbcConnection, transactionalBuffer);
 
-                                // This needs to be re-calculated because building the data dictionary will force the
-                                // current redo log sequence to be advanced due to a complete log switch of all logs.
+                                // This needs to be re-calculated because building the data
+                                // dictionary will force the
+                                // current redo log sequence to be advanced due to a complete log
+                                // switch of all logs.
                                 currentRedoLogSequences = getCurrentRedoLogSequences();
                             }
 
-                            startLogMining(jdbcConnection, startScn, endScn, strategy, isContinuousMining, streamingMetrics);
+                            startLogMining(
+                                    jdbcConnection,
+                                    startScn,
+                                    endScn,
+                                    strategy,
+                                    isContinuousMining,
+                                    streamingMetrics);
 
                             stopwatch.start();
                             miningView.setFetchSize(connectorConfig.getMaxQueueSize());
@@ -176,53 +232,64 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
                             miningView.setString(1, startScn.toString());
                             miningView.setString(2, endScn.toString());
                             try (ResultSet rs = miningView.executeQuery()) {
-                                Duration lastDurationOfBatchCapturing = stopwatch.stop().durations().statistics().getTotal();
-                                streamingMetrics.setLastDurationOfBatchCapturing(lastDurationOfBatchCapturing);
+                                Duration lastDurationOfBatchCapturing =
+                                        stopwatch.stop().durations().statistics().getTotal();
+                                streamingMetrics.setLastDurationOfBatchCapturing(
+                                        lastDurationOfBatchCapturing);
                                 processor.processResult(rs);
 
                                 startScn = endScn;
 
                                 if (transactionalBuffer.isEmpty()) {
-                                    LOGGER.debug("Transactional buffer empty, updating offset's SCN {}", startScn);
+                                    LOGGER.debug(
+                                            "Transactional buffer empty, updating offset's SCN {}",
+                                            startScn);
                                     offsetContext.setScn(startScn);
                                 }
                             }
 
-                            streamingMetrics.setCurrentBatchProcessingTime(Duration.between(start, Instant.now()));
+                            streamingMetrics.setCurrentBatchProcessingTime(
+                                    Duration.between(start, Instant.now()));
                             pauseBetweenMiningSessions();
                         }
                     }
-                }
-                finally {
+                } finally {
                     historyRecorder.close();
                 }
-            }
-            catch (Throwable t) {
+            } catch (Throwable t) {
                 logError(streamingMetrics, "Mining session stopped due to the {}", t);
                 errorHandler.setProducerThrowable(t);
-            }
-            finally {
-                LOGGER.info("startScn={}, endScn={}, offsetContext.getScn()={}", startScn, endScn, offsetContext.getScn());
+            } finally {
+                LOGGER.info(
+                        "startScn={}, endScn={}, offsetContext.getScn()={}",
+                        startScn,
+                        endScn,
+                        offsetContext.getScn());
                 LOGGER.info("Transactional buffer dump: {}", transactionalBuffer.toString());
                 LOGGER.info("Streaming metrics dump: {}", streamingMetrics.toString());
             }
         }
     }
 
-    private void abandonOldTransactionsIfExist(OracleConnection connection, TransactionalBuffer transactionalBuffer) {
+    private void abandonOldTransactionsIfExist(
+            OracleConnection connection, TransactionalBuffer transactionalBuffer) {
         Duration transactionRetention = connectorConfig.getLogMiningTransactionRetention();
         if (!Duration.ZERO.equals(transactionRetention)) {
             final Scn offsetScn = offsetContext.getScn();
-            Optional<Scn> lastScnToAbandonTransactions = getLastScnToAbandon(connection, offsetScn, transactionRetention);
-            lastScnToAbandonTransactions.ifPresent(thresholdScn -> {
-                transactionalBuffer.abandonLongTransactions(thresholdScn, offsetContext);
-                offsetContext.setScn(thresholdScn);
-                startScn = endScn;
-            });
+            Optional<Scn> lastScnToAbandonTransactions =
+                    getLastScnToAbandon(connection, offsetScn, transactionRetention);
+            lastScnToAbandonTransactions.ifPresent(
+                    thresholdScn -> {
+                        transactionalBuffer.abandonLongTransactions(thresholdScn, offsetContext);
+                        offsetContext.setScn(thresholdScn);
+                        startScn = endScn;
+                    });
         }
     }
 
-    private void initializeRedoLogsForMining(OracleConnection connection, boolean postEndMiningSession, Duration archiveLogRetention) throws SQLException {
+    private void initializeRedoLogsForMining(
+            OracleConnection connection, boolean postEndMiningSession, Duration archiveLogRetention)
+            throws SQLException {
         if (!postEndMiningSession) {
             if (OracleConnectorConfig.LogMiningStrategy.CATALOG_IN_REDO.equals(strategy)) {
                 buildDataDictionary(connection);
@@ -230,8 +297,7 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
             if (!isContinuousMining) {
                 setRedoLogFilesForMining(connection, startScn, archiveLogRetention);
             }
-        }
-        else {
+        } else {
             if (!isContinuousMining) {
                 if (OracleConnectorConfig.LogMiningStrategy.CATALOG_IN_REDO.equals(strategy)) {
                     buildDataDictionary(connection);
@@ -250,24 +316,33 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
     private boolean hasLogSwitchOccurred() throws SQLException {
         final List<BigInteger> newSequences = getCurrentRedoLogSequences();
         if (!newSequences.equals(currentRedoLogSequences)) {
-            LOGGER.debug("Current log sequence(s) is now {}, was {}", newSequences, currentRedoLogSequences);
+            LOGGER.debug(
+                    "Current log sequence(s) is now {}, was {}",
+                    newSequences,
+                    currentRedoLogSequences);
 
             currentRedoLogSequences = newSequences;
 
-            final Map<String, String> logStatuses = jdbcConnection.queryAndMap(SqlUtils.redoLogStatusQuery(), rs -> {
-                Map<String, String> results = new LinkedHashMap<>();
-                while (rs.next()) {
-                    results.put(rs.getString(1), rs.getString(2));
-                }
-                return results;
-            });
+            final Map<String, String> logStatuses =
+                    jdbcConnection.queryAndMap(
+                            SqlUtils.redoLogStatusQuery(),
+                            rs -> {
+                                Map<String, String> results = new LinkedHashMap<>();
+                                while (rs.next()) {
+                                    results.put(rs.getString(1), rs.getString(2));
+                                }
+                                return results;
+                            });
 
-            final int logSwitchCount = jdbcConnection.queryAndMap(SqlUtils.switchHistoryQuery(), rs -> {
-                if (rs.next()) {
-                    return rs.getInt(2);
-                }
-                return 0;
-            });
+            final int logSwitchCount =
+                    jdbcConnection.queryAndMap(
+                            SqlUtils.switchHistoryQuery(),
+                            rs -> {
+                                if (rs.next()) {
+                                    return rs.getInt(2);
+                                }
+                                return 0;
+                            });
 
             final Set<String> fileNames = getCurrentRedoLogFiles(jdbcConnection);
 
@@ -282,25 +357,28 @@ public class LogMinerStreamingChangeEventSource implements StreamingChangeEventS
     }
 
     /**
-     * Get the current redo log sequence(s).
-     * In an Oracle RAC environment, there are multiple current redo logs and therefore this method
-     * returns multiple values, each relating to a single RAC node in the Oracle cluster.
+     * Get the current redo log sequence(s). In an Oracle RAC environment, there are multiple
+     * current redo logs and therefore this method returns multiple values, each relating to a
+     * single RAC node in the Oracle cluster.
      *
      * @return list of sequence numbers
      * @throws SQLException if a database exception occurred
      */
     private List<BigInteger> getCurrentRedoLogSequences() throws SQLException {
-        return jdbcConnection.queryAndMap(SqlUtils.currentRedoLogSequenceQuery(), rs -> {
-            List<BigInteger> sequences = new ArrayList<>();
-            while (rs.next()) {
-                sequences.add(new BigInteger(rs.getString(1)));
-            }
-            return sequences;
-        });
+        return jdbcConnection.queryAndMap(
+                SqlUtils.currentRedoLogSequenceQuery(),
+                rs -> {
+                    List<BigInteger> sequences = new ArrayList<>();
+                    while (rs.next()) {
+                        sequences.add(new BigInteger(rs.getString(1)));
+                    }
+                    return sequences;
+                });
     }
 
     private void pauseBetweenMiningSessions() throws InterruptedException {
-        Duration period = Duration.ofMillis(streamingMetrics.getMillisecondToSleepBetweenMiningQuery());
+        Duration period =
+                Duration.ofMillis(streamingMetrics.getMillisecondToSleepBetweenMiningQuery());
         Metronome.sleeper(period, clock).pause();
     }
 
