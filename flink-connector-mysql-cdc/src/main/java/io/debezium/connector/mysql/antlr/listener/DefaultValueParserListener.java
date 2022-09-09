@@ -16,9 +16,12 @@ import io.debezium.relational.ColumnEditor;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Copied from Debezium project(v1.6.4.Final) to fix error when parsing the string default value.
+ * Copied from Debezium project(v1.6.4.Final) to fix
+ * https://github.com/ververica/flink-cdc-connectors/issues/1506.
  *
- * <p>Line 63~74: use the actual default string value when the sql contains COLLATE.
+ * <p>Line 66~77: use the actual default string value when the sql contains COLLATE. We should
+ * remove this class after we bumped a higher debezium version where the
+ * https://issues.redhat.com/browse/DBZ-5587 has been fixed.
  */
 public class DefaultValueParserListener extends MySqlParserBaseListener {
 
