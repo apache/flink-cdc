@@ -43,7 +43,7 @@ import java.util.stream.Stream;
 import static org.junit.Assert.assertNotNull;
 
 /**
- * Basic class for testing PostgresSQL source, this contains a PostgreSQL container which enables
+ * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables
  * binlog.
  */
 public abstract class PostgresTestBase extends AbstractTestBase {
@@ -96,7 +96,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                                                         return m.matches() ? m.group(1) : x;
                                                     })
                                             .collect(Collectors.joining("\n"))
-                                            .split(";"))
+                                            .split(";\n"))
                             .collect(Collectors.toList());
             for (String stmt : statements) {
                 statement.execute(stmt);

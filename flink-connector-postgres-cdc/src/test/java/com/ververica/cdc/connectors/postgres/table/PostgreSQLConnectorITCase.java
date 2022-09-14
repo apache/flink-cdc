@@ -247,26 +247,28 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         String sourceDDL =
                 String.format(
-                        "CREATE TABLE full_types (\n"
-                                + "    id INTEGER NOT NULL,\n"
-                                + "    bytea_c BYTES,\n"
-                                + "    small_c SMALLINT,\n"
-                                + "    int_c INTEGER,\n"
-                                + "    big_c BIGINT,\n"
-                                + "    real_c FLOAT,\n"
-                                + "    double_precision DOUBLE,\n"
-                                + "    numeric_c DECIMAL(10, 5),\n"
-                                + "    decimal_c DECIMAL(10, 1),\n"
-                                + "    boolean_c BOOLEAN,\n"
-                                + "    text_c STRING,\n"
-                                + "    char_c STRING,\n"
-                                + "    character_c STRING,\n"
-                                + "    character_varying_c STRING,\n"
-                                + "    timestamp3_c TIMESTAMP(3),\n"
-                                + "    timestamp6_c TIMESTAMP(6),\n"
-                                + "    date_c DATE,\n"
-                                + "    time_c TIME(0),\n"
-                                + "    default_numeric_c DECIMAL\n"
+                        "CREATE TABLE full_types ("
+                                + "    id INTEGER NOT NULL,"
+                                + "    bytea_c BYTES,"
+                                + "    small_c SMALLINT,"
+                                + "    int_c INTEGER,"
+                                + "    big_c BIGINT,"
+                                + "    real_c FLOAT,"
+                                + "    double_precision DOUBLE,"
+                                + "    numeric_c DECIMAL(10, 5),"
+                                + "    decimal_c DECIMAL(10, 1),"
+                                + "    boolean_c BOOLEAN,"
+                                + "    text_c STRING,"
+                                + "    char_c STRING,"
+                                + "    character_c STRING,"
+                                + "    character_varying_c STRING,"
+                                + "    timestamp3_c TIMESTAMP(3),"
+                                + "    timestamp6_c TIMESTAMP(6),"
+                                + "    date_c DATE,"
+                                + "    time_c TIME(0),"
+                                + "    default_numeric_c DECIMAL,"
+                                + "    geography_c STRING,"
+                                + "    geometry_c STRING"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'hostname' = '%s',"
@@ -282,29 +284,31 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getUsername(),
                         POSTGERS_CONTAINER.getPassword(),
                         POSTGERS_CONTAINER.getDatabaseName(),
-                        "public",
+                        "inventory",
                         "full_types");
         String sinkDDL =
-                "CREATE TABLE sink (\n"
-                        + "    id INTEGER NOT NULL,\n"
-                        + "    bytea_c BYTES,\n"
-                        + "    small_c SMALLINT,\n"
-                        + "    int_c INTEGER,\n"
-                        + "    big_c BIGINT,\n"
-                        + "    real_c FLOAT,\n"
-                        + "    double_precision DOUBLE,\n"
-                        + "    numeric_c DECIMAL(10, 5),\n"
-                        + "    decimal_c DECIMAL(10, 1),\n"
-                        + "    boolean_c BOOLEAN,\n"
-                        + "    text_c STRING,\n"
-                        + "    char_c STRING,\n"
-                        + "    character_c STRING,\n"
-                        + "    character_varying_c STRING,\n"
-                        + "    timestamp3_c TIMESTAMP(3),\n"
-                        + "    timestamp6_c TIMESTAMP(6),\n"
-                        + "    date_c DATE,\n"
-                        + "    time_c TIME(0),\n"
-                        + "    default_numeric_c DECIMAL\n"
+                "CREATE TABLE sink ("
+                        + "    id INTEGER NOT NULL,"
+                        + "    bytea_c BYTES,"
+                        + "    small_c SMALLINT,"
+                        + "    int_c INTEGER,"
+                        + "    big_c BIGINT,"
+                        + "    real_c FLOAT,"
+                        + "    double_precision DOUBLE,"
+                        + "    numeric_c DECIMAL(10, 5),"
+                        + "    decimal_c DECIMAL(10, 1),"
+                        + "    boolean_c BOOLEAN,"
+                        + "    text_c STRING,"
+                        + "    char_c STRING,"
+                        + "    character_c STRING,"
+                        + "    character_varying_c STRING,"
+                        + "    timestamp3_c TIMESTAMP(3),"
+                        + "    timestamp6_c TIMESTAMP(6),"
+                        + "    date_c DATE,"
+                        + "    time_c TIME(0),"
+                        + "    default_numeric_c DECIMAL,"
+                        + "    geography_c STRING,"
+                        + "    geometry_c STRING"
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false'"
@@ -319,16 +323,16 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute("UPDATE full_types SET small_c=0 WHERE id=1;");
+            statement.execute("UPDATE inventory.full_types SET small_c=0 WHERE id=1;");
         }
 
         waitForSinkSize("sink", 3);
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500)",
-                        "-U(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500)",
-                        "+U(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500)");
+                        "+I(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
+                        "-U(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
+                        "+U(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
 
