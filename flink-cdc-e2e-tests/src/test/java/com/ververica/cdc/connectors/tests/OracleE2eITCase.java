@@ -159,7 +159,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8",
                         "104,hammer,12oz carpenters hammer,0.75",
                         "105,hammer,14oz carpenters hammer,0.875",
-                        "106,hammer,18oz carpenter hammer,1.0",
+                        "106,hammer,18oz carpenters hammer,1.0",
                         "107,rocks,box of assorted rocks,5.1",
                         "108,jacket,water resistent black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
