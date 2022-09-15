@@ -25,7 +25,6 @@ import com.ververica.cdc.debezium.table.DeserializationRuntimeConverter;
 import com.ververica.cdc.debezium.table.DeserializationRuntimeConverterFactory;
 import io.debezium.data.geometry.Geography;
 import io.debezium.data.geometry.Geometry;
-import io.debezium.data.geometry.Point;
 import io.debezium.util.HexConverter;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -72,8 +71,7 @@ public class PostgreSQLDeserializationConverterFactory {
                     public Object convert(Object dbzObj, Schema schema) throws Exception {
                         // the Geometry datatype in PostgreSQL will be converted to
                         // a String with Json format
-                        if (Point.LOGICAL_NAME.equals(schema.name())
-                                || Geometry.LOGICAL_NAME.equals(schema.name())
+                        if (Geometry.LOGICAL_NAME.equals(schema.name())
                                 || Geography.LOGICAL_NAME.equals(schema.name())) {
                             try {
                                 Struct geometryStruct = (Struct) dbzObj;
