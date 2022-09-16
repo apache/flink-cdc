@@ -26,6 +26,9 @@ import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.TestLogger;
 
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.PortBinding;
+import com.github.dockerjava.api.model.Ports;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.After;
@@ -136,6 +139,13 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
+                        .withCreateContainerCmdModifier(
+                                cmd ->
+                                        cmd.getHostConfig()
+                                                .withPortBindings(
+                                                        (new PortBinding(
+                                                                Ports.Binding.bindPort(8081),
+                                                                new ExposedPort(8081)))))
                         .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
         taskManager =

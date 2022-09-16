@@ -31,6 +31,7 @@ under the License.
         <flink-1.13>1.13.6</flink-1.13>
         <flink-1.14>1.14.4</flink-1.14>
         <mysql.driver.version>8.0.27</mysql.driver.version>
+        <docker-java>3.2.8</docker-java>
     </properties>
 
     <dependencies>
@@ -119,6 +120,18 @@ under the License.
             <groupId>org.testcontainers</groupId>
             <artifactId>mssqlserver</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-api</artifactId>
+            <version>${docker-java}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-transport-zerodep</artifactId>
+            <version>${docker-java}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
