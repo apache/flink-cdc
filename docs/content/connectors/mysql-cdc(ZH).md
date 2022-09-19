@@ -342,6 +342,57 @@ CREATE TABLE products (
 );
 ```
 
+下述创建表示例展示使用正则表达式匹配多张库表的用法：
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+    'table-name' = '(t[5-8]|tt)'
+);
+```
+<table class="colwidths-auto docutils">
+  <thead>
+     <tr>
+       <th class="text-left" style="width: 15%">匹配示例</th>
+       <th class="text-left" style="width: 30%">表达式</th>
+       <th class="text-left" style="width: 55%">描述</th>
+     </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>前缀匹配</td>
+      <td>^(test).*</td>
+      <td>匹配前缀为test的数据库，例如test1、test2等，与表匹配操作一致。</td>
+    </tr>
+    <tr>
+      <td>后缀匹配</td>
+      <td>.*[p$]</td>
+      <td>匹配后缀为p的数据库，例如cdcp、edcp等，与表匹配操作一致。</td>
+    </tr>
+    <tr>
+      <td>普通匹配</td>
+      <td>txc</td>
+      <td>匹配具体的数据库名，与表匹配操作一致</td>
+    </tr>
+  </tbody>
+</table>
+建议：进行库表匹配时,使用的模式是database-name.table-name，所以反映到这个例子就是使用(^(test).*|^(tpc).*|txc|.*[p$]|t{2}).(t[5-8]|tt)，匹配txc.tt、test2.test5。所以可以使用正则校验工具，验证匹配库表的正确性。
+
 支持的特性
 --------
 
