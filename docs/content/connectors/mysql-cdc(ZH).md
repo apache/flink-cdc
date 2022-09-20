@@ -385,7 +385,7 @@ CREATE TABLE products (
       <td>匹配后缀为p的数据库名或表名，例如cdcp、edcp等。</td>
     </tr>
     <tr>
-      <td>普通匹配</td>
+      <td>特定匹配</td>
       <td>txc</td>
       <td>匹配具体的数据库名或表名。</td>
     </tr>
