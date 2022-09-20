@@ -83,6 +83,12 @@ under the License.
                             </filters>
                             <relocations>
                                 <relocation>
+                                    <pattern>org.apache.commons</pattern>
+                                    <shadedPattern>
+                                        com.ververica.cdc.connectors.shaded.org.apache.commons
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
                                         com.ververica.cdc.connectors.shaded.org.apache.kafka
