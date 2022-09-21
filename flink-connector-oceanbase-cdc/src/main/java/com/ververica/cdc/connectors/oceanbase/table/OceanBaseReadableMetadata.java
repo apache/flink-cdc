@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.oceanbase.table;
 
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
@@ -37,7 +38,7 @@ public enum OceanBaseReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct value = (Struct) record.value();
                     Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                     return StringData.fromString(source.getString("tenant"));
@@ -52,7 +53,7 @@ public enum OceanBaseReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct value = (Struct) record.value();
                     Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                     return StringData.fromString(source.getString("database"));
@@ -67,7 +68,7 @@ public enum OceanBaseReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct value = (Struct) record.value();
                     Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                     return StringData.fromString(source.getString("table"));
@@ -85,7 +86,7 @@ public enum OceanBaseReadableMetadata {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
+                public Object read(SourceRecord record, RowData rowData) {
                     Struct value = (Struct) record.value();
                     Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                     String timestamp = source.getString("timestamp");
@@ -94,8 +95,19 @@ public enum OceanBaseReadableMetadata {
                     }
                     return TimestampData.fromEpochMillis(Long.parseLong(timestamp) * 1000);
                 }
-            });
+            }),
+    /** It indicates the change type was made in the database. */
+    OP(
+            "op",
+            DataTypes.STRING().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
 
+                @Override
+                public Object read(SourceRecord record, RowData rowData) {
+                    return StringData.fromString(rowData.getRowKind().shortString());
+                }
+            });
     private final String key;
 
     private final DataType dataType;
