@@ -1130,7 +1130,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.startup.mode' = 'latest-offset',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -1151,21 +1150,18 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 jobClient,
                 Collections.singletonList(RUNNING),
                 Deadline.fromNow(Duration.ofSeconds(10)));
-        // wait the job totally finishes starting
-        Thread.sleep(10000);
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
         try (Connection connection = customerDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "INSERT INTO default_value_test\n"
-                            + "        VALUES (101,\"user_1\",\"Shanghai\",123567),\n"
-                            + "                (102,\"user_2\",\"Shanghai\",123567);");
+            statement.execute("DELETE FROM default_value_test WHERE id=1;");
         }
-        CloseableIterator<Row> iterator = result.collect();
         String[] expected =
                 new String[] {
-                    "+I[101, user_1, Shanghai, 123567]", "+I[102, user_2, Shanghai, 123567]"
+                    "+I[1, user1, Shanghai, 123567]",
+                    "+I[2, user2, Shanghai, 123567]",
+                    "-D[1, user1, Shanghai, 123567]"
                 };
-
         try (Connection connection = customerDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
@@ -1241,7 +1237,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
-                                + " 'scan.startup.mode' = 'latest-offset',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
@@ -1262,19 +1257,17 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 jobClient,
                 Collections.singletonList(RUNNING),
                 Deadline.fromNow(Duration.ofSeconds(10)));
-        // wait the job totally finishes starting
-        Thread.sleep(10000);
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
         try (Connection connection = customerDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "INSERT INTO default_value_test\n"
-                            + "        VALUES (101,\"user_1\",\"Shanghai\",123567),\n"
-                            + "                (102,\"user_2\",\"Shanghai\",123567);");
+            statement.execute("DELETE FROM default_value_test WHERE id=1;");
         }
-        CloseableIterator<Row> iterator = result.collect();
         String[] expected =
                 new String[] {
-                    "+I[101, user_1, Shanghai, 123567]", "+I[102, user_2, Shanghai, 123567]"
+                    "+I[1, user1, Shanghai, 123567]",
+                    "+I[2, user2, Shanghai, 123567]",
+                    "-D[1, user1, Shanghai, 123567]"
                 };
 
         try (Connection connection = customerDatabase.getJdbcConnection();
