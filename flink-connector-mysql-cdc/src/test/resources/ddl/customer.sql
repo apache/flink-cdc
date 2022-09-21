@@ -307,3 +307,6 @@ CREATE TABLE default_value_test (
   address VARCHAR(1024),
   phone_number INTEGER DEFAULT ' 123 '
 );
+INSERT INTO default_value_test
+VALUES (1,'user1','Shanghai',123567),
+       (2,'user2','Shanghai',123567);
