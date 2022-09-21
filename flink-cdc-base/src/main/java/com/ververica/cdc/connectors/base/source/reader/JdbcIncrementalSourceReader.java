@@ -51,7 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -271,7 +271,7 @@ public class JdbcIncrementalSourceReader<T>
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
             LOG.info("The meta of binlog split {} has been collected success", splitId);
-            this.addSplits(Arrays.asList(binlogSplit));
+            this.addSplits(Collections.singletonList(binlogSplit));
         }
     }
 

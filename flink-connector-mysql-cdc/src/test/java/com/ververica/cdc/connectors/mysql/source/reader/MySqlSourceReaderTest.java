@@ -134,7 +134,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         // the 2 records are produced by 1 operations
         MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, 1);
         reader.start();
-        reader.addSplits(Arrays.asList(binlogSplit));
+        reader.addSplits(Collections.singletonList(binlogSplit));
         List<String> actualRecords = consumeRecords(reader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRecords), actualRecords);
         List<MySqlSplit> splitsState = reader.snapshotState(1L);
