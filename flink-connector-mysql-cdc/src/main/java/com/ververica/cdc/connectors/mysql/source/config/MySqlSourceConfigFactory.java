@@ -39,6 +39,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static io.debezium.config.CommonConnectorConfig.QUERY_FETCH_SIZE;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
@@ -270,7 +271,6 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
-        props.setProperty("database.fetchSize", String.valueOf(fetchSize));
         props.setProperty("database.responseBuffering", "adaptive");
         props.setProperty("database.serverTimezone", serverTimeZone);
         // database history
@@ -316,6 +316,13 @@ public class MySqlSourceConfigFactory implements Serializable {
 
         if (jdbcProperties == null) {
             jdbcProperties = new Properties();
+        }
+
+        // use cursor-based streaming to retrieve a set number of rows
+        // https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-implementation-notes.html
+        if (fetchSize > 0) {
+            jdbcProperties.setProperty("useCursorFetch", "true");
+            props.setProperty(QUERY_FETCH_SIZE.name(), String.valueOf(fetchSize));
         }
 
         return new MySqlSourceConfig(
