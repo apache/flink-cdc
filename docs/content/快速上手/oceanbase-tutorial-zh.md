@@ -1,5 +1,11 @@
 # 演示: OceanBase CDC 导入 Elasticsearch
 
+## 视频教程
+
+- [YouTube](https://www.youtube.com/watch?v=ODGE-73Dntg&t=2s)
+- [Bilibili](https://www.bilibili.com/video/BV1Zg411a7ZB/?spm_id_from=333.999.0.0)
+
+
 ### 准备教程所需要的组件
 
 #### 配置并启动容器
