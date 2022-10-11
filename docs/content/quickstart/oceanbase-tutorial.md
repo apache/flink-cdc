@@ -1,5 +1,10 @@
 # Demo: OceanBase CDC to ElasticSearch
 
+## Video tutorial
+
+- [YouTube](https://www.youtube.com/watch?v=ODGE-73Dntg&t=2s)
+- [Bilibili](https://www.bilibili.com/video/BV1Zg411a7ZB/?spm_id_from=333.999.0.0)
+
 ### Preparation
 
 #### Configure and start the components

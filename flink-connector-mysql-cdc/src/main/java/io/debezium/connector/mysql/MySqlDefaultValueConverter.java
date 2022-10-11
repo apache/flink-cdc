@@ -30,9 +30,10 @@ import java.util.regex.Pattern;
 
 /**
  * Copied from Debezium project(v1.6.4.Final) to fix error when parsing the string default value for
- * numeric types.
+ * numeric types. This class should be deleted after https://issues.redhat.com/browse/DBZ-4150
+ * included.
  *
- * <p>Line 81, Line 108~124: trim the default string value when the type is a numeric type.
+ * <p>Line 87, Line 114~129: trim the default string value when the type is a numeric type.
  */
 @Immutable
 public class MySqlDefaultValueConverter {

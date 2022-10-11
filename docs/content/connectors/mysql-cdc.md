@@ -346,6 +346,57 @@ CREATE TABLE products (
 );
 ```
 
+The extended CREATE TABLE example demonstrates the usage of regex to match multi-tables:
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+    'table-name' = '(t[5-8]|tt)'
+);
+```
+<table class="colwidths-auto docutils">
+  <thead>
+     <tr>
+       <th class="text-left" style="width: 15%">example</th>
+       <th class="text-left" style="width: 30%">expression</th>
+       <th class="text-left" style="width: 55%">description</th>
+     </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>prefix match</td>
+      <td>^(test).*</td>
+      <td>This matches the database name or table name starts with prefix of test, e.g test1、test2. </td>
+    </tr>
+    <tr>
+      <td>suffix match</td>
+      <td>.*[p$]</td>
+      <td>This matches the database name or table name ends with suffix of p, e.g cdcp、edcp. </td>
+    </tr>
+    <tr>
+      <td>specific match</td>
+      <td>txc</td>
+      <td>This matches the database name or table name according to a specific name, e.g txc. </td>
+    </tr>
+  </tbody>
+</table>
+It will use database.table as a pattern to match tables, as above examples using (^(test).*|^(tpc).*|txc|.*[p$]|t{2}).(t[5-8]|tt) matches txc.tt、test2.test5.
+
 Features
 --------
 
