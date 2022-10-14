@@ -50,7 +50,7 @@ under the License.
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.3.1</version>
+            <version>42.2.26</version>
         </dependency>
 
         <!-- CDC connectors test utils -->
