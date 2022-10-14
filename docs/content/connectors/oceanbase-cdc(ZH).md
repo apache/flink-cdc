@@ -10,7 +10,7 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-oceanbase-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
   <version>2.2.1</version>
 </dependency>
 ```
@@ -51,7 +51,7 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 使用以下命令，创建 OceanBase CDC 表：
 
 ```sql
--- 每 3000 毫秒做一次 checkpoint                  
+-- 每 3 秒做一次 checkpoint，用于测试，生产配置建议 5 到 10 分钟                  
 Flink SQL> SET 'execution.checkpointing.interval' = '3s';
 
 -- 在 Flink SQL 中创建 OceanBase 表 `orders`
@@ -96,10 +96,10 @@ tenant-name | 是 | 无 | String | 待监控 OceanBase 数据库的租户名，�
 database-name | 是 | 无 | String | 待监控 OceanBase 数据库的数据库名。
 table-name | 是 | 无 | String | 待监控 OceanBase 数据库的表名。
 hostname | 否 | 无 | String | OceanBase 数据库或 OceanBbase 代理 ODP 的 IP 地址或主机名。
-port | 否 | 无 | String | Integer | OceanBase 数据库服务器的整数端口号。可以是 OceanBase 服务器的 SQL 端口号，默认值为 `2881`。或 ODP 的端口号默认值为 `2883`。
-connect.timeout |  否 | 30s | Duration | 连接器在尝试连接到 OceanBase 数据库服务器后的超时时间。
+port | 否 | 无 | String | Integer | OceanBase 数据库服务器的整数端口号。可以是 OceanBase 服务器的 SQL 端口号（默认值为 `2881`）或 ODP 的端口号（默认值为 `2883`）。
+connect.timeout |  否 | 30s | Duration | 连接器在尝试连接到 OceanBase 数据库服务器超时前的最长时间。
 server-time-zone |  否 | UTC | String | 数据库服务器中的会话时区，例如 `"Asia/Shanghai"`。此选项控制 OceanBase 数据库中的 `TIMESTAMP` 类型在快照读取时如何转换为`STRING`。确保此选项与 `oblogproxy` 的时区设置相同。
-rootserver-list | 是 | 无 | String | 格式为 `ip:rpc_port:sql_port`。多个服务器地址使用英文分号 `;` 隔开。
+rootserver-list | 是 | 无 | String | OceanBase root 服务器列表，服务器格式为 `ip:rpc_port:sql_port`，多个服务器地址使用英文分号 `;` 隔开。
 logproxy.host | 是 | 无 | String | oblogproxy 的 IP 地址或主机名。
 logproxy.port | 是 | 无 | Integer | oblogproxy 的端口号。
 
@@ -156,9 +156,9 @@ OceanBase 数据库是一个分布式数据库，它的日志也分散在不同�
 
 配置选项 `scan.startup.mode` 指定 OceanBase CDC 连接器的启动模式。可用取值包括：
 
-- initial（默认）：在首次启动时对受监视的数据库表执行初始快照，并继续读取最新的提交日志。
+- `initial`（默认）：在首次启动时对受监视的数据库表执行初始快照，并继续读取最新的提交日志。
 - `latest-offset`：首次启动时，不对受监视的数据库表执行快照，仅从连接器启动时读取提交日志。
-- `timestamp`：在首次启动时不对受监视的数据库表执行初始快照，仅从指定的 `scan.startup.timestamp` 读取提交日志。
+- `timestamp`：在首次启动时不对受监视的数据库表执行初始快照，仅从指定的 `scan.startup.timestamp` 读取最新的提交日志。
 
 ### 消费提交日志
 
@@ -221,7 +221,7 @@ BIGINT UNSIGNED | DECIMAL(20, 0) |
 REAL FLOAT | FLOAT |
 DOUBLE | DOUBLE |
 NUMERIC(p, s)<br>DECIMAL(p, s)<br>where p <= 38 | DECIMAL(p, s) |
-NUMERIC(p, s)<br>DECIMAL(p, s)<br>where 38 < p <=65 | STRING | DECIMAL 等同于 NUMERIC。在 OceanBase 数据库中，DECIMAL 数据类型的精度最高为 65。但在 Flink 中，DECIMAL 的精度为 38。因此，如果你定义了一个精度大于 38 的 DECIMAL 列，你应当将其映射为 STRING，以避免精度损失。 |
+NUMERIC(p, s)<br>DECIMAL(p, s)<br>where 38 < p <=65 | STRING | DECIMAL 等同于 NUMERIC。在 OceanBase 数据库中，DECIMAL 数据类型的精度最高为 65。但在 Flink 中，DECIMAL 的最高精度为 38。因此，如果你定义了一个精度大于 38 的 DECIMAL 列，你应当将其映射为 STRING，以避免精度损失。 |
 DATE | DATE |
 TIME [(p)] | TIME [(p)] |
 TIMESTAMP [(p)]<br>DATETIME [(p)] | TIMESTAMP [(p)] |
