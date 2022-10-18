@@ -473,7 +473,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
 
 对于数值和自动增量拆分列，MySQL CDC Source 按固定步长高效地拆分块。
 例如，如果你有一个主键列为`id`的表，它是自动增量 BIGINT 类型，最小值为`0`，最大值为`100`，
-和表选项 `scan.incremental.snapshot.chunk`。大小`value`为`25`，表将被拆分为以下块：
+和表选项 `scan.incremental.snapshot.chunk.size` 大小 `value`为`25`，表将被拆分为以下块：
 
 ```
  (-∞, 25),
