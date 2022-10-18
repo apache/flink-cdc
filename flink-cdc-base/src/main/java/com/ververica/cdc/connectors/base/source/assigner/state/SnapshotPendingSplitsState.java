@@ -18,7 +18,7 @@ package com.ververica.cdc.connectors.base.source.assigner.state;
 
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import com.ververica.cdc.connectors.base.source.meta.split.SchemaLessSnapshotSplit;
+import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.base.source.reader.JdbcSourceSplitReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -40,13 +40,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final List<TableId> alreadyProcessedTables;
 
     /** The splits in the checkpoint. */
-    private final List<SchemaLessSnapshotSplit> remainingSplits;
+    private final List<SchemalessSnapshotSplit> remainingSplits;
 
     /**
      * The snapshot splits that the {@link IncrementalSourceEnumerator} has assigned to {@link
      * JdbcSourceSplitReader}s.
      */
-    private final Map<String, SchemaLessSnapshotSplit> assignedSplits;
+    private final Map<String, SchemalessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link IncrementalSourceEnumerator} has
@@ -70,8 +70,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
-            List<SchemaLessSnapshotSplit> remainingSplits,
-            Map<String, SchemaLessSnapshotSplit> assignedSplits,
+            List<SchemalessSnapshotSplit> remainingSplits,
+            Map<String, SchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
             boolean isAssignerFinished,
@@ -93,11 +93,11 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return alreadyProcessedTables;
     }
 
-    public List<SchemaLessSnapshotSplit> getRemainingSplits() {
+    public List<SchemalessSnapshotSplit> getRemainingSplits() {
         return remainingSplits;
     }
 
-    public Map<String, SchemaLessSnapshotSplit> getAssignedSplits() {
+    public Map<String, SchemalessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
     }
 

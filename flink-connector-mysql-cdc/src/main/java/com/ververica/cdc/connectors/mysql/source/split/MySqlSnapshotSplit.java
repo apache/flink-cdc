@@ -88,9 +88,9 @@ public class MySqlSnapshotSplit extends MySqlSplit {
         return tableSchemas;
     }
 
-    /** Casts this split into a {@link MySqlSchemaLessSnapshotSplit}. */
-    public final MySqlSchemaLessSnapshotSplit toSchemaLessSnapshotSplit() {
-        return new MySqlSchemaLessSnapshotSplit(
+    /** Casts this split into a {@link MySqlSchemalessSnapshotSplit}. */
+    public final MySqlSchemalessSnapshotSplit toSchemalessSnapshotSplit() {
+        return new MySqlSchemalessSnapshotSplit(
                 tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
     }
 

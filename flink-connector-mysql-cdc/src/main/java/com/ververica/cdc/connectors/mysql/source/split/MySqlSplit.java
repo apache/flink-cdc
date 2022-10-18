@@ -36,7 +36,7 @@ public abstract class MySqlSplit implements SourceSplit {
     /** Checks whether this split is a snapshot split. */
     public final boolean isSnapshotSplit() {
         return getClass() == MySqlSnapshotSplit.class
-                || getClass() == MySqlSchemaLessSnapshotSplit.class;
+                || getClass() == MySqlSchemalessSnapshotSplit.class;
     }
 
     /** Checks whether this split is a binlog split. */

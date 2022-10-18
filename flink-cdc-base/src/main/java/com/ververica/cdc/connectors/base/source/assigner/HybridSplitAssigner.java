@@ -23,7 +23,7 @@ import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsStat
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
-import com.ververica.cdc.connectors.base.source.meta.split.SchemaLessSnapshotSplit;
+import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import io.debezium.relational.TableId;
@@ -175,7 +175,7 @@ public class HybridSplitAssigner implements SplitAssigner {
     // --------------------------------------------------------------------------------------------
 
     public StreamSplit createStreamSplit() {
-        final List<SchemaLessSnapshotSplit> assignedSnapshotSplit =
+        final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
                 snapshotSplitAssigner.getAssignedSplits().values().stream()
                         .sorted(Comparator.comparing(SourceSplitBase::splitId))
                         .collect(Collectors.toList());
@@ -184,7 +184,7 @@ public class HybridSplitAssigner implements SplitAssigner {
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
 
         Offset minBinlogOffset = null;
-        for (SchemaLessSnapshotSplit split : assignedSnapshotSplit) {
+        for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
             // find the min binlog offset
             Offset binlogOffset = splitFinishedOffsets.get(split.splitId());
             if (minBinlogOffset == null || binlogOffset.isBefore(minBinlogOffset)) {

@@ -20,7 +20,7 @@ import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemaLessSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
@@ -41,13 +41,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final List<TableId> alreadyProcessedTables;
 
     /** The splits in the checkpoint. */
-    private final List<MySqlSchemaLessSnapshotSplit> remainingSplits;
+    private final List<MySqlSchemalessSnapshotSplit> remainingSplits;
 
     /**
      * The snapshot splits that the {@link MySqlSourceEnumerator} has assigned to {@link
      * MySqlSplitReader}s.
      */
-    private final Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits;
+    private final Map<String, MySqlSchemalessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received
@@ -68,8 +68,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
-            List<MySqlSchemaLessSnapshotSplit> remainingSplits,
-            Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits,
+            List<MySqlSchemalessSnapshotSplit> remainingSplits,
+            Map<String, MySqlSchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChange> tableSchemas,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
@@ -91,11 +91,11 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return alreadyProcessedTables;
     }
 
-    public List<MySqlSchemaLessSnapshotSplit> getRemainingSplits() {
+    public List<MySqlSchemalessSnapshotSplit> getRemainingSplits() {
         return remainingSplits;
     }
 
-    public Map<String, MySqlSchemaLessSnapshotSplit> getAssignedSplits() {
+    public Map<String, MySqlSchemalessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
     }
 

@@ -29,9 +29,9 @@ import java.util.Map;
  * A kind of {@link MySqlSnapshotSplit} without table schema information, it is useful to reduce
  * memory usage in JobManager.
  */
-public class MySqlSchemaLessSnapshotSplit extends MySqlSnapshotSplit {
+public class MySqlSchemalessSnapshotSplit extends MySqlSnapshotSplit {
 
-    public MySqlSchemaLessSnapshotSplit(
+    public MySqlSchemalessSnapshotSplit(
             TableId tableId,
             String splitId,
             RowType splitKeyType,
@@ -49,7 +49,7 @@ public class MySqlSchemaLessSnapshotSplit extends MySqlSnapshotSplit {
     }
 
     /**
-     * Converts current {@link MySqlSchemaLessSnapshotSplit} to {@link MySqlSnapshotSplit} with
+     * Converts current {@link MySqlSchemalessSnapshotSplit} to {@link MySqlSnapshotSplit} with
      * given table schema information.
      */
     public final MySqlSnapshotSplit toMySqlSnapshotSplit(TableChange tableSchema) {
