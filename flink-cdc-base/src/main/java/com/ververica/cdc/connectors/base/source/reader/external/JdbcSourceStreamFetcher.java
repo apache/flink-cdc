@@ -144,12 +144,12 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
                 if (executorService.awaitTermination(
                         READER_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     LOG.warn(
-                            "Failed to close the binlog split reader in {} seconds.",
+                            "Failed to close the stream fetcher in {} seconds.",
                             READER_CLOSE_TIMEOUT_SECONDS);
                 }
             }
         } catch (Exception e) {
-            LOG.error("Close binlog reader error", e);
+            LOG.error("Close stream fetcher error", e);
         }
     }
 

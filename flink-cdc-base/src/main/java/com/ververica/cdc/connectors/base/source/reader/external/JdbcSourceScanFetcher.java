@@ -200,12 +200,12 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecords, SourceSplit
                 if (executorService.awaitTermination(
                         READER_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     LOG.warn(
-                            "Failed to close the snapshot split reader in {} seconds.",
+                            "Failed to close the scan fetcher in {} seconds.",
                             READER_CLOSE_TIMEOUT_SECONDS);
                 }
             }
         } catch (Exception e) {
-            LOG.error("Close snapshot reader error", e);
+            LOG.error("Close scan fetcher error", e);
         }
     }
 
