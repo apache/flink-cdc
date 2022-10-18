@@ -39,9 +39,11 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -56,6 +58,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
 
     private final JdbcSourceFetchTaskContext taskContext;
     private final ExecutorService executor;
+    private final Set<TableId> pureBinlogPhaseTables;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile Throwable readException;
@@ -72,6 +75,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.pureBinlogPhaseTables = new HashSet<>();
     }
 
     @Override
@@ -178,9 +182,13 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, Offset position) {
+        if (pureBinlogPhaseTables.contains(tableId)) {
+            return true;
+        }
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
+            pureBinlogPhaseTables.add(tableId);
             return true;
         }
 
@@ -217,5 +225,6 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
+        this.pureBinlogPhaseTables.clear();
     }
 }
