@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getTableId;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
@@ -57,7 +58,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceStreamFetcher.class);
 
     private final JdbcSourceFetchTaskContext taskContext;
-    private final ExecutorService executor;
+    private final ExecutorService executorService;
     private final Set<TableId> pureBinlogPhaseTables;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
@@ -70,11 +71,13 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
     private Map<TableId, Offset> maxSplitHighWatermarkMap;
     private Tables.TableFilter capturedTableFilter;
 
+    private static final long READER_CLOSE_TIMEOUT_SECONDS = 30L;
+
     public JdbcSourceStreamFetcher(JdbcSourceFetchTaskContext taskContext, int subTaskId) {
         this.taskContext = taskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.pureBinlogPhaseTables = new HashSet<>();
     }
 
@@ -85,7 +88,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
         configureFilter();
         taskContext.configure(currentStreamSplit);
         this.queue = taskContext.getQueue();
-        executor.submit(
+        executorService.submit(
                 () -> {
                     try {
                         streamFetchTask.execute(taskContext);
@@ -134,7 +137,21 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
     }
 
     @Override
-    public void close() {}
+    public void close() {
+        try {
+            if (executorService != null) {
+                executorService.shutdown();
+                if (executorService.awaitTermination(
+                        READER_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    LOG.warn(
+                            "Failed to close the stream fetcher in {} seconds.",
+                            READER_CLOSE_TIMEOUT_SECONDS);
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Close stream fetcher error", e);
+        }
+    }
 
     /**
      * Returns the record should emit or not.
