@@ -22,6 +22,7 @@ import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitState;
 import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getFetchTimestamp;
@@ -52,7 +54,7 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isWaterm
  * emit records rather than emit the records directly.
  */
 public class JdbcSourceRecordEmitter<T>
-        implements RecordEmitter<SourceRecord, T, SourceSplitState> {
+        implements RecordEmitter<SourceRecords, T, SourceSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
@@ -78,6 +80,15 @@ public class JdbcSourceRecordEmitter<T>
 
     @Override
     public void emitRecord(
+            SourceRecords sourceRecords, SourceOutput<T> output, SourceSplitState splitState)
+            throws Exception {
+        final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
+        while (elementIterator.hasNext()) {
+            processElement(elementIterator.next(), output, splitState);
+        }
+    }
+
+    private void processElement(
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {

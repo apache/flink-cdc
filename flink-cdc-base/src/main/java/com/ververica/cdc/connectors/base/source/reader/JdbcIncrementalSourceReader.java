@@ -39,6 +39,7 @@ import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplitState;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitState;
@@ -46,7 +47,6 @@ import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplitState;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
-import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +68,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 @Experimental
 public class JdbcIncrementalSourceReader<T>
         extends SingleThreadMultiplexSourceReaderBase<
-                SourceRecord, T, SourceSplitBase, SourceSplitState> {
+                SourceRecords, T, SourceSplitBase, SourceSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcIncrementalSourceReader.class);
 
@@ -80,9 +80,9 @@ public class JdbcIncrementalSourceReader<T>
     private final JdbcDataSourceDialect dialect;
 
     public JdbcIncrementalSourceReader(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
+            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<JdbcSourceSplitReader> splitReaderSupplier,
-            RecordEmitter<SourceRecord, T, SourceSplitState> recordEmitter,
+            RecordEmitter<SourceRecords, T, SourceSplitState> recordEmitter,
             Configuration config,
             SourceReaderContext context,
             JdbcSourceConfig sourceConfig,

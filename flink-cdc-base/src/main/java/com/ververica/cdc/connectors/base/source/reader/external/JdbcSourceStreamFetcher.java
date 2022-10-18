@@ -23,6 +23,7 @@ import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadF
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
@@ -50,7 +51,7 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataCh
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.splitKeyRangeContains;
 
 /** Fetcher to fetch data from table split, the split is the stream split {@link StreamSplit}. */
-public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSplitBase> {
+public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSplitBase> {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceStreamFetcher.class);
 
     private final JdbcSourceFetchTaskContext taskContext;
@@ -102,7 +103,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
 
     @Nullable
     @Override
-    public Iterator<SourceRecord> pollSplitRecords() throws InterruptedException {
+    public Iterator<SourceRecords> pollSplitRecords() throws InterruptedException {
         checkReadException();
         final List<SourceRecord> sourceRecords = new ArrayList<>();
         if (streamFetchTask.isRunning()) {
@@ -113,7 +114,9 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecord, SourceSpli
                 }
             }
         }
-        return sourceRecords.iterator();
+        List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+        sourceRecordsSet.add(new SourceRecords(sourceRecords));
+        return sourceRecordsSet.iterator();
     }
 
     private void checkReadException() {
