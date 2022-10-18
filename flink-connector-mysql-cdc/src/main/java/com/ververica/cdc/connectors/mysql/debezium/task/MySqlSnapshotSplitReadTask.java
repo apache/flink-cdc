@@ -58,6 +58,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Duration;
 import java.util.Calendar;
+import java.util.TimeZone;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
 
@@ -78,6 +79,7 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
     private final MySqlOffsetContext offsetContext;
     private final TopicSelector<TableId> topicSelector;
     private final SnapshotProgressListener snapshotProgressListener;
+    private final TimeZone srcDbTimeZone;
 
     public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
@@ -99,6 +101,10 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         this.snapshotSplit = snapshotSplit;
         this.topicSelector = topicSelector;
         this.snapshotProgressListener = snapshotProgressListener;
+        String timeZone = null;
+        timeZone = jdbcConnection.config().getString("serverTimezone");
+        this.srcDbTimeZone =
+                null == timeZone ? TimeZone.getTimeZone("UTC") : TimeZone.getTimeZone(timeZone);
     }
 
     @Override
@@ -367,10 +373,16 @@ public class MySqlSnapshotSplitReadTask extends AbstractSnapshotChangeEventSourc
         }
 
         try {
+            //            return MySqlValueConverters.containsZeroValuesInDatePart(
+            //                            (new String(b.getBytes(1, (int) (b.length())), "UTF-8")),
+            // column, table)
+            //                    ? null
+            //                    : rs.getTimestamp(fieldNo, Calendar.getInstance());
             return MySqlValueConverters.containsZeroValuesInDatePart(
                             (new String(b.getBytes(1, (int) (b.length())), "UTF-8")), column, table)
                     ? null
-                    : rs.getTimestamp(fieldNo, Calendar.getInstance());
+                    : rs.getTimestamp(
+                            fieldNo, Calendar.getInstance(this.srcDbTimeZone)); // benjamin 20221109
         } catch (UnsupportedEncodingException e) {
             LOG.error("Could not read MySQL TIME value as UTF-8");
             throw new RuntimeException(e);

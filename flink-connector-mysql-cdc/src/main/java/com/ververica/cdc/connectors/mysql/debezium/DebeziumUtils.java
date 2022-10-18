@@ -144,7 +144,7 @@ public class DebeziumUtils {
 
         boolean timeAdjusterEnabled =
                 dbzMySqlConfig.getConfig().getBoolean(MySqlConnectorConfig.ENABLE_TIME_ADJUSTER);
-        return new MySqlValueConverters(
+        return new PFMySqlValueConverters(
                 decimalMode,
                 timePrecisionMode,
                 bigIntUnsignedMode,
