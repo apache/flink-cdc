@@ -37,7 +37,7 @@ public abstract class SourceSplitBase implements SourceSplit {
 
     /** Checks whether this split is a snapshot split. */
     public final boolean isSnapshotSplit() {
-        return getClass() == SnapshotSplit.class;
+        return getClass() == SnapshotSplit.class || getClass() == SchemaLessSnapshotSplit.class;
     }
 
     /** Checks whether this split is a stream split. */
