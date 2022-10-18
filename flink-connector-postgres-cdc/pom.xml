@@ -47,8 +47,20 @@ under the License.
             <groupId>io.debezium</groupId>
             <artifactId>debezium-connector-postgres</artifactId>
             <version>${debezium.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.postgresql</groupId>
+                    <artifactId>postgresql</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
+        <dependency>
+            <!-- fix CVE-2022-31197 https://www.oscs1024.com/hd/CVE-2022-31197  -->
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.2.26</version>
+        </dependency>
         <!-- test dependencies on Debezium -->
 
         <dependency>
