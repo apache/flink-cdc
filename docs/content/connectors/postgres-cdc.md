@@ -141,7 +141,15 @@ Connector Options
       <td>The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in
           for a particular database/schema. The server uses this slot to stream events to the connector that you are configuring.
           <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
-    </tr>  
+    </tr> 
+    <tr>
+      <td>changelog-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">all</td>
+      <td>String</td>
+      <td>The changelog mode used for encoding streaming changes. Supported values are <code>all</code> (which encodes changes as retract stream using all RowKinds) and <code>upsert</code> (which encodes changes as upsert stream that describes idempotent updates on a key).
+          <br/> <code>upsert</code> mode can be used for tables with primary keys when replica identity <code>FULL</code> is not an option. Primary keys must be set to use <code>upsert</code> mode.</td>
+    </tr> 
    <tr>
       <td>debezium.*</td>
       <td>optional</td>
