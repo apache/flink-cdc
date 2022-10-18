@@ -21,7 +21,7 @@ import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemaLessSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
@@ -111,23 +111,23 @@ public class PendingSplitsStateSerializerTest {
         final List<TableId> alreadyProcessedTables = new ArrayList<>();
         final List<TableId> remainingTables = new ArrayList<>();
 
-        final List<MySqlSchemaLessSnapshotSplit> remainingSplits = new ArrayList<>();
+        final List<MySqlSchemalessSnapshotSplit> remainingSplits = new ArrayList<>();
 
         alreadyProcessedTables.add(tableId0);
         alreadyProcessedTables.add(tableId1);
 
         remainingTables.add(tableId2);
 
-        remainingSplits.add(getTestSchemaLessSnapshotSplit(tableId1, 2));
-        remainingSplits.add(getTestSchemaLessSnapshotSplit(tableId1, 3));
+        remainingSplits.add(getTestSchemalessSnapshotSplit(tableId1, 2));
+        remainingSplits.add(getTestSchemalessSnapshotSplit(tableId1, 3));
 
-        final Map<String, MySqlSchemaLessSnapshotSplit> assignedSnapshotSplits = new HashMap<>();
+        final Map<String, MySqlSchemalessSnapshotSplit> assignedSnapshotSplits = new HashMap<>();
         Arrays.asList(
-                        getTestSchemaLessSnapshotSplit(tableId0, 0),
-                        getTestSchemaLessSnapshotSplit(tableId0, 1),
-                        getTestSchemaLessSnapshotSplit(tableId0, 2),
-                        getTestSchemaLessSnapshotSplit(tableId1, 0),
-                        getTestSchemaLessSnapshotSplit(tableId1, 1))
+                        getTestSchemalessSnapshotSplit(tableId0, 0),
+                        getTestSchemalessSnapshotSplit(tableId0, 1),
+                        getTestSchemalessSnapshotSplit(tableId0, 2),
+                        getTestSchemalessSnapshotSplit(tableId1, 0),
+                        getTestSchemalessSnapshotSplit(tableId1, 1))
                 .forEach(split -> assignedSnapshotSplits.put(split.splitId(), split));
 
         Map<String, BinlogOffset> finishedOffsets = new HashMap<>();
@@ -160,10 +160,10 @@ public class PendingSplitsStateSerializerTest {
         return new BinlogPendingSplitsState(true);
     }
 
-    private static MySqlSchemaLessSnapshotSplit getTestSchemaLessSnapshotSplit(
+    private static MySqlSchemalessSnapshotSplit getTestSchemalessSnapshotSplit(
             TableId tableId, int splitNo) {
         long restartSkipEvent = splitNo;
-        return new MySqlSchemaLessSnapshotSplit(
+        return new MySqlSchemalessSnapshotSplit(
                 tableId,
                 tableId.toString() + "-" + splitNo,
                 new RowType(

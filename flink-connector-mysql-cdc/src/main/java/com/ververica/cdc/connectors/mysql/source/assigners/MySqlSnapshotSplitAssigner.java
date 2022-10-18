@@ -28,7 +28,7 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemaLessSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.jdbc.JdbcConnection;
@@ -68,8 +68,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitAssigner.class);
 
     private final List<TableId> alreadyProcessedTables;
-    private final List<MySqlSchemaLessSnapshotSplit> remainingSplits;
-    private final Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits;
+    private final List<MySqlSchemalessSnapshotSplit> remainingSplits;
+    private final Map<String, MySqlSchemalessSnapshotSplit> assignedSplits;
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, BinlogOffset> splitFinishedOffsets;
     private final MySqlSourceConfig sourceConfig;
@@ -127,8 +127,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
-            List<MySqlSchemaLessSnapshotSplit> remainingSplits,
-            Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits,
+            List<MySqlSchemalessSnapshotSplit> remainingSplits,
+            Map<String, MySqlSchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
@@ -232,8 +232,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         synchronized (lock) {
             if (!remainingSplits.isEmpty()) {
                 // return remaining splits firstly
-                Iterator<MySqlSchemaLessSnapshotSplit> iterator = remainingSplits.iterator();
-                MySqlSchemaLessSnapshotSplit split = iterator.next();
+                Iterator<MySqlSchemalessSnapshotSplit> iterator = remainingSplits.iterator();
+                MySqlSchemalessSnapshotSplit split = iterator.next();
                 remainingSplits.remove(split);
                 assignedSplits.put(split.splitId(), split);
                 addAlreadyProcessedTablesIfNotExists(split.getTableId());
@@ -268,12 +268,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             throw new FlinkRuntimeException(
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
-        final List<MySqlSchemaLessSnapshotSplit> assignedSnapshotSplit =
+        final List<MySqlSchemalessSnapshotSplit> assignedSnapshotSplit =
                 assignedSplits.values().stream()
                         .sorted(Comparator.comparing(MySqlSplit::splitId))
                         .collect(Collectors.toList());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        for (MySqlSchemaLessSnapshotSplit split : assignedSnapshotSplit) {
+        for (MySqlSchemalessSnapshotSplit split : assignedSnapshotSplit) {
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
@@ -307,7 +307,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     public void addSplits(Collection<MySqlSplit> splits) {
         for (MySqlSplit split : splits) {
             tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
-            remainingSplits.add(split.asSnapshotSplit().toSchemaLessSnapshotSplit());
+            remainingSplits.add(split.asSnapshotSplit().toSchemalessSnapshotSplit());
             // we should remove the add-backed splits from the assigned list,
             // because they are failed
             assignedSplits.remove(split.splitId());
@@ -411,7 +411,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 && alreadyProcessedTables.isEmpty();
     }
 
-    public Map<String, MySqlSchemaLessSnapshotSplit> getAssignedSplits() {
+    public Map<String, MySqlSchemalessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
     }
 
@@ -443,13 +443,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 if (!splits.isEmpty()) {
                     tableSchema.putAll(splits.iterator().next().getTableSchemas());
                 }
-                final List<MySqlSchemaLessSnapshotSplit> schemaLessSnapshotSplits =
+                final List<MySqlSchemalessSnapshotSplit> schemalessSnapshotSplits =
                         splits.stream()
-                                .map(MySqlSnapshotSplit::toSchemaLessSnapshotSplit)
+                                .map(MySqlSnapshotSplit::toSchemalessSnapshotSplit)
                                 .collect(Collectors.toList());
                 synchronized (lock) {
                     tableSchemas.putAll(tableSchema);
-                    remainingSplits.addAll(schemaLessSnapshotSplits);
+                    remainingSplits.addAll(schemalessSnapshotSplits);
                     remainingTables.remove(nextTable);
                     lock.notify();
                 }

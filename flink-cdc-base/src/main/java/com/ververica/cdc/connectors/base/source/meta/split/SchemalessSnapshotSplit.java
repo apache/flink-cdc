@@ -29,9 +29,9 @@ import java.util.Map;
  * A kind of {@link SnapshotSplit} without table schema information, it is useful to reduce memory
  * usage in JobManager.
  */
-public class SchemaLessSnapshotSplit extends SnapshotSplit {
+public class SchemalessSnapshotSplit extends SnapshotSplit {
 
-    public SchemaLessSnapshotSplit(
+    public SchemalessSnapshotSplit(
             TableId tableId,
             String splitId,
             RowType splitKeyType,
@@ -49,7 +49,7 @@ public class SchemaLessSnapshotSplit extends SnapshotSplit {
     }
 
     /**
-     * Converts current {@link SchemaLessSnapshotSplit} to {@link SnapshotSplit} with given table
+     * Converts current {@link SchemalessSnapshotSplit} to {@link SnapshotSplit} with given table
      * schema information.
      */
     public final SnapshotSplit toSnapshotSplit(TableChange tableSchema) {

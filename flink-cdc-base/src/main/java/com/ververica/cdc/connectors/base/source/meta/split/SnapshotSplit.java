@@ -88,9 +88,9 @@ public class SnapshotSplit extends SourceSplitBase {
         return tableSchemas;
     }
 
-    /** Casts this split into a {@link SchemaLessSnapshotSplit}. */
-    public final SchemaLessSnapshotSplit toSchemaLessSnapshotSplit() {
-        return new SchemaLessSnapshotSplit(
+    /** Casts this split into a {@link SchemalessSnapshotSplit}. */
+    public final SchemalessSnapshotSplit toSchemalessSnapshotSplit() {
+        return new SchemalessSnapshotSplit(
                 tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
     }
 
