@@ -39,6 +39,8 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_TABLE_AHEAD_NUMS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_TABLE_PROCESS_CONTROL_ENABLED;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
@@ -59,6 +61,9 @@ public class MySqlSourceConfigFactory implements Serializable {
     private int splitSize = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
     private int splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private int fetchSize = SCAN_SNAPSHOT_FETCH_SIZE.defaultValue();
+    private boolean splitTableProcessControlEnabled =
+            SPLIT_TABLE_PROCESS_CONTROL_ENABLED.defaultValue();
+    private int splitTableAheadNums = SPLIT_TABLE_AHEAD_NUMS.defaultValue();
     private Duration connectTimeout = CONNECT_TIMEOUT.defaultValue();
     private int connectMaxRetries = CONNECT_MAX_RETRIES.defaultValue();
     private int connectionPoolSize = CONNECTION_POOL_SIZE.defaultValue();
@@ -189,6 +194,22 @@ public class MySqlSourceConfigFactory implements Serializable {
     /** The maximum fetch size for per poll when read table snapshot. */
     public MySqlSourceConfigFactory fetchSize(int fetchSize) {
         this.fetchSize = fetchSize;
+        return this;
+    }
+
+    /** Whether to control the process of table splitting when read table snapshot. */
+    public MySqlSourceConfigFactory splitTableProcessControlEnabled(
+            boolean splitTableProcessControlEnabled) {
+        this.splitTableProcessControlEnabled = splitTableProcessControlEnabled;
+        return this;
+    }
+
+    /**
+     * The number of tables split ahead than the number of tables already processed when read table
+     * snapshot.
+     */
+    public MySqlSourceConfigFactory splitTableAheadNums(int splitTableAheadNums) {
+        this.splitTableAheadNums = splitTableAheadNums;
         return this;
     }
 
@@ -330,6 +351,8 @@ public class MySqlSourceConfigFactory implements Serializable {
                 splitSize,
                 splitMetaGroupSize,
                 fetchSize,
+                splitTableProcessControlEnabled,
+                splitTableAheadNums,
                 serverTimeZone,
                 connectTimeout,
                 connectMaxRetries,

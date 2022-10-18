@@ -170,6 +170,17 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    public MySqlSourceBuilder<T> splitTableProcessControlEnabled(
+            boolean splitTableProcessControlEnabled) {
+        this.configFactory.splitTableProcessControlEnabled(splitTableProcessControlEnabled);
+        return this;
+    }
+
+    public MySqlSourceBuilder<T> splitTableAheadNums(int splitTableAheadNums) {
+        this.configFactory.splitTableAheadNums(splitTableAheadNums);
+        return this;
+    }
+
     /**
      * The maximum time that the connector should wait after trying to connect to the MySQL database
      * server before timing out.

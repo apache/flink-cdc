@@ -70,6 +70,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final int splitSize;
     private final int splitMetaGroupSize;
     private final int fetchSize;
+    private final boolean splitTableProcessControlEnabled;
+    private final int splitTableAheadNums;
     private final Duration connectTimeout;
     private final int connectionPoolSize;
     private final int connectMaxRetries;
@@ -106,6 +108,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             int splitSize,
             int splitMetaGroupSize,
             int fetchSize,
+            boolean splitTableProcessControlEnabled,
+            int splitTableAheadNums,
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
@@ -128,6 +132,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 splitSize,
                 splitMetaGroupSize,
                 fetchSize,
+                splitTableProcessControlEnabled,
+                splitTableAheadNums,
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
@@ -155,6 +161,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             int splitSize,
             int splitMetaGroupSize,
             int fetchSize,
+            boolean splitTableProcessControlEnabled,
+            int splitTableAheadNums,
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
@@ -179,6 +187,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.splitSize = splitSize;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.fetchSize = fetchSize;
+        this.splitTableProcessControlEnabled = splitTableProcessControlEnabled;
+        this.splitTableAheadNums = splitTableAheadNums;
         this.connectTimeout = connectTimeout;
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
@@ -237,6 +247,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .distributionFactorUpper(distributionFactorUpper)
                             .distributionFactorLower(distributionFactorLower)
                             .fetchSize(fetchSize)
+                            .splitTableProcessControlEnabled(splitTableProcessControlEnabled)
+                            .splitTableAheadNums(splitTableAheadNums)
                             .connectTimeout(connectTimeout)
                             .connectMaxRetries(connectMaxRetries)
                             .connectionPoolSize(connectionPoolSize)
@@ -317,6 +329,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         splitSize,
                         splitMetaGroupSize,
                         fetchSize,
+                        splitTableProcessControlEnabled,
+                        splitTableAheadNums,
                         connectTimeout,
                         connectMaxRetries,
                         connectionPoolSize,
@@ -386,6 +400,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 splitSize,
                 splitMetaGroupSize,
                 fetchSize,
+                splitTableProcessControlEnabled,
+                splitTableAheadNums,
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,

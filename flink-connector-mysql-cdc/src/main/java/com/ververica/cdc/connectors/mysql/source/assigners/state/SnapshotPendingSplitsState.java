@@ -40,6 +40,9 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      */
     private final List<TableId> alreadyProcessedTables;
 
+    /** The tables that have been split by ChunkSplitter. */
+    private final List<TableId> alreadySplitTables;
+
     /** The splits in the checkpoint. */
     private final List<MySqlSchemaLessSnapshotSplit> remainingSplits;
 
@@ -68,6 +71,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
+            List<TableId> alreadySplitTables,
             List<MySqlSchemaLessSnapshotSplit> remainingSplits,
             Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits,
             Map<TableId, TableChange> tableSchemas,
@@ -77,6 +81,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed) {
         this.alreadyProcessedTables = alreadyProcessedTables;
+        this.alreadySplitTables = alreadySplitTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
         this.splitFinishedOffsets = splitFinishedOffsets;
@@ -93,6 +98,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     public List<MySqlSchemaLessSnapshotSplit> getRemainingSplits() {
         return remainingSplits;
+    }
+
+    public List<TableId> getAlreadySplitTables() {
+        return alreadySplitTables;
     }
 
     public Map<String, MySqlSchemaLessSnapshotSplit> getAssignedSplits() {
@@ -137,6 +146,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && isRemainingTablesCheckpointed == that.isRemainingTablesCheckpointed
                 && Objects.equals(remainingTables, that.remainingTables)
                 && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
+                && Objects.equals(alreadySplitTables, that.alreadySplitTables)
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
                 && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets);
@@ -147,6 +157,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return Objects.hash(
                 remainingTables,
                 alreadyProcessedTables,
+                alreadySplitTables,
                 remainingSplits,
                 assignedSplits,
                 splitFinishedOffsets,
@@ -162,6 +173,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + remainingTables
                 + ", alreadyProcessedTables="
                 + alreadyProcessedTables
+                + ", alreadySplitTables="
+                + alreadySplitTables
                 + ", remainingSplits="
                 + remainingSplits
                 + ", assignedSplits="

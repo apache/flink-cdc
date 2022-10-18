@@ -68,6 +68,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitAssigner.class);
 
     private final List<TableId> alreadyProcessedTables;
+    private final List<TableId> alreadySplitTables;
     private final List<MySqlSchemaLessSnapshotSplit> remainingSplits;
     private final Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits;
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
@@ -96,6 +97,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 currentParallelism,
                 new ArrayList<>(),
                 new ArrayList<>(),
+                new ArrayList<>(),
                 new HashMap<>(),
                 new HashMap<>(),
                 new HashMap<>(),
@@ -113,6 +115,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 sourceConfig,
                 currentParallelism,
                 checkpoint.getAlreadyProcessedTables(),
+                checkpoint.getAlreadySplitTables(),
                 checkpoint.getRemainingSplits(),
                 checkpoint.getAssignedSplits(),
                 checkpoint.getTableSchemas(),
@@ -127,6 +130,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
+            List<TableId> alreadySplitTables,
             List<MySqlSchemaLessSnapshotSplit> remainingSplits,
             Map<String, MySqlSchemaLessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
@@ -138,6 +142,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
+        this.alreadySplitTables = alreadySplitTables;
         this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
         this.assignedSplits = assignedSplits;
         this.tableSchemas = tableSchemas;
@@ -320,6 +325,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
+                        alreadySplitTables,
                         remainingSplits,
                         assignedSplits,
                         tableSchemas,
@@ -385,6 +391,18 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void addAlreadyProcessedTablesIfNotExists(TableId tableId) {
         if (!alreadyProcessedTables.contains(tableId)) {
             alreadyProcessedTables.add(tableId);
+            // wake up table splitting thread when table split assigner process catch up with it
+            if (sourceConfig.getsplitTableProcessControlEnabled()) {
+                if (!allSplitsFinished()
+                        && (alreadySplitTables.size() - alreadyProcessedTables.size()
+                                <= sourceConfig.getSplitTableAheadNums())) {
+                    LOG.info(
+                            "split {} tables, processed {} tables, waking up splitting thread",
+                            alreadySplitTables.size(),
+                            alreadyProcessedTables.size());
+                    lock.notify();
+                }
+            }
         }
     }
 
@@ -436,6 +454,20 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void splitChunksForRemainingTables() {
         try {
             for (TableId nextTable : remainingTables) {
+                // when splitting table process go beyond split reading job too much, wait
+                if (sourceConfig.getsplitTableProcessControlEnabled()) {
+                    synchronized (lock) {
+                        if (alreadySplitTables.size() - alreadyProcessedTables.size()
+                                > sourceConfig.getSplitTableAheadNums()) {
+                            LOG.info(
+                                    "split {} tables, processed {} tables, splitting thread waiting...",
+                                    alreadySplitTables.size(),
+                                    alreadyProcessedTables.size());
+                            lock.wait();
+                        }
+                    }
+                }
+
                 // split the given table into chunks (snapshot splits)
                 Collection<MySqlSnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
 
@@ -451,6 +483,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     tableSchemas.putAll(tableSchema);
                     remainingSplits.addAll(schemaLessSnapshotSplits);
                     remainingTables.remove(nextTable);
+                    alreadySplitTables.add(nextTable);
                     lock.notify();
                 }
             }

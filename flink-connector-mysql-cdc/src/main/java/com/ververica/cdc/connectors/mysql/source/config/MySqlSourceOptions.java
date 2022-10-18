@@ -114,6 +114,20 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "The maximum fetch size for per poll when read table snapshot.");
 
+    public static final ConfigOption<Boolean> SPLIT_TABLE_PROCESS_CONTROL_ENABLED =
+            ConfigOptions.key("split.table.process.control.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to control the process of table splitting when read table snapshot.");
+
+    public static final ConfigOption<Integer> SPLIT_TABLE_AHEAD_NUMS =
+            ConfigOptions.key("split.table.ahead.nums")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "The number of tables already split ahead than the number of tables already processed when read table snapshot.");
+
     public static final ConfigOption<Duration> CONNECT_TIMEOUT =
             ConfigOptions.key("connect.timeout")
                     .durationType()

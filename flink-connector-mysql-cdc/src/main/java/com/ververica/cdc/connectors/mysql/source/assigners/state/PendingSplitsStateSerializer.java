@@ -153,6 +153,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             SnapshotPendingSplitsState state, DataOutputSerializer out) throws IOException {
         writeTableIds(state.getAlreadyProcessedTables(), out);
         writeRemainingSplits(state.getRemainingSplits(), out);
+        writeTableIds(state.getAlreadySplitTables(), out);
         writeAssignedSnapshotSplits(state.getAssignedSplits(), out);
         writeFinishedOffsets(state.getSplitFinishedOffsets(), out);
         out.writeInt(state.getSnapshotAssignerStatus().getStatusCode());
@@ -179,6 +180,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     private SnapshotPendingSplitsState deserializeLegacySnapshotPendingSplitsState(
             int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(in);
+        List<TableId> alreadySplitTables = readTableIds(in);
         List<MySqlSnapshotSplit> remainingSplits = readMySqlSnapshotSplits(splitVersion, in);
         Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
@@ -211,6 +213,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
+                alreadySplitTables,
                 remainingSchemaLessSplits,
                 assignedSchemaLessSnapshotSplits,
                 tableSchemas,
@@ -232,6 +235,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     private SnapshotPendingSplitsState deserializeSnapshotPendingSplitsState(
             int version, int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(in);
+        List<TableId> alreadySplitTables = readTableIds(in);
         List<MySqlSnapshotSplit> remainingSplits = readMySqlSnapshotSplits(splitVersion, in);
         Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
@@ -271,6 +275,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
+                alreadySplitTables,
                 remainingSchemaLessSplits,
                 assignedSchemaLessSnapshotSplits,
                 tableSchemas,

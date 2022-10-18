@@ -46,6 +46,8 @@ public class MySqlSourceConfig implements Serializable {
     private final int splitSize;
     private final int splitMetaGroupSize;
     private final int fetchSize;
+    private final boolean splitTableProcessControlEnabled;
+    private final int splitTableAheadNums;
     private final String serverTimeZone;
     private final Duration connectTimeout;
     private final int connectMaxRetries;
@@ -76,6 +78,8 @@ public class MySqlSourceConfig implements Serializable {
             int splitSize,
             int splitMetaGroupSize,
             int fetchSize,
+            boolean splitTableProcessControlEnabled,
+            int splitTableAheadNums,
             String serverTimeZone,
             Duration connectTimeout,
             int connectMaxRetries,
@@ -96,6 +100,8 @@ public class MySqlSourceConfig implements Serializable {
         this.serverIdRange = serverIdRange;
         this.startupOptions = checkNotNull(startupOptions);
         this.splitSize = splitSize;
+        this.splitTableProcessControlEnabled = splitTableProcessControlEnabled;
+        this.splitTableAheadNums = splitTableAheadNums;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.fetchSize = fetchSize;
         this.serverTimeZone = checkNotNull(serverTimeZone);
@@ -148,6 +154,14 @@ public class MySqlSourceConfig implements Serializable {
 
     public int getSplitSize() {
         return splitSize;
+    }
+
+    public boolean getsplitTableProcessControlEnabled() {
+        return splitTableProcessControlEnabled;
+    }
+
+    public int getSplitTableAheadNums() {
+        return splitTableAheadNums;
     }
 
     public int getSplitMetaGroupSize() {
