@@ -88,6 +88,12 @@ public class SnapshotSplit extends SourceSplitBase {
         return tableSchemas;
     }
 
+    /** Casts this split into a {@link SchemaLessSnapshotSplit}. */
+    public final SchemaLessSnapshotSplit toSchemaLessSnapshotSplit() {
+        return new SchemaLessSnapshotSplit(
+                tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

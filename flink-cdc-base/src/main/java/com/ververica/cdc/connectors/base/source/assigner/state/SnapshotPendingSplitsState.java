@@ -18,9 +18,10 @@ package com.ververica.cdc.connectors.base.source.assigner.state;
 
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
+import com.ververica.cdc.connectors.base.source.meta.split.SchemaLessSnapshotSplit;
 import com.ververica.cdc.connectors.base.source.reader.JdbcSourceSplitReader;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 
 import java.util.List;
 import java.util.Map;
@@ -39,13 +40,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final List<TableId> alreadyProcessedTables;
 
     /** The splits in the checkpoint. */
-    private final List<SnapshotSplit> remainingSplits;
+    private final List<SchemaLessSnapshotSplit> remainingSplits;
 
     /**
      * The snapshot splits that the {@link IncrementalSourceEnumerator} has assigned to {@link
      * JdbcSourceSplitReader}s.
      */
-    private final Map<String, SnapshotSplit> assignedSplits;
+    private final Map<String, SchemaLessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link IncrementalSourceEnumerator} has
@@ -65,10 +66,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     /** Whether the remaining tables are keep when snapshot state. */
     private final boolean isRemainingTablesCheckpointed;
 
+    private final Map<TableId, TableChanges.TableChange> tableSchemas;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
-            List<SnapshotSplit> remainingSplits,
-            Map<String, SnapshotSplit> assignedSplits,
+            List<SchemaLessSnapshotSplit> remainingSplits,
+            Map<String, SchemaLessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
             boolean isAssignerFinished,
             List<TableId> remainingTables,
@@ -82,18 +86,23 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.remainingTables = remainingTables;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
+        this.tableSchemas = tableSchemas;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
         return alreadyProcessedTables;
     }
 
-    public List<SnapshotSplit> getRemainingSplits() {
+    public List<SchemaLessSnapshotSplit> getRemainingSplits() {
         return remainingSplits;
     }
 
-    public Map<String, SnapshotSplit> getAssignedSplits() {
+    public Map<String, SchemaLessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
+    }
+
+    public Map<TableId, TableChanges.TableChange> getTableSchemas() {
+        return tableSchemas;
     }
 
     public Map<String, Offset> getSplitFinishedOffsets() {
