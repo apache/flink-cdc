@@ -11,19 +11,19 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-oceanbase-cdc</artifactId>
   <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-  <version>2.2.1</version>
+  <version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
 ## 下载 SQL 客户端 JAR 包
 
-点击 [flink-sql-connector-oceanbase-cdc-2.2.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.2.1/flink-sql-connector-oceanbase-cdc-2.2.1.jar) 下载 JAR 包至 `<FLINK_HOME>/lib/`.
+点击 [flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar) 下载 JAR 包至 `<FLINK_HOME>/lib/`.
 
 > **说明：**
 >
 > 下载链接仅适用于稳定发行版本。
 
-`flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT` 快照版本与开发分支的版本对应。要使用快照版本，您必须自行下载并编译源代码。推荐使用稳定发行版本，例如 `flink-sql-connector-oceanbase-cdc-2.2.1.jar`。您可以在 Maven 中央仓库中找到使用稳定发行版本。
+`flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT` 快照版本与开发分支的版本对应。要使用快照版本，您必须自行下载并编译源代码。推荐使用稳定发行版本，例如 `flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar`。您可以在 Maven 中央仓库中找到使用稳定发行版本。
 
 ### 配置 OceanBase 数据库和 oblogproxy 服务
 
