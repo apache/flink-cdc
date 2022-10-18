@@ -25,6 +25,7 @@ import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.Fetcher;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
@@ -43,13 +44,13 @@ import java.util.Queue;
 
 /** Basic class read {@link SourceSplitBase} and return {@link SourceRecord}. */
 @Experimental
-public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSplitBase> {
+public class JdbcSourceSplitReader implements SplitReader<SourceRecords, SourceSplitBase> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceSplitReader.class);
     private final Queue<SourceSplitBase> splits;
     private final int subtaskId;
 
-    @Nullable private Fetcher<SourceRecord, SourceSplitBase> currentFetcher;
+    @Nullable private Fetcher<SourceRecords, SourceSplitBase> currentFetcher;
     @Nullable private String currentSplitId;
     private final JdbcDataSourceDialect dataSourceDialect;
     private final JdbcSourceConfig sourceConfig;
@@ -63,9 +64,9 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecord, SourceSp
     }
 
     @Override
-    public RecordsWithSplitIds<SourceRecord> fetch() throws IOException {
+    public RecordsWithSplitIds<SourceRecords> fetch() throws IOException {
         checkSplitOrStartNext();
-        Iterator<SourceRecord> dataIt = null;
+        Iterator<SourceRecords> dataIt = null;
         try {
             dataIt = currentFetcher.pollSplitRecords();
         } catch (InterruptedException e) {

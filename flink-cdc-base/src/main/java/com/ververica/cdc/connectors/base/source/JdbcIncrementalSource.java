@@ -45,6 +45,7 @@ import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsStat
 import com.ververica.cdc.connectors.base.source.assigner.state.StreamPendingSplitsState;
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
@@ -52,7 +53,6 @@ import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceRead
 import com.ververica.cdc.connectors.base.source.reader.JdbcSourceSplitReader;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.relational.TableId;
-import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -101,7 +101,7 @@ public class JdbcIncrementalSource<T>
     public SourceReader createReader(SourceReaderContext readerContext) {
         // create source config for the given subtask (e.g. unique server id)
         JdbcSourceConfig sourceConfig = configFactory.create(readerContext.getIndexOfSubtask());
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
+        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
         final SourceReaderMetrics sourceReaderMetrics =
                 new SourceReaderMetrics(readerContext.metricGroup());

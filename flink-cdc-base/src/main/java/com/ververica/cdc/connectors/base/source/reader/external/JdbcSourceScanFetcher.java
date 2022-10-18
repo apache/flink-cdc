@@ -21,6 +21,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
@@ -55,7 +56,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 /**
  * Fetcher to fetch data from table split, the split is the snapshot split {@link SnapshotSplit}.
  */
-public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitBase> {
+public class JdbcSourceScanFetcher implements Fetcher<SourceRecords, SourceSplitBase> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceScanFetcher.class);
 
@@ -115,7 +116,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
 
     @Nullable
     @Override
-    public Iterator<SourceRecord> pollSplitRecords() throws InterruptedException {
+    public Iterator<SourceRecords> pollSplitRecords() throws InterruptedException {
         checkReadException();
 
         if (hasNextElement.get()) {
@@ -168,7 +169,10 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecord, SourceSplitB
             normalizedRecords.add(lowWatermark);
             normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
             normalizedRecords.add(highWatermark);
-            return normalizedRecords.iterator();
+
+            final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+            sourceRecordsSet.add(new SourceRecords(normalizedRecords));
+            return sourceRecordsSet.iterator();
         }
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
