@@ -81,7 +81,7 @@ Flink SQL> CREATE TABLE orders (
 Flink SQL> SELECT * FROM orders;
 ```
 
-您也可以访问 Flink 官网文档，快速体验将数据从 OceanBase 导入到 Elasticsearch。更多信息，参考 [Flink 官网文档](https://ververica.github.io/flink-cdc-connectors/release-2.2/content/%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B/oceanbase-tutorial-zh.html)。
+您也可以访问 Flink CDC 官网文档，快速体验将数据从 OceanBase 导入到 Elasticsearch。更多信息，参考 [Flink CDC 官网文档](https://ververica.github.io/flink-cdc-connectors/release-2.2/content/%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B/oceanbase-tutorial-zh.html)。
 
 ## OceanBase CDC 连接器选项
 
@@ -181,18 +181,18 @@ public class OceanBaseSourceExample {
   public static void main(String[] args) throws Exception {
     SourceFunction<String> oceanBaseSource =
         OceanBaseSource.<String>builder()
-            .rsList("127.0.0.1:2882:2881")  // set root server list
-            .startupMode(StartupMode.INITIAL) // set startup mode
-            .username("user@test_tenant")  // set cluster username
-            .password("pswd")  // set cluster password
-            .tenantName("test_tenant")  // set captured tenant name, do not support regex
-            .databaseName("test_db")  // set captured database, support regex
-            .tableName("test_table")  // set captured table, support regex
-            .hostname("127.0.0.1")  // set hostname of OceanBase server or proxy
-            .port(2881)  // set the sql port for OceanBase server or proxy
-            .logProxyHost("127.0.0.1")  // set the hostname of log proxy
-            .logProxyPort(2983)  // set the port of log proxy
-            .deserializer(new JsonDebeziumDeserializationSchema())  // converts SourceRecord to JSON String
+            .rsList("127.0.0.1:2882:2881")  // 设置 rs 列表
+            .startupMode(StartupMode.INITIAL) // 设置 startup 模式
+            .username("user@test_tenant")  // 设置集群用户名
+            .password("pswd")  // 设置集群密码
+            .tenantName("test_tenant")  // 设置捕获租户名，不支持正则表达式
+            .databaseName("test_db")  // 设置捕获数据库，支持正则表达式
+            .tableName("test_table")  //  设置捕获表，支持正则表达式
+            .hostname("127.0.0.1")  // 设置 OceanBase 服务器或代理的 hostname
+            .port(2881)  // 设置 OceanBase 服务器或代理的 SQL 端口
+            .logProxyHost("127.0.0.1")  // 设置 log proxy 的 hostname
+            .logProxyPort(2983)  // 设置 log proxy 的商品
+            .deserializer(new JsonDebeziumDeserializationSchema())  // 把 SourceRecord 转化成 JSON 字符串
             .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
