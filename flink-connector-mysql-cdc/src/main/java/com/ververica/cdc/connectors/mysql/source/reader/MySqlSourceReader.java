@@ -63,7 +63,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.source.events.WakeupReaderEvent.WakeUpTarget.BINLOG_READER;
+import static com.ververica.cdc.connectors.mysql.source.events.WakeupReaderEvent.WakeUpTarget.SNAPSHOT_READER;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toNormalBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils.getNextMetaGroupId;
@@ -144,6 +144,7 @@ public class MySqlSourceReader<T>
 
     @Override
     protected void onSplitFinished(Map<String, MySqlSplitState> finishedSplitIds) {
+        boolean requestNextSplit = true;
         for (MySqlSplitState mySqlSplitState : finishedSplitIds.values()) {
             MySqlSplit mySqlSplit = mySqlSplitState.toMySqlSplit();
             if (mySqlSplit.isBinlogSplit()) {
@@ -154,12 +155,17 @@ public class MySqlSourceReader<T>
                 mySqlSourceReaderContext.resetStopBinlogSplitReader();
                 suspendedBinlogSplit = toSuspendedBinlogSplit(mySqlSplit.asBinlogSplit());
                 context.sendSourceEventToCoordinator(new SuspendBinlogReaderAckEvent());
+                // do not request next split when the reader is suspended, the suspended reader will
+                // automatically request the next split after it has been wakeup
+                requestNextSplit = false;
             } else {
                 finishedUnackedSplits.put(mySqlSplit.splitId(), mySqlSplit.asSnapshotSplit());
             }
         }
         reportFinishedSnapshotSplitsIfNeed();
-        context.sendSplitRequest();
+        if (requestNextSplit) {
+            context.sendSplitRequest();
+        }
     }
 
     @Override
@@ -246,7 +252,9 @@ public class MySqlSourceReader<T>
             mySqlSourceReaderContext.setStopBinlogSplitReader();
         } else if (sourceEvent instanceof WakeupReaderEvent) {
             WakeupReaderEvent wakeupReaderEvent = (WakeupReaderEvent) sourceEvent;
-            if (wakeupReaderEvent.getTarget() == BINLOG_READER) {
+            if (wakeupReaderEvent.getTarget() == SNAPSHOT_READER) {
+                context.sendSplitRequest();
+            } else {
                 if (suspendedBinlogSplit != null) {
                     context.sendSourceEventToCoordinator(
                             new LatestFinishedSplitsSizeRequestEvent());
