@@ -110,7 +110,7 @@ public class MySqlSourceOptions {
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
             ConfigOptions.key("scan.snapshot.fetch.size")
                     .intType()
-                    .defaultValue(1024)
+                    .defaultValue(10_000)
                     .withDescription(
                             "The maximum fetch size for per poll when read table snapshot.");
 

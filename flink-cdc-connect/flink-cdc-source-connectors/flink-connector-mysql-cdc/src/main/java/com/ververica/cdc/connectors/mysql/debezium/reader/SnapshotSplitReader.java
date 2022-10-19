@@ -34,9 +34,11 @@ import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.MySqlBinaryProtocolFieldReader;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
+import io.debezium.connector.mysql.MySqlTextProtocolFieldReader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
@@ -71,7 +73,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.upsert
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
- * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
+ * A snapshot reader that reads data from Table in split-level, the split is assigned by primary key
  * range.
  */
 public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlSplit> {
@@ -122,10 +124,15 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         this.nameAdjuster = statefulTaskContext.getSchemaNameAdjuster();
         this.hasNextElement.set(true);
         this.reachEnd.set(false);
+        MySqlConnectorConfig connectorConfig = statefulTaskContext.getConnectorConfig();
+
         this.splitSnapshotReadTask =
                 new MySqlSnapshotSplitReadTask(
                         statefulTaskContext.getSourceConfig(),
-                        statefulTaskContext.getConnectorConfig(),
+                        connectorConfig,
+                        connectorConfig.useCursorFetch()
+                                ? new MySqlBinaryProtocolFieldReader(connectorConfig)
+                                : new MySqlTextProtocolFieldReader(connectorConfig),
                         statefulTaskContext.getSnapshotChangeEventSourceMetrics(),
                         statefulTaskContext.getDatabaseSchema(),
                         statefulTaskContext.getConnection(),
