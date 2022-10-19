@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
+import org.apache.flink.util.CollectionUtil;
+
 import com.ververica.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -86,8 +88,10 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void addSplits(Collection<MySqlSplit> splits) {
-        // we don't store the split, but will re-create binlog split later
-        isBinlogSplitAssigned = false;
+        if (!CollectionUtil.isNullOrEmpty(splits)) {
+            // we don't store the split, but will re-create binlog split later
+            isBinlogSplitAssigned = false;
+        }
     }
 
     @Override
