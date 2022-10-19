@@ -55,7 +55,6 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -302,7 +301,7 @@ public class MySqlSourceReader<T>
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
             LOG.info("The meta of binlog split {} has been collected success", splitId);
-            this.addSplits(Arrays.asList(binlogSplit));
+            this.addSplits(Collections.singletonList(binlogSplit));
         }
     }
 
