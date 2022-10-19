@@ -108,7 +108,7 @@ public class OceanBaseTestBase extends TestLogger {
 
     @ClassRule
     public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>("oceanbase/oceanbase-ce:3.1.3_bp1")
+            new GenericContainer<>("oceanbase/oceanbase-ce:3.1.4")
                     .withNetworkMode(NETWORK_MODE)
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
@@ -118,7 +118,7 @@ public class OceanBaseTestBase extends TestLogger {
 
     @ClassRule
     public static final GenericContainer<?> LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy:1.0.2")
+            new GenericContainer<>("whhe/oblogproxy:1.0.3")
                     .withNetworkMode(NETWORK_MODE)
                     .withExposedPorts(LOG_PROXY_PORT)
                     .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME)

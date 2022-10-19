@@ -21,11 +21,6 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 
-import com.ververica.cdc.debezium.table.MetadataConverter;
-import io.debezium.data.Envelope;
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.source.SourceRecord;
-
 /** Defines the supported metadata columns for {@link OceanBaseTableSource}. */
 public enum OceanBaseReadableMetadata {
 
@@ -33,14 +28,12 @@ public enum OceanBaseReadableMetadata {
     TENANT(
             "tenant_name",
             DataTypes.STRING().notNull(),
-            new MetadataConverter() {
+            new OceanBaseMetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
-                    Struct value = (Struct) record.value();
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    return StringData.fromString(source.getString("tenant"));
+                public Object read(OceanBaseRecord record) {
+                    return StringData.fromString(record.getSourceInfo().getTenant());
                 }
             }),
 
@@ -48,14 +41,12 @@ public enum OceanBaseReadableMetadata {
     DATABASE(
             "database_name",
             DataTypes.STRING().notNull(),
-            new MetadataConverter() {
+            new OceanBaseMetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
-                    Struct value = (Struct) record.value();
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    return StringData.fromString(source.getString("database"));
+                public Object read(OceanBaseRecord record) {
+                    return StringData.fromString(record.getSourceInfo().getDatabase());
                 }
             }),
 
@@ -63,14 +54,12 @@ public enum OceanBaseReadableMetadata {
     TABLE(
             "table_name",
             DataTypes.STRING().notNull(),
-            new MetadataConverter() {
+            new OceanBaseMetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
-                    Struct value = (Struct) record.value();
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    return StringData.fromString(source.getString("table"));
+                public Object read(OceanBaseRecord record) {
+                    return StringData.fromString(record.getSourceInfo().getTable());
                 }
             }),
 
@@ -81,18 +70,13 @@ public enum OceanBaseReadableMetadata {
     OP_TS(
             "op_ts",
             DataTypes.TIMESTAMP_LTZ(3).notNull(),
-            new MetadataConverter() {
+            new OceanBaseMetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record) {
-                    Struct value = (Struct) record.value();
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    String timestamp = source.getString("timestamp");
-                    if (timestamp == null) {
-                        timestamp = "0";
-                    }
-                    return TimestampData.fromEpochMillis(Long.parseLong(timestamp) * 1000);
+                public Object read(OceanBaseRecord record) {
+                    return TimestampData.fromEpochMillis(
+                            record.getSourceInfo().getTimestampS() * 1000);
                 }
             });
 
@@ -100,9 +84,9 @@ public enum OceanBaseReadableMetadata {
 
     private final DataType dataType;
 
-    private final MetadataConverter converter;
+    private final OceanBaseMetadataConverter converter;
 
-    OceanBaseReadableMetadata(String key, DataType dataType, MetadataConverter converter) {
+    OceanBaseReadableMetadata(String key, DataType dataType, OceanBaseMetadataConverter converter) {
         this.key = key;
         this.dataType = dataType;
         this.converter = converter;
@@ -116,7 +100,7 @@ public enum OceanBaseReadableMetadata {
         return dataType;
     }
 
-    public MetadataConverter getConverter() {
+    public OceanBaseMetadataConverter getConverter() {
         return converter;
     }
 }

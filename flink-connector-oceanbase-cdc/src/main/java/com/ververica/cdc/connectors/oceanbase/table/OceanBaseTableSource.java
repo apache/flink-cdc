@@ -29,9 +29,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.table.MetadataConverter;
-import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import com.ververica.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -138,11 +136,11 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext context) {
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
-        MetadataConverter[] metadataConverters = getMetadataConverters();
+        OceanBaseMetadataConverter[] metadataConverters = getMetadataConverters();
         TypeInformation<RowData> resultTypeInfo = context.createTypeInformation(producedDataType);
 
-        DebeziumDeserializationSchema<RowData> deserializer =
-                RowDataDebeziumDeserializeSchema.newBuilder()
+        RowDataOceanBaseDeserializationSchema deserializer =
+                RowDataOceanBaseDeserializationSchema.newBuilder()
                         .setPhysicalRowType(physicalDataType)
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(resultTypeInfo)
@@ -173,9 +171,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         return SourceFunctionProvider.of(builder.build(), false);
     }
 
-    protected MetadataConverter[] getMetadataConverters() {
+    protected OceanBaseMetadataConverter[] getMetadataConverters() {
         if (metadataKeys.isEmpty()) {
-            return new MetadataConverter[0];
+            return new OceanBaseMetadataConverter[0];
         }
         return metadataKeys.stream()
                 .map(
@@ -185,7 +183,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                                         .findFirst()
                                         .orElseThrow(IllegalStateException::new))
                 .map(OceanBaseReadableMetadata::getConverter)
-                .toArray(MetadataConverter[]::new);
+                .toArray(OceanBaseMetadataConverter[]::new);
     }
 
     @Override

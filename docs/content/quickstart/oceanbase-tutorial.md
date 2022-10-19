@@ -15,13 +15,13 @@ Create `docker-compose.yml`.
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:3.1.3_bp1
+    image: oceanbase/oceanbase-ce:3.1.4
     container_name: observer
     environment:
       - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.0.2
+    image: whhe/oblogproxy:1.0.3
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
@@ -130,7 +130,7 @@ Flink SQL> CREATE TABLE orders (
    customer_name STRING,
    price DECIMAL(10, 5),
    product_id INT,
-   order_status TINYINT,
+   order_status BOOLEAN,
    PRIMARY KEY (order_id) NOT ENFORCED
  ) WITH (
     'connector' = 'oceanbase-cdc',
@@ -177,7 +177,7 @@ Flink SQL> CREATE TABLE enriched_orders (
    customer_name STRING,
    price DECIMAL(10, 5),
    product_id INT,
-   order_status TINYINT,
+   order_status BOOLEAN,
    product_name STRING,
    product_description STRING,
    PRIMARY KEY (order_id) NOT ENFORCED
