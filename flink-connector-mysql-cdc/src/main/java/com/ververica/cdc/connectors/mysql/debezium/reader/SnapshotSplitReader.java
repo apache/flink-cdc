@@ -49,8 +49,8 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -247,7 +247,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             boolean reachBinlogEnd = false;
             SourceRecord lowWatermark = null;
             SourceRecord highWatermark = null;
-            Map<Struct, SourceRecord> snapshotRecords = new HashMap<>();
+            Map<Struct, SourceRecord> snapshotRecords = new LinkedHashMap<>();
             while (!reachBinlogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
