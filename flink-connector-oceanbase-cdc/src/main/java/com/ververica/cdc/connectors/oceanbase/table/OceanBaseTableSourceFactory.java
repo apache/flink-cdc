@@ -32,7 +32,6 @@ import java.util.Set;
 public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "oceanbase-cdc";
-    private static final String OB_CDC_PREFIX = "obcdc.";
 
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")

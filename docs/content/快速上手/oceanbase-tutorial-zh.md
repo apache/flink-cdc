@@ -129,7 +129,7 @@ Flink SQL> CREATE TABLE orders (
    customer_name STRING,
    price DECIMAL(10, 5),
    product_id INT,
-   order_status TINYINT,
+   order_status BOOLEAN,
    PRIMARY KEY (order_id) NOT ENFORCED
  ) WITH (
     'connector' = 'oceanbase-cdc',
@@ -176,7 +176,7 @@ Flink SQL> CREATE TABLE enriched_orders (
    customer_name STRING,
    price DECIMAL(10, 5),
    product_id INT,
-   order_status TINYINT,
+   order_status BOOLEAN,
    product_name STRING,
    product_description STRING,
    PRIMARY KEY (order_id) NOT ENFORCED

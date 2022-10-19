@@ -296,13 +296,16 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                 String.format(
                         "CREATE TABLE ob_source (\n"
                                 + "    `id` INT NOT NULL,\n"
-                                + "    bool_c TINYINT,\n"
+                                + "    bit1_c BOOLEAN,\n"
+                                + "    tiny1_c BOOLEAN,\n"
+                                + "    boolean_c BOOLEAN,\n"
                                 + "    tiny_c TINYINT,\n"
                                 + "    tiny_un_c SMALLINT,\n"
                                 + "    small_c SMALLINT ,\n"
                                 + "    small_un_c INT ,\n"
                                 + "    medium_c INT,\n"
                                 + "    medium_un_c INT,\n"
+                                + "    int11_c INT,\n"
                                 + "    int_c INT,\n"
                                 + "    int_un_c BIGINT,\n"
                                 + "    big_c BIGINT,\n"
@@ -317,18 +320,22 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + "    time_c TIME(0),\n"
                                 + "    datetime3_c TIMESTAMP(3),\n"
                                 + "    datetime6_c TIMESTAMP(6),\n"
-                                + "    timestamp_c TIMESTAMP,\n"
+                                + "    timestamp_c TIMESTAMP_LTZ,\n"
+                                + "    timestamp3_c TIMESTAMP_LTZ(3),\n"
+                                + "    timestamp6_c TIMESTAMP_LTZ(6),\n"
                                 + "    char_c CHAR(3),\n"
                                 + "    varchar_c VARCHAR(255),\n"
+                                + "    file_uuid BINARY(16),\n"
                                 + "    bit_c BINARY(8),\n"
                                 + "    text_c STRING,\n"
                                 + "    tiny_blob_c BYTES,\n"
                                 + "    medium_blob_c BYTES,\n"
-                                + "    long_blob_c BYTES,\n"
                                 + "    blob_c BYTES,\n"
+                                + "    long_blob_c BYTES,\n"
                                 + "    year_c INT,\n"
-                                + "    set_c STRING,\n"
+                                + "    set_c ARRAY<STRING>,\n"
                                 + "    enum_c STRING,\n"
+                                + "    json_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'oceanbase-cdc',"
@@ -360,13 +367,16 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + "    `id` INT NOT NULL,\n"
-                        + "    bool_c TINYINT,\n"
+                        + "    bit1_c BOOLEAN,\n"
+                        + "    tiny1_c BOOLEAN,\n"
+                        + "    boolean_c BOOLEAN,\n"
                         + "    tiny_c TINYINT,\n"
                         + "    tiny_un_c SMALLINT,\n"
                         + "    small_c SMALLINT ,\n"
                         + "    small_un_c INT ,\n"
                         + "    medium_c INT,\n"
                         + "    medium_un_c INT,\n"
+                        + "    int11_c INT,\n"
                         + "    int_c INT,\n"
                         + "    int_un_c BIGINT,\n"
                         + "    big_c BIGINT,\n"
@@ -382,8 +392,11 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         + "    datetime3_c TIMESTAMP(3),\n"
                         + "    datetime6_c TIMESTAMP(6),\n"
                         + "    timestamp_c TIMESTAMP,\n"
+                        + "    timestamp3_c TIMESTAMP(3),\n"
+                        + "    timestamp6_c TIMESTAMP(6),\n"
                         + "    char_c CHAR(3),\n"
                         + "    varchar_c VARCHAR(255),\n"
+                        + "    file_uuid BINARY(16),\n"
                         + "    bit_c BINARY(8),\n"
                         + "    text_c STRING,\n"
                         + "    tiny_blob_c BYTES,\n"
@@ -391,8 +404,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         + "    blob_c BYTES,\n"
                         + "    long_blob_c BYTES,\n"
                         + "    year_c INT,\n"
+                        + "    set_c ARRAY<STRING>,\n"
                         + "    enum_c STRING,\n"
-                        + "    set_c STRING,\n"
+                        + "    json_c STRING,\n"
                         + "    primary key (`id`) not enforced"
                         + ") WITH ("
                         + " 'connector' = 'values',"
@@ -417,8 +431,107 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(1,1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,abc,Hello World,[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,a,red)",
-                        "+U(1,1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,abc,Hello World,[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,a,red)");
+                        "+I(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})",
+                        "+U(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        assertContainsInAnyOrder(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testTimezoneBerlin() throws Exception {
+        testTimeDataTypes("+02:00");
+    }
+
+    @Test
+    public void testTimezoneShanghai() throws Exception {
+        testTimeDataTypes("+08:00");
+    }
+
+    public void testTimeDataTypes(String serverTimeZone) throws Exception {
+        try (Connection connection = getJdbcConnection("");
+                Statement statement = connection.createStatement()) {
+            statement.execute(String.format("SET GLOBAL time_zone = '%s';", serverTimeZone));
+        }
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
+        initializeTable("column_type_test");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE ob_source (\n"
+                                + "    `id` INT NOT NULL,\n"
+                                + "    date_c DATE,\n"
+                                + "    time_c TIME(0),\n"
+                                + "    datetime3_c TIMESTAMP(3),\n"
+                                + "    datetime6_c TIMESTAMP(6),\n"
+                                + "    timestamp_c TIMESTAMP_LTZ,\n"
+                                + "    primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'scan.startup.mode' = 'initial',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'tenant-name' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'logproxy.host' = '%s',"
+                                + " 'logproxy.port' = '%s',"
+                                + " 'rootserver-list' = '%s',"
+                                + " 'working-mode' = 'memory'"
+                                + ")",
+                        getUsername(),
+                        getPassword(),
+                        getTenant(),
+                        "column_type_test",
+                        "full_types",
+                        serverTimeZone,
+                        getObServerHost(),
+                        getObServerSqlPort(),
+                        getLogProxyHost(),
+                        getLogProxyPort(),
+                        getRsList());
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + "    `id` INT NOT NULL,\n"
+                        + "    date_c DATE,\n"
+                        + "    time_c TIME(0),\n"
+                        + "    datetime3_c TIMESTAMP(3),\n"
+                        + "    datetime6_c TIMESTAMP(6),\n"
+                        + "    timestamp_c TIMESTAMP,\n"
+                        + "    primary key (`id`) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT `id`, date_c, time_c, datetime3_c, datetime6_c, cast(timestamp_c as timestamp) FROM ob_source");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", 1);
+        int snapshotSize = sinkSize("sink");
+
+        try (Connection connection = getJdbcConnection("column_type_test");
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+        }
+
+        waitForSinkSize("sink", snapshotSize + 1);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22)",
+                        "+U(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22)");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertContainsInAnyOrder(expected, actual);

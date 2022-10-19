@@ -349,49 +349,77 @@ The OceanBase CDC Connector using [oblogclient](https://github.com/oceanbase/obl
 The OceanBase CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
 
 ```java
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.UniqueConstraint;
+import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.logical.RowType;
+
 import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
-import com.ververica.cdc.connectors.oceanbase.table.OceanBaseTableSourceFactory;
+import com.ververica.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
+import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+
+import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.Collections;
 
 public class OceanBaseSourceExample {
+   public static void main(String[] args) throws Exception {
+      ResolvedSchema resolvedSchema =
+              new ResolvedSchema(
+                      Arrays.asList(
+                              Column.physical("id", DataTypes.INT().notNull()),
+                              Column.physical("name", DataTypes.STRING().notNull())),
+                      Collections.emptyList(),
+                      UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
-  public static void main(String[] args) throws Exception {
-    SourceFunction<String> oceanBaseSource =
-        OceanBaseSource.<String>builder()
-            .rsList("127.0.0.1:2882:2881")  // set root server list
-            .startupMode(StartupMode.INITIAL) // set startup mode
-            .username("user@test_tenant")  // set cluster username
-            .password("pswd")  // set cluster password
-            .tenantName("test_tenant")  // set captured tenant name, do not support regex
-            .databaseName("test_db")  // set captured database, support regex
-            .tableName("test_table")  // set captured table, support regex
-            .hostname("127.0.0.1")  // set hostname of OceanBase server or proxy
-            .port(2881)  // set the sql port for OceanBase server or proxy
-            .logProxyHost("127.0.0.1")  // set the hostname of log proxy
-            .logProxyPort(2983)  // set the port of log proxy
-            .deserializer(new JsonDebeziumDeserializationSchema())  // converts SourceRecord to JSON String
-            .build();
+      RowType physicalDataType =
+              (RowType) resolvedSchema.toPhysicalRowDataType().getLogicalType();
+      TypeInformation<RowData> resultTypeInfo = InternalTypeInfo.of(physicalDataType);
+      String serverTimeZone = "+00:00";
 
-    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+      OceanBaseDeserializationSchema<RowData> deserializer =
+              RowDataOceanBaseDeserializationSchema.newBuilder()
+                      .setPhysicalRowType(physicalDataType)
+                      .setResultTypeInfo(resultTypeInfo)
+                      .setServerTimeZone(ZoneId.of(serverTimeZone))
+                      .build();
 
-    // enable checkpoint
-    env.enableCheckpointing(3000);
-    
-    env.addSource(oceanBaseSource).print().setParallelism(1);
+      SourceFunction<RowData> oceanBaseSource =
+              OceanBaseSource.<RowData>builder()
+                      .rsList("127.0.0.1:2882:2881")
+                      .startupMode(StartupMode.INITIAL)
+                      .username("user@test_tenant")
+                      .password("pswd")
+                      .tenantName("test_tenant")
+                      .databaseName("test_db")
+                      .tableName("test_table")
+                      .hostname("127.0.0.1")
+                      .port(2881)
+                      .logProxyHost("127.0.0.1")
+                      .logProxyPort(2983)
+                      .serverTimeZone(serverTimezone)
+                      .deserializer(deserializer)
+                      .build();
 
-    env.execute("Print OceanBase Snapshot + Commit Log");
-  }
+      StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+      // enable checkpoint
+      env.enableCheckpointing(3000);
+
+      env.addSource(oceanBaseSource).print().setParallelism(1);
+      env.execute("Print OceanBase Snapshot + Change Events");
+   }
 }
 ```
 Data Type Mapping
 ----------------
-
-When the startup mode is not `INITIAL`, we will not be able to get the precision and scale of a column. In order to be compatible with different startup modes, we will not map one OceanBase type of different precision to different FLink types.
-
-For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) or BIT(1). BOOLEAN is equivalent to TINYINT(1) in OceanBase, so columns of BOOLEAN and TINYINT types will be mapped to TINYINT in Flink, and BIT(1) will be mapped to BINARY(1) in Flink.
 
 <div class="wy-table-responsive">
     <table class="colwidths-auto docutils">
@@ -405,7 +433,13 @@ For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) o
         <tbody>
             <tr>
                 <td>BOOLEAN<br>
-                    TINYINT</td>
+                    TINYINT(1)<br>
+                    BIT(1)</td>
+                <td>BOOLEAN</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TINYINT</td>
                 <td>TINYINT</td>
                 <td></td>
             </tr>
@@ -483,11 +517,13 @@ For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) o
                 <td></td>
             </tr>
             <tr>
-                <td>TIMESTAMP [(p)]<br>
-                    DATETIME [(p)]
-                </td>
-                <td>TIMESTAMP [(p)]
-                </td>
+                <td>DATETIME [(p)]</td>
+                <td>TIMESTAMP [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP [(p)]</td>
+                <td>TIMESTAMP_LTZ [(p)]</td>
                 <td></td>
             </tr>
             <tr>
@@ -547,8 +583,13 @@ For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) o
             </tr>
             <tr>
                 <td>SET</td>
+                <td>ARRAY&lt;STRING&gt;</td>
+                <td>As the SET data type in OceanBase is a string object that can have zero or more values, it should always be mapped to an array of string</td>
+            </tr>
+            <tr>
+                <td>JSON</td>
                 <td>STRING</td>
-                <td></td>
+                <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
             </tr>
         </tbody>
     </table>

@@ -23,20 +23,15 @@ import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
+import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/**
- * A builder to build a SourceFunction which can read snapshot and continue to consume commit log.
- */
+/** A builder to build a SourceFunction which can read snapshot and change events of OceanBase. */
 @PublicEvolving
 public class OceanBaseSource {
 
@@ -71,7 +66,7 @@ public class OceanBaseSource {
         private String configUrl;
         private String workingMode;
 
-        private DebeziumDeserializationSchema<T> deserializer;
+        private OceanBaseDeserializationSchema<T> deserializer;
 
         public Builder<T> startupMode(StartupMode startupMode) {
             this.startupMode = startupMode;
@@ -163,7 +158,7 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
+        public Builder<T> deserializer(OceanBaseDeserializationSchema<T> deserializer) {
             this.deserializer = deserializer;
             return this;
         }
@@ -202,7 +197,6 @@ public class OceanBaseSource {
             if (serverTimeZone == null) {
                 serverTimeZone = "+00:00";
             }
-            ZoneOffset zoneOffset = ZoneId.of(serverTimeZone).getRules().getOffset(Instant.now());
 
             if (connectTimeout == null) {
                 connectTimeout = Duration.ofSeconds(30);
@@ -245,7 +239,6 @@ public class OceanBaseSource {
                     databaseName,
                     tableName,
                     tableList,
-                    zoneOffset,
                     connectTimeout,
                     hostname,
                     port,
