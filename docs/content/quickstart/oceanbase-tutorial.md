@@ -15,13 +15,13 @@ Create `docker-compose.yml`.
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:3.1.3_bp1
+    image: oceanbase/oceanbase-ce:3.1.4
     container_name: observer
     environment:
       - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.0.2
+    image: whhe/oblogproxy:1.0.3
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
