@@ -71,7 +71,7 @@ under the License.
     </distributionManagement>
 
     <properties>
-        <flink.version>1.14.4</flink.version>
+        <flink.version>1.15.2</flink.version>
         <debezium.version>1.6.4.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
@@ -224,8 +224,7 @@ under the License.
                             specific language governing permissions and limitations
                             under the License.
                         -->
-                        <license
-                                implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+                        <license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
                             <licenseFamilyCategory>AL2</licenseFamilyCategory>
                             <licenseFamilyName>Apache License 2.0</licenseFamilyName>
                             <notes/>
@@ -414,7 +413,7 @@ under the License.
                             <artifactSet>
                                 <includes>
                                     <!-- include nothing -->
-                                    <include></include>
+                                    <include/>
                                 </includes>
                             </artifactSet>
                         </configuration>
