@@ -48,6 +48,10 @@ import org.tikv.txn.KVClient;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * The source implementation for TiKV that read snapshot events first and then read the change
@@ -76,7 +80,11 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     private transient volatile long resolvedTs = -1L;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> prewrites = null;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> commits = null;
+    private transient BlockingQueue<Cdcpb.Event.Row> committedEvents = null;
     private transient OutputCollector<T> outputCollector;
+
+    private transient boolean running = true;
+    private ExecutorService executor = null;
 
     // offset state
     private transient ListState<Long> offsetState;
@@ -114,6 +122,10 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         cdcClient = new CDCClient(session, keyRange);
         prewrites = new TreeMap<>();
         commits = new TreeMap<>();
+        // cdc event will lose if pull cdc event block when region split
+        // use queue to separate read and write to ensure pull event unblock.
+        // since sink jdbc is slow, 5000W queue size may be safe size.
+        committedEvents = new LinkedBlockingQueue<>(50000000);
         outputCollector = new OutputCollector<>();
         resolvedTs =
                 startupMode == StartupMode.INITIAL
@@ -137,6 +149,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
         LOG.info("start read change events");
         cdcClient.start(resolvedTs);
+        running = true;
         readChangeEvents();
     }
 
@@ -198,6 +211,9 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
     protected void readChangeEvents() throws Exception {
         LOG.info("read change event from resolvedTs:{}", resolvedTs);
+        // child thread to sink committed rows.
+        executor = Executors.newSingleThreadExecutor();
+        executor.execute(this::asyncSink);
         while (resolvedTs >= STREAMING_VERSION_START_EPOCH) {
             for (int i = 0; i < 1000; i++) {
                 final Cdcpb.Event.Row row = cdcClient.get();
@@ -213,6 +229,19 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         }
     }
 
+    private void asyncSink() {
+        while (running) {
+            try {
+                Cdcpb.Event.Row committedRow = committedEvents.take();
+                if (committedRow != null) {
+                    changeEventDeserializationSchema.deserialize(committedRow, outputCollector);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     protected void flushRows(final long timestamp) throws Exception {
         Preconditions.checkState(sourceContext != null, "sourceContext shouldn't be null");
         synchronized (sourceContext) {
@@ -220,7 +249,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                 final Cdcpb.Event.Row commitRow = commits.pollFirstEntry().getValue();
                 final Cdcpb.Event.Row prewriteRow =
                         prewrites.remove(RowKeyWithTs.ofStart(commitRow));
-                changeEventDeserializationSchema.deserialize(prewriteRow, outputCollector);
+                // if pull cdc event block when region split, cdc event will lose.
+                committedEvents.offer(prewriteRow);
             }
         }
     }
@@ -228,8 +258,12 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     @Override
     public void cancel() {
         try {
+            running = false;
             if (cdcClient != null) {
                 cdcClient.close();
+            }
+            if (executor != null) {
+                executor.shutdown();
             }
         } catch (final Exception e) {
             LOG.error("Unable to close cdcClient", e);
