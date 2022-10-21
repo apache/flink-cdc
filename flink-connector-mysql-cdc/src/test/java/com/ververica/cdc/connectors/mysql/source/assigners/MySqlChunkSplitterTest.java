@@ -23,12 +23,12 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/** Tests for {@link ChunkSplitter}. */
+/** Tests for {@link StatefulChunkSplitter}. */
 public class MySqlChunkSplitterTest {
 
     @Test
     public void testSplitEvenlySizedChunksOverflow() {
-        ChunkSplitter splitter = new ChunkSplitter(null, null);
+        StatefulChunkSplitter splitter = new StatefulChunkSplitter(null, null);
         List<ChunkRange> res =
                 splitter.splitEvenlySizedChunks(
                         new TableId("catalog", "db", "tab"),
@@ -44,7 +44,7 @@ public class MySqlChunkSplitterTest {
 
     @Test
     public void testSplitEvenlySizedChunksNormal() {
-        ChunkSplitter splitter = new ChunkSplitter(null, null);
+        StatefulChunkSplitter splitter = new StatefulChunkSplitter(null, null);
         List<ChunkRange> res =
                 splitter.splitEvenlySizedChunks(
                         new TableId("catalog", "db", "tab"),

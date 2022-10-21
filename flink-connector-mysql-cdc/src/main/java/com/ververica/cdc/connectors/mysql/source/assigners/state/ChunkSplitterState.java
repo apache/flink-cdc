@@ -16,13 +16,14 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners.state;
 
+import com.ververica.cdc.connectors.mysql.source.assigners.StatefulChunkSplitter;
 import io.debezium.relational.TableId;
 
 import javax.annotation.Nullable;
 
 import java.util.Objects;
 
-/** The state of the {@link com.ververica.cdc.connectors.mysql.source.assigners.ChunkSplitter}. */
+/** The state of the {@link StatefulChunkSplitter}. */
 public class ChunkSplitterState {
     public static final ChunkSplitterState EMPTY_STATE = new ChunkSplitterState(null, null, null);
 
