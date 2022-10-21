@@ -173,7 +173,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             out.writeUTF(
                     rowToSerializedString(
                             new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
-            out.writeInt(chunkSplitterState.getChunkId());
+            out.writeInt(chunkSplitterState.getNextChunkId());
         }
     }
 
@@ -289,13 +289,13 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
         TableId splittingTableId = null;
         Object nextChunkStart = null;
-        Integer chunkId = null;
+        Integer nextChunkId = null;
         if (version > 4) {
             boolean isSplittingChunks = in.readBoolean();
             if (isSplittingChunks) {
                 splittingTableId = TableId.parse(in.readUTF());
                 nextChunkStart = serializedStringToRow(in.readUTF())[0];
-                chunkId = in.readInt();
+                nextChunkId = in.readInt();
             }
         }
         return new SnapshotPendingSplitsState(
@@ -313,7 +313,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                         : new ChunkSplitterState(
                                 splittingTableId,
                                 ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
-                                chunkId));
+                                nextChunkId));
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

@@ -58,7 +58,7 @@ import static java.math.BigDecimal.ROUND_CEILING;
  * The {@code ChunkSplitter}'s task is to split table into a set of chunks or called splits (i.e.
  * {@link MySqlSnapshotSplit}).
  */
-class ChunkSplitter {
+public class ChunkSplitter {
 
     private static final Logger LOG = LoggerFactory.getLogger(ChunkSplitter.class);
 
@@ -74,7 +74,7 @@ class ChunkSplitter {
 
     private TableId currentSplittingTableId;
     private ChunkSplitterState.ChunkBound nextChunkStart;
-    private Integer chunkId;
+    private Integer nextChunkId;
 
     public ChunkSplitter(MySqlSchema mySqlSchema, MySqlSourceConfig sourceConfig) {
         this.mySqlSchema = mySqlSchema;
@@ -104,14 +104,14 @@ class ChunkSplitter {
     private void initChunkSplitterContextForUnevenlyTable(TableId tableId) {
         this.currentSplittingTableId = tableId;
         this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
-        this.chunkId = 0;
+        this.nextChunkId = 0;
         switchChunkSplitterContext(currentSplittingTableId);
     }
 
     public void restoreFromCheckpoint(ChunkSplitterState chunkSplitterState) throws SQLException {
         this.currentSplittingTableId = chunkSplitterState.getCurrentSplittingTableId();
         this.nextChunkStart = chunkSplitterState.getNextChunkStart();
-        this.chunkId = chunkSplitterState.getChunkId();
+        this.nextChunkId = chunkSplitterState.getNextChunkId();
         switchChunkSplitterContext(currentSplittingTableId);
     }
 
@@ -160,16 +160,16 @@ class ChunkSplitter {
                         minMaxOfSplitColumn[1],
                         chunkSize);
         // may sleep a while to avoid DDOS on MySQL server
-        maySleep(chunkId, tableId);
+        maySleep(nextChunkId, tableId);
         if (chunkEnd != null && ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) <= 0) {
             nextChunkStart = ChunkSplitterState.ChunkBound.middleOf(chunkEnd);
             return createSnapshotSplit(
-                    jdbcConnection, tableId, chunkId++, splitType, chunkStartVal, chunkEnd);
+                    jdbcConnection, tableId, nextChunkId++, splitType, chunkStartVal, chunkEnd);
         } else {
             currentSplittingTableId = null;
             nextChunkStart = ChunkSplitterState.ChunkBound.END_BOUND;
             return createSnapshotSplit(
-                    jdbcConnection, tableId, chunkId++, splitType, chunkStartVal, null);
+                    jdbcConnection, tableId, nextChunkId++, splitType, chunkStartVal, null);
         }
     }
 
@@ -216,7 +216,7 @@ class ChunkSplitter {
     }
 
     public ChunkSplitterState snapshotState() {
-        return new ChunkSplitterState(currentSplittingTableId, nextChunkStart, chunkId);
+        return new ChunkSplitterState(currentSplittingTableId, nextChunkStart, nextChunkId);
     }
 
     /**
@@ -401,8 +401,8 @@ class ChunkSplitter {
         return currentSplittingTableId;
     }
 
-    public Integer getChunkId() {
-        return chunkId;
+    public Integer getNextChunkId() {
+        return nextChunkId;
     }
 
     public void close() throws SQLException {

@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
 
 import java.util.Objects;
 
-/** The state of the chunk splitter. */
+/** The state of the {@link com.ververica.cdc.connectors.mysql.source.assigners.ChunkSplitter}. */
 public class ChunkSplitterState {
     public static final ChunkSplitterState EMPTY_STATE = new ChunkSplitterState(null, null, null);
 
@@ -31,15 +31,15 @@ public class ChunkSplitterState {
 
     @Nullable private final ChunkBound nextChunkStart;
     /** Record next chunk id. */
-    @Nullable private final Integer chunkId;
+    @Nullable private final Integer nextChunkId;
 
     public ChunkSplitterState(
             @Nullable TableId currentSplittingTableId,
             @Nullable ChunkBound nextChunkStart,
-            @Nullable Integer chunkId) {
+            @Nullable Integer nextChunkId) {
         this.currentSplittingTableId = currentSplittingTableId;
         this.nextChunkStart = nextChunkStart;
-        this.chunkId = chunkId;
+        this.nextChunkId = nextChunkId;
     }
 
     @Nullable
@@ -53,8 +53,8 @@ public class ChunkSplitterState {
     }
 
     @Nullable
-    public Integer getChunkId() {
-        return chunkId;
+    public Integer getNextChunkId() {
+        return nextChunkId;
     }
 
     @Override
@@ -68,12 +68,12 @@ public class ChunkSplitterState {
         ChunkSplitterState that = (ChunkSplitterState) o;
         return Objects.equals(currentSplittingTableId, that.currentSplittingTableId)
                 && Objects.equals(nextChunkStart, that.nextChunkStart)
-                && Objects.equals(chunkId, that.chunkId);
+                && Objects.equals(nextChunkId, that.nextChunkId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(currentSplittingTableId, nextChunkStart, chunkId);
+        return Objects.hash(currentSplittingTableId, nextChunkStart, nextChunkId);
     }
 
     @Override
@@ -83,8 +83,8 @@ public class ChunkSplitterState {
                 + (currentSplittingTableId == null ? "null" : currentSplittingTableId)
                 + ", nextChunkStart="
                 + (nextChunkStart == null ? "null" : nextChunkStart)
-                + ", chunkId="
-                + (chunkId == null ? "null" : String.valueOf(chunkId))
+                + ", nextChunkId="
+                + (nextChunkId == null ? "null" : String.valueOf(nextChunkId))
                 + '}';
     }
 

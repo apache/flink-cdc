@@ -514,7 +514,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     }
                 } else {
                     splitUnevenlySizedChunks(nextTable);
-                    chunkNum = chunkSplitter.getChunkId();
+                    chunkNum = chunkSplitter.getNextChunkId();
                 }
                 long end = System.currentTimeMillis();
                 LOG.info(
