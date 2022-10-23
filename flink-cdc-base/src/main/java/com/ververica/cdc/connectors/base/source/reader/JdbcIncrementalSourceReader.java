@@ -73,7 +73,7 @@ public class JdbcIncrementalSourceReader<T>
     private static final Logger LOG = LoggerFactory.getLogger(JdbcIncrementalSourceReader.class);
 
     private final Map<String, SnapshotSplit> finishedUnackedSplits;
-    private final Map<String, StreamSplit> uncompletedBinlogSplits;
+    private final Map<String, StreamSplit> uncompletedStreamSplits;
     private final int subtaskId;
     private final SourceSplitSerializer sourceSplitSerializer;
     private final JdbcSourceConfig sourceConfig;
@@ -96,7 +96,7 @@ public class JdbcIncrementalSourceReader<T>
                 context);
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
-        this.uncompletedBinlogSplits = new HashMap<>();
+        this.uncompletedStreamSplits = new HashMap<>();
         this.subtaskId = context.getIndexOfSubtask();
         this.sourceSplitSerializer = checkNotNull(sourceSplitSerializer);
         this.dialect = dialect;
@@ -126,8 +126,8 @@ public class JdbcIncrementalSourceReader<T>
         // add finished snapshot splits that didn't receive ack yet
         stateSplits.addAll(finishedUnackedSplits.values());
 
-        // add binlog splits who are uncompleted
-        stateSplits.addAll(uncompletedBinlogSplits.values());
+        // add stream splits who are uncompleted
+        stateSplits.addAll(uncompletedStreamSplits.values());
 
         return stateSplits;
     }
@@ -135,13 +135,13 @@ public class JdbcIncrementalSourceReader<T>
     @Override
     protected void onSplitFinished(Map<String, SourceSplitState> finishedSplitIds) {
         for (SourceSplitState splitState : finishedSplitIds.values()) {
-            SourceSplitBase mySqlSplit = splitState.toSourceSplit();
+            SourceSplitBase sourceSplit = splitState.toSourceSplit();
             checkState(
-                    mySqlSplit.isSnapshotSplit(),
+                    sourceSplit.isSnapshotSplit(),
                     String.format(
-                            "Only snapshot split could finish, but the actual split is binlog split %s",
-                            mySqlSplit));
-            finishedUnackedSplits.put(mySqlSplit.splitId(), mySqlSplit.asSnapshotSplit());
+                            "Only snapshot split could finish, but the actual split is stream split %s",
+                            sourceSplit));
+            finishedUnackedSplits.put(sourceSplit.splitId(), sourceSplit.asSnapshotSplit());
         }
         reportFinishedSnapshotSplitsIfNeed();
         context.sendSplitRequest();
@@ -160,31 +160,31 @@ public class JdbcIncrementalSourceReader<T>
                     unfinishedSplits.add(split);
                 }
             } else {
-                // the binlog split is uncompleted
+                // the stream split is uncompleted
                 if (!split.asStreamSplit().isCompletedSplit()) {
-                    uncompletedBinlogSplits.put(split.splitId(), split.asStreamSplit());
-                    requestBinlogSplitMetaIfNeeded(split.asStreamSplit());
+                    uncompletedStreamSplits.put(split.splitId(), split.asStreamSplit());
+                    requestStreamSplitMetaIfNeeded(split.asStreamSplit());
                 } else {
-                    uncompletedBinlogSplits.remove(split.splitId());
-                    StreamSplit mySqlBinlogSplit =
-                            discoverTableSchemasForBinlogSplit(split.asStreamSplit());
-                    unfinishedSplits.add(mySqlBinlogSplit);
+                    uncompletedStreamSplits.remove(split.splitId());
+                    StreamSplit streamSplit =
+                            discoverTableSchemasForStreamSplit(split.asStreamSplit());
+                    unfinishedSplits.add(streamSplit);
                 }
             }
         }
         // notify split enumerator again about the finished unacked snapshot splits
         reportFinishedSnapshotSplitsIfNeed();
-        // add all un-finished splits (including binlog split) to SourceReaderBase
+        // add all un-finished splits (including stream split) to SourceReaderBase
         super.addSplits(unfinishedSplits);
     }
 
-    private StreamSplit discoverTableSchemasForBinlogSplit(StreamSplit split) {
+    private StreamSplit discoverTableSchemasForStreamSplit(StreamSplit split) {
         final String splitId = split.splitId();
         if (split.getTableSchemas().isEmpty()) {
             try {
                 Map<TableId, TableChanges.TableChange> tableSchemas =
                         dialect.discoverDataCollectionSchemas(sourceConfig);
-                LOG.info("The table schema discovery for binlog split {} success", splitId);
+                LOG.info("The table schema discovery for stream split {} success", splitId);
                 return StreamSplit.fillTableSchemas(split, tableSchemas);
             } catch (Exception e) {
                 LOG.error("Failed to obtains table schemas due to {}", e.getMessage());
@@ -192,7 +192,7 @@ public class JdbcIncrementalSourceReader<T>
             }
         } else {
             LOG.warn(
-                    "The binlog split {} has table schemas yet, skip the table schema discovery",
+                    "The stream split {} has table schemas yet, skip the table schema discovery",
                     split);
             return split;
         }
@@ -217,61 +217,61 @@ public class JdbcIncrementalSourceReader<T>
             reportFinishedSnapshotSplitsIfNeed();
         } else if (sourceEvent instanceof StreamSplitMetaEvent) {
             LOG.debug(
-                    "The subtask {} receives binlog meta with group id {}.",
+                    "The subtask {} receives stream meta with group id {}.",
                     subtaskId,
                     ((StreamSplitMetaEvent) sourceEvent).getMetaGroupId());
-            fillMetaDataForBinlogSplit((StreamSplitMetaEvent) sourceEvent);
+            fillMetaDataForStreamSplit((StreamSplitMetaEvent) sourceEvent);
         } else {
             super.handleSourceEvents(sourceEvent);
         }
     }
 
-    private void fillMetaDataForBinlogSplit(StreamSplitMetaEvent metadataEvent) {
-        StreamSplit binlogSplit = uncompletedBinlogSplits.get(metadataEvent.getSplitId());
-        if (binlogSplit != null) {
+    private void fillMetaDataForStreamSplit(StreamSplitMetaEvent metadataEvent) {
+        StreamSplit streamSplit = uncompletedStreamSplits.get(metadataEvent.getSplitId());
+        if (streamSplit != null) {
             final int receivedMetaGroupId = metadataEvent.getMetaGroupId();
             final int expectedMetaGroupId =
                     getNextMetaGroupId(
-                            binlogSplit.getFinishedSnapshotSplitInfos().size(),
+                            streamSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             if (receivedMetaGroupId == expectedMetaGroupId) {
                 List<FinishedSnapshotSplitInfo> metaDataGroup =
                         metadataEvent.getMetaGroup().stream()
                                 .map(bytes -> sourceSplitSerializer.deserialize(bytes))
                                 .collect(Collectors.toList());
-                uncompletedBinlogSplits.put(
-                        binlogSplit.splitId(),
-                        StreamSplit.appendFinishedSplitInfos(binlogSplit, metaDataGroup));
+                uncompletedStreamSplits.put(
+                        streamSplit.splitId(),
+                        StreamSplit.appendFinishedSplitInfos(streamSplit, metaDataGroup));
 
-                LOG.info("Fill meta data of group {} to binlog split", metaDataGroup.size());
+                LOG.info("Fill meta data of group {} to stream split", metaDataGroup.size());
             } else {
                 LOG.warn(
-                        "Received out of oder binlog meta event for split {}, the received meta group id is {}, but expected is {}, ignore it",
+                        "Received out of oder metadata event for split {}, the received meta group id is {}, but expected is {}, ignore it",
                         metadataEvent.getSplitId(),
                         receivedMetaGroupId,
                         expectedMetaGroupId);
             }
-            requestBinlogSplitMetaIfNeeded(binlogSplit);
+            requestStreamSplitMetaIfNeeded(streamSplit);
         } else {
             LOG.warn(
-                    "Received binlog meta event for split {}, but the uncompleted split map does not contain it",
+                    "Received metadata event for split {}, but the uncompleted split map does not contain it",
                     metadataEvent.getSplitId());
         }
     }
 
-    private void requestBinlogSplitMetaIfNeeded(StreamSplit binlogSplit) {
-        final String splitId = binlogSplit.splitId();
-        if (!binlogSplit.isCompletedSplit()) {
+    private void requestStreamSplitMetaIfNeeded(StreamSplit streamSplit) {
+        final String splitId = streamSplit.splitId();
+        if (!streamSplit.isCompletedSplit()) {
             final int nextMetaGroupId =
                     getNextMetaGroupId(
-                            binlogSplit.getFinishedSnapshotSplitInfos().size(),
+                            streamSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             StreamSplitMetaRequestEvent splitMetaRequestEvent =
                     new StreamSplitMetaRequestEvent(splitId, nextMetaGroupId);
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
-            LOG.info("The meta of binlog split {} has been collected success", splitId);
-            this.addSplits(Collections.singletonList(binlogSplit));
+            LOG.info("The meta of stream split {} has been collected success", splitId);
+            this.addSplits(Collections.singletonList(streamSplit));
         }
     }
 

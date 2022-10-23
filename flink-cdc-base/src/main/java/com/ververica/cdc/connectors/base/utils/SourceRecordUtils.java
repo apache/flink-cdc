@@ -83,7 +83,7 @@ public class SourceRecordUtils {
 
     public static boolean isEndWatermarkEvent(SourceRecord record) {
         Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.BINLOG_END;
+        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.END;
     }
 
     /**
@@ -236,42 +236,42 @@ public class SourceRecordUtils {
         return Optional.empty();
     }
 
-    /** upsert binlog events to snapshot events collection. */
-    public static void upsertBinlog(
-            Map<Struct, SourceRecord> snapshotRecords, SourceRecord binlogRecord) {
-        Struct key = (Struct) binlogRecord.key();
-        Struct value = (Struct) binlogRecord.value();
+    /** rewrite output buffer by data change event. */
+    public static void rewriteOutputBuffer(
+            Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord) {
+        Struct key = (Struct) changeRecord.key();
+        Struct value = (Struct) changeRecord.value();
         if (value != null) {
             Envelope.Operation operation =
                     Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
             switch (operation) {
                 case CREATE:
                 case UPDATE:
-                    Envelope envelope = Envelope.fromSchema(binlogRecord.valueSchema());
+                    Envelope envelope = Envelope.fromSchema(changeRecord.valueSchema());
                     Struct source = value.getStruct(Envelope.FieldName.SOURCE);
                     Struct after = value.getStruct(Envelope.FieldName.AFTER);
                     Instant fetchTs =
                             Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
                     SourceRecord record =
                             new SourceRecord(
-                                    binlogRecord.sourcePartition(),
-                                    binlogRecord.sourceOffset(),
-                                    binlogRecord.topic(),
-                                    binlogRecord.kafkaPartition(),
-                                    binlogRecord.keySchema(),
-                                    binlogRecord.key(),
-                                    binlogRecord.valueSchema(),
+                                    changeRecord.sourcePartition(),
+                                    changeRecord.sourceOffset(),
+                                    changeRecord.topic(),
+                                    changeRecord.kafkaPartition(),
+                                    changeRecord.keySchema(),
+                                    changeRecord.key(),
+                                    changeRecord.valueSchema(),
                                     envelope.read(after, source, fetchTs));
-                    snapshotRecords.put(key, record);
+                    outputBuffer.put(key, record);
                     break;
                 case DELETE:
-                    snapshotRecords.remove(key);
+                    outputBuffer.remove(key);
                     break;
                 case READ:
                     throw new IllegalStateException(
                             String.format(
-                                    "Binlog record shouldn't use READ operation, the the record is %s.",
-                                    binlogRecord));
+                                    "Data change record shouldn't use READ operation, the the record is %s.",
+                                    changeRecord));
             }
         }
     }

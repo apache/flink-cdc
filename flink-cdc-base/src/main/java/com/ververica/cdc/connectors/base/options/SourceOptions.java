@@ -56,7 +56,7 @@ public class SourceOptions {
                     .stringType()
                     .defaultValue("initial")
                     .withDescription(
-                            "Optional startup mode for MySQL CDC consumer, valid enumerations are "
+                            "Optional startup mode for CDC consumer, valid enumerations are "
                                     + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
                                     + "or \"specific-offset\"");
 
@@ -97,7 +97,7 @@ public class SourceOptions {
                             "The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
-                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " and the query for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
     public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
@@ -109,6 +109,6 @@ public class SourceOptions {
                             "The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
-                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " and the query for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 }

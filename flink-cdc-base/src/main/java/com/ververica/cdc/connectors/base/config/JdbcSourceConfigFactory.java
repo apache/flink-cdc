@@ -102,7 +102,7 @@ public abstract class JdbcSourceConfigFactory implements Factory {
 
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
-     * TIMESTAMP type in MYSQL converted to STRING. See more
+     * TIMESTAMP type converted to STRING. See more
      * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
      */
     public JdbcSourceConfigFactory serverTimeZone(String timeZone) {
@@ -153,7 +153,7 @@ public abstract class JdbcSourceConfigFactory implements Factory {
     }
 
     /**
-     * The maximum time that the connector should wait after trying to connect to the MySQL database
+     * The maximum time that the connector should wait after trying to connect to the database
      * server before timing out.
      */
     public JdbcSourceConfigFactory connectTimeout(Duration connectTimeout) {
@@ -179,7 +179,7 @@ public abstract class JdbcSourceConfigFactory implements Factory {
         return this;
     }
 
-    /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
+    /** The Debezium connector properties. For example, "snapshot.mode". */
     public JdbcSourceConfigFactory debeziumProperties(Properties properties) {
         this.dbzProperties = properties;
         return this;

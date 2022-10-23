@@ -213,14 +213,14 @@ public class SnapshotSplitAssigner implements SplitAssigner {
                         .collect(Collectors.toList());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
-            Offset binlogOffset = splitFinishedOffsets.get(split.splitId());
+            Offset finishedOffset = splitFinishedOffsets.get(split.splitId());
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),
                             split.splitId(),
                             split.getSplitStart(),
                             split.getSplitEnd(),
-                            binlogOffset,
+                            finishedOffset,
                             offsetFactory));
         }
         return finishedSnapshotSplitInfos;
@@ -231,7 +231,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
         this.splitFinishedOffsets.putAll(splitFinishedOffsets);
         if (allSplitsFinished()) {
             // Skip the waiting checkpoint when current parallelism is 1 which means we do not need
-            // to care about the global output data order of snapshot splits and binlog split.
+            // to care about the global output data order of snapshot splits and stream split.
             if (currentParallelism == 1) {
                 assignerFinished = true;
                 LOG.info(

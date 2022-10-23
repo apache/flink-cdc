@@ -25,10 +25,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * A structure describes a fine-grained offset in a binlog event including binlog position and gtid
- * set etc.
+ * A structure describes a fine-grained offset in a change event including change log position.
  *
- * <p>This structure can also be used to deal the binlog event in transaction, a transaction may
+ * <p>This structure can also be used to deal the change event in transaction, a transaction may
  * contain multiple change events, and each change event may contain multiple rows. When restart
  * from a specific {@link Offset}, we need to skip the processed change events and the processed
  * rows.

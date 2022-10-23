@@ -40,7 +40,7 @@ import java.util.Optional;
 public class StreamSplitAssigner implements SplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreamSplitAssigner.class);
-    private static final String BINLOG_SPLIT_ID = "binlog-split";
+    private static final String STREAM_SPLIT_ID = "stream-split";
 
     private final SourceConfig sourceConfig;
 
@@ -103,7 +103,7 @@ public class StreamSplitAssigner implements SplitAssigner {
 
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
-        // we don't store the split, but will re-create binlog split later
+        // we don't store the split, but will re-create stream split later
         isStreamSplitAssigned = false;
     }
 
@@ -125,7 +125,7 @@ public class StreamSplitAssigner implements SplitAssigner {
     public StreamSplit createStreamSplit() {
 
         return new StreamSplit(
-                BINLOG_SPLIT_ID,
+                STREAM_SPLIT_ID,
                 dialect.displayCurrentOffset(sourceConfig),
                 offsetFactory.createInitialOffset(),
                 new ArrayList<>(),

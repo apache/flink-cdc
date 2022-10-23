@@ -30,7 +30,7 @@ public abstract class SourceSplitState {
         return getClass() == SnapshotSplitState.class;
     }
 
-    /** Checks whether this split state is a binlog split state. */
+    /** Checks whether this split state is a stream split state. */
     public final boolean isStreamSplitState() {
         return getClass() == StreamSplitState.class;
     }
@@ -45,6 +45,6 @@ public abstract class SourceSplitState {
         return (StreamSplitState) this;
     }
 
-    /** Use the current split state to create a new MySqlSplit. */
+    /** Use the current split state to create a new SourceSplit. */
     public abstract SourceSplitBase toSourceSplit();
 }

@@ -139,7 +139,7 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 offsetContext.getPartition(),
                                 binlogSplit,
                                 currentBinlogOffset,
-                                JdbcSourceEventDispatcher.WatermarkKind.BINLOG_END);
+                                JdbcSourceEventDispatcher.WatermarkKind.END);
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
                         errorHandler.setProducerThrowable(

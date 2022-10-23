@@ -18,7 +18,7 @@ package com.ververica.cdc.connectors.base.source.assigner.state;
 
 import java.util.Objects;
 
-/** A {@link PendingSplitsState} for pending hybrid (snapshot & binlog) splits. */
+/** A {@link PendingSplitsState} for pending hybrid (snapshot & stream) splits. */
 public class HybridPendingSplitsState extends PendingSplitsState {
     private final SnapshotPendingSplitsState snapshotPendingSplits;
     private final boolean isStreamSplitAssigned;
@@ -60,7 +60,7 @@ public class HybridPendingSplitsState extends PendingSplitsState {
         return "HybridPendingSplitsState{"
                 + "snapshotPendingSplits="
                 + snapshotPendingSplits
-                + ", isBinlogSplitAssigned="
+                + ", isStreamSplitAssigned="
                 + isStreamSplitAssigned
                 + '}';
     }

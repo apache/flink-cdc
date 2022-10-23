@@ -56,14 +56,14 @@ public interface SplitAssigner {
     boolean waitingForFinishedSplits();
 
     /**
-     * Gets the finished splits information. This is useful meta data to generate a binlog split
+     * Gets the finished splits information. This is useful meta data to generate a stream split
      * that considering finished snapshot splits.
      */
     List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();
 
     /**
-     * Callback to handle the finished splits with finished binlog offset. This is useful for
-     * determine when to generate binlog split and what binlog split to generate.
+     * Callback to handle the finished splits with finished change log offset. This is useful for
+     * determine when to generate stream split and what stream split to generate.
      */
     void onFinishedSplits(Map<String, Offset> splitFinishedOffsets);
 
