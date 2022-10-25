@@ -51,7 +51,7 @@ public class HybridSplitAssigner implements SplitAssigner {
 
     private final SnapshotSplitAssigner snapshotSplitAssigner;
 
-    private OffsetFactory offsetFactory;
+    private final OffsetFactory offsetFactory;
 
     public HybridSplitAssigner(
             SourceConfig sourceConfig,
@@ -69,8 +69,8 @@ public class HybridSplitAssigner implements SplitAssigner {
                         dialect,
                         offsetFactory),
                 false,
-                sourceConfig.getSplitMetaGroupSize());
-        this.offsetFactory = offsetFactory;
+                sourceConfig.getSplitMetaGroupSize(),
+                offsetFactory);
     }
 
     public HybridSplitAssigner(
@@ -87,16 +87,19 @@ public class HybridSplitAssigner implements SplitAssigner {
                         dialect,
                         offsetFactory),
                 checkpoint.isStreamSplitAssigned(),
-                sourceConfig.getSplitMetaGroupSize());
+                sourceConfig.getSplitMetaGroupSize(),
+                offsetFactory);
     }
 
     private HybridSplitAssigner(
             SnapshotSplitAssigner snapshotSplitAssigner,
             boolean isStreamSplitAssigned,
-            int splitMetaGroupSize) {
+            int splitMetaGroupSize,
+            OffsetFactory offsetFactory) {
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
+        this.offsetFactory = offsetFactory;
     }
 
     @Override
