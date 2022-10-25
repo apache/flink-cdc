@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState.EMPTY_STATE;
+import static com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState.NO_SPLITTING_TABLE_STATE;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer.readTableSchemas;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer.writeTableSchemas;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
@@ -164,10 +164,10 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         out.writeBoolean(state.isTableIdCaseSensitive());
         writeTableSchemas(state.getTableSchemas(), out);
 
-        boolean isSplittingChunks =
+        boolean hasTableIsSplitting =
                 state.getChunkSplitterState().getCurrentSplittingTableId() != null;
-        out.writeBoolean(isSplittingChunks);
-        if (isSplittingChunks) {
+        out.writeBoolean(hasTableIsSplitting);
+        if (hasTableIsSplitting) {
             ChunkSplitterState chunkSplitterState = state.getChunkSplitterState();
             out.writeUTF(chunkSplitterState.getCurrentSplittingTableId().toString());
             out.writeUTF(
@@ -235,7 +235,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 new ArrayList<>(),
                 false,
                 false,
-                EMPTY_STATE);
+                NO_SPLITTING_TABLE_STATE);
     }
 
     private HybridPendingSplitsState deserializeLegacyHybridPendingSplitsState(
@@ -291,8 +291,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         Object nextChunkStart = null;
         Integer nextChunkId = null;
         if (version > 4) {
-            boolean isSplittingChunks = in.readBoolean();
-            if (isSplittingChunks) {
+            boolean hasTableIsSplitting = in.readBoolean();
+            if (hasTableIsSplitting) {
                 splittingTableId = TableId.parse(in.readUTF());
                 nextChunkStart = serializedStringToRow(in.readUTF())[0];
                 nextChunkId = in.readInt();
@@ -309,7 +309,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 isTableIdCaseSensitive,
                 true,
                 splittingTableId == null
-                        ? EMPTY_STATE
+                        ? NO_SPLITTING_TABLE_STATE
                         : new ChunkSplitterState(
                                 splittingTableId,
                                 ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),

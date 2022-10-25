@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.source.assigners.state;
 
 import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
+import com.ververica.cdc.connectors.mysql.source.assigners.ChunkSplitter;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
@@ -66,7 +67,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     private final Map<TableId, TableChange> tableSchemas;
 
-    /** Record split chunk process. */
+    /** The data structure to record the state of a {@link ChunkSplitter}. */
     private final ChunkSplitterState chunkSplitterState;
 
     public SnapshotPendingSplitsState(

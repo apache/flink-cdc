@@ -38,10 +38,10 @@ public interface ChunkSplitter {
      * Called to split chunks for a table, the assigner could invoke this method multiple times to
      * receive all the splits.
      */
-    List<MySqlSnapshotSplit> splitTable(TableId tableId) throws Exception;
+    List<MySqlSnapshotSplit> splitChunks(TableId tableId) throws Exception;
 
-    /** Get whether the chunk splitter finished splitting the current table. */
-    boolean splitCurrentTableFinished();
+    /** Get whether the splitter has more chunks for current table. */
+    boolean hasNextChunk();
 
     /**
      * Creates a snapshot of the state of this chunk splitter, to be stored in a checkpoint.

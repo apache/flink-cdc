@@ -20,6 +20,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.schema.MySqlTypeUtils;
@@ -35,6 +36,8 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -54,13 +57,17 @@ import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.que
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryNextChunkMax;
 import static java.math.BigDecimal.ROUND_CEILING;
 
-/** The stateful chunk splitter of {@link ChunkSplitter}. */
-public class StatefulChunkSplitter implements ChunkSplitter {
+/** The {@link ChunkSplitter} implementation for MySQL. */
+public class MySqlChunkSplitter implements ChunkSplitter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(StatefulChunkSplitter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlChunkSplitter.class);
 
     private final MySqlSourceConfig sourceConfig;
     private final MySqlSchema mySqlSchema;
+
+    @Nullable private TableId currentSplittingTableId;
+    @Nullable private ChunkSplitterState.ChunkBound nextChunkStart;
+    @Nullable private Integer nextChunkId;
 
     private JdbcConnection jdbcConnection;
     private Table currentSplittingTable;
@@ -69,21 +76,33 @@ public class StatefulChunkSplitter implements ChunkSplitter {
     private Object[] minMaxOfSplitColumn;
     private long approximateRowCnt;
 
-    private TableId currentSplittingTableId;
-    private ChunkSplitterState.ChunkBound nextChunkStart;
-    private Integer nextChunkId;
-
-    public StatefulChunkSplitter(MySqlSchema mySqlSchema, MySqlSourceConfig sourceConfig) {
-        this.mySqlSchema = mySqlSchema;
-        this.sourceConfig = sourceConfig;
+    public MySqlChunkSplitter(MySqlSchema mySqlSchema, MySqlSourceConfig sourceConfig) {
+        this(mySqlSchema, sourceConfig, null, null, null);
     }
 
-    public StatefulChunkSplitter(
+    public MySqlChunkSplitter(
             MySqlSchema mySqlSchema,
             MySqlSourceConfig sourceConfig,
             ChunkSplitterState chunkSplitterState) {
-        this(mySqlSchema, sourceConfig);
-        handleTable(chunkSplitterState);
+        this(
+                mySqlSchema,
+                sourceConfig,
+                chunkSplitterState.getCurrentSplittingTableId(),
+                chunkSplitterState.getNextChunkStart(),
+                chunkSplitterState.getNextChunkId());
+    }
+
+    private MySqlChunkSplitter(
+            MySqlSchema mySqlSchema,
+            MySqlSourceConfig sourceConfig,
+            @Nullable TableId currentSplittingTableId,
+            @Nullable ChunkSplitterState.ChunkBound nextChunkStart,
+            @Nullable Integer nextChunkId) {
+        this.mySqlSchema = mySqlSchema;
+        this.sourceConfig = sourceConfig;
+        this.currentSplittingTableId = currentSplittingTableId;
+        this.nextChunkStart = nextChunkStart;
+        this.nextChunkId = nextChunkId;
     }
 
     @Override
@@ -91,15 +110,30 @@ public class StatefulChunkSplitter implements ChunkSplitter {
         this.jdbcConnection = openJdbcConnection(sourceConfig);
     }
 
-    private void handleTable(ChunkSplitterState chunkSplitterState) {
-        handleTable(chunkSplitterState.getCurrentSplittingTableId());
-        this.currentSplittingTableId = chunkSplitterState.getCurrentSplittingTableId();
-        this.nextChunkStart = chunkSplitterState.getNextChunkStart();
-        this.nextChunkId = chunkSplitterState.getNextChunkId();
+    @Override
+    public List<MySqlSnapshotSplit> splitChunks(TableId tableId) throws Exception {
+        if (!hasNextChunk()) {
+            analyzeTable(tableId);
+            Optional<List<MySqlSnapshotSplit>> evenlySplitChunks =
+                    trySplitAllEvenlySizedChunks(tableId);
+            if (evenlySplitChunks.isPresent()) {
+                return evenlySplitChunks.get();
+            } else {
+                this.currentSplittingTableId = tableId;
+                this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
+                this.nextChunkId = 0;
+                return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+            }
+        } else {
+            Preconditions.checkState(
+                    currentSplittingTableId.equals(tableId),
+                    "Can not split a new table before the previous table splitting finish.");
+            return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+        }
     }
 
-    /** This method should be invoked before getting chunks for a table. */
-    private void handleTable(TableId tableId) {
+    /** Analyze the meta information for given table. */
+    private void analyzeTable(TableId tableId) {
         try {
             currentSplittingTable = mySqlSchema.getTableSchema(jdbcConnection, tableId).getTable();
             splitColumn =
@@ -109,33 +143,12 @@ public class StatefulChunkSplitter implements ChunkSplitter {
             minMaxOfSplitColumn = queryMinMax(jdbcConnection, tableId, splitColumn.name());
             approximateRowCnt = queryApproximateRowCnt(jdbcConnection, tableId);
         } catch (Exception e) {
-            throw new RuntimeException("Fail to init chunk splitter context.", e);
-        }
-    }
-
-    @Override
-    public List<MySqlSnapshotSplit> splitTable(TableId tableId) throws Exception {
-        if (splitCurrentTableFinished()) {
-            handleTable(tableId);
-            Optional<List<MySqlSnapshotSplit>> evenlySplitChunks = splitAsEvenlySized(tableId);
-            if (evenlySplitChunks.isPresent()) {
-                return evenlySplitChunks.get();
-            } else {
-                this.currentSplittingTableId = tableId;
-                this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
-                this.nextChunkId = 0;
-                return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
-            }
-        } else if (currentSplittingTableId.equals(tableId)) {
-            return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
-        } else {
-            throw new IllegalStateException(
-                    "[Error] Start to split a new table before the previous table finishes.");
+            throw new RuntimeException("Fail to analyze table in chunk splitter.", e);
         }
     }
 
     /** Generates one snapshot split (chunk) for the give table path. */
-    public MySqlSnapshotSplit splitOneUnevenlySizedChunk(TableId tableId) throws SQLException {
+    private MySqlSnapshotSplit splitOneUnevenlySizedChunk(TableId tableId) throws SQLException {
         final int chunkSize = sourceConfig.getSplitSize();
         final Object chunkStartVal = nextChunkStart.getValue();
         LOG.info(
@@ -170,18 +183,14 @@ public class StatefulChunkSplitter implements ChunkSplitter {
         }
     }
 
-    // --------------------------------------------------------------------------------------------
-    // Utilities
-    // --------------------------------------------------------------------------------------------
-
     /**
-     * Try to split chunks as evenly-sized table, or else return empty.
+     * Try to split all chunks for evenly-sized table, or else return empty.
      *
      * <p>We can use evenly-sized chunks or unevenly-sized chunks when split table into chunks,
      * using evenly-sized chunks which is much efficient, using unevenly-sized chunks which will
      * request many queries and is not efficient.
      */
-    public Optional<List<MySqlSnapshotSplit>> splitAsEvenlySized(TableId tableId) {
+    private Optional<List<MySqlSnapshotSplit>> trySplitAllEvenlySizedChunks(TableId tableId) {
         LOG.debug("Try evenly splitting table {} into chunks", tableId);
         final Object min = minMaxOfSplitColumn[0];
         final Object max = minMaxOfSplitColumn[1];
@@ -226,8 +235,8 @@ public class StatefulChunkSplitter implements ChunkSplitter {
     }
 
     @Override
-    public boolean splitCurrentTableFinished() {
-        return currentSplittingTableId == null;
+    public boolean hasNextChunk() {
+        return currentSplittingTableId != null;
     }
 
     @Override

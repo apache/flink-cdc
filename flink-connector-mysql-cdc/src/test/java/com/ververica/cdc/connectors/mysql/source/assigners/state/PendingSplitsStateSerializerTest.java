@@ -168,7 +168,7 @@ public class PendingSplitsStateSerializerTest {
                     remainingTables,
                     false,
                     true,
-                    ChunkSplitterState.EMPTY_STATE);
+                    ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         }
     }
 

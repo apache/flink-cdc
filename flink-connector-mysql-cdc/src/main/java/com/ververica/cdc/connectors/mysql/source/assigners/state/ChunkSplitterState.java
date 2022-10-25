@@ -16,21 +16,25 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners.state;
 
-import com.ververica.cdc.connectors.mysql.source.assigners.StatefulChunkSplitter;
+import com.ververica.cdc.connectors.mysql.source.assigners.MySqlChunkSplitter;
 import io.debezium.relational.TableId;
 
 import javax.annotation.Nullable;
 
 import java.util.Objects;
 
-/** The state of the {@link StatefulChunkSplitter}. */
+/** The state of the {@link MySqlChunkSplitter}. */
 public class ChunkSplitterState {
-    public static final ChunkSplitterState EMPTY_STATE = new ChunkSplitterState(null, null, null);
+
+    public static final ChunkSplitterState NO_SPLITTING_TABLE_STATE =
+            new ChunkSplitterState(null, null, null);
 
     /** Record current splitting table id in the chunk splitter. */
     @Nullable private final TableId currentSplittingTableId;
 
+    /** Record next chunk start. */
     @Nullable private final ChunkBound nextChunkStart;
+
     /** Record next chunk id. */
     @Nullable private final Integer nextChunkId;
 
@@ -90,7 +94,8 @@ public class ChunkSplitterState {
     }
 
     /** The definition of the chunk bound. */
-    public static class ChunkBound {
+    public static final class ChunkBound {
+
         public static final ChunkBound START_BOUND = new ChunkBound(ChunkBoundType.START, null);
         public static final ChunkBound END_BOUND = new ChunkBound(ChunkBoundType.END, null);
 
