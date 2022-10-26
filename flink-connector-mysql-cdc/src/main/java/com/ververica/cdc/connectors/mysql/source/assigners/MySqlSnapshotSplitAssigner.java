@@ -245,7 +245,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 try {
                     splits = chunkSplitter.splitChunks(nextTable);
                 } catch (Exception e) {
-                    throw new IllegalStateException("Error when splitting chunks for " + nextTable);
+                    throw new IllegalStateException(
+                            "Error when splitting chunks for " + nextTable, e);
                 }
 
                 if (!hasRecordSchema && !splits.isEmpty()) {

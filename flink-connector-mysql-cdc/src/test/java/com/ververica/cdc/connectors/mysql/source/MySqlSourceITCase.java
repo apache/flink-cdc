@@ -280,7 +280,11 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     public void testConsumingTableWithoutPrimaryKey() {
         try {
             testMySqlParallelSource(
-                    1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers_no_pk"});
+                    1,
+                    FailoverType.NONE,
+                    FailoverPhase.NEVER,
+                    new String[] {"customers_no_pk"},
+                    RestartStrategies.noRestart());
         } catch (Exception e) {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
@@ -430,13 +434,28 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
+        testMySqlParallelSource(
+                parallelism,
+                failoverType,
+                failoverPhase,
+                captureCustomerTables,
+                RestartStrategies.fixedDelayRestart(1, 0));
+    }
+
+    private void testMySqlParallelSource(
+            int parallelism,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables,
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration)
+            throws Exception {
         customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        env.setRestartStrategy(restartStrategyConfiguration);
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
