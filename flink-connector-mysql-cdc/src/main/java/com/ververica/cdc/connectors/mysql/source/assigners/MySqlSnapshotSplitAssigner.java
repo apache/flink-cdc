@@ -157,9 +157,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void open() {
-        if (chunkSplitter != null) {
-            chunkSplitter.open();
-        }
+        chunkSplitter.open();
         discoveryCaptureTables();
         captureNewlyAddedTables();
         startAsynchronouslySplit();
