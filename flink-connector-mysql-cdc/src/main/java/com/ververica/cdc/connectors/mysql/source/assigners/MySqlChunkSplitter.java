@@ -103,6 +103,9 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         this.currentSplittingTableId = currentSplittingTableId;
         this.nextChunkStart = nextChunkStart;
         this.nextChunkId = nextChunkId;
+        if (currentSplittingTableId != null) {
+            analyzeTable(currentSplittingTableId);
+        }
     }
 
     @Override

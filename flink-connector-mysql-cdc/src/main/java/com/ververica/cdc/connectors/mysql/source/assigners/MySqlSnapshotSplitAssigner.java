@@ -223,7 +223,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private void startAsynchronouslySplit() {
-        if ((!chunkSplitter.hasNextChunk()) || !remainingTables.isEmpty()) {
+        if (chunkSplitter.hasNextChunk() || !remainingTables.isEmpty()) {
             if (executor == null) {
                 ThreadFactory threadFactory =
                         new ThreadFactoryBuilder().setNameFormat("snapshot-splitting").build();
