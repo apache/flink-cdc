@@ -366,29 +366,27 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public SnapshotPendingSplitsState snapshotState(long checkpointId) {
-        synchronized (lock) {
-            SnapshotPendingSplitsState state =
-                    new SnapshotPendingSplitsState(
-                            alreadyProcessedTables,
-                            remainingSplits,
-                            assignedSplits,
-                            tableSchemas,
-                            splitFinishedOffsets,
-                            assignerStatus,
-                            remainingTables,
-                            isTableIdCaseSensitive,
-                            true,
-                            chunkSplitter.snapshotState(checkpointId));
-            // we need a complete checkpoint before mark this assigner to be finished, to wait for
-            // all
-            // records of snapshot splits are completely processed
-            if (checkpointIdToFinish == null
-                    && !isAssigningFinished(assignerStatus)
-                    && allSplitsFinished()) {
-                checkpointIdToFinish = checkpointId;
-            }
-            return state;
+        SnapshotPendingSplitsState state =
+                new SnapshotPendingSplitsState(
+                        alreadyProcessedTables,
+                        remainingSplits,
+                        assignedSplits,
+                        tableSchemas,
+                        splitFinishedOffsets,
+                        assignerStatus,
+                        remainingTables,
+                        isTableIdCaseSensitive,
+                        true,
+                        chunkSplitter.snapshotState(checkpointId));
+        // we need a complete checkpoint before mark this assigner to be finished, to wait for
+        // all
+        // records of snapshot splits are completely processed
+        if (checkpointIdToFinish == null
+                && !isAssigningFinished(assignerStatus)
+                && allSplitsFinished()) {
+            checkpointIdToFinish = checkpointId;
         }
+        return state;
     }
 
     @Override

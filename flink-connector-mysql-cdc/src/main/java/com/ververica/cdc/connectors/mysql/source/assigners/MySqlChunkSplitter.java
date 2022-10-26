@@ -61,6 +61,7 @@ import static java.math.BigDecimal.ROUND_CEILING;
 public class MySqlChunkSplitter implements ChunkSplitter {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlChunkSplitter.class);
+    private final Object lock = new Object();
 
     private final MySqlSourceConfig sourceConfig;
     private final MySqlSchema mySqlSchema;
@@ -103,9 +104,6 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         this.currentSplittingTableId = currentSplittingTableId;
         this.nextChunkStart = nextChunkStart;
         this.nextChunkId = nextChunkId;
-        if (currentSplittingTableId != null) {
-            analyzeTable(currentSplittingTableId);
-        }
     }
 
     @Override
@@ -122,16 +120,23 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             if (evenlySplitChunks.isPresent()) {
                 return evenlySplitChunks.get();
             } else {
-                this.currentSplittingTableId = tableId;
-                this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
-                this.nextChunkId = 0;
-                return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+                synchronized (lock) {
+                    this.currentSplittingTableId = tableId;
+                    this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
+                    this.nextChunkId = 0;
+                    return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+                }
             }
         } else {
             Preconditions.checkState(
                     currentSplittingTableId.equals(tableId),
                     "Can not split a new table before the previous table splitting finish.");
-            return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+            if (currentSplittingTable == null) {
+                analyzeTable(currentSplittingTableId);
+            }
+            synchronized (lock) {
+                return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+            }
         }
     }
 
@@ -244,7 +249,9 @@ public class MySqlChunkSplitter implements ChunkSplitter {
 
     @Override
     public ChunkSplitterState snapshotState(long checkpointId) {
-        return new ChunkSplitterState(currentSplittingTableId, nextChunkStart, nextChunkId);
+        synchronized (lock) {
+            return new ChunkSplitterState(currentSplittingTableId, nextChunkStart, nextChunkId);
+        }
     }
 
     @Override
