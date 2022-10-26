@@ -127,7 +127,7 @@ public class StreamSplitAssigner implements SplitAssigner {
         return new StreamSplit(
                 BINLOG_SPLIT_ID,
                 dialect.displayCurrentOffset(sourceConfig),
-                offsetFactory.createInitialOffset(),
+                offsetFactory.createNoStoppingOffset(),
                 new ArrayList<>(),
                 new HashMap<>(),
                 0);
