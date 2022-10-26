@@ -49,6 +49,7 @@ import java.util.Objects;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryApproximateRowCnt;
+import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryCaseSensitive;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMin;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMinMax;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryNextChunkMax;
@@ -156,10 +157,11 @@ class ChunkSplitter {
                         tableId, min, max, approximateRowCnt, chunkSize, dynamicChunkSize);
             } else {
                 return splitUnevenlySizedChunks(
-                        jdbc, tableId, splitColumnName, min, max, chunkSize);
+                        jdbc, tableId, splitColumnName, min, max, chunkSize, true);
             }
         } else {
-            return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
+            return splitUnevenlySizedChunks(
+                    jdbc, tableId, splitColumnName, min, max, chunkSize, false);
         }
     }
 
@@ -211,21 +213,48 @@ class ChunkSplitter {
             String splitColumnName,
             Object min,
             Object max,
-            int chunkSize)
+            int chunkSize,
+            boolean evenlyColumn)
             throws SQLException {
         LOG.info(
                 "Use unevenly-sized chunks for table {}, the chunk size is {}", tableId, chunkSize);
+        // If the primary key passed in is a Int, follow the original logic. Otherwise, judge
+        // whether it is case sensitive
+        boolean isCaseSensitive =
+                evenlyColumn ? true : queryCaseSensitive(jdbc, tableId, splitColumnName);
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
-        Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize);
+        Object chunkEnd =
+                nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize, isCaseSensitive);
         int count = 0;
-        while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
-            // we start from [null, min + chunk_size) and avoid [null, min)
-            splits.add(ChunkRange.of(chunkStart, chunkEnd));
-            // may sleep a while to avoid DDOS on MySQL server
-            maySleep(count++, tableId);
-            chunkStart = chunkEnd;
-            chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
+
+        if (isCaseSensitive) {
+            // Case sensitive logic
+            while (chunkEnd != null && (ObjectUtils.compare(chunkEnd, max) <= 0)) {
+                // we start from [null, min + chunk_size) and avoid [null, min)
+                splits.add(ChunkRange.of(chunkStart, chunkEnd));
+                // may sleep a while to avoid DDOS on MySQL server
+                maySleep(count++, tableId);
+                chunkStart = chunkEnd;
+                chunkEnd =
+                        nextChunkEnd(
+                                jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize, true);
+            }
+        } else {
+            // Case insensitive logic
+            String endId = String.valueOf(chunkEnd);
+            String maxId = String.valueOf(max);
+            while (chunkEnd != null
+                    && (ObjectUtils.compare(endId.toLowerCase(), maxId.toLowerCase()) <= 0)) {
+                // we start from [null, min + chunk_size) and avoid [null, min)
+                splits.add(ChunkRange.of(chunkStart, chunkEnd));
+                // may sleep a while to avoid DDOS on MySQL server
+                maySleep(count++, tableId);
+                chunkStart = chunkEnd;
+                chunkEnd =
+                        nextChunkEnd(
+                                jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize, false);
+            }
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
@@ -238,7 +267,8 @@ class ChunkSplitter {
             TableId tableId,
             String splitColumnName,
             Object max,
-            int chunkSize)
+            int chunkSize,
+            boolean isCaseSensitive)
             throws SQLException {
         // chunk end might be null when max values are removed
         Object chunkEnd =
@@ -248,7 +278,15 @@ class ChunkSplitter {
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
+        boolean compare;
+        if (isCaseSensitive) {
+            compare = (ObjectUtils.compare(chunkEnd, max) >= 0);
+        } else {
+            String endId = String.valueOf(chunkEnd);
+            String maxId = String.valueOf(max);
+            compare = (ObjectUtils.compare(endId.toLowerCase(), maxId.toLowerCase()) >= 0);
+        }
+        if (compare) {
             return null;
         } else {
             return chunkEnd;
