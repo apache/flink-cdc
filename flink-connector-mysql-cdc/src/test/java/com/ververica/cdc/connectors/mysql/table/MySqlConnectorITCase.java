@@ -57,8 +57,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
+import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
-import static org.apache.flink.runtime.testutils.CommonTestUtils.waitForJobStatus;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for MySQL Table source. */
