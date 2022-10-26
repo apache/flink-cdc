@@ -72,7 +72,6 @@ under the License.
 
     <properties>
         <flink.version>1.15.2</flink.version>
-        <flink.submodule.postfix></flink.submodule.postfix>
         <debezium.version>1.6.4.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
@@ -114,7 +113,7 @@ under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-api-java-bridge${flink.submodule.postfix}</artifactId>
+            <artifactId>flink-table-api-java-bridge</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -126,7 +125,7 @@ under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-streaming-java${flink.submodule.postfix}</artifactId>
+            <artifactId>flink-streaming-java</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -474,14 +473,6 @@ under the License.
     </build>
 
     <profiles>
-        <profile>
-            <id>flink-1.14</id>
-            <properties>
-                <flink.version>1.14.4</flink.version>
-                <scala.binary.version>2.11</scala.binary.version>
-                <flink.submodule.postfix>_${scala.binary.version}</flink.submodule.postfix>
-            </properties>
-        </profile>
         <profile>
             <id>release</id>
             <build>
