@@ -487,6 +487,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 break;
             }
         }
+        assigner.close();
 
         return sqlSplits.stream()
                 .map(

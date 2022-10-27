@@ -35,9 +35,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState.NO_SPLITTING_TABLE_STATE;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer.readTableSchemas;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer.writeTableSchemas;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
+import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
 
 /**
@@ -46,7 +49,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.wr
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -105,6 +108,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 return deserializeLegacyPendingSplitsState(serialized);
             case 3:
             case 4:
+            case 5:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -159,6 +163,18 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeTableIds(state.getRemainingTables(), out);
         out.writeBoolean(state.isTableIdCaseSensitive());
         writeTableSchemas(state.getTableSchemas(), out);
+
+        boolean hasTableIsSplitting =
+                state.getChunkSplitterState().getCurrentSplittingTableId() != null;
+        out.writeBoolean(hasTableIsSplitting);
+        if (hasTableIsSplitting) {
+            ChunkSplitterState chunkSplitterState = state.getChunkSplitterState();
+            out.writeUTF(chunkSplitterState.getCurrentSplittingTableId().toString());
+            out.writeUTF(
+                    rowToSerializedString(
+                            new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
+            out.writeInt(chunkSplitterState.getNextChunkId());
+        }
     }
 
     private void serializeHybridPendingSplitsState(
@@ -218,7 +234,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 new ArrayList<>(),
                 false,
-                false);
+                false,
+                NO_SPLITTING_TABLE_STATE);
     }
 
     private HybridPendingSplitsState deserializeLegacyHybridPendingSplitsState(
@@ -269,6 +286,18 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         if (version >= 4) {
             tableSchemas.putAll(readTableSchemas(splitVersion, in));
         }
+
+        TableId splittingTableId = null;
+        Object nextChunkStart = null;
+        Integer nextChunkId = null;
+        if (version > 4) {
+            boolean hasTableIsSplitting = in.readBoolean();
+            if (hasTableIsSplitting) {
+                splittingTableId = TableId.parse(in.readUTF());
+                nextChunkStart = serializedStringToRow(in.readUTF())[0];
+                nextChunkId = in.readInt();
+            }
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
@@ -278,7 +307,13 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 remainingTableIds,
                 isTableIdCaseSensitive,
-                true);
+                true,
+                splittingTableId == null
+                        ? NO_SPLITTING_TABLE_STATE
+                        : new ChunkSplitterState(
+                                splittingTableId,
+                                ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
+                                nextChunkId));
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

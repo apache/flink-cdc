@@ -22,6 +22,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -99,7 +100,8 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         AssignerStatus.INITIAL_ASSIGNING_FINISHED,
                         new ArrayList<>(),
                         false,
-                        true);
+                        true,
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
         final MySqlHybridSplitAssigner assigner =

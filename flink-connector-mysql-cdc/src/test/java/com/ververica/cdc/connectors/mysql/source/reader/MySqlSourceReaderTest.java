@@ -191,6 +191,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         // and the split is a full range one
         assertNull(snapshotSplit.getSplitStart());
         assertNull(snapshotSplit.getSplitEnd());
+        assigner.close();
 
         final AtomicBoolean finishReading = new AtomicBoolean(false);
         final CountDownLatch updatingExecuted = new CountDownLatch(1);

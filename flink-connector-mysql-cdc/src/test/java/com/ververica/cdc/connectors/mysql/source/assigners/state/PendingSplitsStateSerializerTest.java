@@ -56,8 +56,10 @@ public class PendingSplitsStateSerializerTest {
     @Parameterized.Parameters(name = "PendingSplitsState = {index}")
     public static Collection<PendingSplitsState> params() {
         return Arrays.asList(
-                getTestSnapshotPendingSplitsState(),
-                getTestHybridPendingSplitsState(),
+                getTestSnapshotPendingSplitsState(true),
+                getTestSnapshotPendingSplitsState(false),
+                getTestHybridPendingSplitsState(false),
+                getTestHybridPendingSplitsState(true),
                 getTestBinlogPendingSplitsState());
     }
 
@@ -103,7 +105,8 @@ public class PendingSplitsStateSerializerTest {
         return serializer.deserialize(serializer.getVersion(), serialized);
     }
 
-    private static SnapshotPendingSplitsState getTestSnapshotPendingSplitsState() {
+    private static SnapshotPendingSplitsState getTestSnapshotPendingSplitsState(
+            boolean checkpointWhenSplitting) {
         // construct the source that captures three tables
         // the first table has 3 snapshot splits and has been assigned finished
         // the second table has 4 snapshot splits and has been assigned 2 splits
@@ -140,20 +143,39 @@ public class PendingSplitsStateSerializerTest {
                 .forEach(finishedOffsets::putAll);
         Map<TableId, TableChanges.TableChange> tableSchemas =
                 getTestTableSchema(tableId0, tableId1);
-        return new SnapshotPendingSplitsState(
-                alreadyProcessedTables,
-                remainingSplits,
-                assignedSnapshotSplits,
-                tableSchemas,
-                finishedOffsets,
-                AssignerStatus.INITIAL_ASSIGNING,
-                remainingTables,
-                false,
-                true);
+
+        if (checkpointWhenSplitting) {
+            return new SnapshotPendingSplitsState(
+                    alreadyProcessedTables,
+                    remainingSplits,
+                    assignedSnapshotSplits,
+                    tableSchemas,
+                    finishedOffsets,
+                    AssignerStatus.INITIAL_ASSIGNING,
+                    remainingTables,
+                    false,
+                    true,
+                    new ChunkSplitterState(
+                            tableId1, ChunkSplitterState.ChunkBound.middleOf("test"), 3));
+        } else {
+            return new SnapshotPendingSplitsState(
+                    alreadyProcessedTables,
+                    remainingSplits,
+                    assignedSnapshotSplits,
+                    tableSchemas,
+                    finishedOffsets,
+                    AssignerStatus.INITIAL_ASSIGNING,
+                    remainingTables,
+                    false,
+                    true,
+                    ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+        }
     }
 
-    private static HybridPendingSplitsState getTestHybridPendingSplitsState() {
-        return new HybridPendingSplitsState(getTestSnapshotPendingSplitsState(), false);
+    private static HybridPendingSplitsState getTestHybridPendingSplitsState(
+            boolean checkpointWhenSplitting) {
+        return new HybridPendingSplitsState(
+                getTestSnapshotPendingSplitsState(checkpointWhenSplitting), false);
     }
 
     private static BinlogPendingSplitsState getTestBinlogPendingSplitsState() {
