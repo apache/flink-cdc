@@ -238,7 +238,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
     protected Connection getTidbJdbcConnection(String databaseName) throws SQLException {
         return DriverManager.getConnection(
                 "jdbc:mysql://"
-                        + TIDB.getContainerIpAddress()
+                        + TIDB.getHost()
                         + ":"
                         + TIDB.getMappedPort(TIDB_PORT)
                         + "/"

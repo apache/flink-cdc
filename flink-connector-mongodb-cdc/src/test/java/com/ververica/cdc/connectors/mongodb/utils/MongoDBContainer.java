@@ -94,11 +94,11 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
     public String getConnectionString(String username, String password) {
         return String.format(
                 "mongodb://%s:%s@%s:%d",
-                username, password, getContainerIpAddress(), getMappedPort(MONGODB_PORT));
+                username, password, getHost(), getMappedPort(MONGODB_PORT));
     }
 
     public String getHostAndPort() {
-        return String.format("%s:%s", getContainerIpAddress(), getMappedPort(MONGODB_PORT));
+        return String.format("%s:%s", getHost(), getMappedPort(MONGODB_PORT));
     }
 
     public void executeCommand(String command) {

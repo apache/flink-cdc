@@ -137,16 +137,9 @@ under the License.
         </dependency>
 
         <dependency>
-            <groupId>org.awaitility</groupId>
-            <artifactId>awaitility</artifactId>
-            <version>${version.awaitility}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dns-cache-manipulator</artifactId>
-            <version>1.8.0</version>
+            <version>${dns-cache-manipulator.version}</version>
             <scope>test</scope>
         </dependency>
 

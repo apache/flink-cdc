@@ -131,13 +131,6 @@ under the License.
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>org.awaitility</groupId>
-            <artifactId>awaitility</artifactId>
-            <version>${version.awaitility}</version>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
 
 </project>
