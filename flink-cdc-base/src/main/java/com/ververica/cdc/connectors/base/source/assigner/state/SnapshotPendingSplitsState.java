@@ -19,7 +19,7 @@ package com.ververica.cdc.connectors.base.source.assigner.state;
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
-import com.ververica.cdc.connectors.base.source.reader.JdbcSourceSplitReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 
@@ -44,13 +44,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     /**
      * The snapshot splits that the {@link IncrementalSourceEnumerator} has assigned to {@link
-     * JdbcSourceSplitReader}s.
+     * IncrementalSourceSplitReader}s.
      */
     private final Map<String, SchemalessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link IncrementalSourceEnumerator} has
-     * received from {@link JdbcSourceSplitReader}s.
+     * received from {@link IncrementalSourceSplitReader}s.
      */
     private final Map<String, Offset> splitFinishedOffsets;
 

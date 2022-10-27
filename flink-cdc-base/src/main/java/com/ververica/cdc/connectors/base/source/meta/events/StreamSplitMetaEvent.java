@@ -20,13 +20,13 @@ import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
 import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to pass change log metadata, i.e. {@link FinishedSnapshotSplitInfo}.
+ * IncrementalSourceReader} to pass change log metadata, i.e. {@link FinishedSnapshotSplitInfo}.
  */
 public class StreamSplitMetaEvent implements SourceEvent {
 

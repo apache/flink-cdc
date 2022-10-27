@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.source.assigner.splitter;
+package com.ververica.cdc.connectors.base.source.meta.wartermark;
 
-import org.apache.flink.annotation.Experimental;
+/** The watermark kind. */
+public enum WatermarkKind {
+    LOW,
+    HIGH,
+    END;
 
-import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
-import io.debezium.relational.TableId;
-
-import java.util.Collection;
-
-/** The splitter used to split collection into a set of chunks. */
-@Experimental
-public interface ChunkSplitter {
-
-    /** Generates all snapshot splits (chunks) for the give data collection. */
-    Collection<SnapshotSplit> generateSplits(TableId tableId);
+    public WatermarkKind fromString(String kindString) {
+        if (LOW.name().equalsIgnoreCase(kindString)) {
+            return LOW;
+        } else if (HIGH.name().equalsIgnoreCase(kindString)) {
+            return HIGH;
+        } else {
+            return END;
+        }
+    }
 }

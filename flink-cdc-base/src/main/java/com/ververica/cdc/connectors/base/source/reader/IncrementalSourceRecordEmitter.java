@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.relational;
+package com.ververica.cdc.connectors.base.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -25,7 +25,6 @@ import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitState;
 import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.document.Array;
@@ -39,34 +38,34 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
+import static com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isWatermarkEvent;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getFetchTimestamp;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getMessageTimestamp;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isWatermarkEvent;
 
 /**
- * The {@link RecordEmitter} implementation for {@link JdbcIncrementalSourceReader}.
+ * The {@link RecordEmitter} implementation for {@link IncrementalSourceReader}.
  *
  * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the stream reader to
  * emit records rather than emit the records directly.
  */
-public class JdbcSourceRecordEmitter<T>
+public class IncrementalSourceRecordEmitter<T>
         implements RecordEmitter<SourceRecords, T, SourceSplitState> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceRecordEmitter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
             new FlinkJsonTableChangeSerializer();
 
-    private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
-    private final SourceReaderMetrics sourceReaderMetrics;
-    private final boolean includeSchemaChanges;
-    private final OutputCollector<T> outputCollector;
-    private final OffsetFactory offsetFactory;
+    protected final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
+    protected final SourceReaderMetrics sourceReaderMetrics;
+    protected final boolean includeSchemaChanges;
+    protected final OutputCollector<T> outputCollector;
+    protected final OffsetFactory offsetFactory;
 
-    public JdbcSourceRecordEmitter(
+    public IncrementalSourceRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             SourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges,
@@ -88,7 +87,7 @@ public class JdbcSourceRecordEmitter<T>
         }
     }
 
-    private void processElement(
+    protected void processElement(
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
@@ -137,12 +136,12 @@ public class JdbcSourceRecordEmitter<T>
         return offsetFactory.newOffset(offsetStrMap);
     }
 
-    private void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
+    protected void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
         outputCollector.output = output;
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
-    private void reportMetrics(SourceRecord element) {
+    protected void reportMetrics(SourceRecord element) {
         long now = System.currentTimeMillis();
         // record the latest process time
         sourceReaderMetrics.recordProcessTime(now);

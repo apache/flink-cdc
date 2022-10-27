@@ -47,7 +47,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Assigner for snapshot split. */
-public class SnapshotSplitAssigner implements SplitAssigner {
+public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssigner {
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitAssigner.class);
 
     private final List<TableId> alreadyProcessedTables;
@@ -57,7 +57,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     private final Map<String, Offset> splitFinishedOffsets;
     private boolean assignerFinished;
 
-    private final SourceConfig sourceConfig;
+    private final C sourceConfig;
     private final int currentParallelism;
     private final LinkedList<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
@@ -66,15 +66,15 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     private boolean isTableIdCaseSensitive;
 
     @Nullable private Long checkpointIdToFinish;
-    private final DataSourceDialect dialect;
+    private final DataSourceDialect<C> dialect;
     private final OffsetFactory offsetFactory;
 
     public SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
                 sourceConfig,
@@ -93,10 +93,10 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     public SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             SnapshotPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
                 sourceConfig,
@@ -115,7 +115,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     private SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
@@ -126,7 +126,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;

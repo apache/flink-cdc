@@ -35,8 +35,7 @@ import java.util.Map;
 
 /** The dialect of JDBC data source. */
 @Experimental
-public interface JdbcDataSourceDialect
-        extends DataSourceDialect<TableId, TableChange, JdbcSourceConfig> {
+public interface JdbcDataSourceDialect extends DataSourceDialect<JdbcSourceConfig> {
 
     /** Discovers the list of table to capture. */
     @Override

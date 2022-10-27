@@ -21,6 +21,7 @@ import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
+import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -139,7 +140,7 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 offsetContext.getPartition(),
                                 binlogSplit,
                                 currentBinlogOffset,
-                                JdbcSourceEventDispatcher.WatermarkKind.END);
+                                WatermarkKind.END);
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
                         errorHandler.setProducerThrowable(

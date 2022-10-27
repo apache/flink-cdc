@@ -30,7 +30,7 @@ import java.util.Properties;
 
 /** A {@link Factory} to provide {@link SourceConfig} of JDBC data source. */
 @Internal
-public abstract class JdbcSourceConfigFactory implements Factory {
+public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfig> {
 
     private static final long serialVersionUID = 1L;
 

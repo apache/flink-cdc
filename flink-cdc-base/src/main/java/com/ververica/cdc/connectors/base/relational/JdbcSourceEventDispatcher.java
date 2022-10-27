@@ -18,6 +18,8 @@ package com.ververica.cdc.connectors.base.relational;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent;
+import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.document.DocumentWriter;
@@ -64,14 +66,6 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
     public static final String BINLOG_POSITION_OFFSET_KEY = "pos";
 
     private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
-    private static final SchemaNameAdjuster SCHEMA_NAME_ADJUSTER = SchemaNameAdjuster.create();
-    public static final String WATERMARK_SIGNAL = "_split_watermark_signal_";
-    public static final String SPLIT_ID_KEY = "split_id";
-    public static final String WATERMARK_KIND = "watermark_kind";
-    public static final String SIGNAL_EVENT_KEY_SCHEMA_NAME =
-            "io.debezium.connector.flink.cdc.embedded.watermark.key";
-    public static final String SIGNAL_EVENT_VALUE_SCHEMA_NAME =
-            "io.debezium.connector.flink.cdc.embedded.watermark.value";
 
     private final ChangeEventQueue<DataChangeEvent> queue;
     private final HistorizedDatabaseSchema historizedSchema;
@@ -80,8 +74,6 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
     private final TopicSelector<TableId> topicSelector;
     private final Schema schemaChangeKeySchema;
     private final Schema schemaChangeValueSchema;
-    private final Schema signalEventKeySchema;
-    private final Schema signalEventValueSchema;
     private final String topic;
 
     public JdbcSourceEventDispatcher(
@@ -131,18 +123,6 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
                                 HistoryRecord.Fields.SOURCE,
                                 connectorConfig.getSourceInfoStructMaker().schema())
                         .field(HISTORY_RECORD_FIELD, Schema.OPTIONAL_STRING_SCHEMA)
-                        .build();
-        this.signalEventKeySchema =
-                SchemaBuilder.struct()
-                        .name(SCHEMA_NAME_ADJUSTER.adjust(SIGNAL_EVENT_KEY_SCHEMA_NAME))
-                        .field(SPLIT_ID_KEY, Schema.STRING_SCHEMA)
-                        .field(WATERMARK_SIGNAL, Schema.BOOLEAN_SCHEMA)
-                        .build();
-        this.signalEventValueSchema =
-                SchemaBuilder.struct()
-                        .name(SCHEMA_NAME_ADJUSTER.adjust(SIGNAL_EVENT_VALUE_SCHEMA_NAME))
-                        .field(SPLIT_ID_KEY, Schema.STRING_SCHEMA)
-                        .field(WATERMARK_KIND, Schema.STRING_SCHEMA)
                         .build();
     }
 
@@ -259,45 +239,8 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
             throws InterruptedException {
 
         SourceRecord sourceRecord =
-                new SourceRecord(
-                        sourcePartition,
-                        watermark.getOffset(),
-                        topic,
-                        signalEventKeySchema,
-                        signalRecordKey(sourceSplit.splitId()),
-                        signalEventValueSchema,
-                        signalRecordValue(sourceSplit.splitId(), watermarkKind));
+                WatermarkEvent.create(
+                        sourcePartition, topic, sourceSplit.splitId(), watermarkKind, watermark);
         queue.enqueue(new DataChangeEvent(sourceRecord));
-    }
-
-    private Struct signalRecordKey(String splitId) {
-        Struct result = new Struct(signalEventKeySchema);
-        result.put(SPLIT_ID_KEY, splitId);
-        result.put(WATERMARK_SIGNAL, true);
-        return result;
-    }
-
-    private Struct signalRecordValue(String splitId, WatermarkKind watermarkKind) {
-        Struct result = new Struct(signalEventValueSchema);
-        result.put(SPLIT_ID_KEY, splitId);
-        result.put(WATERMARK_KIND, watermarkKind.toString());
-        return result;
-    }
-
-    /** The watermark kind. */
-    public enum WatermarkKind {
-        LOW,
-        HIGH,
-        END;
-
-        public WatermarkKind fromString(String kindString) {
-            if (LOW.name().equalsIgnoreCase(kindString)) {
-                return LOW;
-            } else if (HIGH.name().equalsIgnoreCase(kindString)) {
-                return HIGH;
-            } else {
-                return END;
-            }
-        }
     }
 }

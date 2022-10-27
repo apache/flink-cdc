@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.base.utils;
 
 import org.apache.flink.table.types.logical.RowType;
 
-import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.WatermarkKind;
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
@@ -33,17 +32,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
-import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.SIGNAL_EVENT_VALUE_SCHEMA_NAME;
-import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.WATERMARK_KIND;
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
@@ -64,26 +55,6 @@ public class SourceRecordUtils {
             row[i] = rs.getObject(i + 1);
         }
         return row;
-    }
-
-    public static boolean isWatermarkEvent(SourceRecord record) {
-        Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        return watermarkKind.isPresent();
-    }
-
-    public static boolean isLowWatermarkEvent(SourceRecord record) {
-        Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.LOW;
-    }
-
-    public static boolean isHighWatermarkEvent(SourceRecord record) {
-        Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.HIGH;
-    }
-
-    public static boolean isEndWatermarkEvent(SourceRecord record) {
-        Optional<WatermarkKind> watermarkKind = getWatermarkKind(record);
-        return watermarkKind.isPresent() && watermarkKind.get() == WatermarkKind.END;
     }
 
     /**
@@ -225,87 +196,5 @@ public class SourceRecordUtils {
         Struct value = (Struct) schemaRecord.value();
         String historyRecordStr = value.getString(HISTORY_RECORD_FIELD);
         return new HistoryRecord(DOCUMENT_READER.read(historyRecordStr));
-    }
-
-    private static Optional<WatermarkKind> getWatermarkKind(SourceRecord record) {
-        if (record.valueSchema() != null
-                && SIGNAL_EVENT_VALUE_SCHEMA_NAME.equals(record.valueSchema().name())) {
-            Struct value = (Struct) record.value();
-            return Optional.of(WatermarkKind.valueOf(value.getString(WATERMARK_KIND)));
-        }
-        return Optional.empty();
-    }
-
-    /** rewrite output buffer by data change event. */
-    public static void rewriteOutputBuffer(
-            Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord) {
-        Struct key = (Struct) changeRecord.key();
-        Struct value = (Struct) changeRecord.value();
-        if (value != null) {
-            Envelope.Operation operation =
-                    Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
-            switch (operation) {
-                case CREATE:
-                case UPDATE:
-                    Envelope envelope = Envelope.fromSchema(changeRecord.valueSchema());
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    Struct after = value.getStruct(Envelope.FieldName.AFTER);
-                    Instant fetchTs =
-                            Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
-                    SourceRecord record =
-                            new SourceRecord(
-                                    changeRecord.sourcePartition(),
-                                    changeRecord.sourceOffset(),
-                                    changeRecord.topic(),
-                                    changeRecord.kafkaPartition(),
-                                    changeRecord.keySchema(),
-                                    changeRecord.key(),
-                                    changeRecord.valueSchema(),
-                                    envelope.read(after, source, fetchTs));
-                    outputBuffer.put(key, record);
-                    break;
-                case DELETE:
-                    outputBuffer.remove(key);
-                    break;
-                case READ:
-                    throw new IllegalStateException(
-                            String.format(
-                                    "Data change record shouldn't use READ operation, the the record is %s.",
-                                    changeRecord));
-            }
-        }
-    }
-
-    /**
-     * Format message timestamp(source.ts_ms) value to 0L for all records read in snapshot phase.
-     */
-    public static List<SourceRecord> formatMessageTimestamp(
-            Collection<SourceRecord> snapshotRecords) {
-        return snapshotRecords.stream()
-                .map(
-                        record -> {
-                            Envelope envelope = Envelope.fromSchema(record.valueSchema());
-                            Struct value = (Struct) record.value();
-                            Struct updateAfter = value.getStruct(Envelope.FieldName.AFTER);
-                            // set message timestamp (source.ts_ms) to 0L
-                            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                            source.put(Envelope.FieldName.TIMESTAMP, 0L);
-                            // extend the fetch timestamp(ts_ms)
-                            Instant fetchTs =
-                                    Instant.ofEpochMilli(
-                                            value.getInt64(Envelope.FieldName.TIMESTAMP));
-                            SourceRecord sourceRecord =
-                                    new SourceRecord(
-                                            record.sourcePartition(),
-                                            record.sourceOffset(),
-                                            record.topic(),
-                                            record.kafkaPartition(),
-                                            record.keySchema(),
-                                            record.key(),
-                                            record.valueSchema(),
-                                            envelope.read(updateAfter, source, fetchTs));
-                            return sourceRecord;
-                        })
-                .collect(Collectors.toList());
     }
 }

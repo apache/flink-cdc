@@ -19,9 +19,9 @@ package com.ververica.cdc.connectors.base.options;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
 
-/** Configurations for {@link JdbcIncrementalSource}. */
+/** Configurations for {@link IncrementalSource}. */
 public class SourceOptions {
 
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
