@@ -40,7 +40,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Assigner for Hybrid split which contains snapshot splits and stream splits. */
-public class HybridSplitAssigner implements SplitAssigner {
+public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(HybridSplitAssigner.class);
     private static final String STREAM_SPLIT_ID = "stream-split";
@@ -49,19 +49,19 @@ public class HybridSplitAssigner implements SplitAssigner {
 
     private boolean isStreamSplitAssigned;
 
-    private final SnapshotSplitAssigner snapshotSplitAssigner;
+    private final SnapshotSplitAssigner<C> snapshotSplitAssigner;
 
     private final OffsetFactory offsetFactory;
 
     public HybridSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
-                new SnapshotSplitAssigner(
+                new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
                         remainingTables,
@@ -74,13 +74,13 @@ public class HybridSplitAssigner implements SplitAssigner {
     }
 
     public HybridSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             HybridPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
-                new SnapshotSplitAssigner(
+                new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
                         checkpoint.getSnapshotPendingSplits(),
@@ -92,7 +92,7 @@ public class HybridSplitAssigner implements SplitAssigner {
     }
 
     private HybridSplitAssigner(
-            SnapshotSplitAssigner snapshotSplitAssigner,
+            SnapshotSplitAssigner<C> snapshotSplitAssigner,
             boolean isStreamSplitAssigned,
             int splitMetaGroupSize,
             OffsetFactory offsetFactory) {

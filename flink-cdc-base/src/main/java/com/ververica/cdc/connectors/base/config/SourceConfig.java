@@ -32,16 +32,12 @@ public interface SourceConfig extends Serializable {
 
     int getSplitMetaGroupSize();
 
-    double getDistributionFactorUpper();
-
-    double getDistributionFactorLower();
-
     boolean isIncludeSchemaChanges();
 
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface
-    interface Factory extends Serializable {
+    interface Factory<C extends SourceConfig> extends Serializable {
 
-        SourceConfig create(int subtask);
+        C create(int subtask);
     }
 }

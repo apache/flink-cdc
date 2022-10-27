@@ -48,6 +48,7 @@ import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Collect;
@@ -212,6 +213,11 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     @Override
     public ChangeEventQueue<DataChangeEvent> getQueue() {
         return queue;
+    }
+
+    @Override
+    public Tables.TableFilter getTableFilter() {
+        return getDbzConnectorConfig().getTableFilters().dataCollectionFilter();
     }
 
     @Override

@@ -88,7 +88,7 @@ public class MySqlDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public ChunkSplitter<TableId> createChunkSplitter(JdbcSourceConfig sourceConfig) {
+    public ChunkSplitter createChunkSplitter(JdbcSourceConfig sourceConfig) {
         return new MySqlChunkSplitter(sourceConfig, this);
     }
 

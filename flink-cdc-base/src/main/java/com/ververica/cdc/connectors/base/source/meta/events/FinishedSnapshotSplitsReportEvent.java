@@ -20,12 +20,12 @@ import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
 import java.util.Map;
 
 /**
- * The {@link SourceEvent} that {@link JdbcIncrementalSourceReader} sends to {@link
+ * The {@link SourceEvent} that {@link IncrementalSourceReader} sends to {@link
  * IncrementalSourceEnumerator} to notify the snapshot split has read finished with the consistent
  * change log position.
  */

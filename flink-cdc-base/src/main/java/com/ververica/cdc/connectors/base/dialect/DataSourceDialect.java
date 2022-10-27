@@ -23,7 +23,8 @@ import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
-import io.debezium.schema.DataCollectionId;
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 
 import java.io.Serializable;
 import java.util.List;
@@ -32,26 +33,23 @@ import java.util.Map;
 /**
  * The dialect of data source.
  *
- * @param <ID> The identifier type of data collection.
- * @param <S> The schema type of data collection.
  * @param <C> The source config of data source.
  */
 @Experimental
-public interface DataSourceDialect<ID extends DataCollectionId, S, C extends SourceConfig>
-        extends Serializable {
+public interface DataSourceDialect<C extends SourceConfig> extends Serializable {
 
     /** Get the name of dialect. */
     String getName();
 
     /** Discovers the list of data collection to capture. */
-    List<ID> discoverDataCollections(C sourceConfig);
+    List<TableId> discoverDataCollections(C sourceConfig);
 
     /**
      * Discovers the captured data collections' schema by {@link SourceConfig}.
      *
      * @param sourceConfig a basic source configuration.
      */
-    Map<ID, S> discoverDataCollectionSchemas(C sourceConfig);
+    Map<TableId, TableChanges.TableChange> discoverDataCollectionSchemas(C sourceConfig);
 
     /**
      * Displays current offset from the database e.g. query Mysql binary logs by query <code>
@@ -63,7 +61,7 @@ public interface DataSourceDialect<ID extends DataCollectionId, S, C extends Sou
     boolean isDataCollectionIdCaseSensitive(C sourceConfig);
 
     /** Returns the {@link ChunkSplitter} which used to split collection to splits. */
-    ChunkSplitter<ID> createChunkSplitter(C sourceConfig);
+    ChunkSplitter createChunkSplitter(C sourceConfig);
 
     /** The fetch task used to fetch data of a snapshot split or stream split. */
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);

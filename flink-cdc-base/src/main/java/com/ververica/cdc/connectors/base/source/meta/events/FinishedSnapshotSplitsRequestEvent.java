@@ -19,11 +19,11 @@ package com.ververica.cdc.connectors.base.source.meta.events;
 import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
 /**
  * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to notify reader should report its finished snapshot splits, i.e.
+ * IncrementalSourceReader} to notify reader should report its finished snapshot splits, i.e.
  * sending {@link FinishedSnapshotSplitsReportEvent}.
  */
 public class FinishedSnapshotSplitsRequestEvent implements SourceEvent {

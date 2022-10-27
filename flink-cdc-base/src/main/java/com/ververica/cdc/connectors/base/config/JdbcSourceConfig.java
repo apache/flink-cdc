@@ -17,7 +17,7 @@
 package com.ververica.cdc.connectors.base.config;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
 import io.debezium.config.Configuration;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 
@@ -26,8 +26,7 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * A Source configuration which is used by {@link JdbcIncrementalSource} which used JDBC data
- * source.
+ * A Source configuration which is used by {@link IncrementalSource} which used JDBC data source.
  */
 public abstract class JdbcSourceConfig extends BaseSourceConfig {
 

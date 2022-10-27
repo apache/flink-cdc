@@ -28,8 +28,8 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
-import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
+import com.ververica.cdc.connectors.base.config.SourceConfig;
+import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsRequestEvent;
@@ -66,28 +66,28 @@ import static org.apache.flink.util.Preconditions.checkState;
  * single-parallel source reader for table stream phase from {@link StreamSplit}.
  */
 @Experimental
-public class JdbcIncrementalSourceReader<T>
+public class IncrementalSourceReader<T, C extends SourceConfig>
         extends SingleThreadMultiplexSourceReaderBase<
                 SourceRecords, T, SourceSplitBase, SourceSplitState> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JdbcIncrementalSourceReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceReader.class);
 
     private final Map<String, SnapshotSplit> finishedUnackedSplits;
     private final Map<String, StreamSplit> uncompletedStreamSplits;
     private final int subtaskId;
     private final SourceSplitSerializer sourceSplitSerializer;
-    private final JdbcSourceConfig sourceConfig;
-    private final JdbcDataSourceDialect dialect;
+    private final C sourceConfig;
+    private final DataSourceDialect<C> dialect;
 
-    public JdbcIncrementalSourceReader(
+    public IncrementalSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
-            Supplier<JdbcSourceSplitReader> splitReaderSupplier,
+            Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier,
             RecordEmitter<SourceRecords, T, SourceSplitState> recordEmitter,
             Configuration config,
             SourceReaderContext context,
-            JdbcSourceConfig sourceConfig,
+            C sourceConfig,
             SourceSplitSerializer sourceSplitSerializer,
-            JdbcDataSourceDialect dialect) {
+            DataSourceDialect<C> dialect) {
         super(
                 elementQueue,
                 new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
@@ -237,7 +237,7 @@ public class JdbcIncrementalSourceReader<T>
             if (receivedMetaGroupId == expectedMetaGroupId) {
                 List<FinishedSnapshotSplitInfo> metaDataGroup =
                         metadataEvent.getMetaGroup().stream()
-                                .map(bytes -> sourceSplitSerializer.deserialize(bytes))
+                                .map(sourceSplitSerializer::deserialize)
                                 .collect(Collectors.toList());
                 uncompletedStreamSplits.put(
                         streamSplit.splitId(),

@@ -33,7 +33,7 @@ import org.apache.flink.util.CloseableIterator;
 
 import com.ververica.cdc.connectors.base.experimental.MySqlSourceBuilder;
 import com.ververica.cdc.connectors.base.experimental.utils.MySqlConnectionUtils;
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
 import com.ververica.cdc.connectors.base.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.base.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.base.testutils.UniqueDatabase;
@@ -64,7 +64,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/** Example Tests for {@link JdbcIncrementalSource}. */
+/** Example Tests for {@link IncrementalSource}. */
 public class MySqlChangeEventSourceExampleTest {
 
     private static final Logger LOG =
@@ -97,8 +97,8 @@ public class MySqlChangeEventSourceExampleTest {
     @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingScanEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
-        JdbcIncrementalSource<String> mySqlChangeEventSource =
-                new MySqlSourceBuilder()
+        MySqlSourceBuilder.MySqlIncrementalSource<String> mySqlChangeEventSource =
+                new MySqlSourceBuilder<String>()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(inventoryDatabase.getDatabaseName())
@@ -137,8 +137,8 @@ public class MySqlChangeEventSourceExampleTest {
 
         inventoryDatabase.createAndInitialize();
         final String tableId = inventoryDatabase.getDatabaseName() + ".products";
-        JdbcIncrementalSource<RowData> mySqlChangeEventSource =
-                new MySqlSourceBuilder()
+        MySqlSourceBuilder.MySqlIncrementalSource<RowData> mySqlChangeEventSource =
+                new MySqlSourceBuilder<RowData>()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(inventoryDatabase.getDatabaseName())
@@ -178,7 +178,7 @@ public class MySqlChangeEventSourceExampleTest {
                 };
 
         // step-1: consume snapshot data
-        List<RowData> snapshotRowDataList = new ArrayList();
+        List<RowData> snapshotRowDataList = new ArrayList<>();
         for (int i = 0; i < snapshotExpectedRecords.length && iterator.hasNext(); i++) {
             snapshotRowDataList.add(iterator.next());
         }
@@ -200,7 +200,7 @@ public class MySqlChangeEventSourceExampleTest {
                 };
 
         // step-3: consume binlog change events
-        List<RowData> binlogRowDataList = new ArrayList();
+        List<RowData> binlogRowDataList = new ArrayList<>();
         for (int i = 0; i < binlogExpectedRecords.length && iterator.hasNext(); i++) {
             binlogRowDataList.add(iterator.next());
         }
@@ -274,13 +274,12 @@ public class MySqlChangeEventSourceExampleTest {
     }
 
     private static MySqlContainer createMySqlContainer(MySqlVersion version) {
-        return (MySqlContainer)
-                new MySqlContainer(version)
-                        .withConfigurationOverride("docker/server-gtids/my.cnf")
-                        .withSetupSQL("docker/setup.sql")
-                        .withDatabaseName("flink-test")
-                        .withUsername("flinkuser")
-                        .withPassword("flinkpw")
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+        return new MySqlContainer(version)
+                .withConfigurationOverride("docker/server-gtids/my.cnf")
+                .withSetupSQL("docker/setup.sql")
+                .withDatabaseName("flink-test")
+                .withUsername("flinkuser")
+                .withPassword("flinkpw")
+                .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 }

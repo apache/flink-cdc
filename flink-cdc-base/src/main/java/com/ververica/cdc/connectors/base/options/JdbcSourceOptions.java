@@ -19,11 +19,11 @@ package com.ververica.cdc.connectors.base.options;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
 
 import java.time.Duration;
 
-/** Configurations for {@link JdbcIncrementalSource} of JDBC data source. */
+/** Configurations for {@link IncrementalSource} of JDBC data source. */
 public class JdbcSourceOptions extends SourceOptions {
 
     public static final ConfigOption<String> HOSTNAME =

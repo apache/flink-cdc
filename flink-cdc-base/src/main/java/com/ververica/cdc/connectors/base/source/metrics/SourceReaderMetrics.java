@@ -19,15 +19,15 @@ package com.ververica.cdc.connectors.base.source.metrics;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
-/** A collection class for handling metrics in {@link JdbcIncrementalSourceReader}. */
+/** A collection class for handling metrics in {@link IncrementalSourceReader}. */
 public class SourceReaderMetrics {
 
     private final MetricGroup metricGroup;
 
     /**
-     * The last record processing time, which is updated after {@link JdbcIncrementalSourceReader}
+     * The last record processing time, which is updated after {@link IncrementalSourceReader}
      * fetches a batch of data. It's mainly used to report metrics sourceIdleTime for sourceIdleTime
      * = System.currentTimeMillis() - processTime.
      */

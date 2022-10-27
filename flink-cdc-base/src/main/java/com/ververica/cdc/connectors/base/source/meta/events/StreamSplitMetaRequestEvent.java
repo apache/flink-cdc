@@ -19,10 +19,10 @@ package com.ververica.cdc.connectors.base.source.meta.events;
 import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link JdbcIncrementalSourceReader} sends to {@link
+ * The {@link SourceEvent} that {@link IncrementalSourceReader} sends to {@link
  * IncrementalSourceEnumerator} to pull change log metadata, i.e. sending {@link
  * StreamSplitMetaEvent}.
  */

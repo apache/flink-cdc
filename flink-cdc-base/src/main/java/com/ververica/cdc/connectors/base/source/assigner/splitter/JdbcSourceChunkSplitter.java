@@ -34,7 +34,7 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 
 /** The {@code ChunkSplitter} used to split table into a set of chunks for JDBC data source. */
 @Experimental
-public interface JdbcSourceChunkSplitter extends ChunkSplitter<TableId> {
+public interface JdbcSourceChunkSplitter extends ChunkSplitter {
 
     /** Generates all snapshot splits (chunks) for the give table path. */
     @Override
