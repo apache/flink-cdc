@@ -56,11 +56,11 @@ public interface OffsetDeserializerSerializer extends Serializable {
     default Offset readOffsetPosition(DataInputDeserializer in) throws IOException {
         boolean offsetNonNull = in.readBoolean();
         if (offsetNonNull) {
-            int binlogOffsetBytesLength = in.readInt();
-            byte[] binlogOffsetBytes = new byte[binlogOffsetBytesLength];
-            in.readFully(binlogOffsetBytes);
+            int offsetBytesLength = in.readInt();
+            byte[] offsetBytes = new byte[offsetBytesLength];
+            in.readFully(offsetBytes);
             OffsetDeserializer offsetDeserializer = createOffsetDeserializer();
-            return offsetDeserializer.deserialize(binlogOffsetBytes);
+            return offsetDeserializer.deserialize(offsetBytes);
         } else {
             return null;
         }
@@ -69,9 +69,9 @@ public interface OffsetDeserializerSerializer extends Serializable {
     default void writeOffsetPosition(Offset offset, DataOutputSerializer out) throws IOException {
         out.writeBoolean(offset != null);
         if (offset != null) {
-            byte[] binlogOffsetBytes = OffsetSerializer.INSTANCE.serialize(offset);
-            out.writeInt(binlogOffsetBytes.length);
-            out.write(binlogOffsetBytes);
+            byte[] offsetBytes = OffsetSerializer.INSTANCE.serialize(offset);
+            out.writeInt(offsetBytes.length);
+            out.write(offsetBytes);
         }
     }
 

@@ -18,7 +18,7 @@ package com.ververica.cdc.connectors.base.source.assigner.state;
 
 import java.util.Objects;
 
-/** A {@link PendingSplitsState} for pending binlog splits. */
+/** A {@link PendingSplitsState} for pending stream splits. */
 public class StreamPendingSplitsState extends PendingSplitsState {
 
     private final boolean isStreamSplitAssigned;

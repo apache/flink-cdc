@@ -50,7 +50,7 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isWaterm
 /**
  * The {@link RecordEmitter} implementation for {@link JdbcIncrementalSourceReader}.
  *
- * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the binlog reader to
+ * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the stream reader to
  * emit records rather than emit the records directly.
  */
 public class JdbcSourceRecordEmitter<T>

@@ -59,7 +59,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
 
     private final JdbcSourceFetchTaskContext taskContext;
     private final ExecutorService executorService;
-    private final Set<TableId> pureBinlogPhaseTables;
+    private final Set<TableId> pureStreamPhaseTables;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile Throwable readException;
@@ -78,7 +78,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
-        this.pureBinlogPhaseTables = new HashSet<>();
+        this.pureStreamPhaseTables = new HashSet<>();
     }
 
     @Override
@@ -95,7 +95,7 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
                     } catch (Exception e) {
                         LOG.error(
                                 String.format(
-                                        "Execute binlog read task for stream split %s fail",
+                                        "Execute stream read task for stream split %s fail",
                                         currentStreamSplit),
                                 e);
                         readException = e;
@@ -156,23 +156,23 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
     /**
      * Returns the record should emit or not.
      *
-     * <p>The watermark signal algorithm is the binlog split reader only sends the binlog event that
-     * belongs to its finished snapshot splits. For each snapshot split, the binlog event is valid
+     * <p>The watermark signal algorithm is the stream split reader only sends the change event that
+     * belongs to its finished snapshot splits. For each snapshot split, the change event is valid
      * since the offset is after its high watermark.
      *
      * <pre> E.g: the data input is :
      *    snapshot-split-0 info : [0,    1024) highWatermark0
      *    snapshot-split-1 info : [1024, 2048) highWatermark1
      *  the data output is:
-     *  only the binlog event belong to [0,    1024) and offset is after highWatermark0 should send,
-     *  only the binlog event belong to [1024, 2048) and offset is after highWatermark1 should send.
+     *  only the change event belong to [0,    1024) and offset is after highWatermark0 should send,
+     *  only the change event belong to [1024, 2048) and offset is after highWatermark1 should send.
      * </pre>
      */
     private boolean shouldEmit(SourceRecord sourceRecord) {
         if (isDataChangeRecord(sourceRecord)) {
             TableId tableId = getTableId(sourceRecord);
             Offset position = taskContext.getStreamOffset(sourceRecord);
-            if (hasEnterPureBinlogPhase(tableId, position)) {
+            if (hasEnterPureStreamPhase(tableId, position)) {
                 return true;
             }
             // only the table who captured snapshot splits need to filter
@@ -198,14 +198,14 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
         return true;
     }
 
-    private boolean hasEnterPureBinlogPhase(TableId tableId, Offset position) {
-        if (pureBinlogPhaseTables.contains(tableId)) {
+    private boolean hasEnterPureStreamPhase(TableId tableId, Offset position) {
+        if (pureStreamPhaseTables.contains(tableId)) {
             return true;
         }
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
-            pureBinlogPhaseTables.add(tableId);
+            pureStreamPhaseTables.add(tableId);
             return true;
         }
 
@@ -217,11 +217,11 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
         List<FinishedSnapshotSplitInfo> finishedSplitInfos =
                 currentStreamSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
-        Map<TableId, Offset> tableIdBinlogPositionMap = new HashMap<>();
+        Map<TableId, Offset> tableIdOffsetPositionMap = new HashMap<>();
         // latest-offset mode
         if (finishedSplitInfos.isEmpty()) {
             for (TableId tableId : currentStreamSplit.getTableSchemas().keySet()) {
-                tableIdBinlogPositionMap.put(tableId, currentStreamSplit.getStartingOffset());
+                tableIdOffsetPositionMap.put(tableId, currentStreamSplit.getStartingOffset());
             }
         }
         // initial mode
@@ -234,14 +234,14 @@ public class JdbcSourceStreamFetcher implements Fetcher<SourceRecords, SourceSpl
                 splitsInfoMap.put(tableId, list);
 
                 Offset highWatermark = finishedSplitInfo.getHighWatermark();
-                Offset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
+                Offset maxHighWatermark = tableIdOffsetPositionMap.get(tableId);
                 if (maxHighWatermark == null || highWatermark.isAfter(maxHighWatermark)) {
-                    tableIdBinlogPositionMap.put(tableId, highWatermark);
+                    tableIdOffsetPositionMap.put(tableId, highWatermark);
                 }
             }
         }
         this.finishedSplitsInfo = splitsInfoMap;
-        this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
-        this.pureBinlogPhaseTables.clear();
+        this.maxSplitHighWatermarkMap = tableIdOffsetPositionMap;
+        this.pureStreamPhaseTables.clear();
     }
 }

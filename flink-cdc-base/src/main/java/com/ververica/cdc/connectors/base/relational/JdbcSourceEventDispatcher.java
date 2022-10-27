@@ -288,7 +288,7 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
     public enum WatermarkKind {
         LOW,
         HIGH,
-        BINLOG_END;
+        END;
 
         public WatermarkKind fromString(String kindString) {
             if (LOW.name().equalsIgnoreCase(kindString)) {
@@ -296,7 +296,7 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
             } else if (HIGH.name().equalsIgnoreCase(kindString)) {
                 return HIGH;
             } else {
-                return BINLOG_END;
+                return END;
             }
         }
     }

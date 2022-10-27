@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** The split to describe a split of a MySql table snapshot. */
+/** The split to describe a split of a database table snapshot. */
 public class SnapshotSplit extends SourceSplitBase {
 
     private final TableId tableId;
@@ -132,7 +132,7 @@ public class SnapshotSplit extends SourceSplitBase {
                 splitKeyType.getFields().stream()
                         .map(RowType.RowField::asSummaryString)
                         .collect(Collectors.joining(",", "[", "]"));
-        return "MySqlSnapshotSplit{"
+        return "SnapshotSplit{"
                 + "tableId="
                 + tableId
                 + ", splitId='"

@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 
 import java.util.Map;
 
-/** The state of split to describe the binlog of table(s). */
+/** The state of split to describe the change log of table(s). */
 public class StreamSplitState extends SourceSplitState {
 
     @Nullable private Offset startingOffset;
@@ -66,14 +66,14 @@ public class StreamSplitState extends SourceSplitState {
 
     @Override
     public StreamSplit toSourceSplit() {
-        final StreamSplit binlogSplit = split.asStreamSplit();
+        final StreamSplit streamSplit = split.asStreamSplit();
         return new StreamSplit(
-                binlogSplit.splitId(),
+                streamSplit.splitId(),
                 getStartingOffset(),
                 getEndingOffset(),
-                binlogSplit.asStreamSplit().getFinishedSnapshotSplitInfos(),
+                streamSplit.asStreamSplit().getFinishedSnapshotSplitInfos(),
                 getTableSchemas(),
-                binlogSplit.getTotalFinishedSplitSize());
+                streamSplit.getTotalFinishedSplitSize());
     }
 
     @Override

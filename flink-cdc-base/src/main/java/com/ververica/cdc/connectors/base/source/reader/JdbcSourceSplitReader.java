@@ -104,7 +104,7 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecords, SourceS
     }
 
     protected void checkSplitOrStartNext() throws IOException {
-        // the binlog fetcher should keep alive
+        // the stream fetcher should keep alive
         if (currentFetcher instanceof JdbcSourceStreamFetcher) {
             return;
         }
@@ -123,9 +123,9 @@ public class JdbcSourceSplitReader implements SplitReader<SourceRecords, SourceS
                     currentFetcher = new JdbcSourceScanFetcher(taskContext, subtaskId);
                 }
             } else {
-                // point from snapshot split to binlog split
+                // point from snapshot split to stream split
                 if (currentFetcher != null) {
-                    LOG.info("It's turn to read binlog split, close current snapshot fetcher.");
+                    LOG.info("It's turn to read stream split, close current snapshot fetcher.");
                     currentFetcher.close();
                 }
                 final JdbcSourceFetchTaskContext taskContext =

@@ -50,8 +50,8 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataCh
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isEndWatermarkEvent;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isLowWatermarkEvent;
+import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.rewriteOutputBuffer;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.splitKeyRangeContains;
-import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.upsertBinlog;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
@@ -123,15 +123,16 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecords, SourceSplit
         checkReadException();
 
         if (hasNextElement.get()) {
-            // data input: [low watermark event][snapshot events][high watermark event][binlog
-            // events][binlog-end event]
+            // eg:
+            // data input: [low watermark event][snapshot events][high watermark event][change
+            // events][end watermark event]
             // data output: [low watermark event][normalized events][high watermark event]
-            boolean reachBinlogStart = false;
-            boolean reachBinlogEnd = false;
+            boolean reachChangeLogStart = false;
+            boolean reachChangeLogEnd = false;
             SourceRecord lowWatermark = null;
             SourceRecord highWatermark = null;
-            Map<Struct, SourceRecord> snapshotRecords = new HashMap<>();
-            while (!reachBinlogEnd) {
+            Map<Struct, SourceRecord> outputBuffer = new HashMap<>();
+            while (!reachChangeLogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
                 for (DataChangeEvent event : batch) {
@@ -145,22 +146,22 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecords, SourceSplit
                     if (highWatermark == null && isHighWatermarkEvent(record)) {
                         highWatermark = record;
                         // snapshot events capture end and begin to capture binlog events
-                        reachBinlogStart = true;
+                        reachChangeLogStart = true;
                         continue;
                     }
 
-                    if (reachBinlogStart && isEndWatermarkEvent(record)) {
+                    if (reachChangeLogStart && isEndWatermarkEvent(record)) {
                         // capture to end watermark events, stop the loop
-                        reachBinlogEnd = true;
+                        reachChangeLogEnd = true;
                         break;
                     }
 
-                    if (!reachBinlogStart) {
-                        snapshotRecords.put((Struct) record.key(), record);
+                    if (!reachChangeLogStart) {
+                        outputBuffer.put((Struct) record.key(), record);
                     } else {
-                        if (isRequiredBinlogRecord(record)) {
-                            // upsert binlog events through the record key
-                            upsertBinlog(snapshotRecords, record);
+                        if (isChangeRecordInChunkRange(record)) {
+                            // rewrite overlapping snapshot records through the record key
+                            rewriteOutputBuffer(outputBuffer, record);
                         }
                     }
                 }
@@ -170,7 +171,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecords, SourceSplit
 
             final List<SourceRecord> normalizedRecords = new ArrayList<>();
             normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
+            normalizedRecords.addAll(formatMessageTimestamp(outputBuffer.values()));
             normalizedRecords.add(highWatermark);
 
             final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
@@ -217,7 +218,7 @@ public class JdbcSourceScanFetcher implements Fetcher<SourceRecords, SourceSplit
                         lowWatermark));
     }
 
-    private boolean isRequiredBinlogRecord(SourceRecord record) {
+    private boolean isChangeRecordInChunkRange(SourceRecord record) {
         if (isDataChangeRecord(record)) {
             Object[] key =
                     getSplitKey(currentSnapshotSplit.getSplitKeyType(), record, nameAdjuster);

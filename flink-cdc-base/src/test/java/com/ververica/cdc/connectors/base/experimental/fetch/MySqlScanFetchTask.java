@@ -187,7 +187,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 sourcePartition,
                 backFillBinlogSplit,
                 backFillBinlogSplit.getEndingOffset(),
-                WatermarkKind.BINLOG_END);
+                WatermarkKind.END);
     }
 
     /** A wrapped task to fetch snapshot split of table. */
