@@ -57,8 +57,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
+import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
-import static org.apache.flink.runtime.testutils.CommonTestUtils.waitForJobStatus;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for MySQL Table source. */
@@ -70,8 +70,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
 
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            (MySqlContainer) createMySqlContainer(MySqlVersion.V8_0).withExposedPorts(3307);
+    private static final MySqlContainer MYSQL8_CONTAINER = createMySqlContainer(MySqlVersion.V8_0);
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);

@@ -121,7 +121,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.13.6", "1.14.4");
+        return Arrays.asList("1.13.6", "1.14.4", "1.15.2");
     }
 
     @Before
@@ -258,6 +258,9 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     }
 
     private String getFlinkDockerImageTag() {
+        if ("1.15.2".equals(flinkVersion)) {
+            return String.format("flink:%s-scala_2.12", flinkVersion);
+        }
         return String.format("flink:%s-scala_2.11", flinkVersion);
     }
 
