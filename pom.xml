@@ -49,6 +49,7 @@ under the License.
         <module>flink-sql-connector-oceanbase-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
         <module>flink-sql-connector-tidb-cdc</module>
+        <module>flink-sql-connector-db2-cdc</module>
         <module>flink-cdc-e2e-tests</module>
     </modules>
 
