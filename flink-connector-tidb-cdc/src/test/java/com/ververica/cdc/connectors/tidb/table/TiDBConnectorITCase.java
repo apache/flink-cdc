@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
@@ -547,87 +546,6 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     @Test
     public void testTiDBServerInShanghai() throws Exception {
         testTiDBServerTimezone("Asia/Shanghai");
-    }
-
-    @Test
-    public void testRegionChange() throws Exception {
-        initializeTidbTable("region_switch_test");
-        String sourceDDL =
-                String.format(
-                        "CREATE TABLE tidb_source ("
-                                + " `id` INT NOT NULL,"
-                                + " b INT,"
-                                + " PRIMARY KEY (`id`) NOT ENFORCED"
-                                + ") WITH ("
-                                + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
-                                + " 'pd-addresses' = '%s',"
-                                + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s'"
-                                + ")",
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
-                        "region_switch_test",
-                        "t1");
-
-        String sinkDDL =
-                "CREATE TABLE sink ("
-                        + " `id` INT NOT NULL,"
-                        + " b INT,"
-                        + " PRIMARY KEY (`id`) NOT ENFORCED"
-                        + ") WITH ("
-                        + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false'"
-                        //                            + " 'sink-expected-messages-num' = '121010'"
-                        + ")";
-        tEnv.executeSql(sourceDDL);
-        tEnv.executeSql(sinkDDL);
-        // async submit job
-        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
-
-        // Don't wait for snapshot finished is for the scene in issue
-        // https://github.com/ververica/flink-cdc-connectors/issues/1206 .
-        //        waitForSinkSize("sink", 1);
-
-        int count = 0;
-
-        try (Connection connection = getJdbcConnection("region_switch_test");
-                Statement statement = connection.createStatement()) {
-            for (int i = 0; i < 20; i++) {
-                statement.execute(
-                        "INSERT INTO t1 SELECT NULL, FLOOR(RAND()*1000), RANDOM_BYTES(1024), RANDOM_BYTES"
-                                + "(1024), RANDOM_BYTES(1024) FROM t1 a JOIN t1 b JOIN t1 c LIMIT 10000;");
-            }
-
-            statement.execute("SELECT SLEEP(30);");
-
-            ResultSet resultSet = statement.executeQuery("SHOW TABLE t1 REGIONS;");
-            while (resultSet.next()) {
-                String regionId = resultSet.getString(1);
-                String leaderStoreId = resultSet.getString(2);
-                String peerStoreIds = resultSet.getString(3);
-                String regionState = resultSet.getString(4);
-                String regionRows = resultSet.getString(5);
-                String regionSize = resultSet.getString(6);
-                String regionKeys = resultSet.getString(7);
-                LOG.info(
-                        "regionId: {}, leaderStoreId: {}, peerStoreIds: {}, regionState: {}, regionRows: {}, regionSize: {}, regionKeys: {}",
-                        regionId,
-                        leaderStoreId,
-                        peerStoreIds,
-                        regionState,
-                        regionRows,
-                        regionSize,
-                        regionKeys);
-            }
-
-            ResultSet resultSetCount = statement.executeQuery("select count(*) from t1;");
-            resultSetCount.next();
-            count = resultSetCount.getInt(1);
-            LOG.info("count: {}", count);
-        }
-
-        waitForSinkSize("sink", count);
-        result.getJobClient().get().cancel().get();
     }
 
     public void testTiDBServerTimezone(String timezone) throws Exception {

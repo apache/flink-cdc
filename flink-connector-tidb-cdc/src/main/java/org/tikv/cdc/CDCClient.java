@@ -37,8 +37,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
 
@@ -54,7 +54,8 @@ public class CDCClient implements AutoCloseable {
     private final CDCConfig config;
 
     private final BlockingQueue<CDCEvent> eventsBuffer;
-    private final TreeMap<Long, RegionCDCClient> regionClients = new TreeMap<>();
+    private final ConcurrentHashMap<Long, RegionCDCClient> regionClients =
+            new ConcurrentHashMap<>();
     private final Map<Long, Long> regionToResolvedTs = new HashMap<>();
     private final TreeMultiset<Long> resolvedTsSet = TreeMultiset.create();
 
