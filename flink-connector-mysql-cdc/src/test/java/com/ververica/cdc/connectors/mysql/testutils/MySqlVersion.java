@@ -21,6 +21,7 @@ public enum MySqlVersion {
     V5_5("5.5"),
     V5_6("5.6"),
     V5_7("5.7"),
+    // chip of arm64 is available
     V8_0("8.0");
 
     private String version;
