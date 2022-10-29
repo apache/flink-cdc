@@ -20,17 +20,24 @@ package com.ververica.cdc.connectors.oracle.source;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
+import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
+import org.apache.commons.lang3.StringUtils;
 
 /** A Oracle datasource factory. */
 public class OraclePooledDataSourceFactory extends JdbcConnectionPoolFactory {
 
-    public static final String JDBC_URL_PATTERN = "jdbc:oracle:thin:@%s:%s/%s";
+    public static final String JDBC_URL_PATTERN = "jdbc:oracle:thin:@%s:%s:%s";
 
     @Override
     public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
-        String hostName = sourceConfig.getHostname();
-        int port = sourceConfig.getPort();
-        String schema = sourceConfig.getDatabaseList().get(0);
-        return String.format(JDBC_URL_PATTERN, hostName, port, schema);
+        OracleSourceConfig oracleSourceConfig = (OracleSourceConfig) sourceConfig;
+        if (StringUtils.isNotBlank(oracleSourceConfig.getUrl())) {
+            return oracleSourceConfig.getUrl();
+        } else {
+            String hostName = sourceConfig.getHostname();
+            int port = sourceConfig.getPort();
+            String database = sourceConfig.getDatabaseList().get(0);
+            return String.format(JDBC_URL_PATTERN, hostName, port, database);
+        }
     }
 }

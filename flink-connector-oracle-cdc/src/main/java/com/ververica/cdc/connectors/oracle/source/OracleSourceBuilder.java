@@ -26,6 +26,8 @@ import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFacto
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
+import javax.annotation.Nullable;
+
 import java.time.Duration;
 import java.util.Properties;
 
@@ -47,6 +49,12 @@ public class OracleSourceBuilder<T> {
 
     public OracleSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);
+        return this;
+    }
+
+    /** Url to use when connecting to the Oracle database server. */
+    public OracleSourceBuilder<T> url(@Nullable String url) {
+        this.configFactory.url(url);
         return this;
     }
 

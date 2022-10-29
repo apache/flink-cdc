@@ -27,9 +27,21 @@ import com.ververica.cdc.connectors.oracle.OracleSource;
 /** Configurations for {@link OracleSource}. */
 public class OracleSourceOptions extends JdbcSourceOptions {
 
+    public static final ConfigOption<String> URL =
+            ConfigOptions.key("url")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Url to use when connecting to the Oracle database server.");
+
     public static final ConfigOption<String> SCHEMA_NAME =
             ConfigOptions.key("schema-name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Schema name of the Oracle database to monitor.");
+
+    public static final ConfigOption<Integer> PORT =
+            ConfigOptions.key("port")
+                    .intType()
+                    .defaultValue(1521)
+                    .withDescription("Integer port number of the Oracle database server.");
 }

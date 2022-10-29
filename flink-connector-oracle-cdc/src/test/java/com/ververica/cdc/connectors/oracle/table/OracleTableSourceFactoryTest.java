@@ -93,6 +93,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        null,
                         MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -115,6 +116,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        null,
                         MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -141,6 +143,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        null,
                         MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -164,6 +167,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        null,
                         MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -187,6 +191,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA,
+                        null,
                         MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
@@ -214,6 +219,7 @@ public class OracleTableSourceFactoryTest {
         OracleTableSource expectedSource =
                 new OracleTableSource(
                         SCHEMA_WITH_METADATA,
+                        null,
                         MY_PORT,
                         MY_LOCALHOST,
                         MY_DATABASE,
