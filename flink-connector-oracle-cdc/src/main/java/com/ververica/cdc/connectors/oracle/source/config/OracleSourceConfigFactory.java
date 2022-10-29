@@ -23,6 +23,8 @@ import com.ververica.cdc.connectors.oracle.source.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnector;
 
+import javax.annotation.Nullable;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -36,8 +38,20 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
     private static final String DATABASE_SERVER_NAME = "oracle_logminer";
     private static final String DRIVER_ClASS_NAME = "oracle.jdbc.OracleDriver";
 
-    protected List<String> schemaList;
+    @Nullable private String url;
+    private List<String> schemaList;
 
+    /** Url to use when connecting to the Oracle database server. */
+    public JdbcSourceConfigFactory url(@Nullable String url) {
+        this.url = url;
+        return this;
+    }
+
+    /**
+     * An optional list of regular expressions that match schema names to be monitored; any schema
+     * name not included in the whitelist will be excluded from monitoring. By default all
+     * non-system schemas will be monitored.
+     */
     public JdbcSourceConfigFactory schemaList(String... schemaList) {
         this.schemaList = Arrays.asList(schemaList);
         return this;
@@ -55,10 +69,8 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         // and
         // underscores should be used.
         props.setProperty("database.server.name", DATABASE_SERVER_NAME);
-        props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
-        props.setProperty("database.port", String.valueOf(port));
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
         // database history
@@ -70,6 +82,15 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // disable tombstones
         props.setProperty("tombstones.on.delete", String.valueOf(false));
+
+        if (url != null) {
+            props.setProperty("database.url", url);
+        } else {
+            checkNotNull(hostname, "hostname is required when url is not configured");
+            props.setProperty("database.hostname", hostname);
+            checkNotNull(port, "port is required when url is not configured");
+            props.setProperty("database.port", String.valueOf(port));
+        }
 
         if (schemaList != null) {
             props.setProperty("schema.whitelist", String.join(",", schemaList));
@@ -88,6 +109,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         return new OracleSourceConfig(
                 startupOptions,
                 databaseList,
+                schemaList,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,
@@ -97,6 +119,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 props,
                 dbzConfiguration,
                 DRIVER_ClASS_NAME,
+                url,
                 hostname,
                 port,
                 username,
