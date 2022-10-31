@@ -43,6 +43,8 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -60,6 +62,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public final class RowDataDebeziumDeserializeSchema
         implements DebeziumDeserializationSchema<RowData> {
+    private static final Logger LOG =
+            LoggerFactory.getLogger(RowDataDebeziumDeserializeSchema.class);
     private static final long serialVersionUID = 2L;
 
     /** Custom validator to validate the row value. */
@@ -89,6 +93,8 @@ public final class RowDataDebeziumDeserializeSchema
 
     /** Changelog Mode to use for encoding changes in Flink internal data structure. */
     private final DebeziumChangelogMode changelogMode;
+
+    private boolean debug = false;
 
     /** Returns a builder to build {@link RowDataDebeziumDeserializeSchema}. */
     public static Builder newBuilder() {
@@ -145,6 +151,10 @@ public final class RowDataDebeziumDeserializeSchema
         }
     }
 
+    private void setDebug(boolean debug) {
+        this.debug = debug;
+    }
+
     private GenericRowData extractAfterRow(Struct value, Schema valueSchema) throws Exception {
         Schema afterSchema = valueSchema.field(Envelope.FieldName.AFTER).schema();
         Struct after = value.getStruct(Envelope.FieldName.AFTER);
@@ -158,6 +168,10 @@ public final class RowDataDebeziumDeserializeSchema
     }
 
     private void emit(SourceRecord inRecord, RowData physicalRow, Collector<RowData> collector) {
+        if (debug) {
+            LOG.info(physicalRow.toString());
+        }
+
         if (!hasMetadata) {
             collector.collect(physicalRow);
             return;
@@ -187,6 +201,7 @@ public final class RowDataDebeziumDeserializeSchema
         private DeserializationRuntimeConverterFactory userDefinedConverterFactory =
                 DeserializationRuntimeConverterFactory.DEFAULT;
         private DebeziumChangelogMode changelogMode = DebeziumChangelogMode.ALL;
+        private boolean debug = false;
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -213,6 +228,11 @@ public final class RowDataDebeziumDeserializeSchema
             return this;
         }
 
+        public Builder setDebug(boolean debug) {
+            this.debug = debug;
+            return this;
+        }
+
         public Builder setUserDefinedConverterFactory(
                 DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
             this.userDefinedConverterFactory = userDefinedConverterFactory;
@@ -225,14 +245,17 @@ public final class RowDataDebeziumDeserializeSchema
         }
 
         public RowDataDebeziumDeserializeSchema build() {
-            return new RowDataDebeziumDeserializeSchema(
-                    physicalRowType,
-                    metadataConverters,
-                    resultTypeInfo,
-                    validator,
-                    serverTimeZone,
-                    userDefinedConverterFactory,
-                    changelogMode);
+            RowDataDebeziumDeserializeSchema deserializeSchema =
+                    new RowDataDebeziumDeserializeSchema(
+                            physicalRowType,
+                            metadataConverters,
+                            resultTypeInfo,
+                            validator,
+                            serverTimeZone,
+                            userDefinedConverterFactory,
+                            changelogMode);
+            deserializeSchema.setDebug(debug);
+            return deserializeSchema;
         }
     }
 

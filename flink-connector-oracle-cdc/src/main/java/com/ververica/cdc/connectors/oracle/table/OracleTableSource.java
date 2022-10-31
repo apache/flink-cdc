@@ -160,6 +160,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         .setResultTypeInfo(typeInfo)
                         .setUserDefinedConverterFactory(
                                 OracleDeserializationConverterFactory.instance())
+                        .setDebug(true)
                         .build();
 
         if (enableParallelRead) {
