@@ -320,9 +320,11 @@ public class MySqlSourceConfigFactory implements Serializable {
 
         // use cursor-based streaming to retrieve a set number of rows
         // https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-reference-implementation-notes.html
+        // https://github.com/debezium/debezium/pull/2245
         props.setProperty(SNAPSHOT_FETCH_SIZE.name(), String.valueOf(fetchSize));
         if (fetchSize > 0) {
             jdbcProperties.setProperty("useCursorFetch", "true");
+            props.setProperty("database.useCursorFetch", String.valueOf(true));
         }
 
         return new MySqlSourceConfig(
