@@ -84,6 +84,8 @@ jobs:
           module: sqlserver
         tidb:
           module: tidb
+        db2:
+          module: db2
         e2e:
           module: e2e
         misc:
