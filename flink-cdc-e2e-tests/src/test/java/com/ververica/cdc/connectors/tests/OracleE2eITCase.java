@@ -72,7 +72,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     @After
     public void after() {
         if (oracle != null) {
-            oracle.stop();
+            oracle.close();
         }
         super.after();
     }
