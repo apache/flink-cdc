@@ -47,7 +47,6 @@ public class Db2TestBase {
                                     .withDockerfile(getFilePath("db2_server/Dockerfile"))
                                     .get())
                     .asCompatibleSubstituteFor("ibmcom/db2");
-    private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(LOG);
     private static boolean db2AsnAgentRunning = false;
 
     protected static final Db2Container DB2_CONTAINER =
@@ -58,7 +57,7 @@ public class Db2TestBase {
                     .withEnv("AUTOCONFIG", "false")
                     .withEnv("ARCHIVE_LOGS", "true")
                     .acceptLicense()
-                    .withLogConsumer(logConsumer)
+                    .withLogConsumer(new Slf4jLogConsumer(LOG))
                     .withLogConsumer(
                             outputFrame -> {
                                 if (outputFrame

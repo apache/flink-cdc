@@ -53,6 +53,12 @@ under the License.
             <artifactId>postgresql</artifactId>
             <version>42.2.26</version>
         </dependency>
+        <dependency>
+            <groupId>com.ibm.db2.jcc</groupId>
+            <artifactId>db2jcc</artifactId>
+            <version>db2jcc4</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- CDC connectors test utils -->
         <dependency>
@@ -92,6 +98,13 @@ under the License.
         </dependency>
         <dependency>
             <groupId>com.ververica</groupId>
+            <artifactId>flink-connector-db2-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-connector-test-util</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -119,6 +132,12 @@ under the License.
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>mssqlserver</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>db2</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
@@ -199,7 +218,6 @@ under the License.
                             </outputDirectory>
                         </artifactItem>
 
-
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
                             <artifactId>flink-connector-jdbc_2.11</artifactId>
@@ -275,6 +293,16 @@ under the License.
                             <artifactId>flink-sql-connector-tidb-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>tidb-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ververica</groupId>
+                            <artifactId>flink-sql-connector-db2-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>db2-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
