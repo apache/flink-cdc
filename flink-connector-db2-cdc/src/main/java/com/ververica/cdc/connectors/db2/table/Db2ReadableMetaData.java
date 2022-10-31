@@ -45,6 +45,7 @@ public enum Db2ReadableMetaData {
                             sourceStruct.getString(AbstractSourceInfo.TABLE_NAME_KEY));
                 }
             }),
+
     /** Name of the schema that contain the row. */
     SCHEMA_NAME(
             "schema_name",
