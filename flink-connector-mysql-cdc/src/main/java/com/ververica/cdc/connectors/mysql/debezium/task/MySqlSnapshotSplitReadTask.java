@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.task;
 
+import org.apache.flink.annotation.VisibleForTesting;
+
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
@@ -226,7 +228,7 @@ public class MySqlSnapshotSplitReadTask
                                 snapshotSplit.getSplitStart(),
                                 snapshotSplit.getSplitEnd(),
                                 snapshotSplit.getSplitKeyType().getFieldCount(),
-                                connectorConfig.getQueryFetchSize());
+                                getFetchSize());
                 ResultSet rs = selectStatement.executeQuery()) {
 
             ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
@@ -369,5 +371,10 @@ public class MySqlSnapshotSplitReadTask
             LOG.error("Could not read MySQL TIME value as UTF-8");
             throw new RuntimeException(e);
         }
+    }
+
+    @VisibleForTesting
+    public int getFetchSize() {
+        return connectorConfig.getQueryFetchSize();
     }
 }

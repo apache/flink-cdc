@@ -54,6 +54,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -63,6 +64,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+    private static final int DEFAULT_FETCH_SIZE = 2;
 
     private static BinaryLogClient binaryLogClient;
     private static MySqlConnection mySqlConnection;
@@ -73,6 +75,18 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"}, 10);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+    }
+
+    @Test
+    public void testFetchSize() {
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"}, 4);
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+        SnapshotSplitReader snapshotSplitReader = new SnapshotSplitReader(statefulTaskContext, 0);
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+        snapshotSplitReader.submitSplit(mySqlSplits.get(0));
+        assertEquals(
+                DEFAULT_FETCH_SIZE, snapshotSplitReader.getSplitSnapshotReadTask().getFetchSize());
     }
 
     @Test
@@ -448,7 +462,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         return mySqlSplitList;
     }
 
-    public static MySqlSourceConfig getConfig(String[] captureTables, int splitSize) {
+    private static MySqlSourceConfig getConfig(String[] captureTables, int splitSize) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
@@ -462,7 +476,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .username(customerDatabase.getUsername())
                 .splitSize(splitSize)
-                .fetchSize(2)
+                .fetchSize(DEFAULT_FETCH_SIZE)
                 .password(customerDatabase.getPassword())
                 .createConfig(0);
     }

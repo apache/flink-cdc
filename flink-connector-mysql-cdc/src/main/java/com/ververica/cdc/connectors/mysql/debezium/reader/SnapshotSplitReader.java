@@ -354,6 +354,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         return executorService;
     }
 
+    @VisibleForTesting
+    public MySqlSnapshotSplitReadTask getSplitSnapshotReadTask() {
+        return splitSnapshotReadTask;
+    }
+
     /**
      * {@link ChangeEventSource.ChangeEventSourceContext} implementation that keeps low/high
      * watermark for each {@link MySqlSnapshotSplit}.
