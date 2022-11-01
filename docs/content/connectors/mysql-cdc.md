@@ -625,7 +625,7 @@ $ ./bin/flink run \
       --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.15/docs/deployment/cli/#command-line-interface) for more details.
 
 Data Type Mapping
 ----------------

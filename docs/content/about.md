@@ -31,6 +31,7 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Con
 | <font color="DarkCyan">2.0.*</font> | <font color="MediumVioletRed">1.13.*</font> |
 | <font color="DarkCyan">2.1.*</font> | <font color="MediumVioletRed">1.13.*</font> |
 | <font color="DarkCyan">2.2.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font> |
+| <font color="DarkCyan">2.3.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font> |
 
 ## Features
 
