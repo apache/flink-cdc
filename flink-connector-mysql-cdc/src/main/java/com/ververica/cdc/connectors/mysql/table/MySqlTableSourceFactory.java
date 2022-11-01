@@ -23,10 +23,11 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +57,10 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
@@ -109,7 +113,6 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
-            validateStartupOptionIfEnableParallel(startupOptions);
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
@@ -171,6 +174,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
@@ -204,15 +210,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 return StartupOptions.latest();
 
             case SCAN_STARTUP_MODE_VALUE_EARLIEST:
+                return StartupOptions.earliest();
+
             case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET:
+                validateSpecificOffset(config);
+                return getSpecificOffset(config);
+
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
-                throw new ValidationException(
-                        String.format(
-                                "Unsupported option value '%s', the options [%s, %s, %s] are not supported correctly, please do not use them until they're correctly supported",
-                                modeString,
-                                SCAN_STARTUP_MODE_VALUE_EARLIEST,
-                                SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET,
-                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP));
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
 
             default:
                 throw new ValidationException(
@@ -225,6 +230,43 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         }
     }
 
+    private static void validateSpecificOffset(ReadableConfig config) {
+        Optional<String> gtidSet = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
+        Optional<String> binlogFilename = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+        Optional<Long> binlogPosition = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        if (!gtidSet.isPresent() && !(binlogFilename.isPresent() && binlogPosition.isPresent())) {
+            throw new ValidationException(
+                    String.format(
+                            "Unable to find a valid binlog offset. Either %s, or %s and %s are required.",
+                            SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET.key(),
+                            SCAN_STARTUP_SPECIFIC_OFFSET_FILE.key(),
+                            SCAN_STARTUP_SPECIFIC_OFFSET_POS.key()));
+        }
+    }
+
+    private static StartupOptions getSpecificOffset(ReadableConfig config) {
+        BinlogOffsetBuilder offsetBuilder = BinlogOffset.builder();
+
+        // GTID set
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET)
+                .ifPresent(offsetBuilder::setGtidSet);
+
+        // Binlog file + pos
+        Optional<String> binlogFilename = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+        Optional<Long> binlogPosition = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        if (binlogFilename.isPresent() && binlogPosition.isPresent()) {
+            offsetBuilder.setBinlogFilePosition(binlogFilename.get(), binlogPosition.get());
+        } else {
+            offsetBuilder.setBinlogFilePosition("", 0);
+        }
+
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS)
+                .ifPresent(offsetBuilder::setSkipEvents);
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS)
+                .ifPresent(offsetBuilder::setSkipRows);
+        return StartupOptions.specificOffset(offsetBuilder.build());
+    }
+
     private void validatePrimaryKeyIfEnableParallel(ResolvedSchema physicalSchema) {
         if (!physicalSchema.getPrimaryKey().isPresent()) {
             throw new ValidationException(
@@ -232,17 +274,6 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                             "The primary key is necessary when enable '%s' to 'true'",
                             SCAN_INCREMENTAL_SNAPSHOT_ENABLED));
         }
-    }
-
-    private void validateStartupOptionIfEnableParallel(StartupOptions startupOptions) {
-        // validate mode
-        Preconditions.checkState(
-                startupOptions.startupMode == StartupMode.INITIAL
-                        || startupOptions.startupMode == StartupMode.LATEST_OFFSET,
-                String.format(
-                        "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
-                                + " but actual is %s",
-                        startupOptions.startupMode));
     }
 
     private String validateAndGetServerId(ReadableConfig configuration) {

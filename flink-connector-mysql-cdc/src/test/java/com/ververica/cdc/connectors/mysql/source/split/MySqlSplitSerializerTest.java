@@ -28,7 +28,6 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.Test;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +46,9 @@ public class MySqlSplitSerializerTest {
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
-                        new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
+                        new RowType(
+                                Collections.singletonList(
+                                        new RowType.RowField("id", new BigIntType()))),
                         new Object[] {100L},
                         new Object[] {999L},
                         null,
@@ -65,28 +66,28 @@ public class MySqlSplitSerializerTest {
                         tableId + "-0",
                         null,
                         new Object[] {100},
-                        new BinlogOffset("mysql-bin.000001", 4L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 4L)));
         finishedSplitsInfo.add(
                 new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-1",
                         new Object[] {100},
                         new Object[] {200},
-                        new BinlogOffset("mysql-bin.000001", 200L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 200L)));
         finishedSplitsInfo.add(
                 new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-2",
                         new Object[] {200},
                         new Object[] {300},
-                        new BinlogOffset("mysql-bin.000001", 600L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 600L)));
         finishedSplitsInfo.add(
                 new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-3",
                         new Object[] {300},
                         null,
-                        new BinlogOffset("mysql-bin.000001", 800L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 800L)));
 
         final Map<TableId, TableChange> databaseHistory = new HashMap<>();
         databaseHistory.put(tableId, getTestTableSchema());
@@ -94,8 +95,8 @@ public class MySqlSplitSerializerTest {
         final MySqlSplit split =
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        new BinlogOffset("mysql-bin.000001", 4L),
-                        BinlogOffset.NO_STOPPING_OFFSET,
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 4L),
+                        BinlogOffset.ofNonStopping(),
                         finishedSplitsInfo,
                         databaseHistory,
                         finishedSplitsInfo.size());
@@ -107,8 +108,8 @@ public class MySqlSplitSerializerTest {
         final MySqlSplit unCompletedBinlogSplit =
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        new BinlogOffset("mysql-bin.000001", 4L),
-                        BinlogOffset.NO_STOPPING_OFFSET,
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 4L),
+                        BinlogOffset.ofNonStopping(),
                         new ArrayList<>(),
                         new HashMap<>(),
                         0);

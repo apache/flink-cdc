@@ -35,7 +35,7 @@ import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.NO_STOPPING_OFFSET;
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.isNonStoppingOffset;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 
 /**
@@ -101,6 +101,6 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     }
 
     private boolean isBoundedRead() {
-        return !NO_STOPPING_OFFSET.equals(binlogSplit.getEndingOffset());
+        return !isNonStoppingOffset(binlogSplit.getEndingOffset());
     }
 }

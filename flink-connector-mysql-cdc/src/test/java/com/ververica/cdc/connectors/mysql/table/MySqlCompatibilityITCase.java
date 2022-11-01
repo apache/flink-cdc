@@ -219,6 +219,7 @@ public class MySqlCompatibilityITCase {
         assertEqualsInOrder(
                 Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
         result.getJobClient().get().cancel().get();
+        mySqlContainer.stop();
     }
 
     private String getServerId() {

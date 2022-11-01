@@ -115,8 +115,10 @@ public class DebeziumUtils {
                             final long binlogPosition = rs.getLong(2);
                             final String gtidSet =
                                     rs.getMetaData().getColumnCount() > 4 ? rs.getString(5) : null;
-                            return new BinlogOffset(
-                                    binlogFilename, binlogPosition, 0L, 0, 0, gtidSet, null);
+                            return BinlogOffset.builder()
+                                    .setBinlogFilePosition(binlogFilename, binlogPosition)
+                                    .setGtidSet(gtidSet)
+                                    .build();
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the binlog filename and position via '"

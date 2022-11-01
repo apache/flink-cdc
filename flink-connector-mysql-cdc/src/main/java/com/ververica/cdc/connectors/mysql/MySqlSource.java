@@ -215,8 +215,8 @@ public class MySqlSource {
                     specificOffset.setSourcePartition(sourcePartition);
 
                     Map<String, Object> sourceOffset = new HashMap<>();
-                    sourceOffset.put("file", startupOptions.specificOffsetFile);
-                    sourceOffset.put("pos", startupOptions.specificOffsetPos);
+                    sourceOffset.put("file", startupOptions.binlogOffset.getFilename());
+                    sourceOffset.put("pos", startupOptions.binlogOffset.getPosition());
                     specificOffset.setSourceOffset(sourceOffset);
                     break;
 
@@ -225,7 +225,8 @@ public class MySqlSource {
                     props.setProperty("snapshot.mode", "never");
                     deserializer =
                             new SeekBinlogToTimestampFilter<>(
-                                    startupOptions.startupTimestampMillis, deserializer);
+                                    startupOptions.binlogOffset.getTimestampSec() * 1000,
+                                    deserializer);
                     break;
 
                 default:

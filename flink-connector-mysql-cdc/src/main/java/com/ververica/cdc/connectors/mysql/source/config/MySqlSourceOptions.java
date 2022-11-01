@@ -148,14 +148,34 @@ public class MySqlSourceOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "Optional offsets used in case of \"specific-offset\" startup mode");
+                            "Optional binlog file name used in case of \"specific-offset\" startup mode");
 
-    public static final ConfigOption<Integer> SCAN_STARTUP_SPECIFIC_OFFSET_POS =
+    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_POS =
             ConfigOptions.key("scan.startup.specific-offset.pos")
-                    .intType()
+                    .longType()
                     .noDefaultValue()
                     .withDescription(
-                            "Optional offsets used in case of \"specific-offset\" startup mode");
+                            "Optional binlog file position used in case of \"specific-offset\" startup mode");
+
+    public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET =
+            ConfigOptions.key("scan.startup.specific-offset.gtid-set")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional GTID set used in case of \"specific-offset\" startup mode");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS =
+            ConfigOptions.key("scan.startup.specific-offset.skip-events")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional number of events to skip after the specific starting offset");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS =
+            ConfigOptions.key("scan.startup.specific-offset.skip-rows")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription("Optional number of rows to skip after the specific offset");
 
     public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
             ConfigOptions.key("scan.startup.timestamp-millis")

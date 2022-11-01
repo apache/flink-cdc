@@ -138,6 +138,9 @@ public class MySqlSourceReader<T>
         if (suspendedBinlogSplit != null) {
             unfinishedSplits.add(suspendedBinlogSplit);
         }
+
+        logCurrentBinlogOffsets(unfinishedSplits, checkpointId);
+
         return unfinishedSplits;
     }
 
@@ -335,6 +338,19 @@ public class MySqlSourceReader<T>
             LOG.warn(
                     "Received binlog meta event for split {}, but the uncompleted split map does not contain it",
                     metadataEvent.getSplitId());
+        }
+    }
+
+    private void logCurrentBinlogOffsets(List<MySqlSplit> splits, long checkpointId) {
+        if (!LOG.isInfoEnabled()) {
+            return;
+        }
+        for (MySqlSplit split : splits) {
+            if (!split.isBinlogSplit()) {
+                return;
+            }
+            BinlogOffset offset = split.asBinlogSplit().getStartingOffset();
+            LOG.info("Binlog offset on checkpoint {}: {}", checkpointId, offset);
         }
     }
 
