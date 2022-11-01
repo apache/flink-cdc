@@ -21,7 +21,7 @@ package com.ververica.cdc.connectors.oracle.source;
 import org.apache.flink.annotation.Internal;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;

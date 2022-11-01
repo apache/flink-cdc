@@ -21,6 +21,7 @@ package com.ververica.cdc.connectors.oracle.source.reader.fetch;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
+import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.DebeziumException;
@@ -143,7 +144,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 offsetContext.getPartition(),
                                 redoLogSplit,
                                 currentRedoLogOffset,
-                                JdbcSourceEventDispatcher.WatermarkKind.END);
+                                WatermarkKind.END);
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
                         errorHandler.setProducerThrowable(

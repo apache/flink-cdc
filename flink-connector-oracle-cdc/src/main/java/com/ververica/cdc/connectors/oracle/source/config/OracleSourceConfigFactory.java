@@ -19,7 +19,7 @@
 package com.ververica.cdc.connectors.oracle.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
-import com.ververica.cdc.connectors.oracle.source.EmbeddedFlinkDatabaseHistory;
+import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnector;
 

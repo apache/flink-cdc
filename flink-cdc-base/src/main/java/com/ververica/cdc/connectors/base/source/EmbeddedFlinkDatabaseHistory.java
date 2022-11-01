@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.oracle.source;
+package com.ververica.cdc.connectors.base.source;
 
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitState;
 import io.debezium.config.Configuration;
