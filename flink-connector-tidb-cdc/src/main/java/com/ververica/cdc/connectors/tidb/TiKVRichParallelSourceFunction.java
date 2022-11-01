@@ -206,7 +206,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                 }
                 handleRow(row);
             }
-            resolvedTs = cdcClient.getMinResolvedTs();
+            resolvedTs = cdcClient.getMaxResolvedTs();
             if (commits.size() > 0) {
                 flushRows(resolvedTs);
             }
