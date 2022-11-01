@@ -246,7 +246,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;">Db2 type<a href="https://www.ibm.com/docs/en/db2-for-zos/12?topic=elements-data-types"></a></th>
+        <th class="text-left" style="width:30%;"><a href="https://www.ibm.com/docs/en/db2-for-zos/12?topic=elements-data-types">Db2 type</a></th>
         <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
