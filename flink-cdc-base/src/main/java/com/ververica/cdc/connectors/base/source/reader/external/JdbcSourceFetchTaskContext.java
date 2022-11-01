@@ -28,6 +28,7 @@ import io.debezium.data.Envelope;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.RelationalDatabaseSchema;
+import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.util.SchemaNameAdjuster;
@@ -169,4 +170,6 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     public abstract JdbcSourceEventDispatcher getDispatcher();
 
     public abstract OffsetContext getOffsetContext();
+
+    public abstract RelationalTableFilters getRelationalTableFilters();
 }

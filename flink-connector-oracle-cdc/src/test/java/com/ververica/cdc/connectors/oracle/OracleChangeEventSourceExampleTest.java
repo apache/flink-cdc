@@ -25,7 +25,7 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.source.OracleSourceBuilder;
 import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;

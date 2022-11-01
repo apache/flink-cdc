@@ -23,10 +23,10 @@ import org.apache.flink.table.types.logical.RowType;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
-import com.ververica.cdc.connectors.oracle.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleUtils;
@@ -51,6 +51,7 @@ import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Collect;
@@ -203,6 +204,11 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     @Override
     public ChangeEventQueue<DataChangeEvent> getQueue() {
         return queue;
+    }
+
+    @Override
+    public Tables.TableFilter getTableFilter() {
+        return getDbzConnectorConfig().getTableFilters().dataCollectionFilter();
     }
 
     @Override

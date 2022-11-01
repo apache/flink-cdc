@@ -53,6 +53,9 @@ public class OracleConnectionUtils {
     /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
 
+    /** show current scn sql in oracle. */
+    private static final String SHOW_CURRENT_SCN = "SELECT CURRENT_SCN FROM V$DATABASE";
+
     /** Creates a new {@link OracleConnection}, but not open the connection. */
     public static OracleConnection createOracleConnection(Configuration dbzConfiguration) {
         Configuration configuration = dbzConfiguration.subset(DATABASE_CONFIG_PREFIX, true);
@@ -63,10 +66,9 @@ public class OracleConnectionUtils {
 
     /** Fetch current redoLog offsets in Oracle Server. */
     public static RedoLogOffset currentRedoLogOffset(JdbcConnection jdbc) {
-        final String showCurrentScn = "SELECT CURRENT_SCN FROM V$DATABASE";
         try {
             return jdbc.queryAndMap(
-                    showCurrentScn,
+                    SHOW_CURRENT_SCN,
                     rs -> {
                         if (rs.next()) {
                             final String scn = rs.getString(1);
@@ -74,14 +76,14 @@ public class OracleConnectionUtils {
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the scn via '"
-                                            + showCurrentScn
+                                            + SHOW_CURRENT_SCN
                                             + "'. Make sure your server is correctly configured");
                         }
                     });
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     "Cannot read the redo log position via '"
-                            + showCurrentScn
+                            + SHOW_CURRENT_SCN
                             + "'. Make sure your server is correctly configured",
                     e);
         }

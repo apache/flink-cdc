@@ -93,19 +93,6 @@ public class IncrementalSource<T, C extends SourceConfig>
                 };
     }
 
-    public JdbcIncrementalSource(
-            JdbcSourceConfigFactory configFactory,
-            DebeziumDeserializationSchema<T> deserializationSchema,
-            OffsetFactory offsetFactory,
-            JdbcDataSourceDialect dataSourceDialect,
-            SourceSplitSerializer sourceSplitSerializer) {
-        this.configFactory = configFactory;
-        this.deserializationSchema = deserializationSchema;
-        this.offsetFactory = offsetFactory;
-        this.dataSourceDialect = dataSourceDialect;
-        this.sourceSplitSerializer = sourceSplitSerializer;
-    }
-
     @Override
     public Boundedness getBoundedness() {
         return Boundedness.CONTINUOUS_UNBOUNDED;

@@ -94,7 +94,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public ChunkSplitter<TableId> createChunkSplitter(JdbcSourceConfig sourceConfig) {
+    public ChunkSplitter createChunkSplitter(JdbcSourceConfig sourceConfig) {
         return new OracleChunkSplitter(sourceConfig, this);
     }
 
