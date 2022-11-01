@@ -43,7 +43,7 @@ public class MySqlRecordEmitterTest {
     @Test
     public void testHeartbeatEventHandling() throws Exception {
         Heartbeat heartbeat = Heartbeat.create(Duration.ofMillis(100), "fake-topic", "fake-key");
-        BinlogOffset fakeOffset = new BinlogOffset("fake-file", 15213L);
+        BinlogOffset fakeOffset = BinlogOffset.ofBinlogFilePosition("fake-file", 15213L);
         MySqlRecordEmitter<Void> recordEmitter = createRecordEmitter();
         MySqlBinlogSplitState splitState = createBinlogSplitState();
         heartbeat.forcedBeat(
@@ -85,8 +85,8 @@ public class MySqlRecordEmitterTest {
         return new MySqlBinlogSplitState(
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        BinlogOffset.INITIAL_OFFSET,
-                        BinlogOffset.NO_STOPPING_OFFSET,
+                        BinlogOffset.ofEarliest(),
+                        BinlogOffset.ofNonStopping(),
                         Collections.emptyList(),
                         Collections.emptyMap(),
                         0));

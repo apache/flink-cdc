@@ -25,7 +25,7 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.Test;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,10 +42,12 @@ public class MySqlSplitStateTest {
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
-                        new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
+                        new RowType(
+                                Collections.singletonList(
+                                        new RowType.RowField("id", new BigIntType()))),
                         new Object[] {100L},
                         new Object[] {999L},
-                        new BinlogOffset("mysql-bin.000002", 78L),
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000002", 78L),
                         new HashMap<>());
         final MySqlSnapshotSplitState mySqlSplitState = new MySqlSnapshotSplitState(split);
         assertEquals(split, mySqlSplitState.toMySqlSplit());
@@ -57,22 +59,27 @@ public class MySqlSplitStateTest {
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
-                        new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
+                        new RowType(
+                                Collections.singletonList(
+                                        new RowType.RowField("id", new BigIntType()))),
                         new Object[] {100L},
                         new Object[] {999L},
                         null,
                         new HashMap<>());
         final MySqlSnapshotSplitState mySqlSplitState = new MySqlSnapshotSplitState(split);
-        mySqlSplitState.setHighWatermark(new BinlogOffset("mysql-bin.000002", 78L));
+        mySqlSplitState.setHighWatermark(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000002", 78L));
 
         final MySqlSnapshotSplit expected =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
                         "test_db.test_table-1",
-                        new RowType(Arrays.asList(new RowType.RowField("id", new BigIntType()))),
+                        new RowType(
+                                Collections.singletonList(
+                                        new RowType.RowField("id", new BigIntType()))),
                         new Object[] {100L},
                         new Object[] {999L},
-                        new BinlogOffset("mysql-bin.000002", 78L),
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000002", 78L),
                         new HashMap<>());
         assertEquals(expected, mySqlSplitState.toMySqlSplit());
     }
@@ -81,18 +88,23 @@ public class MySqlSplitStateTest {
     public void testRecordBinlogSplitState() throws Exception {
 
         final MySqlBinlogSplit split =
-                getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 4L));
+                getTestBinlogSplitWithOffset(
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 4));
 
         final MySqlBinlogSplitState mySqlSplitState = new MySqlBinlogSplitState(split);
-        mySqlSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 100L));
+        mySqlSplitState.setStartingOffset(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100));
 
         assertEquals(
-                getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 100L)),
+                getTestBinlogSplitWithOffset(
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100)),
                 mySqlSplitState.toMySqlSplit());
 
-        mySqlSplitState.setStartingOffset(new BinlogOffset("mysql-bin.000001", 400L));
+        mySqlSplitState.setStartingOffset(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400));
         assertEquals(
-                getTestBinlogSplitWithOffset(new BinlogOffset("mysql-bin.000001", 400L)),
+                getTestBinlogSplitWithOffset(
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400)),
                 mySqlSplitState.toMySqlSplit());
     }
 
@@ -106,28 +118,28 @@ public class MySqlSplitStateTest {
                         tableId + "-0",
                         null,
                         new Object[] {100},
-                        new BinlogOffset("mysql-bin.000001", 4L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 4)));
         finishedSplitsInfo.add(
                 new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-1",
                         new Object[] {100},
                         new Object[] {200},
-                        new BinlogOffset("mysql-bin.000001", 200L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 200)));
         finishedSplitsInfo.add(
                 new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-2",
                         new Object[] {200},
                         new Object[] {300},
-                        new BinlogOffset("mysql-bin.000001", 600L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 600)));
         finishedSplitsInfo.add(
                 new FinishedSnapshotSplitInfo(
                         tableId,
                         tableId + "-3",
                         new Object[] {300},
                         null,
-                        new BinlogOffset("mysql-bin.000001", 800L)));
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 800)));
 
         final Map<TableId, TableChange> tableSchemas = new HashMap<>();
         tableSchemas.put(tableId, getTestTableSchema());
@@ -135,7 +147,7 @@ public class MySqlSplitStateTest {
         return new MySqlBinlogSplit(
                 "binlog-split",
                 startingOffset,
-                BinlogOffset.NO_STOPPING_OFFSET,
+                BinlogOffset.ofNonStopping(),
                 finishedSplitsInfo,
                 tableSchemas,
                 finishedSplitsInfo.size());

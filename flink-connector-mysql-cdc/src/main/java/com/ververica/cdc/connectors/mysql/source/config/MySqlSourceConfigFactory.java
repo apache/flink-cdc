@@ -233,14 +233,6 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     /** Specifies the startup options. */
     public MySqlSourceConfigFactory startupOptions(StartupOptions startupOptions) {
-        switch (startupOptions.startupMode) {
-            case INITIAL:
-            case LATEST_OFFSET:
-                break;
-            default:
-                throw new UnsupportedOperationException(
-                        "Unsupported startup mode: " + startupOptions.startupMode);
-        }
         this.startupOptions = startupOptions;
         return this;
     }

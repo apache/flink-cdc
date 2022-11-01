@@ -30,13 +30,16 @@ import org.apache.flink.util.CloseableIterator;
 
 import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -125,6 +128,13 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        LOG.info("Stopping MySql8 containers...");
+        MYSQL8_CONTAINER.stop();
+        LOG.info("Container MySql8 is stopped.");
     }
 
     @Before
@@ -1355,13 +1365,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")
     @Test
-    public void testStartupFromSpecificOffset() throws Exception {
-        if (incrementalSnapshot) {
-            // not support yet
-            return;
-        }
+    public void testStartupFromSpecificBinlogFilePos() throws Exception {
         inventoryDatabase.createAndInitialize();
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
@@ -1371,7 +1376,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
         }
         Tuple2<String, Integer> offset =
-                currentMySqlLatestOffset(inventoryDatabase, "products", 9, useLegacyDezMySql);
+                currentMySqlLatestOffset(
+                        MYSQL_CONTAINER, inventoryDatabase, "products", 9, useLegacyDezMySql);
 
         String sourceDDL =
                 String.format(
@@ -1379,7 +1385,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -1435,7 +1442,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 7);
+        // We only expect 5 records here as all UPDATE_BEFOREs are ignored with primary key defined
+        waitForSinkSize("sink", 5);
 
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
@@ -1446,13 +1454,111 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")
     @Test
-    public void testStartupFromEarliestOffset() throws Exception {
-        if (incrementalSnapshot) {
-            // not support yet
+    public void testStartupFromSpecificGtidSet() throws Exception {
+        // Unfortunately the legacy MySQL source without incremental snapshot does not support
+        // starting from GTID set
+        if (!incrementalSnapshot) {
             return;
         }
+
+        inventoryDatabase.createAndInitialize();
+
+        BinlogOffset offset;
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+            offset =
+                    DebeziumUtils.currentBinlogOffset(
+                            DebeziumUtils.createMySqlConnection(
+                                    new MySqlSourceConfigFactory()
+                                            .hostname(MYSQL_CONTAINER.getHost())
+                                            .port(MYSQL_CONTAINER.getDatabasePort())
+                                            .username(TEST_USER)
+                                            .password(TEST_PASSWORD)
+                                            .databaseList(inventoryDatabase.getDatabaseName())
+                                            .tableList("products")
+                                            .createConfig(0)));
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'scan.startup.mode' = 'specific-offset',"
+                                + " 'scan.startup.specific-offset.gtid-set' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        inventoryDatabase.getDatabaseName(),
+                        "products",
+                        offset.getGtidSet(),
+                        incrementalSnapshot,
+                        getDezImplementation());
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE debezium_source (EXCLUDING OPTIONS)";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+        }
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM products WHERE id=111;");
+        }
+
+        // We only expect 5 records here as all UPDATE_BEFOREs are ignored with primary key defined
+        waitForSinkSize("sink", 5);
+
+        String[] expected =
+                new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testStartupFromEarliestOffset() throws Exception {
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -1460,7 +1566,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -1510,7 +1617,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", 16);
 
         String[] expected =
                 new String[] {
@@ -1532,21 +1639,22 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Ignore("https://github.com/ververica/flink-cdc-connectors/issues/254")
     @Test
     public void testStartupFromTimestamp() throws Exception {
-        if (incrementalSnapshot) {
-            // not support yet
-            return;
-        }
         inventoryDatabase.createAndInitialize();
+
+        // Unfortunately we have to sleep here to differ initial and later-generating changes in
+        // binlog by timestamp
+        Thread.sleep(5000L);
+
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
@@ -1597,7 +1705,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 7);
+        waitForSinkSize("sink", 5);
 
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};

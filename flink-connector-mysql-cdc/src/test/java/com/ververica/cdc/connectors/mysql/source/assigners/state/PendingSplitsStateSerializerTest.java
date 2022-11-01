@@ -162,28 +162,23 @@ public class PendingSplitsStateSerializerTest {
 
     private static MySqlSchemalessSnapshotSplit getTestSchemalessSnapshotSplit(
             TableId tableId, int splitNo) {
-        long restartSkipEvent = splitNo;
         return new MySqlSchemalessSnapshotSplit(
                 tableId,
                 tableId.toString() + "-" + splitNo,
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
-                new Object[] {100L + splitNo * 1000},
-                new Object[] {999L + splitNo * 1000},
-                new BinlogOffset(
-                        "mysql-bin.000001",
-                        78L + splitNo * 200,
-                        restartSkipEvent,
-                        0L,
-                        0L,
-                        null,
-                        0));
+                new Object[] {100L + splitNo * 1000L},
+                new Object[] {999L + splitNo * 1000L},
+                BinlogOffset.builder()
+                        .setBinlogFilePosition("mysql-bin.000001", 78L + splitNo * 200L)
+                        .setSkipEvents(splitNo)
+                        .build());
     }
 
     private static Map<String, BinlogOffset> getTestSplitInfo(TableId tableId, int splitNo) {
         final String splitId = tableId.toString() + "-" + splitNo;
         final BinlogOffset highWatermark =
-                new BinlogOffset("mysql-bin.000001", (long) splitNo * 200);
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", splitNo * 200L);
         return Collections.singletonMap(splitId, highWatermark);
     }
 

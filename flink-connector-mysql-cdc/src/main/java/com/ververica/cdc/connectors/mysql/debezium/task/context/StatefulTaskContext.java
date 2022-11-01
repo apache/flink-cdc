@@ -56,7 +56,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mysql.debezium.task.context.ChangeEventCreatorFactory.createChangeEventCreator;
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
 
 /**
  * A stateful task context that contains entries the debezium mysql connector task required.
@@ -143,7 +145,7 @@ public class StatefulTaskContext {
                         databaseSchema,
                         queue,
                         connectorConfig.getTableFilters().dataCollectionFilter(),
-                        DataChangeEvent::new,
+                        createChangeEventCreator(mySqlSplit),
                         metadataProvider,
                         schemaNameAdjuster);
 
@@ -175,14 +177,16 @@ public class StatefulTaskContext {
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
     private MySqlOffsetContext loadStartingOffsetState(
-            OffsetContext.Loader loader, MySqlSplit mySqlSplit) {
+            OffsetContext.Loader<MySqlOffsetContext> loader, MySqlSplit mySqlSplit) {
         BinlogOffset offset =
                 mySqlSplit.isSnapshotSplit()
-                        ? BinlogOffset.INITIAL_OFFSET
-                        : mySqlSplit.asBinlogSplit().getStartingOffset();
+                        ? BinlogOffset.ofEarliest()
+                        : initializeEffectiveOffset(
+                                mySqlSplit.asBinlogSplit().getStartingOffset(), connection);
 
-        MySqlOffsetContext mySqlOffsetContext =
-                (MySqlOffsetContext) loader.load(offset.getOffset());
+        LOG.info("Starting offset is initialized to {}", offset);
+
+        MySqlOffsetContext mySqlOffsetContext = loader.load(offset.getOffset());
 
         if (!isBinlogAvailable(mySqlOffsetContext)) {
             throw new IllegalStateException(

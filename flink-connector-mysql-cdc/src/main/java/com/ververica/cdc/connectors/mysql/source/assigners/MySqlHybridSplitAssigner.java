@@ -218,8 +218,8 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new MySqlBinlogSplit(
                 BINLOG_SPLIT_ID,
-                minBinlogOffset == null ? BinlogOffset.INITIAL_OFFSET : minBinlogOffset,
-                BinlogOffset.NO_STOPPING_OFFSET,
+                minBinlogOffset == null ? BinlogOffset.ofEarliest() : minBinlogOffset,
+                BinlogOffset.ofNonStopping(),
                 divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
                 new HashMap<>(),
                 finishedSnapshotSplitInfos.size());

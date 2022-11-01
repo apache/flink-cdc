@@ -121,6 +121,10 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                             createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
         }
 
+        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, 1);
+        reader.start();
+        reader.addSplits(Collections.singletonList(binlogSplit));
+
         // step-1: make 6 change events in one MySQL transaction
         TableId tableId = binlogSplit.getTableSchemas().keySet().iterator().next();
         makeBinlogEventsInOneTransaction(sourceConfig, tableId.toString());
@@ -132,9 +136,6 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Hangzhou, 123567891234]"
                 };
         // the 2 records are produced by 1 operations
-        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, 1);
-        reader.start();
-        reader.addSplits(Collections.singletonList(binlogSplit));
         List<String> actualRecords = consumeRecords(reader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRecords), actualRecords);
         List<MySqlSplit> splitsState = reader.snapshotState(1L);
@@ -326,7 +327,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         .toArray(String[]::new);
 
         return new MySqlSourceConfigFactory()
-                .startupOptions(StartupOptions.initial())
+                .startupOptions(StartupOptions.latest())
                 .databaseList(customerDatabase.getDatabaseName())
                 .tableList(captureTableIds)
                 .includeSchemaChanges(false)

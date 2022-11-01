@@ -42,7 +42,10 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
@@ -95,6 +98,52 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+
+    /** Initial changelogs in string of table "customers" in database "customer". */
+    private final List<String> initialChanges =
+            Arrays.asList(
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]");
+
+    /** First part binlog events in string, which is made by {@link #makeFirstPartBinlogEvents}. */
+    private final List<String> firstPartBinlogEvents =
+            Arrays.asList(
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-D[102, user_2, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]");
+
+    /**
+     * Second part binlog events in string, which is made by {@link #makeSecondPartBinlogEvents}.
+     */
+    private final List<String> secondPartBinlogEvents =
+            Arrays.asList(
+                    "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+I[2001, user_22, Shanghai, 123567891234]",
+                    "+I[2002, user_23, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]",
+                    "+U[1010, user_11, Hangzhou, 123567891234]");
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
@@ -365,6 +414,71 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         jobClient.cancel().get();
     }
 
+    @Test
+    public void testStartFromEarliestOffset() throws Exception {
+        List<String> expected = new ArrayList<>();
+        expected.addAll(initialChanges);
+        expected.addAll(firstPartBinlogEvents);
+        testStartingOffset(StartupOptions.earliest(), expected);
+    }
+
+    @Test
+    public void testStartFromLatestOffset() throws Exception {
+        testStartingOffset(StartupOptions.latest(), Collections.emptyList());
+    }
+
+    private void testStartingOffset(
+            StartupOptions startupOptions, List<String> expectedChangelogAfterStart)
+            throws Exception {
+        // Initialize customer database
+        customDatabase.createAndInitialize();
+        String tableId = customDatabase.getDatabaseName() + ".customers";
+
+        // Make some changes before starting the CDC job
+        makeFirstPartBinlogEvents(getConnection(), tableId);
+
+        // Create Flink execution environment
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+        // Build deserializer
+        DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        LogicalType logicalType = TypeConversions.fromDataToLogicalType(dataType);
+        InternalTypeInfo<RowData> typeInfo = InternalTypeInfo.of(logicalType);
+        RowDataDebeziumDeserializeSchema deserializer =
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType((RowType) dataType.getLogicalType())
+                        .setResultTypeInfo(typeInfo)
+                        .build();
+
+        // Build source
+        MySqlSource<RowData> mySqlSource =
+                MySqlSource.<RowData>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(customDatabase.getDatabaseName())
+                        .serverTimeZone("UTC")
+                        .tableList(tableId)
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .serverId("5401-5404")
+                        .deserializer(deserializer)
+                        .startupOptions(startupOptions)
+                        .build();
+
+        // Build and execute the job
+        DataStreamSource<RowData> source =
+                env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
+        try (CloseableIterator<RowData> iterator = source.executeAndCollect()) {
+            List<String> rows = fetchRowData(iterator, expectedChangelogAfterStart.size());
+            assertEqualsInAnyOrder(expectedChangelogAfterStart, rows);
+        }
+    }
+
     private MySqlSource<RowData> buildSleepingSource() {
         ResolvedSchema physicalSchema =
                 new ResolvedSchema(
@@ -522,23 +636,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     getConnection(), customDatabase.getDatabaseName() + '.' + tableId);
         }
 
-        String[] binlogForSingleTable =
-                new String[] {
-                    "-U[103, user_3, Shanghai, 123567891234]",
-                    "+U[103, user_3, Hangzhou, 123567891234]",
-                    "-D[102, user_2, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "-U[103, user_3, Hangzhou, 123567891234]",
-                    "+U[103, user_3, Shanghai, 123567891234]",
-                    "-U[1010, user_11, Shanghai, 123567891234]",
-                    "+U[1010, user_11, Hangzhou, 123567891234]",
-                    "+I[2001, user_22, Shanghai, 123567891234]",
-                    "+I[2002, user_23, Shanghai, 123567891234]",
-                    "+I[2003, user_24, Shanghai, 123567891234]"
-                };
         List<String> expectedBinlogData = new ArrayList<>();
         for (int i = 0; i < captureCustomerTables.length; i++) {
-            expectedBinlogData.addAll(Arrays.asList(binlogForSingleTable));
+            expectedBinlogData.addAll(firstPartBinlogEvents);
+            expectedBinlogData.addAll(secondPartBinlogEvents);
         }
         assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
         tableResult.getJobClient().get().cancel().get();
@@ -810,6 +911,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
     }
 
+    /**
+     * Make some changes on the specified customer table. Changelog in string could be accessed by
+     * {@link #firstPartBinlogEvents}.
+     */
     private void makeFirstPartBinlogEvents(JdbcConnection connection, String tableId)
             throws SQLException {
         try {
@@ -827,6 +932,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
     }
 
+    /**
+     * Make some other changes on the specified customer table. Changelog in string could be
+     * accessed by {@link #secondPartBinlogEvents}.
+     */
     private void makeSecondPartBinlogEvents(JdbcConnection connection, String tableId)
             throws SQLException {
         try {

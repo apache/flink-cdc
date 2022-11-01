@@ -81,7 +81,8 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
             String splitId = customerDatabase.getDatabaseName() + "." + captureTable + ":" + i;
             Object[] splitStart = i == 0 ? null : new Object[] {i * 2};
             Object[] splitEnd = new Object[] {i * 2 + 2};
-            BinlogOffset highWatermark = new BinlogOffset("mysql-bin.00001", i + 1);
+            BinlogOffset highWatermark =
+                    BinlogOffset.ofBinlogFilePosition("mysql-bin.00001", i + 1);
             MySqlSchemalessSnapshotSplit mySqlSchemalessSnapshotSplit =
                     new MySqlSchemalessSnapshotSplit(
                             tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
@@ -127,8 +128,8 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         MySqlBinlogSplit expected =
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        new BinlogOffset("mysql-bin.00001", 1),
-                        BinlogOffset.NO_STOPPING_OFFSET,
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.00001", 1),
+                        BinlogOffset.ofNonStopping(),
                         finishedSnapshotSplitInfos,
                         new HashMap<>(),
                         finishedSnapshotSplitInfos.size());
