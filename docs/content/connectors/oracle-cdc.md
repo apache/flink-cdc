@@ -301,7 +301,7 @@ Connector Options
       <td>String</td>
       <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
            and "latest-offset". 
-           Please see <a href="#startup-reading-position">Startup Reading Position</a>section for more detailed information.</td>
+           Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>  
     <tr>
       <td>debezium.*</td>

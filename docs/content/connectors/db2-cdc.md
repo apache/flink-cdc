@@ -160,7 +160,7 @@ Connector Options
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td>Optional startup mode for Db2 CDC consumer, valid enumerations are "initial"
-           and "latest-offset". Please see <a href="#startup-reading-position">Startup Reading Position</a>section 
+           and "latest-offset". Please see <a href="#startup-reading-position">Startup Reading Position</a> section 
 for more detailed information.</td>
     </tr> 
     <tr>
@@ -170,7 +170,7 @@ for more detailed information.</td>
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai". 
           It controls how the TIMESTAMP type in Db2 converted to STRING.
-          See more <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-temporal-types">here</a>.
+          See more <a href="https://debezium.io/documentation/reference/1.6/connectors/db2.html#db2-temporal-types">here</a>.
           If not set, then ZoneId.systemDefault() is used to determine the server time zone.
       </td>
     </tr>
@@ -192,7 +192,7 @@ Features
 --------
 ### Startup Reading Position
 
-The config option `scan.startup.mode` specifies the startup mode for MySQL CDC consumer. The valid enumerations are:
+The config option `scan.startup.mode` specifies the startup mode for DB2 CDC consumer. The valid enumerations are:
 
 - `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
 - `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
@@ -209,7 +209,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.db2.Db2Source;
 
-public class MySqlSourceExample {
+public class Db2SourceExample {
   public static void main(String[] args) throws Exception {
     Db2Source<SourceRecord> db2Source = Db2Source.<SourceRecord>builder()
         .hostname("yourHostname")
@@ -246,8 +246,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;">Db2 type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.
-html"></a></th>
+        <th class="text-left" style="width:30%;"><a href="https://www.ibm.com/docs/en/db2/11.5?topic=elements-data-types">Db2 type</a></th>
         <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
