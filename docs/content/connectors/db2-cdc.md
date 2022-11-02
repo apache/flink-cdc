@@ -160,7 +160,7 @@ Connector Options
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td>Optional startup mode for Db2 CDC consumer, valid enumerations are "initial"
-           and "latest-offset". Please see <a href="#startup-reading-position">Startup Reading Position</a>section 
+           and "latest-offset". Please see <a href="#startup-reading-position">Startup Reading Position</a> section 
 for more detailed information.</td>
     </tr> 
     <tr>
