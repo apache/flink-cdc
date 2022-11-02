@@ -30,6 +30,8 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 import com.ververica.cdc.connectors.tidb.table.StartupMode;
 import com.ververica.cdc.connectors.tidb.table.utils.TableKeyRangeUtils;
 import org.slf4j.Logger;
@@ -48,6 +50,12 @@ import org.tikv.txn.KVClient;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The source implementation for TiKV that read snapshot events first and then read the change
@@ -68,18 +76,25 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     private final String database;
     private final String tableName;
 
-    // Task local variables
+    /** Task local variables. */
     private transient TiSession session = null;
+
     private transient Coprocessor.KeyRange keyRange = null;
     private transient CDCClient cdcClient = null;
     private transient SourceContext<T> sourceContext = null;
     private transient volatile long resolvedTs = -1L;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> prewrites = null;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> commits = null;
+    private transient BlockingQueue<Cdcpb.Event.Row> committedEvents = null;
     private transient OutputCollector<T> outputCollector;
 
-    // offset state
+    private transient boolean running = true;
+    private transient ExecutorService executorService;
+
+    /** offset state. */
     private transient ListState<Long> offsetState;
+
+    private static final long CLOSE_TIMEOUT = 30L;
 
     public TiKVRichParallelSourceFunction(
             TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema,
@@ -114,11 +129,22 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         cdcClient = new CDCClient(session, keyRange);
         prewrites = new TreeMap<>();
         commits = new TreeMap<>();
+        // cdc event will lose if pull cdc event block when region split
+        // use queue to separate read and write to ensure pull event unblock.
+        // since sink jdbc is slow, 5000W queue size may be safe size.
+        committedEvents = new LinkedBlockingQueue<>();
         outputCollector = new OutputCollector<>();
         resolvedTs =
                 startupMode == StartupMode.INITIAL
                         ? SNAPSHOT_VERSION_EPOCH
                         : STREAMING_VERSION_START_EPOCH;
+        ThreadFactory threadFactory =
+                new ThreadFactoryBuilder()
+                        .setNameFormat(
+                                "tidb-source-function-"
+                                        + getRuntimeContext().getIndexOfThisSubtask())
+                        .build();
+        executorService = Executors.newSingleThreadExecutor(threadFactory);
     }
 
     @Override
@@ -137,6 +163,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
         LOG.info("start read change events");
         cdcClient.start(resolvedTs);
+        running = true;
         readChangeEvents();
     }
 
@@ -167,9 +194,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
     protected void readSnapshotEvents() throws Exception {
         LOG.info("read snapshot events");
-        final KVClient scanClient = session.createKVClient();
-        long startTs = session.getTimestamp().getVersion();
-        try {
+        try (KVClient scanClient = session.createKVClient()) {
+            long startTs = session.getTimestamp().getVersion();
             ByteString start = keyRange.getStart();
             while (true) {
                 final List<Kvrpcpb.KvPair> segment =
@@ -191,13 +217,24 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                                 .next()
                                 .toByteString();
             }
-        } finally {
-            scanClient.close();
         }
     }
 
     protected void readChangeEvents() throws Exception {
         LOG.info("read change event from resolvedTs:{}", resolvedTs);
+        // child thread to sink committed rows.
+        executorService.execute(
+                () -> {
+                    while (running) {
+                        try {
+                            Cdcpb.Event.Row committedRow = committedEvents.take();
+                            changeEventDeserializationSchema.deserialize(
+                                    committedRow, outputCollector);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
         while (resolvedTs >= STREAMING_VERSION_START_EPOCH) {
             for (int i = 0; i < 1000; i++) {
                 final Cdcpb.Event.Row row = cdcClient.get();
@@ -220,7 +257,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                 final Cdcpb.Event.Row commitRow = commits.pollFirstEntry().getValue();
                 final Cdcpb.Event.Row prewriteRow =
                         prewrites.remove(RowKeyWithTs.ofStart(commitRow));
-                changeEventDeserializationSchema.deserialize(prewriteRow, outputCollector);
+                // if pull cdc event block when region split, cdc event will lose.
+                committedEvents.offer(prewriteRow);
             }
         }
     }
@@ -228,8 +266,17 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     @Override
     public void cancel() {
         try {
+            running = false;
             if (cdcClient != null) {
                 cdcClient.close();
+            }
+            if (executorService != null) {
+                executorService.shutdown();
+                if (executorService.awaitTermination(CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                    LOG.warn(
+                            "Failed to close the tidb source function in {} seconds.",
+                            CLOSE_TIMEOUT);
+                }
             }
         } catch (final Exception e) {
             LOG.error("Unable to close cdcClient", e);
@@ -291,14 +338,6 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
         private RowKeyWithTs(final long timestamp, final byte[] key) {
             this(timestamp, RowKey.decode(key));
-        }
-
-        public long getTimestamp() {
-            return timestamp;
-        }
-
-        public RowKey getRowKey() {
-            return rowKey;
         }
 
         @Override

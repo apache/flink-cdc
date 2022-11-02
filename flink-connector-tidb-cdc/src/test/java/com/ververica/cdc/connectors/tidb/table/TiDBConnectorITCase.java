@@ -27,6 +27,8 @@ import com.ververica.cdc.connectors.tidb.TiDBTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -42,6 +44,7 @@ import static org.junit.Assert.assertTrue;
 /** Integration tests for TiDB change stream event SQL source. */
 public class TiDBConnectorITCase extends TiDBTestBase {
 
+    private static final Logger LOG = LoggerFactory.getLogger(TiDBConnectorITCase.class);
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(1);
     private final StreamTableEnvironment tEnv =
