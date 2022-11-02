@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.oracle.source;
+package com.ververica.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
-import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
@@ -34,92 +31,82 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertNotNull;
+import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
-/** IT tests for {@link OracleSourceBuilder.OracleIncrementalSource}. */
-public class OracleSourceITCase extends OracleSourceTestBase {
+/** IT tests for {@link SqlServerSourceBuilder.SqlServerIncrementalSource}. */
+public class SqlServerSourceITCase extends SqlServerSourceTestBase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OracleSourceITCase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SqlServerSourceITCase.class);
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
-        testOracleParallelSource(
-                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"CUSTOMERS"});
+        testSqlServerParallelSource(
+                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"dbo.customers"});
     }
 
     @Test
     public void testReadSingleTableWithMultipleParallelism() throws Exception {
-        testOracleParallelSource(
-                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"CUSTOMERS"});
+        testSqlServerParallelSource(
+                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"dbo.customers"});
     }
 
     // Failover tests
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
-        testOracleParallelSource(
-                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+        testSqlServerParallelSource(
+                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"dbo.customers"});
     }
 
     @Test
     public void testTaskManagerFailoverInBinlogPhase() throws Exception {
-        testOracleParallelSource(FailoverType.TM, FailoverPhase.BINLOG, new String[] {"CUSTOMERS"});
+        testSqlServerParallelSource(
+                FailoverType.TM, FailoverPhase.STREAM, new String[] {"dbo.customers"});
     }
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
-        testOracleParallelSource(
-                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+        testSqlServerParallelSource(
+                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"dbo.customers"});
     }
 
     @Test
     public void testJobManagerFailoverInBinlogPhase() throws Exception {
-        testOracleParallelSource(FailoverType.JM, FailoverPhase.BINLOG, new String[] {"CUSTOMERS"});
-    }
-
-    @Test
-    public void testTaskManagerFailoverSingleParallelism() throws Exception {
-        testOracleParallelSource(
-                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+        testSqlServerParallelSource(
+                FailoverType.JM, FailoverPhase.STREAM, new String[] {"dbo.customers"});
     }
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
-        testOracleParallelSource(
-                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+        testSqlServerParallelSource(
+                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"dbo.customers"});
     }
 
-    private void testOracleParallelSource(
+    private void testSqlServerParallelSource(
             FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
             throws Exception {
-        testOracleParallelSource(
+        testSqlServerParallelSource(
                 DEFAULT_PARALLELISM, failoverType, failoverPhase, captureCustomerTables);
     }
 
-    private void testOracleParallelSource(
+    private void testSqlServerParallelSource(
             int parallelism,
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
-        createAndInitialize("customer.sql");
+
+        String databaseName = "customer";
+
+        initializeSqlServerTable(databaseName);
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
@@ -130,32 +117,26 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " ID INT NOT NULL,"
-                                + " NAME STRING,"
-                                + " ADDRESS STRING,"
-                                + " PHONE_NUMBER STRING,"
-                                + " primary key (ID) not enforced"
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oracle-cdc',"
+                                + " 'connector' = 'sqlserver-cdc',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'false',"
-                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
-                                + " 'debezium.log.mining.continuous.mine' = 'true'"
+                                + " 'table-name' = '%s'"
                                 + ")",
-                        ORACLE_CONTAINER.getHost(),
-                        ORACLE_CONTAINER.getOraclePort(),
-                        ORACLE_CONTAINER.getUsername(),
-                        ORACLE_CONTAINER.getPassword(),
-                        ORACLE_DATABASE,
-                        ORACLE_SCHEMA,
-                        getTableNameRegex(captureCustomerTables) // (customer|customer_1)
-                        );
+                        MSSQL_SERVER_CONTAINER.getHost(),
+                        MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
+                        MSSQL_SERVER_CONTAINER.getUsername(),
+                        MSSQL_SERVER_CONTAINER.getPassword(),
+                        databaseName,
+                        getTableNameRegex(captureCustomerTables));
 
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
@@ -201,16 +182,16 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         assertEqualsInAnyOrder(
                 expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
 
-        // second step: check the binlog data
+        // second step: check the change stream data
         for (String tableId : captureCustomerTables) {
-            makeFirstPartBinlogEvents(ORACLE_SCHEMA + '.' + tableId);
+            makeFirstPartChangeStreamEvents(databaseName + "." + tableId);
         }
-        if (failoverPhase == FailoverPhase.BINLOG) {
+        if (failoverPhase == FailoverPhase.STREAM) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
         }
         for (String tableId : captureCustomerTables) {
-            makeSecondPartBinlogEvents(ORACLE_SCHEMA + '.' + tableId);
+            makeSecondPartBinlogEvents(databaseName + "." + tableId);
         }
 
         String[] binlogForSingleTable =
@@ -235,14 +216,14 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         tableResult.getJobClient().get().cancel().get();
     }
 
-    private void makeFirstPartBinlogEvents(String tableId) throws Exception {
+    private void makeFirstPartChangeStreamEvents(String tableId) {
         executeSql("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103");
         executeSql("DELETE FROM " + tableId + " where id = 102");
         executeSql("INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')");
         executeSql("UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
     }
 
-    private void makeSecondPartBinlogEvents(String tableId) throws Exception {
+    private void makeSecondPartBinlogEvents(String tableId) {
         executeSql("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 1010");
         executeSql("INSERT INTO " + tableId + " VALUES(2001, 'user_22','Shanghai','123567891234')");
         executeSql("INSERT INTO " + tableId + " VALUES(2002, 'user_23','Shanghai','123567891234')");
@@ -272,50 +253,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             return captureCustomerTables[0];
         } else {
             // pattern that matches multiple tables
-            return format("(%s)", StringUtils.join(captureCustomerTables, "|"));
-        }
-    }
-
-    private void createAndInitialize(String sqlFile) throws Exception {
-        final String ddlFile = String.format("ddl/%s", sqlFile);
-        final URL ddlTestFile = OracleSourceITCase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-        try (Connection connection = getConnection();
-                Statement statement = connection.createStatement()) {
-
-            try {
-                // DROP TABLE IF EXITS
-                statement.execute("DROP TABLE DEBEZIUM.CUSTOMERS");
-                statement.execute("DROP TABLE DEBEZIUM.CUSTOMERS_1");
-            } catch (Exception e) {
-                LOG.error("DEBEZIUM.CUSTOMERS DEBEZIUM.CUSTOMERS_1 NOT EXITS", e);
-            }
-
-            final List<String> statements =
-                    Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                                            .map(String::trim)
-                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
-                                            .map(
-                                                    x -> {
-                                                        final Matcher m =
-                                                                COMMENT_PATTERN.matcher(x);
-                                                        return m.matches() ? m.group(1) : x;
-                                                    })
-                                            .collect(Collectors.joining("\n"))
-                                            .split(";"))
-                            .collect(Collectors.toList());
-
-            for (String stmt : statements) {
-                statement.execute(stmt);
-            }
-        }
-    }
-
-    private void executeSql(String sql) throws Exception {
-        try (Connection connection = getConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute(sql);
+            return format("(%s)", StringUtils.join(captureCustomerTables, ","));
         }
     }
 
@@ -323,72 +261,4 @@ public class OracleSourceITCase extends OracleSourceTestBase {
     //  test utilities
     // ------------------------------------------------------------------------
 
-    /** The type of failover. */
-    private enum FailoverType {
-        TM,
-        JM,
-        NONE
-    }
-
-    /** The phase of failover. */
-    private enum FailoverPhase {
-        SNAPSHOT,
-        BINLOG,
-        NEVER
-    }
-
-    private static void triggerFailover(
-            FailoverType type, JobID jobId, MiniCluster miniCluster, Runnable afterFailAction)
-            throws Exception {
-        switch (type) {
-            case TM:
-                restartTaskManager(miniCluster, afterFailAction);
-                break;
-            case JM:
-                triggerJobManagerFailover(jobId, miniCluster, afterFailAction);
-                break;
-            case NONE:
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + type);
-        }
-    }
-
-    private static void triggerJobManagerFailover(
-            JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
-        final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
-        haLeadershipControl.revokeJobMasterLeadership(jobId).get();
-        afterFailAction.run();
-        haLeadershipControl.grantJobMasterLeadership(jobId).get();
-    }
-
-    private static void restartTaskManager(MiniCluster miniCluster, Runnable afterFailAction)
-            throws Exception {
-        miniCluster.terminateTaskManager(0).get();
-        afterFailAction.run();
-        miniCluster.startTaskManager();
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
-    public Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(
-                ORACLE_CONTAINER.getJdbcUrl(), ORACLE_SYSTEM_USER, ORACLE_SYSTEM_PASSWORD);
-    }
 }

@@ -81,8 +81,7 @@ CREATE TABLE orders (
     'username' = 'sa',
     'password' = 'Password!',
     'database-name' = 'inventory',
-    'schema-name' = 'dbo',
-    'table-name' = 'orders'
+    'table-name' = 'dob.orders'
 );
 
 -- read snapshot and binlogs from orders table
@@ -167,6 +166,38 @@ Connector Options
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai".</td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether enable parallelism snapshot.</td>
+    </tr>
+    <tr>
+      <td>chunk-meta.group.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000</td>
+      <td>Integer</td>
+      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
+    </tr>
+    <tr>
+      <td>chunk-key.even-distribution.factor.lower-bound</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">0.05d</td>
+      <td>Double</td>
+      <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+          The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+          The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr> 
+    <tr>
+      <td>chunk-key.even-distribution.factor.upper-bound</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000.0d</td>
+      <td>Double</td>
+      <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+          The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+          The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr>
    <tr>
       <td>debezium.*</td>
       <td>optional</td>
@@ -248,8 +279,7 @@ CREATE TABLE products (
     'username' = 'sa',
     'password' = 'Password!',
     'database-name' = 'inventory',
-    'schema-name' = 'dbo',
-    'table-name' = 'products'
+    'table-name' = 'dbo.products'
 );
 ```
 
@@ -304,6 +334,47 @@ public class SqlServerSourceExample {
 
     env.execute();
   }
+}
+```
+
+The SQLServer CDC incremental connector (after 2.4.0) can be used as the following shows:
+```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
+import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.sqlserver.source.SqlServerSourceBuilder;
+import com.ververica.cdc.connectors.sqlserver.source.SqlServerSourceBuilder.SqlServerIncrementalSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+
+public class SqlServerIncrementalSourceExample {
+    public static void main(String[] args) throws Exception {
+        SqlServerIncrementalSource<String> sqlServerSource =
+                new SqlServerSourceBuilder()
+                        .hostname("localhost")
+                        .port(1433)
+                        .databaseList("inventory")
+                        .tableList("dbo.products")
+                        .username("sa")
+                        .password("Password!")
+                        .deserializer(new JsonDebeziumDeserializationSchema())
+                        .startupOptions(StartupOptions.initial())
+                        .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        // enable checkpoint
+        env.enableCheckpointing(3000);
+        // set the source parallelism to 2
+        env.fromSource(
+                        sqlServerSource,
+                        WatermarkStrategy.noWatermarks(),
+                        "SqlServerIncrementalSource")
+                .setParallelism(2)
+                .print()
+                .setParallelism(1);
+
+        env.execute("Print SqlServer Snapshot + Change Stream");
+    }
 }
 ```
 **Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.

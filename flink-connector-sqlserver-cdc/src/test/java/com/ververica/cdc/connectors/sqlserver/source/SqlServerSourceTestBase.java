@@ -14,18 +14,29 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.sqlserver;
+package com.ververica.cdc.connectors.sqlserver.source;
 
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
+import org.apache.flink.runtime.minicluster.MiniCluster;
+import org.apache.flink.runtime.minicluster.RpcServiceSharing;
+import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.MiniClusterWithClientResource;
+import org.apache.flink.util.TestLogger;
 
+import com.ververica.cdc.connectors.sqlserver.SqlServerSource;
+import com.ververica.cdc.connectors.sqlserver.SqlServerTestBase;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
@@ -45,11 +56,23 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-/** Utility class for sqlserver tests. */
-public class SqlServerTestBase extends AbstractTestBase {
-    private static final Logger LOG = LoggerFactory.getLogger(SqlServerTestBase.class);
+/** Basic class for testing {@link SqlServerSource}. */
+public abstract class SqlServerSourceTestBase extends TestLogger {
+
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    protected static final Logger LOG = LoggerFactory.getLogger(SqlServerSourceTestBase.class);
+    public static final MSSQLServerContainer MSSQL_SERVER_CONTAINER =
+            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
+                    .withPassword("Password!")
+                    .withEnv("MSSQL_AGENT_ENABLED", "true")
+                    .withEnv("MSSQL_PID", "Standard")
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    protected static final int DEFAULT_PARALLELISM = 4;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     private static final String STATEMENTS_PLACEHOLDER = "#";
@@ -58,12 +81,15 @@ public class SqlServerTestBase extends AbstractTestBase {
             "IF EXISTS(select 1 from sys.databases where name='#' AND is_cdc_enabled=1)\n"
                     + "EXEC sys.sp_cdc_disable_db";
 
-    public static final MSSQLServerContainer MSSQL_SERVER_CONTAINER =
-            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
-                    .withPassword("Password!")
-                    .withEnv("MSSQL_AGENT_ENABLED", "true")
-                    .withEnv("MSSQL_PID", "Standard")
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    @Rule
+    public final MiniClusterWithClientResource miniClusterResource =
+            new MiniClusterWithClientResource(
+                    new MiniClusterResourceConfiguration.Builder()
+                            .setNumberTaskManagers(1)
+                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                            .withHaLeadershipControl()
+                            .build());
 
     @BeforeClass
     public static void startContainers() {
@@ -79,13 +105,6 @@ public class SqlServerTestBase extends AbstractTestBase {
             MSSQL_SERVER_CONTAINER.stop();
         }
         LOG.info("Containers are stopped.");
-    }
-
-    protected Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(
-                MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                MSSQL_SERVER_CONTAINER.getUsername(),
-                MSSQL_SERVER_CONTAINER.getPassword());
     }
 
     private static void dropTestDatabase(Connection connection, String databaseName)
@@ -165,6 +184,58 @@ public class SqlServerTestBase extends AbstractTestBase {
         connection.createStatement().execute(DISABLE_DB_CDC.replace(STATEMENTS_PLACEHOLDER, name));
     }
 
+    protected static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
+        assertEqualsInOrder(
+                expected.stream().sorted().collect(Collectors.toList()),
+                actual.stream().sorted().collect(Collectors.toList()));
+    }
+
+    protected static void assertEqualsInOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
+        assertEquals(expected.size(), actual.size());
+        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+    }
+
+    protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
+        while (sinkSize(sinkName) == 0) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected static void waitForSinkSize(String sinkName, int expectedSize)
+            throws InterruptedException {
+        while (sinkSize(sinkName) < expectedSize) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected static int sinkSize(String sinkName) {
+        synchronized (TestValuesTableFactory.class) {
+            try {
+                return TestValuesTableFactory.getRawResults(sinkName).size();
+            } catch (IllegalArgumentException e) {
+                // job is not started yet
+                return 0;
+            }
+        }
+    }
+
+    protected Connection getJdbcConnection() throws SQLException {
+        return DriverManager.getConnection(
+                MSSQL_SERVER_CONTAINER.getJdbcUrl(),
+                MSSQL_SERVER_CONTAINER.getUsername(),
+                MSSQL_SERVER_CONTAINER.getPassword());
+    }
+
+    protected void executeSql(String sql) {
+        try (Connection connection = getJdbcConnection()) {
+            connection.createStatement().execute(sql);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * Executes a JDBC statement using the default jdbc config without autocommitting the
      * connection.
@@ -198,27 +269,49 @@ public class SqlServerTestBase extends AbstractTestBase {
         }
     }
 
-    protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
+    /** The type of failover. */
+    protected enum FailoverType {
+        TM,
+        JM,
+        NONE
+    }
+
+    /** The phase of failover. */
+    protected enum FailoverPhase {
+        SNAPSHOT,
+        STREAM,
+        NEVER
+    }
+
+    protected static void triggerFailover(
+            FailoverType type, JobID jobId, MiniCluster miniCluster, Runnable afterFailAction)
+            throws Exception {
+        switch (type) {
+            case TM:
+                restartTaskManager(miniCluster, afterFailAction);
+                break;
+            case JM:
+                triggerJobManagerFailover(jobId, miniCluster, afterFailAction);
+                break;
+            case NONE:
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + type);
         }
     }
 
-    protected static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
+    protected static void triggerJobManagerFailover(
+            JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
+        final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
+        haLeadershipControl.revokeJobMasterLeadership(jobId).get();
+        afterFailAction.run();
+        haLeadershipControl.grantJobMasterLeadership(jobId).get();
     }
 
-    protected static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
+    protected static void restartTaskManager(MiniCluster miniCluster, Runnable afterFailAction)
+            throws Exception {
+        miniCluster.terminateTaskManager(0).get();
+        afterFailAction.run();
+        miniCluster.startTaskManager();
     }
 }

@@ -35,7 +35,7 @@ import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHisto
  * Inspired from {@link io.debezium.relational.history.MemoryDatabaseHistory} but we will store the
  * HistoryRecords in Flink's state for persistence.
  *
- * <p>Note: This is not a clean solution because we depends on a global variable and all the history
+ * <p>Note: This is not a clean solution because we depend on a global variable and all the history
  * records will be stored in state (grow infinitely). We may need to come up with a
  * FileSystemDatabaseHistory in the future to store history in HDFS.
  */

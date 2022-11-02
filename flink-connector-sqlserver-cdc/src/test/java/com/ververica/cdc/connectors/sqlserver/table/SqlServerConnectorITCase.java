@@ -76,7 +76,6 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
@@ -84,8 +83,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "inventory",
-                        "dbo",
-                        "products");
+                        "dbo.products");
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -202,7 +200,6 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
@@ -210,8 +207,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "column_type_test",
-                        "dbo",
-                        "full_types");
+                        "dbo.full_types");
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id int NOT NULL,\n"
@@ -293,7 +289,6 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
@@ -301,8 +296,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "inventory",
-                        "dbo",
-                        "products");
+                        "dbo.products");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -369,29 +363,5 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         Collections.sort(expected);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 }

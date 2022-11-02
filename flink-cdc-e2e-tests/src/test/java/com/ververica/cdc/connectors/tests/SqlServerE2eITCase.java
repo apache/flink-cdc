@@ -101,8 +101,9 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                         " 'username' = '" + sqlServer.getUsername() + "',",
                         " 'password' = '" + sqlServer.getPassword() + "',",
                         " 'database-name' = 'inventory',",
-                        " 'schema-name' = 'dbo',",
-                        " 'table-name' = 'products'",
+                        " 'table-name' = 'dbo.products',",
+                        " 'scan.incremental.snapshot.enabled' = 'true',",
+                        " 'scan.incremental.snapshot.chunk.size' = '4'",
                         ");",
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
@@ -126,7 +127,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
         submitSQLJob(sqlLines, sqlServerCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
-        // generate binlogs
+        // generate change stream
         try (Connection conn = getSqlServerJdbcConnection();
                 Statement statement = conn.createStatement()) {
 
@@ -171,7 +172,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                60000L);
+                80000L);
     }
 
     private void initializeSqlServerTable(String sqlFile) {
