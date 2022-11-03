@@ -120,6 +120,10 @@ public class CDCClient implements AutoCloseable {
         return resolvedTsSet.firstEntry().getElement();
     }
 
+    public synchronized long getMaxResolvedTs() {
+        return resolvedTsSet.lastEntry().getElement();
+    }
+
     public synchronized void close() {
         removeRegions(regionClients.keySet());
     }
