@@ -94,7 +94,11 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 password,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 startupOptions,
-                enableParallelRead);
+                enableParallelRead,
+                splitSize,
+                fetchSize,
+                connectMaxRetries,
+                connectionPoolSize);
     }
 
     @Override
@@ -122,6 +126,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
         return options;

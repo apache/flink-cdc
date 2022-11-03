@@ -95,6 +95,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         " 'password' = '" + ORACLE_SYSTEM_PASSWORD + "',",
                         " 'database-name' = 'XE',",
                         " 'schema-name' = 'DEBEZIUM',",
+                        " 'scan.incremental.snapshot.enabled' = 'true',",
                         " 'debezium.log.mining.strategy' = 'online_catalog',",
                         " 'debezium.log.mining.continuous.mine' = 'true',",
                         " 'table-name' = 'PRODUCTS',",
