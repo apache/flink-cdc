@@ -88,13 +88,13 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     private transient BlockingQueue<Cdcpb.Event.Row> committedEvents = null;
     private transient OutputCollector<T> outputCollector;
 
-    private transient boolean running = true;
+    private transient volatile boolean running = true;
     private transient ExecutorService executorService;
 
     /** offset state. */
     private transient ListState<Long> offsetState;
 
-    private static final long CLOSE_TIMEOUT = 30L;
+    private static final long CLOSE_TIMEOUT = 5L;
 
     public TiKVRichParallelSourceFunction(
             TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema,
@@ -231,7 +231,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                             changeEventDeserializationSchema.deserialize(
                                     committedRow, outputCollector);
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            LOG.error("Failed to sink row", e);
                         }
                     }
                 });
@@ -270,6 +270,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             if (cdcClient != null) {
                 cdcClient.close();
             }
+            session.getChannelFactory().close();
+            session.close();
             if (executorService != null) {
                 executorService.shutdown();
                 if (executorService.awaitTermination(CLOSE_TIMEOUT, TimeUnit.SECONDS)) {

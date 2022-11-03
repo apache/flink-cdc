@@ -23,6 +23,8 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
+import org.apache.flink.shaded.guava30.com.google.common.base.Joiner;
+
 import com.ververica.cdc.connectors.tidb.TiDBTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -35,8 +37,11 @@ import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
+import static org.assertj.core.api.Assertions.fail;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -162,6 +167,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
+        checkTiKVClientLeak();
     }
 
     @Test
@@ -647,5 +653,37 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         assertTrue(expected != null && actual != null);
         assertEquals(expected.size(), actual.size());
         assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+    }
+
+    public void checkTiKVClientLeak() throws InterruptedException {
+        List<Map.Entry<Thread, StackTraceElement[]>> leaks = null;
+        Thread.getAllStackTraces().entrySet().stream().forEach(System.out::println);
+        for (int tries = 0; tries < 10; tries++) {
+            leaks =
+                    Thread.getAllStackTraces().entrySet().stream()
+                            .filter(this::findAliveTiKVClientThread)
+                            .collect(Collectors.toList());
+            if (leaks.isEmpty()) {
+                return;
+            }
+            Thread.sleep(1000);
+        }
+
+        for (Map.Entry<Thread, StackTraceElement[]> leak : leaks) {
+            leak.getKey().stop();
+        }
+        fail(
+                "Detected tikv client leaks:\n"
+                        + leaks.stream().map(this::format).collect(Collectors.joining("\n\n")));
+    }
+
+    private String format(Map.Entry<Thread, StackTraceElement[]> leak) {
+        return leak.getKey().getName() + ":\n" + Joiner.on("\n").join(leak.getValue());
+    }
+
+    private boolean findAliveTiKVClientThread(Entry<Thread, StackTraceElement[]> threadStackTrace) {
+        return threadStackTrace.getKey().getState() != Thread.State.TERMINATED
+                && (threadStackTrace.getKey().getName().contains("PDClient")
+                        || threadStackTrace.getKey().getName().contains("grpc"));
     }
 }
