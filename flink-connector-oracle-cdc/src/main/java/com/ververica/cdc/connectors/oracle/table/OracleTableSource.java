@@ -67,6 +67,10 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final Properties dbzProperties;
     private final StartupOptions startupOptions;
     private final boolean enableParallelRead;
+    private final int splitSize;
+    private final int fetchSize;
+    private final int connectionPoolSize;
+    private final int connectMaxRetries;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -90,7 +94,11 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             String password,
             Properties dbzProperties,
             StartupOptions startupOptions,
-            boolean enableParallelRead) {
+            boolean enableParallelRead,
+            int splitSize,
+            int fetchSize,
+            int connectMaxRetries,
+            int connectionPoolSize) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -105,6 +113,10 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
         this.enableParallelRead = enableParallelRead;
+        this.splitSize = splitSize;
+        this.fetchSize = fetchSize;
+        this.connectMaxRetries = connectMaxRetries;
+        this.connectionPoolSize = connectionPoolSize;
     }
 
     @Override
@@ -147,6 +159,10 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .password(password)
                             .deserializer(deserializer)
                             .debeziumProperties(dbzProperties)
+                            .splitSize(splitSize)
+                            .fetchSize(fetchSize)
+                            .connectionPoolSize(connectionPoolSize)
+                            .connectMaxRetries(connectMaxRetries)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -201,7 +217,11 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         password,
                         dbzProperties,
                         startupOptions,
-                        enableParallelRead);
+                        enableParallelRead,
+                        splitSize,
+                        fetchSize,
+                        connectMaxRetries,
+                        connectionPoolSize);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -229,7 +249,11 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
-                && Objects.equals(enableParallelRead, that.enableParallelRead);
+                && Objects.equals(enableParallelRead, that.enableParallelRead)
+                && Objects.equals(splitSize, that.splitSize)
+                && Objects.equals(fetchSize, that.fetchSize)
+                && Objects.equals(connectMaxRetries, that.connectMaxRetries)
+                && Objects.equals(connectionPoolSize, that.connectionPoolSize);
     }
 
     @Override

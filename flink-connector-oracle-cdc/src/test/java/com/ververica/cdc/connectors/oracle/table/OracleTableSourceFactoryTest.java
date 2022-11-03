@@ -31,6 +31,8 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.connectors.base.options.JdbcSourceOptions;
+import com.ververica.cdc.connectors.base.options.SourceOptions;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -103,7 +105,11 @@ public class OracleTableSourceFactoryTest {
                         MY_PASSWORD,
                         PROPERTIES,
                         StartupOptions.initial(),
-                        true);
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -126,7 +132,11 @@ public class OracleTableSourceFactoryTest {
                         MY_PASSWORD,
                         PROPERTIES,
                         StartupOptions.initial(),
-                        true);
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -153,7 +163,53 @@ public class OracleTableSourceFactoryTest {
                         MY_PASSWORD,
                         dbzProperties,
                         StartupOptions.initial(),
-                        true);
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testScanIncrementalProperties() {
+        Map<String, String> options = getAllRequiredOptions();
+        int chunkSize = 4096;
+        int fetchSize = 1024;
+        int connectMaxRetry = 5;
+        int connectPoolSize = 10;
+        options.put("port", "1521");
+        options.put("hostname", MY_LOCALHOST);
+        options.put("debezium.snapshot.mode", "initial");
+        options.put(SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(), "true");
+        options.put(
+                SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(),
+                String.valueOf(chunkSize));
+        options.put(SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
+        options.put(JdbcSourceOptions.CONNECT_MAX_RETRIES.key(), String.valueOf(connectMaxRetry));
+        options.put(JdbcSourceOptions.CONNECTION_POOL_SIZE.key(), String.valueOf(connectPoolSize));
+
+        DynamicTableSource actualSource = createTableSource(options);
+        Properties dbzProperties = new Properties();
+        dbzProperties.put("snapshot.mode", "initial");
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        SCHEMA,
+                        null,
+                        MY_PORT,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        dbzProperties,
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        chunkSize,
+                        fetchSize,
+                        connectMaxRetry,
+                        connectPoolSize);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -177,7 +233,11 @@ public class OracleTableSourceFactoryTest {
                         MY_PASSWORD,
                         PROPERTIES,
                         StartupOptions.initial(),
-                        true);
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -201,7 +261,11 @@ public class OracleTableSourceFactoryTest {
                         MY_PASSWORD,
                         PROPERTIES,
                         StartupOptions.latest(),
-                        true);
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -229,7 +293,11 @@ public class OracleTableSourceFactoryTest {
                         MY_PASSWORD,
                         new Properties(),
                         StartupOptions.initial(),
-                        true);
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
