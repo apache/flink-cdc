@@ -131,7 +131,6 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();

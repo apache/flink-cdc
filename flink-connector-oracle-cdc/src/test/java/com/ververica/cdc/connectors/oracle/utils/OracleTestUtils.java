@@ -16,11 +16,23 @@
 
 package com.ververica.cdc.connectors.oracle.utils;
 
+import com.ververica.cdc.connectors.oracle.source.OracleSourceITCase;
 import org.testcontainers.containers.OracleContainer;
 
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static org.junit.Assert.assertNotNull;
 
 /** Utility class for oracle tests. */
 public class OracleTestUtils {
@@ -38,6 +50,8 @@ public class OracleTestUtils {
     //                                  "docker/assets/activate-archivelog.sql")
     // ----------------- end --------------------------
     private static final String ORACLE_IMAGE = "jark/oracle-xe-11g-r2-cdc:0.1";
+
+    protected static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     public static final OracleContainer ORACLE_CONTAINER = new OracleContainer(ORACLE_IMAGE);
 
@@ -57,5 +71,34 @@ public class OracleTestUtils {
 
     public static Connection testConnection(OracleContainer oracleContainer) throws SQLException {
         return DriverManager.getConnection(oracleContainer.getJdbcUrl(), SCHEMA_USER, SCHEMA_PWD);
+    }
+
+    public static void createAndInitialize(OracleContainer oracleContainer, String sqlFile)
+            throws Exception {
+        final String ddlFile = String.format("ddl/%s", sqlFile);
+        final URL ddlTestFile = OracleSourceITCase.class.getClassLoader().getResource(ddlFile);
+        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+                Statement statement = connection.createStatement()) {
+
+            final List<String> statements =
+                    Arrays.stream(
+                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                                            .map(String::trim)
+                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
+                                            .map(
+                                                    x -> {
+                                                        final Matcher m =
+                                                                COMMENT_PATTERN.matcher(x);
+                                                        return m.matches() ? m.group(1) : x;
+                                                    })
+                                            .collect(Collectors.joining("\n"))
+                                            .split(";"))
+                            .collect(Collectors.toList());
+
+            for (String stmt : statements) {
+                statement.execute(stmt);
+            }
+        }
     }
 }
