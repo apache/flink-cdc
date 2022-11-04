@@ -27,6 +27,8 @@ import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.OracleContainer;
@@ -43,11 +45,14 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_PWD;
+import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_USER;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for Oracle binlog SQL source. */
+@RunWith(Parameterized.class)
 public class OracleConnectorITCase extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleConnectorITCase.class);
@@ -60,6 +65,18 @@ public class OracleConnectorITCase extends AbstractTestBase {
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
+
+    // enable the parallelismSnapshot (i.e: The new source OracleParallelSource)
+    private final boolean parallelismSnapshot;
+
+    public OracleConnectorITCase(boolean parallelismSnapshot) {
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {false}, new Object[] {true}};
+    }
 
     @Before
     public void before() throws Exception {
@@ -93,7 +110,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'false',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -102,6 +119,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "products");
         String sinkDDL =
@@ -178,7 +196,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'false',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -187,6 +205,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "products");
         String sinkDDL =
@@ -273,7 +292,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'false',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s' ,"
@@ -283,6 +302,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "products");
         String sinkDDL =
@@ -369,7 +389,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'false',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -378,6 +398,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "test_numeric_table");
         String sinkDDL =
@@ -448,7 +469,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'false',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -457,6 +478,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "xmltype_table");
         String sinkDDL =
@@ -494,6 +516,120 @@ public class OracleConnectorITCase extends AbstractTestBase {
         List<String> actual = TestValuesTableFactory.getRawResults("test_xmltype_sink");
         Collections.sort(actual);
         assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testAllDataTypes() throws Throwable {
+        OracleTestUtils.createAndInitialize(
+                OracleTestUtils.ORACLE_CONTAINER, "column_type_test.sql");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE full_types ("
+                                + " ID INT,"
+                                + " VAL_VARCHAR STRING,"
+                                + " VAL_VARCHAR2 STRING,"
+                                + " VAL_NVARCHAR2 STRING,"
+                                + " VAL_CHAR STRING,"
+                                + " VAL_NCHAR STRING,"
+                                + " VAL_BF FLOAT,"
+                                + " VAL_BD DOUBLE,"
+                                + " VAL_F FLOAT,"
+                                + " VAL_F_10 FLOAT,"
+                                + " VAL_NUM DECIMAL(10, 6),"
+                                + " VAL_DP DOUBLE,"
+                                + " VAL_R DECIMAL(38,2),"
+                                + " VAL_DECIMAL DECIMAL(10, 6),"
+                                + " VAL_NUMERIC DECIMAL(10, 6),"
+                                + " VAL_NUM_VS DECIMAL(10, 3),"
+                                + " VAL_INT DECIMAL(38,0),"
+                                + " VAL_INTEGER DECIMAL(38,0),"
+                                + " VAL_SMALLINT DECIMAL(38,0),"
+                                + " VAL_NUMBER_38_NO_SCALE DECIMAL(38,0),"
+                                + " VAL_NUMBER_38_SCALE_0 DECIMAL(38,0),"
+                                + " VAL_NUMBER_1 BOOLEAN,"
+                                + " VAL_NUMBER_2 TINYINT,"
+                                + " VAL_NUMBER_4 SMALLINT,"
+                                + " VAL_NUMBER_9 INT,"
+                                + " VAL_NUMBER_18 BIGINT,"
+                                + " VAL_NUMBER_2_NEGATIVE_SCALE TINYINT,"
+                                + " VAL_NUMBER_4_NEGATIVE_SCALE SMALLINT,"
+                                + " VAL_NUMBER_9_NEGATIVE_SCALE INT,"
+                                + " VAL_NUMBER_18_NEGATIVE_SCALE BIGINT,"
+                                + " VAL_NUMBER_36_NEGATIVE_SCALE DECIMAL(38,0),"
+                                + " VAL_DATE TIMESTAMP,"
+                                + " VAL_TS TIMESTAMP,"
+                                + " VAL_TS_PRECISION2 TIMESTAMP(2 ),"
+                                + " VAL_TS_PRECISION4 TIMESTAMP(4),"
+                                + " VAL_TS_PRECISION9 TIMESTAMP(6),"
+                                + " VAL_TSTZ STRING,"
+                                + " VAL_TSLTZ TIMESTAMP_LTZ,"
+                                + " VAL_INT_YTM BIGINT,"
+                                + " VAL_INT_DTS BIGINT,"
+                                + " T15VARCHAR STRING,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        CONNECTOR_USER,
+                        CONNECTOR_PWD,
+                        parallelismSnapshot,
+                        "debezium",
+                        "full_types");
+
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '2'"
+                        + ") LIKE full_types (EXCLUDING OPTIONS)";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
+
+        // waiting for change events finished.
+        waitForSinkSize("sink", 1);
+
+        String[] expected =
+                new String[] {
+                    "+I[1, vc2, vc2, nvc2, c  , nc , "
+                            + "1.1, 2.22, 3.33, 8.888, 4.444400, 5.555, 6.66, "
+                            + "1234.567891, 1234.567891, 77.323, 1, 22, 333, 4444, 5555, "
+                            + "true, 99, 9999, 999999999, 999999999999999999, "
+                            + "90, 9900, 999999990, 999999999999999900, 99999999999999999999999999999999999900, "
+                            + "2022-10-30T00:00, "
+                            + "2022-10-30T12:34:56.007890, "
+                            + "2022-10-30T12:34:56.130, "
+                            + "2022-10-30T12:34:56.125500, "
+                            + "2022-10-30T12:34:56.125457, "
+                            + "2022-10-30T01:34:56.00789-11:00, "
+                            + "2022-10-29T17:34:56.007890Z, "
+                            + "-110451600000000, "
+                            + "-93784560000, "
+                            + "<name>\n"
+                            + "   <a id=\"1\" value=\"some values\">test xmlType</a>\n"
+                            + "</name>]"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        Collections.sort(actual);
+        assertEquals(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
 
