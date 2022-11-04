@@ -47,6 +47,13 @@ under the License.
             <version>${tikv.version}</version>
         </dependency>
 
+        <!-- Logging API -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
         <!-- test dependencies on Flink -->
         <dependency>
             <groupId>org.apache.flink</groupId>
