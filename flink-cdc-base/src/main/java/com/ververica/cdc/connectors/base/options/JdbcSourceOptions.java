@@ -32,12 +32,6 @@ public class JdbcSourceOptions extends SourceOptions {
                     .noDefaultValue()
                     .withDescription("IP address or hostname of the database server.");
 
-    public static final ConfigOption<Integer> PORT =
-            ConfigOptions.key("port")
-                    .intType()
-                    .defaultValue(3306)
-                    .withDescription("Integer port number of the database server.");
-
     public static final ConfigOption<String> USERNAME =
             ConfigOptions.key("username")
                     .stringType()
@@ -56,6 +50,12 @@ public class JdbcSourceOptions extends SourceOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Database name of the database to monitor.");
+
+    public static final ConfigOption<String> SCHEMA_NAME =
+            ConfigOptions.key("schema-name")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Schema name of the database to monitor.");
 
     public static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("table-name")

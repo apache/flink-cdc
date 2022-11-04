@@ -59,7 +59,6 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         redoLogSplitReadTask =
                 new RedoLogSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
-                        sourceFetchContext.getOffsetContext(),
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getDispatcher(),
                         sourceFetchContext.getErrorHandler(),
@@ -91,14 +90,12 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private static final Logger LOG = LoggerFactory.getLogger(RedoLogSplitReadTask.class);
         private final StreamSplit redoLogSplit;
-        private final OracleOffsetContext offsetContext;
         private final JdbcSourceEventDispatcher dispatcher;
         private final ErrorHandler errorHandler;
         private ChangeEventSourceContext context;
 
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
-                OracleOffsetContext offsetContext,
                 OracleConnection connection,
                 JdbcSourceEventDispatcher dispatcher,
                 ErrorHandler errorHandler,
@@ -117,7 +114,6 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                     metrics);
             this.redoLogSplit = redoLogSplit;
             this.dispatcher = dispatcher;
-            this.offsetContext = offsetContext;
             this.errorHandler = errorHandler;
         }
 

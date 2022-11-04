@@ -18,10 +18,7 @@ package com.ververica.cdc.connectors.oracle.source.utils;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import io.debezium.connector.oracle.OracleConnection;
-import io.debezium.connector.oracle.OracleConnectorConfig;
-import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -35,18 +32,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static com.ververica.cdc.connectors.oracle.source.utils.OracleUtils.createOracleDatabaseSchema;
-
 /** A component used to get schema by table path. */
 public class OracleSchema {
 
-    private final OracleConnectorConfig connectorConfig;
-    private final OracleDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
 
-    public OracleSchema(OracleSourceConfig sourceConfig) {
-        this.connectorConfig = sourceConfig.getDbzConnectorConfig();
-        this.databaseSchema = createOracleDatabaseSchema(connectorConfig);
+    public OracleSchema() {
         this.schemasByTableId = new HashMap<>();
     }
 

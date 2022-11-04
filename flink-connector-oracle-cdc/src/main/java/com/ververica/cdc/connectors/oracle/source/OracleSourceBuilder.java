@@ -18,10 +18,10 @@ package com.ververica.cdc.connectors.oracle.source;
 
 import org.apache.flink.annotation.Internal;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
-import com.ververica.cdc.connectors.oracle.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
 import javax.annotation.Nullable;
@@ -184,17 +184,7 @@ public class OracleSourceBuilder<T> {
 
     /** Specifies the startup options. */
     public OracleSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
-        com.ververica.cdc.connectors.base.options.StartupOptions baseStartupOptions = null;
-        switch (startupOptions.startupMode) {
-            case INITIAL:
-                baseStartupOptions =
-                        com.ververica.cdc.connectors.base.options.StartupOptions.initial();
-                break;
-            case LATEST_OFFSET:
-                baseStartupOptions =
-                        com.ververica.cdc.connectors.base.options.StartupOptions.latest();
-        }
-        this.configFactory.startupOptions(baseStartupOptions);
+        this.configFactory.startupOptions(startupOptions);
         return this;
     }
 

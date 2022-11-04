@@ -86,7 +86,12 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
         TestValuesTableFactory.clearAllData();
 
-        env.setParallelism(1);
+        if (parallelismSnapshot) {
+            env.setParallelism(4);
+            env.enableCheckpointing(200);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     @After

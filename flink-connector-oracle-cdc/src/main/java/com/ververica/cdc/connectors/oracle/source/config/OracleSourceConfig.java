@@ -37,12 +37,10 @@ public class OracleSourceConfig extends JdbcSourceConfig {
     private static final long serialVersionUID = 1L;
 
     @Nullable private String url;
-    private List<String> schemaList;
 
     public OracleSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
-            List<String> schemaList,
             List<String> tableList,
             int splitSize,
             int splitMetaGroupSize,
@@ -84,7 +82,6 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 connectMaxRetries,
                 connectionPoolSize);
         this.url = url;
-        this.schemaList = schemaList;
     }
 
     @Override
@@ -103,9 +100,5 @@ public class OracleSourceConfig extends JdbcSourceConfig {
     @Nullable
     public String getUrl() {
         return url;
-    }
-
-    public List<String> getSchemaList() {
-        return schemaList;
     }
 }

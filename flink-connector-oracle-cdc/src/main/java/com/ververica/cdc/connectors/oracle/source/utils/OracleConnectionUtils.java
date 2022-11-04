@@ -21,21 +21,14 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
-import io.debezium.connector.oracle.OracleConnectorConfig;
-import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.Scn;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.relational.Column;
 import io.debezium.relational.RelationalTableFilters;
-import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
-import io.debezium.relational.Tables;
-import oracle.jdbc.OracleTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -122,57 +115,5 @@ public class OracleConnectionUtils {
         }
 
         return capturedTableIds;
-    }
-
-    /**
-     * overwrite table catalog in database schema.
-     *
-     * @param databaseSchema
-     * @param connectorConfig
-     */
-    public static void overwriteCatalog(
-            OracleDatabaseSchema databaseSchema, OracleConnectorConfig connectorConfig) {
-        Tables tables = databaseSchema.getTables();
-        Set<TableId> tableIds = databaseSchema.tableIds();
-        Tables.TableFilter tableFilter = connectorConfig.getTableFilters().dataCollectionFilter();
-
-        for (TableId tableId : tableIds) {
-            TableId tableIdWithCatalog =
-                    new TableId(
-                            connectorConfig.getCatalogName(), tableId.schema(), tableId.table());
-            if (tableFilter.isIncluded(tableIdWithCatalog)) {
-                overrideOracleSpecificColumnTypes(tables, tableId, tableIdWithCatalog);
-                databaseSchema.refresh(tables.forTable(tableIdWithCatalog));
-            }
-        }
-    }
-
-    private static void overrideOracleSpecificColumnTypes(
-            Tables tables, TableId tableId, TableId tableIdWithCatalog) {
-        TableEditor editor = tables.editTable(tableId);
-        editor.tableId(tableIdWithCatalog);
-
-        List<String> columnNames = new ArrayList<>(editor.columnNames());
-        for (String columnName : columnNames) {
-            Column column = editor.columnWithName(columnName);
-            if (column.jdbcType() == Types.TIMESTAMP) {
-                editor.addColumn(
-                        column.edit()
-                                .length(column.scale().orElse(Column.UNSET_INT_VALUE))
-                                .scale(null)
-                                .create());
-            }
-            // NUMBER columns without scale value have it set to -127 instead of null;
-            // let's rectify that
-            else if (column.jdbcType() == OracleTypes.NUMBER) {
-                column.scale()
-                        .filter(s -> s == ORACLE_UNSET_SCALE)
-                        .ifPresent(
-                                s -> {
-                                    editor.addColumn(column.edit().scale(null).create());
-                                });
-            }
-        }
-        tables.overwriteTable(editor.create());
     }
 }
