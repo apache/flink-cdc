@@ -19,6 +19,10 @@ package org.tikv.cdc;
 
 import org.tikv.kvproto.Kvrpcpb;
 
+/**
+ * Copied from https://github.com/tikv/client-java project to fix
+ * https://github.com/tikv/client-java/issues/600 for 3.2.0 version.
+ */
 public class CDCConfig {
     private static final int EVENT_BUFFER_SIZE = 50000;
     private static final int MAX_ROW_KEY_SIZE = 10240;

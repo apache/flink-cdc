@@ -167,7 +167,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
-        checkTiKVClientLeak();
+        //        checkTiKVClientLeak();
     }
 
     @Test
