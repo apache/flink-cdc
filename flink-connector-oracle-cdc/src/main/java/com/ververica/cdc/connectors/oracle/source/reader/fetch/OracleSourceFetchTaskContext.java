@@ -118,7 +118,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         .loggingContextSupplier(
                                 () ->
                                         taskContext.configureLoggingContext(
-                                                "mysql-cdc-connector-task"))
+                                                "oracle-cdc-connector-task"))
                         // do not buffer any element, we use signal event
                         // .buffering()
                         .build();
@@ -154,10 +154,6 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     public OracleConnection getConnection() {
         return connection;
-    }
-
-    public OracleTaskContext getTaskContext() {
-        return taskContext;
     }
 
     @Override

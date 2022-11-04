@@ -31,12 +31,6 @@ public class OracleSourceOptions extends JdbcSourceOptions {
                     .noDefaultValue()
                     .withDescription("Url to use when connecting to the Oracle database server.");
 
-    public static final ConfigOption<String> SCHEMA_NAME =
-            ConfigOptions.key("schema-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Schema name of the Oracle database to monitor.");
-
     public static final ConfigOption<Integer> PORT =
             ConfigOptions.key("port")
                     .intType()

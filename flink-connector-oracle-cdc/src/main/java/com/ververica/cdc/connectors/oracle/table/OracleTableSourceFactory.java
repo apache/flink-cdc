@@ -24,6 +24,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.util.HashSet;

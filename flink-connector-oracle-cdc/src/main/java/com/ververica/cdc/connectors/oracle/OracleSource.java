@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.connectors.oracle;
 
-import com.ververica.cdc.connectors.oracle.table.StartupOptions;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.internal.DebeziumOffset;

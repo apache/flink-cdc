@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.connectors.oracle.source.meta.offset;
 
-import org.apache.flink.util.FlinkRuntimeException;
-
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 
@@ -25,6 +23,8 @@ import java.util.Map;
 
 /** An offset factory class create {@link RedoLogOffset} instance. */
 public class RedoLogOffsetFactory extends OffsetFactory {
+
+    private static final long serialVersionUID = 1L;
 
     public RedoLogOffsetFactory() {}
 
@@ -35,13 +35,14 @@ public class RedoLogOffsetFactory extends OffsetFactory {
 
     @Override
     public Offset newOffset(String filename, Long position) {
-        throw new FlinkRuntimeException(
-                "not supported create new Offset by filename and position.");
+        throw new UnsupportedOperationException(
+                "Do not support to create RedoLogOffset by filename and position.");
     }
 
     @Override
     public Offset newOffset(Long position) {
-        throw new FlinkRuntimeException("not supported create new Offset by Long position.");
+        throw new UnsupportedOperationException(
+                "Do not support to create RedoLogOffset by position.");
     }
 
     @Override

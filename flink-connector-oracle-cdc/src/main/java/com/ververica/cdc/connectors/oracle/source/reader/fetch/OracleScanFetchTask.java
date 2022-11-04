@@ -172,7 +172,6 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         // task to read binlog and backfill for current split
         return new RedoLogSplitReadTask(
                 new OracleConnectorConfig(dezConf),
-                oracleOffsetContext,
                 createOracleConnection(context.getSourceConfig().getDbzConfiguration()),
                 context.getDispatcher(),
                 context.getErrorHandler(),

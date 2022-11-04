@@ -23,6 +23,7 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.source.OracleSourceBuilder;
 import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
@@ -99,6 +100,7 @@ public class OracleChangeEventSourceExampleTest {
                         .password(oracleContainer.getPassword())
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .includeSchemaChanges(true) // output the schema changes as well
+                        .startupOptions(StartupOptions.initial())
                         .debeziumProperties(debeziumProperties)
                         .splitSize(3)
                         .build();
