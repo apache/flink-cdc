@@ -125,6 +125,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 serverTimeZone,
                 connectTimeout,
                 connectMaxRetries,
-                connectionPoolSize);
+                connectionPoolSize,
+                chunkKeyColumn);
     }
 }

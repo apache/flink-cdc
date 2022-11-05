@@ -59,7 +59,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             String serverTimeZone,
             Duration connectTimeout,
             int connectMaxRetries,
-            int connectionPoolSize) {
+            int connectionPoolSize,
+            String chunkKeyColumn) {
         super(
                 startupOptions,
                 databaseList,
@@ -80,7 +81,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 serverTimeZone,
                 connectTimeout,
                 connectMaxRetries,
-                connectionPoolSize);
+                connectionPoolSize,
+                chunkKeyColumn);
         this.url = url;
     }
 

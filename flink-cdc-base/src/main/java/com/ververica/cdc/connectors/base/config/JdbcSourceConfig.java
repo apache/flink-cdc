@@ -42,6 +42,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final Duration connectTimeout;
     protected final int connectMaxRetries;
     protected final int connectionPoolSize;
+    protected final String chunkKeyColumn;
 
     public JdbcSourceConfig(
             StartupOptions startupOptions,
@@ -63,7 +64,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             String serverTimeZone,
             Duration connectTimeout,
             int connectMaxRetries,
-            int connectionPoolSize) {
+            int connectionPoolSize,
+            String chunkKeyColumn) {
         super(
                 startupOptions,
                 splitSize,
@@ -85,6 +87,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         this.connectTimeout = connectTimeout;
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
+        this.chunkKeyColumn = chunkKeyColumn;
     }
 
     public abstract RelationalDatabaseConnectorConfig getDbzConnectorConfig();
@@ -135,5 +138,9 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
 
     public int getConnectionPoolSize() {
         return connectionPoolSize;
+    }
+
+    public String getChunkKeyColumn() {
+        return chunkKeyColumn;
     }
 }

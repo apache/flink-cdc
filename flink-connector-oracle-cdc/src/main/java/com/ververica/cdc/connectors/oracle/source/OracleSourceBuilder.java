@@ -188,6 +188,15 @@ public class OracleSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
+     */
+    public OracleSourceBuilder<T> chunkKeyColumn(String chunkKeyColumn) {
+        this.configFactory.chunkKeyColumn(chunkKeyColumn);
+        return this;
+    }
+
     /** The Debezium Oracle connector properties. For example, "snapshot.mode". */
     public OracleSourceBuilder<T> debeziumProperties(Properties properties) {
         this.configFactory.debeziumProperties(properties);
