@@ -77,7 +77,8 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 serverTimeZone,
                 connectTimeout,
                 connectMaxRetries,
-                connectionPoolSize);
+                connectionPoolSize,
+                null);
     }
 
     @Override

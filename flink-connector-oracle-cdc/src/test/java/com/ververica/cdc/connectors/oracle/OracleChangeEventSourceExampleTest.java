@@ -48,7 +48,7 @@ public class OracleChangeEventSourceExampleTest {
     private static final Logger LOG =
             LoggerFactory.getLogger(OracleChangeEventSourceExampleTest.class);
 
-    private static final int DEFAULT_PARALLELISM = 2;
+    private static final int DEFAULT_PARALLELISM = 4;
     private static final long DEFAULT_CHECKPOINT_INTERVAL = 1000;
     private static final OracleContainer oracleContainer =
             OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
@@ -102,7 +102,52 @@ public class OracleChangeEventSourceExampleTest {
                         .includeSchemaChanges(true) // output the schema changes as well
                         .startupOptions(StartupOptions.initial())
                         .debeziumProperties(debeziumProperties)
-                        .splitSize(3)
+                        .splitSize(2)
+                        .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        // enable checkpoint
+        env.enableCheckpointing(DEFAULT_CHECKPOINT_INTERVAL);
+        // set the source parallelism to 4
+        env.fromSource(
+                        oracleChangeEventSource,
+                        WatermarkStrategy.noWatermarks(),
+                        "OracleParallelSource")
+                .setParallelism(DEFAULT_PARALLELISM)
+                .print()
+                .setParallelism(1);
+
+        env.execute("Print Oracle Snapshot + RedoLog");
+    }
+
+    @Test
+    @Ignore("Test ignored because it won't stop and is used for manual test")
+    public void testConsumingAllEventsByUserChunkKeyColumn() throws Exception {
+        LOG.info(
+                "getOraclePort:{},getUsername:{},getPassword:{}",
+                oracleContainer.getOraclePort(),
+                oracleContainer.getUsername(),
+                oracleContainer.getPassword());
+
+        Properties debeziumProperties = new Properties();
+        debeziumProperties.setProperty("log.mining.strategy", "online_catalog");
+        debeziumProperties.setProperty("log.mining.continuous.mine", "true");
+
+        JdbcIncrementalSource<String> oracleChangeEventSource =
+                new OracleSourceBuilder()
+                        .hostname(oracleContainer.getHost())
+                        .port(oracleContainer.getOraclePort())
+                        .databaseList("XE")
+                        .schemaList("DEBEZIUM")
+                        .tableList("DEBEZIUM.PRODUCTS")
+                        .username(oracleContainer.getUsername())
+                        .password(oracleContainer.getPassword())
+                        .deserializer(new JsonDebeziumDeserializationSchema())
+                        .includeSchemaChanges(true) // output the schema changes as well
+                        .chunkKeyColumn("ID")
+                        .startupOptions(StartupOptions.initial())
+                        .debeziumProperties(debeziumProperties)
+                        .splitSize(2)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

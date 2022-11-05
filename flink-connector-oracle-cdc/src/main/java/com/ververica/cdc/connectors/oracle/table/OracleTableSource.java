@@ -72,6 +72,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final int fetchSize;
     private final int connectionPoolSize;
     private final int connectMaxRetries;
+    private final String chunkKeyColumn;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -99,7 +100,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             int splitSize,
             int fetchSize,
             int connectMaxRetries,
-            int connectionPoolSize) {
+            int connectionPoolSize,
+            @Nullable String chunkKeyColumn) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -118,6 +120,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.fetchSize = fetchSize;
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
+        this.chunkKeyColumn = chunkKeyColumn;
     }
 
     @Override
@@ -222,7 +225,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         splitSize,
                         fetchSize,
                         connectMaxRetries,
-                        connectionPoolSize);
+                        connectionPoolSize,
+                        chunkKeyColumn);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -254,7 +258,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(splitSize, that.splitSize)
                 && Objects.equals(fetchSize, that.fetchSize)
                 && Objects.equals(connectMaxRetries, that.connectMaxRetries)
-                && Objects.equals(connectionPoolSize, that.connectionPoolSize);
+                && Objects.equals(connectionPoolSize, that.connectionPoolSize)
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
     }
 
     @Override

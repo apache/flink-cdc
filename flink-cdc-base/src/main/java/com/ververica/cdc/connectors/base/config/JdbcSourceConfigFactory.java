@@ -54,6 +54,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected int connectMaxRetries = JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue();
     protected int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     protected Properties dbzProperties;
+    protected String chunkKeyColumn;
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -182,6 +183,15 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     /** The Debezium connector properties. For example, "snapshot.mode". */
     public JdbcSourceConfigFactory debeziumProperties(Properties properties) {
         this.dbzProperties = properties;
+        return this;
+    }
+
+    /**
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
+     */
+    public JdbcSourceConfigFactory chunkKeyColumn(String chunkKeyColumn) {
+        this.chunkKeyColumn = chunkKeyColumn;
         return this;
     }
 

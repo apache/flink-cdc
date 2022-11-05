@@ -35,6 +35,7 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNEC
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
@@ -99,7 +100,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 splitSize,
                 fetchSize,
                 connectMaxRetries,
-                connectionPoolSize);
+                connectionPoolSize,
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));
     }
 
     @Override
@@ -130,6 +132,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         return options;
     }
 

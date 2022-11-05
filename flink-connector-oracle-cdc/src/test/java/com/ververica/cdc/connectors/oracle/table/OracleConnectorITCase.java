@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.assertEqualsInAnyOrder;
 import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_PWD;
 import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_USER;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -75,7 +76,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
     public static Object[] parameters() {
-        return new Object[][] {new Object[] {false}, new Object[] {true}};
+        return new Object[][] {new Object[] {true}, new Object[] {false}};
     }
 
     @Before
@@ -118,6 +119,117 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        parallelismSnapshot,
+                        "debezium",
+                        "products");
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " weightSum DECIMAL(10,3),"
+                        + " PRIMARY KEY (name) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
+
+        waitForSnapshotStarted("sink");
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
+            statement.execute("DELETE FROM debezium.products WHERE ID=112");
+        }
+
+        waitForSinkSize("sink", 20);
+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | id  | name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 111 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
+
+        String[] expected =
+                new String[] {
+                    "+I[scooter, 3.140]",
+                    "+I[car battery, 8.100]",
+                    "+I[12-pack drill bits, 0.800]",
+                    "+I[hammer, 2.625]",
+                    "+I[rocks, 5.100]",
+                    "+I[jacket, 0.600]",
+                    "+I[spare tire, 22.200]"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        LOG.info("actual:{}", actual);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testConsumingAllEventsByChunkKeyColumn()
+            throws SQLException, ExecutionException, InterruptedException {
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " DESCRIPTION STRING,"
+                                + " WEIGHT DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.key-column' = 'ID',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -179,7 +291,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        LOG.info("actual:{}", actual);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
     }
@@ -206,6 +319,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -238,7 +352,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
 
-        waitForSnapshotStarted("sink");
+        waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -247,7 +361,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)");
             statement.execute(
                     "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
@@ -255,9 +369,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
-
-        // waiting for change events finished.
-        waitForSinkSize("sink", 16);
 
         List<String> expected =
                 Arrays.asList(
@@ -269,15 +380,11 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         "+I[XE, DEBEZIUM, PRODUCTS, 106, hammer, 16oz carpenters hammer, 1.000]",
                         "+I[XE, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.300]",
                         "+I[XE, DEBEZIUM, PRODUCTS, 108, jacket, water resistent black wind breaker, 0.100]",
-                        "+I[XE, DEBEZIUM, PRODUCTS, 109, spare tire, 24 inch spare tire, 22.200]",
-                        "+I[XE, DEBEZIUM, PRODUCTS, 111, jacket, water resistent white wind breaker, 0.200]",
-                        "+I[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.180]",
-                        "+U[XE, DEBEZIUM, PRODUCTS, 106, hammer, 18oz carpenter hammer, 1.000]",
-                        "+U[XE, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.100]",
-                        "+U[XE, DEBEZIUM, PRODUCTS, 111, jacket, new water resistent white wind breaker, 0.500]",
-                        "+U[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]",
-                        "-D[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
+                        "+I[XE, DEBEZIUM, PRODUCTS, 109, spare tire, 24 inch spare tire, 22.200]");
 
+        // TODO: we can't assert merged result for incremental-snapshot, because we can't add a
+        //  keyby shuffle before "values" upsert sink. We should assert merged result once
+        //  https://issues.apache.org/jira/browse/FLINK-24511 is fixed.
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         Collections.sort(expected);
         Collections.sort(actual);
@@ -485,6 +592,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -592,6 +700,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"

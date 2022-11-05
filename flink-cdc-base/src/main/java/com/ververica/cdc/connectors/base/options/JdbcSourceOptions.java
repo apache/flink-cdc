@@ -102,4 +102,13 @@ public class JdbcSourceOptions extends SourceOptions {
                     .defaultValue(3)
                     .withDescription(
                             "The max retry times that the connector should retry to build database server connection.");
+
+    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
+            ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
+                                    + "By default, the chunk key is the first column of the primary key and the chunk key is the RowId in oracle."
+                                    + "This column must be a column of the primary key.");
 }
