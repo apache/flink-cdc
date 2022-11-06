@@ -671,7 +671,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     formatResult(
                             pollRecordsFromReader(reader, RecordUtils::isDataChangeRecord),
                             dataType);
-            results.forEach(System.out::println);
             actual.addAll(results);
         }
         return actual;

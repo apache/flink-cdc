@@ -17,10 +17,7 @@
 package com.ververica.cdc.connectors.oracle.util;
 
 import org.apache.flink.table.api.ValidationException;
-import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.Preconditions;
 
-import com.ververica.cdc.connectors.oracle.source.utils.OracleTypeUtils;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import oracle.sql.ROWID;
@@ -32,23 +29,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.table.api.DataTypes.FIELD;
-import static org.apache.flink.table.api.DataTypes.ROW;
-
 /** Utilities to split chunks of table. */
 public class ChunkUtils {
 
     private ChunkUtils() {}
-
-    public static RowType getChunkKeyColumnType(Table table, @Nullable String chunkKeyColumn) {
-        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumn));
-    }
-
-    public static RowType getChunkKeyColumnType(Column chunkKeyColumn) {
-        return (RowType)
-                ROW(FIELD(chunkKeyColumn.name(), OracleTypeUtils.fromDbzColumn(chunkKeyColumn)))
-                        .getLogicalType();
-    }
 
     public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
@@ -69,15 +53,7 @@ public class ChunkUtils {
                             table.id()));
         }
 
-        // use the ROWID columns as the chunk key column by default in oracle
+        // Use the ROWID column as the chunk key column by default for oracle cdc connector
         return Column.editor().jdbcType(Types.VARCHAR).name(ROWID.class.getSimpleName()).create();
-    }
-
-    /** Returns next meta group id according to received meta number and meta group size. */
-    public static int getNextMetaGroupId(int receivedMetaNum, int metaGroupSize) {
-        Preconditions.checkState(metaGroupSize > 0);
-        return receivedMetaNum % metaGroupSize == 0
-                ? (receivedMetaNum / metaGroupSize)
-                : (receivedMetaNum / metaGroupSize) + 1;
     }
 }

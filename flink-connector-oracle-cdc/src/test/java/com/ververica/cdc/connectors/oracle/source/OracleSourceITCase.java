@@ -261,7 +261,6 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         while (size > 0 && iter.hasNext()) {
             Row row = iter.next();
             rows.add(row.toString());
-            LOG.info("fetch row:{}", row);
             size--;
         }
         return rows;
@@ -289,7 +288,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 statement.execute("DROP TABLE DEBEZIUM.CUSTOMERS");
                 statement.execute("DROP TABLE DEBEZIUM.CUSTOMERS_1");
             } catch (Exception e) {
-                LOG.info("DEBEZIUM.CUSTOMERS DEBEZIUM.CUSTOMERS_1 NOT EXITS");
+                LOG.error("DEBEZIUM.CUSTOMERS DEBEZIUM.CUSTOMERS_1 NOT EXITS", e);
             }
 
             final List<String> statements =
