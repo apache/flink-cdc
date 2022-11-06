@@ -36,6 +36,7 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABA
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
@@ -76,6 +77,9 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        String chunkKeyColumn =
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
+        String serverTimezone = config.get(SERVER_TIME_ZONE);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -101,7 +105,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 fetchSize,
                 connectMaxRetries,
                 connectionPoolSize,
-                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));
+                chunkKeyColumn);
     }
 
     @Override
