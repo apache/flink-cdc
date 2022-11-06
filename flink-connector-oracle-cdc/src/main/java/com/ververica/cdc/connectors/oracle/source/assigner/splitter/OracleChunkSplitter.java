@@ -51,7 +51,9 @@ import java.util.Objects;
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static java.math.BigDecimal.ROUND_CEILING;
 
-/** The {@code ChunkSplitter} used to split table into a set of chunks for JDBC data source. */
+/**
+ * The {@code ChunkSplitter} used to split Oracle table into a set of chunks for JDBC data source.
+ */
 public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleChunkSplitter.class);

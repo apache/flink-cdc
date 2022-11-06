@@ -204,7 +204,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        LOG.info("actual:{}", actual);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -370,7 +369,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
-
+        waitForSinkSize("sink", 16);
         List<String> expected =
                 Arrays.asList(
                         "+I[XE, DEBEZIUM, PRODUCTS, 101, scooter, Small 2-wheel scooter, 3.140]",
@@ -381,11 +380,15 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         "+I[XE, DEBEZIUM, PRODUCTS, 106, hammer, 16oz carpenters hammer, 1.000]",
                         "+I[XE, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.300]",
                         "+I[XE, DEBEZIUM, PRODUCTS, 108, jacket, water resistent black wind breaker, 0.100]",
-                        "+I[XE, DEBEZIUM, PRODUCTS, 109, spare tire, 24 inch spare tire, 22.200]");
+                        "+I[XE, DEBEZIUM, PRODUCTS, 109, spare tire, 24 inch spare tire, 22.200]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 111, jacket, water resistent white wind breaker, 0.200]",
+                        "+I[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.180]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 106, hammer, 18oz carpenter hammer, 1.000]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.100]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 111, jacket, new water resistent white wind breaker, 0.500]",
+                        "+U[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]",
+                        "-D[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
 
-        // TODO: we can't assert merged result for incremental-snapshot, because we can't add a
-        //  keyby shuffle before "values" upsert sink. We should assert merged result once
-        //  https://issues.apache.org/jira/browse/FLINK-24511 is fixed.
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         Collections.sort(expected);
         Collections.sort(actual);

@@ -40,7 +40,6 @@ import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
 import javax.annotation.Nullable;
 
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

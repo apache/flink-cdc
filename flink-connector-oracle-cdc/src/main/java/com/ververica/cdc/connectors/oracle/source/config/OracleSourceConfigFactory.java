@@ -33,6 +33,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** A factory to initialize {@link OracleSourceConfig}. */
 public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
 
+    private static final long serialVersionUID = 1L;
     private static final String DATABASE_SERVER_NAME = "oracle_logminer";
     private static final String DRIVER_ClASS_NAME = "oracle.jdbc.OracleDriver";
 
