@@ -39,6 +39,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -646,6 +647,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
     public void testAllDataTypes() throws Throwable {
         OracleTestUtils.createAndInitialize(
                 OracleTestUtils.ORACLE_CONTAINER, "column_type_test.sql");
+
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of("Asia/Shanghai"));
         String sourceDDL =
                 String.format(
                         "CREATE TABLE full_types ("

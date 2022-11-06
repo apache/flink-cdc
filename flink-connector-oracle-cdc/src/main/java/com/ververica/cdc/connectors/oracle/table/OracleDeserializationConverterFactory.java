@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oracle.table;
 
+import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import com.ververica.cdc.debezium.table.DeserializationRuntimeConverter;
@@ -26,6 +27,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Optional;
 
@@ -40,14 +42,14 @@ public class OracleDeserializationConverterFactory {
             @Override
             public Optional<DeserializationRuntimeConverter> createUserDefinedConverter(
                     LogicalType logicalType, ZoneId serverTimeZone) {
-                return wrapNumericConverter(createNumericConverter(logicalType));
+                return wrapNumericConverter(createNumericConverter(logicalType, serverTimeZone));
             }
         };
     }
 
     /** Creates a runtime converter which assuming input object is not null. */
     private static Optional<DeserializationRuntimeConverter> createNumericConverter(
-            LogicalType type) {
+            LogicalType type, ZoneId serverTimeZone) {
         switch (type.getTypeRoot()) {
             case BOOLEAN:
                 return createBooleanConverter();
@@ -63,10 +65,37 @@ public class OracleDeserializationConverterFactory {
                 return createFloatConverter();
             case DOUBLE:
                 return createDoubleConverter();
+                // Debezium use io.debezium.time.ZonedTimestamp to map Oracle TIMESTAMP WITH LOCAL
+                // TIME ZONE type, the value is a string representation of a timestamp in UTC.
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return convertToLocalTimeZoneTimestamp();
             default:
                 // fallback to default converter
                 return Optional.empty();
         }
+    }
+
+    private static Optional<DeserializationRuntimeConverter> convertToLocalTimeZoneTimestamp() {
+        return Optional.of(
+                new DeserializationRuntimeConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) {
+                        if (dbzObj instanceof String) {
+                            String str = (String) dbzObj;
+                            // TIMESTAMP_LTZ type is encoded in string type
+                            Instant instant = Instant.parse(str);
+                            return TimestampData.fromInstant(instant);
+                        }
+                        throw new IllegalArgumentException(
+                                "Unable to convert to TimestampData from unexpected value '"
+                                        + dbzObj
+                                        + "' of type "
+                                        + dbzObj.getClass().getName());
+                    }
+                });
     }
 
     private static Optional<DeserializationRuntimeConverter> wrapNumericConverter(
