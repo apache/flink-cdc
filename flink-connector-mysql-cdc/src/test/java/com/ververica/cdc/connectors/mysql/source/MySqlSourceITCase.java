@@ -710,6 +710,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             makeFirstPartBinlogEvents(
                     getConnection(), customDatabase.getDatabaseName() + '.' + tableId);
         }
+
+        // wait for the binlog reading
+        Thread.sleep(2000L);
+
         if (failoverPhase == FailoverPhase.BINLOG) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
