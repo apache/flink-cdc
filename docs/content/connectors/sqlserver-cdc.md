@@ -315,7 +315,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">SQLServer type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
+        <th class="text-left"><a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql">SQLServer type</a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>

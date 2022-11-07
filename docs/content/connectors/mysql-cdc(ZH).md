@@ -695,7 +695,7 @@ $ ./bin/flink run \
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left" style="width:30%;"><a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html">MySQL type</a></th>
         <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
