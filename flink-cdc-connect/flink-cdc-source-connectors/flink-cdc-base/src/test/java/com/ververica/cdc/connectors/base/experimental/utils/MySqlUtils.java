@@ -347,7 +347,7 @@ public class MySqlUtils {
             RowType pkRowType, StringBuilder sql, String predicate) {
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next()).append(predicate);
+            sql.append(quote(fieldNamesIt.next())).append(predicate);
             if (fieldNamesIt.hasNext()) {
                 sql.append(" AND ");
             }
@@ -358,7 +358,7 @@ public class MySqlUtils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next());
+            sql.append(quote(fieldNamesIt.next()));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
@@ -370,7 +370,7 @@ public class MySqlUtils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append("MAX(" + fieldNamesIt.next() + ")");
+            sql.append("MAX(" + quote(fieldNamesIt.next()) + ")");
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
