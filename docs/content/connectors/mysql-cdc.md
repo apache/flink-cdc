@@ -21,7 +21,7 @@ In order to setup the MySQL CDC connector, the following table provides dependen
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.3-SNAPSHOT</version>
+  <version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
