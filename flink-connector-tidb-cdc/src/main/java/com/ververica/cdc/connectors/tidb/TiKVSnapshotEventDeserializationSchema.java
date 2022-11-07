@@ -20,7 +20,6 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.util.Collector;
 
-import org.apache.kafka.connect.source.SourceRecord;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 import java.io.Serializable;
@@ -35,6 +34,6 @@ import java.io.Serializable;
 public interface TiKVSnapshotEventDeserializationSchema<T>
         extends Serializable, ResultTypeQueryable<T> {
 
-    /** Deserialize the Debezium record, it is represented in Kafka {@link SourceRecord}. */
+    /** Deserialize the TiDB record. */
     void deserialize(KvPair record, Collector<T> out) throws Exception;
 }

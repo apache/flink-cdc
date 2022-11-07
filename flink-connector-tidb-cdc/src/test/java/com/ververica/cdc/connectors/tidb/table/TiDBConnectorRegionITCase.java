@@ -80,22 +80,19 @@ public class TiDBConnectorRegionITCase extends TiDBTestBase {
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false'"
-                        //                            + " 'sink-expected-messages-num' = '121010'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
 
-        // Don't wait for snapshot finished is for the scene in issue
-        // https://github.com/ververica/flink-cdc-connectors/issues/1206 .
-        //        waitForSinkSize("sink", 1);
+        waitForSinkSize("sink", 1);
 
         int count = 0;
 
         try (Connection connection = getJdbcConnection("region_switch_test");
                 Statement statement = connection.createStatement()) {
-            for (int i = 0; i < 20; i++) {
+            for (int i = 0; i < 15; i++) {
                 statement.execute(
                         "INSERT INTO t1 SELECT NULL, FLOOR(RAND()*1000), RANDOM_BYTES(1024), RANDOM_BYTES"
                                 + "(1024), RANDOM_BYTES(1024) FROM t1 a JOIN t1 b JOIN t1 c LIMIT 10000;");
