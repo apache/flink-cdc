@@ -290,7 +290,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">TiDB type<a href="https://dev.tidb.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left"><a href="https://dev.tidb.com/doc/man/8.0/en/data-types.html">TiDB type</a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
         <th class="text-left">NOTE</th>
       </tr>

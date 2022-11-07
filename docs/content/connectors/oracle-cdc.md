@@ -455,7 +455,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">Oracle type<a href="https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Data-Types.html"></a></th>
+        <th class="text-left"><a href="https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Data-Types.html">Oracle type</a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>

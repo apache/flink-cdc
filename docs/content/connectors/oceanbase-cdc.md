@@ -425,7 +425,7 @@ Data Type Mapping
     <table class="colwidths-auto docutils">
         <thead>
             <tr>
-                <th class="text-left">OceanBase type</th>
+                <th class="text-left"><a href="https://www.oceanbase.com/docs/community-observer-cn-10000000000013274">OceanBase type</a></th>
                 <th class="text-left">Flink SQL type</th>
                 <th class="text-left">NOTE</th>
             </tr>
