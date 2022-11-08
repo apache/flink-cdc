@@ -294,7 +294,7 @@ public class Db2SourceTest extends Db2TestBase {
             assertDelete(records.get(0), "ID", 1001);
 
             // ---------------------------------------------------------------------------
-            // Step-6: trigger checkpoint-2 to make sure we can continue to to further checkpoints
+            // Step-6: trigger checkpoint-2 to make sure we can continue to further checkpoints
             // ---------------------------------------------------------------------------
             synchronized (sourceContext3.getCheckpointLock()) {
                 // checkpoint 3
