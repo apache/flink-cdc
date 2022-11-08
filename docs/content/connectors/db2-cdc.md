@@ -232,7 +232,7 @@ public class Db2SourceExample {
             .print()
             .setParallelism(1); // use parallelism 1 for sink to keep message ordering
 
-    env.execute();
+    env.execute("Print Db2 Snapshot + Change Stream");
   }
 }
 ```
