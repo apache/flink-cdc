@@ -589,8 +589,10 @@ CREATE TABLE mysql_source (...) WITH (
 )
 ```
 
-**注意**：MySQL source 会在 checkpoint 时将当前位点以 INFO 级别打印到日志中，日志前缀为 "Binlog offset on checkpoint {checkpoint-id}"。
+**注意**：
+1. MySQL source 会在 checkpoint 时将当前位点以 INFO 级别打印到日志中，日志前缀为 "Binlog offset on checkpoint {checkpoint-id}"。
 该日志可以帮助将作业从某个 checkpoint 的位点开始启动的场景。
+2. 如果捕获变更的表曾经发生过表结构变化，从最早位点、特定位点或时间戳启动可能会发生错误，因为 Debezium 读取器会在内部保存当前的最新表结构，结构不匹配的早期数据无法被正确解析。
 
 
 ### DataStream Source
