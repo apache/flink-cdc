@@ -302,7 +302,39 @@ Connector Options
       <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
            and "latest-offset". 
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
-    </tr>  
+    </tr> 
+    <tr>
+      <td>chunk-meta.group.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000</td>
+      <td>Integer</td>
+      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
+    </tr>
+    <tr>
+          <td>connect.timeout</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">30s</td>
+          <td>Duration</td>
+          <td>The maximum time that the connector should wait after trying to connect to the Oracle database server before timing out.</td>
+    </tr> 
+    <tr>
+          <td>chunk-key.even-distribution.factor.lower-bound</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">0.05d</td>
+          <td>Double</td>
+          <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr> 
+    <tr>
+          <td>chunk-key.even-distribution.factor.upper-bound</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">1000.0d</td>
+          <td>Double</td>
+          <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr>
     <tr>
       <td>debezium.*</td>
       <td>optional</td>
