@@ -53,7 +53,7 @@ Setup OceanBase and LogProxy Server
     mysql> show parameters like 'obconfig_url';
     ```
 
-6. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
+5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
 
 How to create a OceanBase CDC table
 ----------------
@@ -92,6 +92,8 @@ Flink SQL> CREATE TABLE orders (
 -- read snapshot and binlogs from orders table
 Flink SQL> SELECT * FROM orders;
 ```
+
+You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial](https://ververica.github.io/flink-cdc-connectors/release-2.3//content/quickstart/oceanbase-tutorial.html) for more information.
 
 Connector Options
 ----------------
