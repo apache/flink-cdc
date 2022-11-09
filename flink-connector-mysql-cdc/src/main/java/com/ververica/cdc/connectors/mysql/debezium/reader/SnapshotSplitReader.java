@@ -212,7 +212,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                 statefulTaskContext.getTaskContext(),
                 (MySqlStreamingChangeEventSourceMetrics)
                         statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                backfillBinlogSplit);
+                backfillBinlogSplit,
+                event -> true);
     }
 
     private void dispatchBinlogEndEvent(MySqlBinlogSplit backFillBinlogSplit)
