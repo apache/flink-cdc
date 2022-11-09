@@ -169,6 +169,7 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      GRANT SELECT ANY TRANSACTION TO flinkuser CONTAINER=ALL;
      GRANT LOGMINING TO flinkuser CONTAINER=ALL;
      GRANT CREATE TABLE TO flinkuser CONTAINER=ALL;
+     -- need not to execute if set scan.incremental.snapshot.enabled=true(default)
      GRANT LOCK ANY TABLE TO flinkuser CONTAINER=ALL;
      GRANT CREATE SEQUENCE TO flinkuser CONTAINER=ALL;
 
@@ -304,6 +305,39 @@ Connector Options
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr> 
     <tr>
+          <td>scan.incremental.snapshot.enabled</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">true</td>
+          <td>Boolean</td>
+          <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
+              the incremental snapshot has many advantages, including:
+                (1) source can be parallel during snapshot reading, 
+                (2) source can perform checkpoints in the chunk granularity during snapshot reading, 
+                (3) source doesn't need to acquire ROW SHARE MODE lock before snapshot reading.
+          </td>
+    </tr>
+    <tr>
+          <td>scan.incremental.snapshot.chunk.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">8096</td>
+          <td>Integer</td>
+          <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
+    </tr>
+    <tr>
+          <td>scan.snapshot.fetch.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">1024</td>
+          <td>Integer</td>
+          <td>The maximum fetch size for per poll when read table snapshot.</td>
+    </tr>
+    <tr>
+          <td>connect.max-retries</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">3</td>
+          <td>Integer</td>
+          <td>The max retry times that the connector should retry to build MySQL database server connection.</td>
+    </tr>
+    <tr>
       <td>chunk-meta.group.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
@@ -334,6 +368,13 @@ Connector Options
           <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
               The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
               The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr>
+    <tr>
+          <td>connection.pool.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">20</td>
+          <td>Integer</td>
+          <td>The connection pool size.</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -418,7 +459,9 @@ CREATE TABLE products (
     'password' = 'flinkpw',
     'database-name' = 'XE',
     'schema-name' = 'inventory',
-    'table-name' = 'products'
+    'table-name' = 'products',
+    'debezium.log.mining.strategy' = 'online_catalog',
+    'debezium.log.mining.continuous.mine' = 'true'
 );
 ```
 
@@ -569,7 +612,8 @@ Data Type Mapping
         VARCHAR2(n)<br>
         CLOB<br>
         NCLOB<br>
-        XMLType
+        XMLType<br>
+        SYS.XMLTYPE
       </td>
       <td>STRING</td>
     </tr>
