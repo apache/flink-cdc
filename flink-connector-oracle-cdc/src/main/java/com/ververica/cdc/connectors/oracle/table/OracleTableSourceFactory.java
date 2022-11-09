@@ -27,11 +27,13 @@ import org.apache.flink.table.factories.FactoryUtil;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
@@ -39,10 +41,14 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_I
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_MODE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
+import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.PORT;
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.SCHEMA_NAME;
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.URL;
@@ -74,9 +80,13 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         String chunkKeyColumn =
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
         String serverTimezone = config.get(SERVER_TIME_ZONE);
@@ -84,8 +94,11 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
+            validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
             validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
             validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
+            validateDistributionFactorUpper(distributionFactorUpper);
+            validateDistributionFactorLower(distributionFactorLower);
         }
 
         return new OracleTableSource(
@@ -102,9 +115,13 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 startupOptions,
                 enableParallelRead,
                 splitSize,
+                splitMetaGroupSize,
                 fetchSize,
+                connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
                 chunkKeyColumn);
     }
 
@@ -133,9 +150,13 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(CHUNK_META_GROUP_SIZE);
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
+        options.add(CONNECT_TIMEOUT);
         options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         return options;
     }
@@ -172,5 +193,29 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 String.format(
                         "The value of option '%s' must larger than %d, but is %d",
                         option.key(), exclusiveMin, optionValue));
+    }
+
+    /** Checks the value of given evenly distribution factor upper bound is valid. */
+    private void validateDistributionFactorUpper(double distributionFactorUpper) {
+        checkState(
+                doubleCompare(distributionFactorUpper, 1.0d) >= 0,
+                String.format(
+                        "The value of option '%s' must larger than or equals %s, but is %s",
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                        1.0d,
+                        distributionFactorUpper));
+    }
+
+    /** Checks the value of given evenly distribution factor lower bound is valid. */
+    private void validateDistributionFactorLower(double distributionFactorLower) {
+        checkState(
+                doubleCompare(distributionFactorLower, 0.0d) >= 0
+                        && doubleCompare(distributionFactorLower, 1.0d) <= 0,
+                String.format(
+                        "The value of option '%s' must between %s and %s inclusively, but is %s",
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                        0.0d,
+                        1.0d,
+                        distributionFactorLower));
     }
 }
