@@ -597,8 +597,11 @@ CREATE TABLE mysql_source (...) WITH (
 )
 ```
 
-**Note:** MySQL source will print the current binlog position into logs with INFO level on checkpoint, with the prefix
+**Notes:**
+1. MySQL source will print the current binlog position into logs with INFO level on checkpoint, with the prefix
 "Binlog offset on checkpoint {checkpoint-id}". It could be useful if you want to restart the job from a specific checkpointed position.
+2. If schema of capturing tables was changed previously, starting with earliest offset, specific offset or timestamp
+could fail as the Debezium reader keeps the current latest table schema internally and earlier records with unmatched schema cannot be correctly parsed.
 
 ### DataStream Source
 
