@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.mysql.source.offset;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
-import com.ververica.cdc.connectors.mysql.debezium.task.context.ChangeEventCreatorFactory;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import io.debezium.connector.mysql.MySqlConnection;
 
@@ -39,8 +38,7 @@ public class BinlogOffsetUtils {
      * <ul>
      *   <li>EARLIEST: binlog filename = "", position = 0
      *   <li>TIMESTAMP: set to earliest, as the current implementation is reading from the earliest
-     *       offset and drop events earlier than the specified timestamp. See {@link
-     *       ChangeEventCreatorFactory#createChangeEventCreator}.
+     *       offset and drop events earlier than the specified timestamp.
      *   <li>LATEST: fetch the current binlog by JDBC
      * </ul>
      */

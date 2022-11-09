@@ -22,9 +22,12 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventType;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -54,6 +57,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
@@ -111,7 +115,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         statefulTaskContext.getTaskContext(),
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                        currentBinlogSplit);
+                        currentBinlogSplit,
+                        createEventFilter(currentBinlogSplit.getStartingOffset()));
 
         executorService.submit(
                 () -> {
@@ -297,6 +302,21 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
         this.pureBinlogPhaseTables.clear();
+    }
+
+    private Predicate<Event> createEventFilter(BinlogOffset startingOffset) {
+        // If the startup mode is set as TIMESTAMP, we need to apply a filter on event to drop
+        // events earlier than the specified timestamp.
+        if (BinlogOffsetKind.TIMESTAMP.equals(startingOffset.getOffsetKind())) {
+            long startTimestampSec = startingOffset.getTimestampSec();
+            // Notes:
+            // 1. Heartbeat event doesn't contain timestamp, so we just keep it
+            // 2. Timestamp of event is in epoch millisecond
+            return event ->
+                    EventType.HEARTBEAT.equals(event.getHeader().getEventType())
+                            || event.getHeader().getTimestamp() >= startTimestampSec * 1000;
+        }
+        return event -> true;
     }
 
     public void stopBinlogReadTask() {
