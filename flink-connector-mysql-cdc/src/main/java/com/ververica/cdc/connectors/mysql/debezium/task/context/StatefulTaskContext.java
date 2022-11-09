@@ -165,7 +165,8 @@ public class StatefulTaskContext {
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
         this.errorHandler =
-                new MySqlErrorHandler(connectorConfig.getLogicalName(), queue, taskContext);
+                new MySqlErrorHandler(
+                        connectorConfig.getLogicalName(), queue, taskContext, sourceConfig);
     }
 
     private void validateAndLoadDatabaseHistory(
