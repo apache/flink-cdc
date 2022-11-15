@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -121,6 +121,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null);
@@ -165,6 +166,7 @@ public class MySqlTableSourceFactoryTest {
                         0.01d,
                         StartupOptions.initial(),
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         "testCol");
@@ -205,6 +207,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null);
@@ -243,6 +246,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null);
@@ -260,6 +264,7 @@ public class MySqlTableSourceFactoryTest {
         options.put("jdbc.properties.useSSL", "false");
         options.put("heartbeat.interval", "15213ms");
         options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+        options.put("scan.incremental.close-idle-reader.enabled", "true");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -288,6 +293,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        true,
                         true,
                         jdbcProperties,
                         Duration.ofMillis(15213),
@@ -333,6 +339,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.specificOffset(offsetFile, offsetPos),
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null);
@@ -368,6 +375,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
@@ -405,6 +413,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.earliest(),
+                        false,
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
@@ -444,6 +453,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.timestamp(0L),
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null);
@@ -479,6 +489,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
+                        false,
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
@@ -520,6 +531,7 @@ public class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),

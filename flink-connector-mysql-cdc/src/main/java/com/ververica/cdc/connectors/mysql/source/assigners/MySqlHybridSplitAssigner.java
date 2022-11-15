@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isInitialAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningFinished;
-import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
 
 /**
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
@@ -95,11 +95,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public Optional<MySqlSplit> getNext() {
-        if (isSuspended(getAssignerStatus())) {
-            // do not assign split until the assigner received SuspendBinlogReaderAckEvent
+        if (isNewlyAddedAssigningSnapshotFinished(getAssignerStatus())) {
+            // do not assign split until the adding table process finished
             return Optional.empty();
         }
-        if (snapshotSplitAssigner.noMoreSplits()) {
+        if (snapshotSplitAssigner.noMoreSnapshotSplits()) {
             // binlog split assigning
             if (isBinlogSplitAssigned) {
                 // no more splits for the assigner
@@ -127,6 +127,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     @Override
     public boolean waitingForFinishedSplits() {
         return snapshotSplitAssigner.waitingForFinishedSplits();
+    }
+
+    @Override
+    public boolean isStreamSplitAssigned() {
+        return isBinlogSplitAssigned;
     }
 
     @Override
@@ -170,13 +175,13 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public void suspend() {
-        snapshotSplitAssigner.suspend();
+    public void startAssignNewlyAddedTables() {
+        snapshotSplitAssigner.startAssignNewlyAddedTables();
     }
 
     @Override
-    public void wakeup() {
-        snapshotSplitAssigner.wakeup();
+    public void onBinlogSplitUpdated() {
+        snapshotSplitAssigner.onBinlogSplitUpdated();
     }
 
     @Override

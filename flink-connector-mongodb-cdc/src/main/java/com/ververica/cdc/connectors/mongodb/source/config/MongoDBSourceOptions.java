@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,18 @@ import org.apache.flink.annotation.Experimental;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
+
 /** Configurations for {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}. */
 public class MongoDBSourceOptions {
+
+    public static final ConfigOption<String> SCHEME =
+            ConfigOptions.key("scheme")
+                    .stringType()
+                    .defaultValue(MONGODB_SCHEME)
+                    .withDescription(
+                            "The protocol connected to MongoDB. eg. mongodb or mongodb+srv. "
+                                    + "The +srv indicates to the client that the hostname that follows corresponds to a DNS SRV record. Defaults to mongodb.");
 
     public static final ConfigOption<String> HOSTS =
             ConfigOptions.key("hosts")
@@ -67,15 +77,6 @@ public class MongoDBSourceOptions {
                     .withDescription(
                             "The ampersand-separated MongoDB connection options. "
                                     + "eg. replicaSet=test&connectTimeoutMS=300000");
-
-    public static final ConfigOption<Boolean> COPY_EXISTING =
-            ConfigOptions.key("copy.existing")
-                    .booleanType()
-                    .defaultValue(Boolean.TRUE)
-                    .withDescription(
-                            "Copy existing data from source collections and convert them "
-                                    + "to Change Stream events on their respective topics. Any changes to the data "
-                                    + "that occur during the copy process are applied once the copy is completed.");
 
     public static final ConfigOption<Integer> COPY_EXISTING_QUEUE_SIZE =
             ConfigOptions.key("copy.existing.queue.size")

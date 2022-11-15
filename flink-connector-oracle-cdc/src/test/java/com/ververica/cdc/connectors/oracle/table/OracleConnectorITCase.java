@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,12 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
+import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.RateLimiter;
+
 import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,7 +47,15 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.assertEqualsInAnyOrder;
@@ -56,6 +68,8 @@ import static org.junit.Assert.assertThat;
 /** Integration tests for Oracle binlog SQL source. */
 @RunWith(Parameterized.class)
 public class OracleConnectorITCase extends AbstractTestBase {
+    private static final int RECORDS_COUNT = 10_000;
+    private static final int WORKERS_COUNT = 4;
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleConnectorITCase.class);
 
@@ -120,6 +134,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
@@ -150,11 +165,11 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 tEnv.executeSql(
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
-        waitForSnapshotStarted("sink");
+        // There are 9 records in the table, wait until the snapshot phase finished
+        waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-
             statement.execute(
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
@@ -212,6 +227,9 @@ public class OracleConnectorITCase extends AbstractTestBase {
     @Test
     public void testConsumingAllEventsByChunkKeyColumn()
             throws SQLException, ExecutionException, InterruptedException {
+        if (!parallelismSnapshot) {
+            return;
+        }
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -229,6 +247,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.chunk.key-column' = 'ID',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
@@ -259,7 +278,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 tEnv.executeSql(
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
-        waitForSnapshotStarted("sink");
+        waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -319,6 +338,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                // + " 'debezium.database.history.store.only.captured.tables.ddl' =
+                                // 'true',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
@@ -398,7 +419,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     @Test
     public void testStartupFromLatestOffset() throws Exception {
-        // database.createAndInitialize();
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -415,6 +435,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s' ,"
@@ -439,7 +460,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
         // wait for the source startup, we don't have a better way to wait it, use sleep for now
-        Thread.sleep(5000L);
+        Thread.sleep(10000L);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -514,6 +535,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -596,6 +618,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
@@ -706,6 +729,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
@@ -761,6 +785,134 @@ public class OracleConnectorITCase extends AbstractTestBase {
         Collections.sort(actual);
         assertEquals(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testSnapshotToStreamingSwitchPendingTransactions() throws Exception {
+        Assume.assumeFalse(parallelismSnapshot);
+
+        CompletableFuture<Void> finishFuture = createRecordInserters();
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE messages ("
+                                + " ID INT NOT NULL,"
+                                + " CATEGORY_NAME STRING"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = 'category',"
+                                + " 'scan.incremental.snapshot.enabled' = 'false',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        "XE",
+                        "debezium");
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " ID INT,"
+                        + " message STRING"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM messages");
+
+        finishFuture.get(10, TimeUnit.MINUTES);
+        LOG.info("all async runners were finished");
+
+        waitForSinkSize("sink", RECORDS_COUNT);
+
+        List<Integer> actual =
+                TestValuesTableFactory.getResults("sink").stream()
+                        .map(s -> s.replaceFirst("\\+I\\[(\\d+).+", "$1"))
+                        .map(Integer::parseInt)
+                        .sorted()
+                        .collect(Collectors.toList());
+
+        List<Integer> expected =
+                IntStream.range(0, RECORDS_COUNT).boxed().collect(Collectors.toList());
+
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletableFuture<Void> createRecordInserters() {
+        int requestPerSecondPerThread = 100;
+        int recordsChunkSize = RECORDS_COUNT / WORKERS_COUNT;
+        int recordsToCommit = recordsChunkSize / 4;
+
+        List<Runnable> runners =
+                IntStream.range(0, WORKERS_COUNT)
+                        .mapToObj(
+                                i ->
+                                        createRecordInserter(
+                                                requestPerSecondPerThread,
+                                                recordsChunkSize * i,
+                                                recordsChunkSize,
+                                                recordsToCommit))
+                        .collect(Collectors.toList());
+
+        ExecutorService executor = Executors.newFixedThreadPool(WORKERS_COUNT);
+        CompletableFuture<Void>[] completableFutures =
+                runners.stream()
+                        .map(runnable -> CompletableFuture.runAsync(runnable, executor))
+                        .toArray(CompletableFuture[]::new);
+
+        return CompletableFuture.allOf(completableFutures);
+    }
+
+    private Runnable createRecordInserter(
+            int requestPerSecond, int startIndex, int recordsCnt, int recordsToCommit) {
+        return () -> {
+            Supplier<String> messageSupplier =
+                    createRandomSupplier(
+                            Lists.newArrayList("msg1", "msg2", "msg3", "msg4", "msg5", "msg6"));
+
+            RateLimiter rateLimiter = RateLimiter.create(requestPerSecond);
+
+            try (Connection connection = getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+
+                connection.setAutoCommit(false);
+                for (long i = startIndex; i < startIndex + recordsCnt; i++) {
+                    rateLimiter.acquire();
+                    statement.execute(
+                            String.format(
+                                    "INSERT INTO %s.%s VALUES (%d,'%s')",
+                                    "debezium", "category", i, messageSupplier.get()));
+                    if (i % recordsToCommit == 0) {
+                        LOG.info("Committing at id {}", i);
+                        connection.commit();
+                    }
+                }
+
+                connection.commit();
+            } catch (SQLException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+        };
+    }
+
+    private <T> Supplier<T> createRandomSupplier(List<T> possibleValues) {
+        int size = possibleValues.size();
+        return () -> possibleValues.get(ThreadLocalRandom.current().nextInt(size));
     }
 
     // ------------------------------------------------------------------------------------

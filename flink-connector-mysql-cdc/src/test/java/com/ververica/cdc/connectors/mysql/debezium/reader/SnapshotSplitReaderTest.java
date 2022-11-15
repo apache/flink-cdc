@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.EventDispatcher;
@@ -64,20 +65,26 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
+    private static final UniqueDatabase customer3_0Database =
+            new UniqueDatabase(MYSQL_CONTAINER, "customer3.0", "mysqluser", "mysqlpw");
+
     private static BinaryLogClient binaryLogClient;
     private static MySqlConnection mySqlConnection;
 
     @BeforeClass
     public static void init() {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"}, 10);
+        customer3_0Database.createAndInitialize();
+        MySqlSourceConfig sourceConfig =
+                getConfig(customerDatabase, new String[] {"customers"}, 10);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
     }
 
     @Test
     public void testReadSingleSnapshotSplit() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"}, 4);
+        MySqlSourceConfig sourceConfig =
+                getConfig(customerDatabase, new String[] {"customers_even_dist"}, 4);
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
         final DataType dataType =
@@ -101,8 +108,47 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testReadSingleSnapshotSplitWithDotName() throws Exception {
+        MySqlSourceConfig sourceConfig =
+                getConfig(customer3_0Database, new String[] {"customers3.0"}, 4);
+        BinaryLogClient binaryLogClient =
+                DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        MySqlConnection mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        List<MySqlSplit> mySqlSplits =
+                getMySqlSplits(
+                        sourceConfig,
+                        Arrays.asList(
+                                        String.format(
+                                                "`%s`.`customers3.0`",
+                                                customer3_0Database.getDatabaseName()))
+                                .stream()
+                                .map(TableId::parse)
+                                .collect(Collectors.toList()));
+
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[104, user_4, Shanghai, 123567891234]"
+                };
+        List<String> actual =
+                readTableSnapshotSplits(mySqlSplits, statefulTaskContext, 1, dataType);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
     public void testReadAllSnapshotSplitsForOneTable() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"}, 4);
+        MySqlSourceConfig sourceConfig =
+                getConfig(customerDatabase, new String[] {"customers_even_dist"}, 4);
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
 
@@ -135,7 +181,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testReadAllSplitForTableWithSingleLine() throws Exception {
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"}, 10);
+        MySqlSourceConfig sourceConfig =
+                getConfig(customerDatabase, new String[] {"customer_card_single_line"}, 10);
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
 
@@ -156,7 +203,10 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testReadAllSnapshotSplitsForTables() throws Exception {
         MySqlSourceConfig sourceConfig =
-                getConfig(new String[] {"customer_card", "customer_card_single_line"}, 10);
+                getConfig(
+                        customerDatabase,
+                        new String[] {"customer_card", "customer_card_single_line"},
+                        10);
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
 
@@ -200,7 +250,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testThrowRuntimeExceptionInSnapshotScan() throws Exception {
         MySqlSourceConfig sourceConfig =
-                getConfig(new String[] {"customer_card", "customers_1"}, 10);
+                getConfig(customerDatabase, new String[] {"customer_card", "customers_1"}, 10);
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
 
@@ -230,7 +280,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testChangingDataInSnapshotScan() throws Exception {
         String tableName = "customers_even_dist";
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {tableName}, 10);
+        MySqlSourceConfig sourceConfig = getConfig(customerDatabase, new String[] {tableName}, 10);
 
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
         String[] changingDataSql =
@@ -279,7 +329,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testInsertDataInSnapshotScan() throws Exception {
         String tableName = "customers_even_dist";
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {tableName}, 10);
+        MySqlSourceConfig sourceConfig = getConfig(customerDatabase, new String[] {tableName}, 10);
 
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
         String[] insertDataSql =
@@ -335,7 +385,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testDeleteDataInSnapshotScan() throws Exception {
         String tableName = "customers_even_dist";
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {tableName}, 10);
+        MySqlSourceConfig sourceConfig = getConfig(customerDatabase, new String[] {tableName}, 10);
 
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
         String[] deleteDataSql =
@@ -431,6 +481,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 sourceConfig.getTableList().stream()
                         .map(TableId::parse)
                         .collect(Collectors.toList());
+        return getMySqlSplits(sourceConfig, remainingTables);
+    }
+
+    private List<MySqlSplit> getMySqlSplits(
+            MySqlSourceConfig sourceConfig, List<TableId> remainingTables) {
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
                         sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
@@ -448,28 +503,28 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         return mySqlSplitList;
     }
 
-    public static MySqlSourceConfig getConfig(String[] captureTables, int splitSize) {
+    public static MySqlSourceConfig getConfig(
+            UniqueDatabase database, String[] captureTables, int splitSize) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
-                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .map(tableName -> database.getDatabaseName() + "." + tableName)
                         .toArray(String[]::new);
 
         return new MySqlSourceConfigFactory()
-                .databaseList(customerDatabase.getDatabaseName())
+                .databaseList(database.getDatabaseName())
                 .tableList(captureTableIds)
                 .serverId("1001-1002")
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
-                .username(customerDatabase.getUsername())
+                .username(database.getUsername())
                 .splitSize(splitSize)
                 .fetchSize(2)
-                .password(customerDatabase.getPassword())
+                .password(database.getPassword())
                 .createConfig(0);
     }
 
     private boolean executeSql(MySqlSourceConfig sourceConfig, String[] sqlStatements) {
-        JdbcConnection connection = DebeziumUtils.openJdbcConnection(sourceConfig);
-        try {
+        try (JdbcConnection connection = DebeziumUtils.openJdbcConnection(sourceConfig)) {
             connection.setAutoCommit(false);
             connection.execute(sqlStatements);
             connection.commit();
@@ -480,9 +535,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         return true;
     }
 
-    class MakeBinlogEventTaskContext extends StatefulTaskContext {
+    static class MakeBinlogEventTaskContext extends StatefulTaskContext {
 
-        private Supplier<Boolean> makeBinlogFunction;
+        private final Supplier<Boolean> makeBinlogFunction;
 
         public MakeBinlogEventTaskContext(
                 MySqlSourceConfig sourceConfig,
@@ -494,12 +549,14 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         }
 
         @Override
-        public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
-            EventDispatcher.SnapshotReceiver snapshotReceiver = super.getSnapshotReceiver();
-            return new EventDispatcher.SnapshotReceiver() {
+        public EventDispatcher.SnapshotReceiver<MySqlPartition> getSnapshotReceiver() {
+            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver =
+                    super.getSnapshotReceiver();
+            return new EventDispatcher.SnapshotReceiver<MySqlPartition>() {
 
                 @Override
                 public void changeRecord(
+                        MySqlPartition partition,
                         DataCollectionSchema schema,
                         Envelope.Operation operation,
                         Object key,
@@ -507,7 +564,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         OffsetContext offset,
                         ConnectHeaders headers)
                         throws InterruptedException {
-                    snapshotReceiver.changeRecord(schema, operation, key, value, offset, headers);
+                    snapshotReceiver.changeRecord(
+                            partition, schema, operation, key, value, offset, headers);
                 }
 
                 @Override

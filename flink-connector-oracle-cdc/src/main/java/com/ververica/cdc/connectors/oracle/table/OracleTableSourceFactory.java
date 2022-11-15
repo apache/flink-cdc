@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.oracle.table;
 
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -25,6 +26,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.utils.OptionUtils;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.Duration;
@@ -37,6 +39,7 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNEC
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
@@ -91,6 +94,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
         String serverTimezone = config.get(SERVER_TIME_ZONE);
 
+        boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
@@ -100,6 +105,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
         }
+
+        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new OracleTableSource(
                 physicalSchema,
@@ -122,7 +129,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                closeIdlerReaders);
     }
 
     @Override
@@ -158,6 +166,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         return options;
     }
 

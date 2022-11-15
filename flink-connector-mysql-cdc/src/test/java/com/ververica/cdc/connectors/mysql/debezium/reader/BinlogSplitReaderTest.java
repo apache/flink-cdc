@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,19 +40,29 @@ import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
+import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.testcontainers.lifecycle.Startables;
 
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,7 +74,10 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.assertContainsErrorMsg;
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static org.junit.Assert.assertEquals;
@@ -74,14 +87,34 @@ import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link BinlogSplitReader}. */
 public class BinlogSplitReaderTest extends MySqlSourceTestBase {
-
+    private static final String TEST_USER = "mysqluser";
+    private static final String TEST_PASSWORD = "mysqlpw";
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
     private final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
+
+    private static final MySqlContainer MYSQL8_CONTAINER =
+            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
+    private final UniqueDatabase inventoryDatabase8 =
+            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private BinaryLogClient binaryLogClient;
     private MySqlConnection mySqlConnection;
+
+    @BeforeClass
+    public static void beforeClass() {
+        LOG.info("Starting MySql8 containers...");
+        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
+        LOG.info("Container MySql8 is started.");
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        LOG.info("Stopping MySql8 containers...");
+        MYSQL8_CONTAINER.stop();
+        LOG.info("Container MySql8 is stopped.");
+    }
 
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
@@ -364,6 +397,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -396,6 +432,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 assertThrows(Throwable.class, () -> readBinlogSplits(dataType, reader, 1));
         Optional<SchemaOutOfSyncException> schemaOutOfSyncException =
                 ExceptionUtils.findThrowable(throwable, SchemaOutOfSyncException.class);
+
+        reader.close();
+
         assertTrue(schemaOutOfSyncException.isPresent());
         assertEquals(
                 "Internal schema representation is probably out of sync with real database schema. "
@@ -453,6 +492,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -506,6 +548,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+U[109, user_4, Pittsburgh, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -557,6 +602,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -610,6 +658,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -668,6 +719,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Shanghai, 123567891234, 15213]",
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -689,7 +743,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create config and initializer client and connections
         MySqlSourceConfig sourceConfig =
-                getConfigFactory(new String[] {"customers"})
+                getConfigFactory(MYSQL_CONTAINER, customerDatabase, new String[] {"customers"})
                         .startupOptions(StartupOptions.latest())
                         .heartbeatInterval(heartbeatInterval)
                         .debeziumProperties(dbzProps)
@@ -719,11 +773,78 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 },
                 DEFAULT_TIMEOUT,
                 "Timeout waiting for heartbeat event");
+        binlogReader.close();
+    }
+
+    @Test
+    public void testReadBinlogFromUnavailableBinlog() throws Exception {
+        // Preparations
+        inventoryDatabase8.createAndInitialize();
+        MySqlSourceConfig connectionConfig =
+                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+
+        // Capture the current binlog offset, and we will start the reader from here
+        BinlogOffset startingOffset = DebeziumUtils.currentBinlogOffset(mySqlConnection);
+
+        // Create a new config to start reading from the offset captured above
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        MYSQL8_CONTAINER,
+                        inventoryDatabase8,
+                        StartupOptions.specificOffset(startingOffset.getGtidSet()),
+                        new String[] {"products"});
+
+        // Create some binlog events and expire the binlog
+        try (Connection connection = inventoryDatabase8.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);");
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM products WHERE id=111;");
+            statement.execute("FLUSH LOGS;");
+            Thread.sleep(3000);
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);");
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute("FLUSH LOGS;");
+            Thread.sleep(3000);
+        }
+
+        // Create reader and submit splits
+        MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
+        BinlogSplitReader reader = createBinlogReader(sourceConfig, true);
+
+        try {
+            reader.submitSplit(split);
+            reader.pollSplitRecords();
+        } catch (Throwable t) {
+            assertContainsErrorMsg(
+                    t,
+                    "The required binary logs are no longer available on the server. This may happen in following situations:\n"
+                            + "1. The speed of CDC source reading is too slow to exceed the binlog expired period. You can consider increasing the binary log expiration period, you can also to check whether there is back pressure in the job and optimize your job.\n"
+                            + "2. The job runs normally, but something happens in the database and lead to the binlog cleanup. You can try to check why this cleanup happens from MySQL side.");
+        }
     }
 
     private BinlogSplitReader createBinlogReader(MySqlSourceConfig sourceConfig) {
+        return createBinlogReader(sourceConfig, false);
+    }
+
+    private BinlogSplitReader createBinlogReader(
+            MySqlSourceConfig sourceConfig, boolean skipValidStartingOffset) {
         return new BinlogSplitReader(
-                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection), 0);
+                skipValidStartingOffset
+                        ? new TestStatefulTaskContext(
+                                sourceConfig, binaryLogClient, mySqlConnection)
+                        : new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection),
+                0);
     }
 
     private MySqlBinlogSplit createBinlogSplit(MySqlSourceConfig sourceConfig) throws Exception {
@@ -731,7 +852,11 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         binlogSplitAssigner.open();
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
-                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                            sourceConfig,
+                            jdbc);
             return MySqlBinlogSplit.fillTableSchemas(
                     binlogSplitAssigner.getNext().get().asBinlogSplit(), tableSchemas);
         }
@@ -1016,33 +1141,76 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     }
 
     private MySqlSourceConfig getConfig(StartupOptions startupOptions, String[] captureTables) {
-        return getConfigFactory(captureTables).startupOptions(startupOptions).createConfig(0);
+        return getConfig(MYSQL_CONTAINER, customerDatabase, startupOptions, captureTables);
+    }
+
+    private MySqlSourceConfig getConfig(
+            MySqlContainer container,
+            UniqueDatabase database,
+            StartupOptions startupOptions,
+            String[] captureTables) {
+        return getConfigFactory(container, database, captureTables)
+                .startupOptions(startupOptions)
+                .createConfig(0);
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables) {
-        return getConfigFactory(captureTables).createConfig(0);
+        return getConfig(MYSQL_CONTAINER, customerDatabase, captureTables);
     }
 
-    private MySqlSourceConfigFactory getConfigFactory(String[] captureTables) {
+    private MySqlSourceConfig getConfig(
+            MySqlContainer container, UniqueDatabase database, String[] captureTables) {
+        return getConfigFactory(container, database, captureTables).createConfig(0);
+    }
+
+    private MySqlSourceConfigFactory getConfigFactory(
+            MySqlContainer container, UniqueDatabase database, String[] captureTables) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
-                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .map(tableName -> database.getDatabaseName() + "." + tableName)
                         .toArray(String[]::new);
 
         return new MySqlSourceConfigFactory()
-                .databaseList(customerDatabase.getDatabaseName())
+                .databaseList(database.getDatabaseName())
                 .tableList(captureTableIds)
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
-                .username(customerDatabase.getUsername())
+                .hostname(container.getHost())
+                .port(container.getDatabasePort())
+                .username(database.getUsername())
                 .splitSize(4)
                 .fetchSize(2)
-                .password(customerDatabase.getPassword());
+                .password(database.getPassword());
     }
 
     private void addColumnToTable(JdbcConnection connection, String tableId) throws Exception {
         connection.execute(
                 "ALTER TABLE " + tableId + " ADD COLUMN new_int_column INT DEFAULT 15213");
         connection.commit();
+    }
+
+    /** This stateful task context will skip valid the starting offset. */
+    private static class TestStatefulTaskContext extends StatefulTaskContext {
+
+        public TestStatefulTaskContext(
+                MySqlSourceConfig sourceConfig,
+                BinaryLogClient binaryLogClient,
+                MySqlConnection connection) {
+            super(sourceConfig, binaryLogClient, connection);
+        }
+
+        @Override
+        protected MySqlOffsetContext loadStartingOffsetState(
+                OffsetContext.Loader<MySqlOffsetContext> loader, MySqlSplit mySqlSplit) {
+            BinlogOffset offset =
+                    mySqlSplit.isSnapshotSplit()
+                            ? BinlogOffset.ofEarliest()
+                            : initializeEffectiveOffset(
+                                    mySqlSplit.asBinlogSplit().getStartingOffset(),
+                                    getConnection());
+
+            LOG.info("Starting offset is initialized to {}", offset);
+
+            MySqlOffsetContext mySqlOffsetContext = loader.load(offset.getOffset());
+            return mySqlOffsetContext;
+        }
     }
 }

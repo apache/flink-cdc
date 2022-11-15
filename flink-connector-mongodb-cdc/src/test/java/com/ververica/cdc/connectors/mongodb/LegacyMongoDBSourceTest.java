@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -354,17 +354,19 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
     public void testConnectionUri() {
         String hosts = MONGODB_CONTAINER.getHostAndPort();
 
-        ConnectionString case0 = buildConnectionString(null, null, hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case0.toString());
+        String case0 = buildConnectionString(null, null, "mongodb", hosts, null);
+        assertEquals(String.format("mongodb://%s", hosts), case0);
 
-        ConnectionString case1 = buildConnectionString("", null, hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case1.toString());
+        String case1 = buildConnectionString("", null, "mongodb", hosts, null);
+        assertEquals(String.format("mongodb://%s", hosts), case1);
 
-        ConnectionString case2 = buildConnectionString(null, "", hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case2.toString());
+        String case2 = buildConnectionString(null, "", "mongodb+srv", "localhost", null);
+        assertEquals("mongodb+srv://localhost", case2);
 
         ConnectionString case3 =
-                buildConnectionString(FLINK_USER, FLINK_USER_PASSWORD, hosts, null);
+                new ConnectionString(
+                        buildConnectionString(
+                                FLINK_USER, FLINK_USER_PASSWORD, "mongodb", hosts, null));
         assertEquals(FLINK_USER, case3.getUsername());
         assertEquals(FLINK_USER_PASSWORD, new String(case3.getPassword()));
     }

@@ -1,4 +1,4 @@
--- Copyright 2022 Ververica Inc.
+-- Copyright 2023 Ververica Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 -- specific language governing permissions and limitations
 -- under the License.
 
--- Create the schema that we'll use to populate data and watch the effect in the binlog
+-- Create the schema that we'll use to populate data and watch the effect in the WAL
 DROP SCHEMA IF EXISTS inventory CASCADE;
 CREATE SCHEMA inventory;
 SET search_path TO inventory;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,15 +113,23 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             // stream split assigning
             if (isStreamSplitAssigned) {
                 // no more splits for the assigner
+                LOG.trace(
+                        "No more splits for the SnapshotSplitAssigner. StreamSplit is already assigned.");
                 return Optional.empty();
             } else if (snapshotSplitAssigner.isFinished()) {
                 // we need to wait snapshot-assigner to be finished before
                 // assigning the stream split. Otherwise, records emitted from stream split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isStreamSplitAssigned = true;
-                return Optional.of(createStreamSplit());
+                StreamSplit streamSplit = createStreamSplit();
+                LOG.trace(
+                        "SnapshotSplitAssigner is finished: creating a new stream split {}",
+                        streamSplit);
+                return Optional.of(streamSplit);
             } else {
                 // stream split is not ready by now
+                LOG.trace(
+                        "Waiting for SnapshotSplitAssigner to be finished before assigning a new stream split.");
                 return Optional.empty();
             }
         } else {
@@ -168,6 +176,11 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         snapshotSplitAssigner.notifyCheckpointComplete(checkpointId);
+    }
+
+    @Override
+    public boolean isStreamSplitAssigned() {
+        return isStreamSplitAssigned;
     }
 
     @Override

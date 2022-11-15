@@ -1,4 +1,4 @@
--- Copyright 2022 Ververica Inc.
+-- Copyright 2023 Ververica Inc.
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -34,6 +34,28 @@ VALUES (default,"scooter","Small 2-wheel scooter",3.14),
        (default,"rocks","box of assorted rocks",5.3),
        (default,"jacket","water resistent black wind breaker",0.1),
        (default,"spare tire","24 inch spare tire",22.2);
+
+-- Create and populate our products using a single insert with many rows
+CREATE TABLE products_no_pk (
+  type INTEGER ,
+  name VARCHAR(255) DEFAULT 'flink',
+  description VARCHAR(512),
+  weight FLOAT
+);
+
+INSERT INTO products_no_pk
+VALUES (100,"scooter","Small 2-wheel scooter",3.14),
+       (101,"car battery","12V car battery",8.1),
+       (102,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3",0.8),
+       (102,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3",0.8),
+       (103,"hammer","12oz carpenter's hammer",0.75),
+       (103,"hammer","14oz carpenter's hammer",0.875),
+       (103,"hammer","16oz carpenter's hammer",1.0),
+       (104,"rocks","box of assorted rocks",5.3),
+       (104,"rocks","box of assorted rocks",5.3),
+       (104,"rocks","box of assorted rocks",5.3),
+       (105,"jacket","water resistent black wind breaker",0.1),
+       (106,"spare tire","24 inch spare tire",22.2);
 
 -- Create and populate the products on hand using multiple inserts
 CREATE TABLE products_on_hand (
@@ -106,3 +128,24 @@ VALUES (b'0000010000000100000001000000010000000100000001000000010000000000', '20
        (b'0000010000000100000001000000010000000100000001000000010000000010', '2021-03-08', 20, 200, 'flink'),
        (b'0000010000000100000001000000010000000100000001000000010000000011', '2021-03-08', 30, 300, 'flink'),
        (b'0000010000000100000001000000010000000100000001000000010000000100', '2021-03-08', 40, 400, 'flink');
+
+CREATE TABLE `multi_max_table`
+(
+    `order_id`   varchar(128) NOT NULL,
+    `index`   int(11) NOT NULL,
+    `desc`  varchar(512) NOT NULL,
+    PRIMARY KEY (`order_id`, `index`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO multi_max_table
+VALUES ('', 0, 'flink'),
+       ('', 1, 'flink'),
+       ('', 2, 'flink'),
+       ('a', 0, 'flink'),
+       ('b', 0, 'flink'),
+       ('c', 0, 'flink'),
+       ('d', 0, 'flink'),
+       ('E', 0, 'flink'),
+       ('E', 1, 'flink'),
+       ('E', 2, 'flink'),
+       ('e', 4, 'flink'),
+       ('E', 3, 'flink');

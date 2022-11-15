@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,21 @@
 package com.ververica.cdc.connectors.mysql.source.utils;
 
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
 
+import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.schema.MySqlTypeUtils;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
+import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 
 import javax.annotation.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -38,8 +43,9 @@ public class ChunkUtils {
 
     private ChunkUtils() {}
 
-    public static RowType getChunkKeyColumnType(Table table, @Nullable String chunkKeyColumn) {
-        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumn));
+    public static RowType getChunkKeyColumnType(
+            Table table, Map<ObjectPath, String> chunkKeyColumns) {
+        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumns));
     }
 
     public static RowType getChunkKeyColumnType(Column chunkKeyColumn) {
@@ -48,29 +54,36 @@ public class ChunkUtils {
                         .getLogicalType();
     }
 
-    public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
+    /**
+     * Get the chunk key column. This column could be set by `chunkKeyColumn`. If the table doesn't
+     * have primary keys, `chunkKeyColumn` must be set. If the table has primary keys,
+     * `chunkKeyColumn` must be a column of them or else null. When the parameter `chunkKeyColumn`
+     * is not set and the table has primary keys, return the first column of primary keys.
+     */
+    public static Column getChunkKeyColumn(Table table, Map<ObjectPath, String> chunkKeyColumns) {
         List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
+        String chunkKeyColumn = findChunkKeyColumn(table.id(), chunkKeyColumns);
+        if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
             throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
+                    "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         }
-
+        List<Column> searchColumns = primaryKeys.isEmpty() ? table.columns() : primaryKeys;
         if (chunkKeyColumn != null) {
-            Optional<Column> targetPkColumn =
-                    primaryKeys.stream()
+            Optional<Column> targetColumn =
+                    searchColumns.stream()
                             .filter(col -> chunkKeyColumn.equals(col.name()))
                             .findFirst();
-            if (targetPkColumn.isPresent()) {
-                return targetPkColumn.get();
+            if (targetColumn.isPresent()) {
+                return targetColumn.get();
             }
             throw new ValidationException(
                     String.format(
-                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            "Chunk key column '%s' doesn't exist in the %s [%s] of the table %s.",
                             chunkKeyColumn,
-                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
+                            primaryKeys.isEmpty() ? "user specified columns" : "primary keys",
+                            searchColumns.stream()
+                                    .map(Column::name)
+                                    .collect(Collectors.joining(",")),
                             table.id()));
         }
 
@@ -78,11 +91,22 @@ public class ChunkUtils {
         return primaryKeys.get(0);
     }
 
+    @Nullable
+    private static String findChunkKeyColumn(
+            TableId tableId, Map<ObjectPath, String> chunkKeyColumns) {
+        for (ObjectPath table : chunkKeyColumns.keySet()) {
+            Tables.TableFilter filter =
+                    DebeziumUtils.createTableFilter(table.getDatabaseName(), table.getFullName());
+            if (filter.isIncluded(tableId)) {
+                return chunkKeyColumns.get(table);
+            }
+        }
+        return null;
+    }
+
     /** Returns next meta group id according to received meta number and meta group size. */
     public static int getNextMetaGroupId(int receivedMetaNum, int metaGroupSize) {
         Preconditions.checkState(metaGroupSize > 0);
-        return receivedMetaNum % metaGroupSize == 0
-                ? (receivedMetaNum / metaGroupSize)
-                : (receivedMetaNum / metaGroupSize) + 1;
+        return receivedMetaNum / metaGroupSize;
     }
 }

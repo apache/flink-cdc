@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -272,7 +272,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             }
             if (executorService != null) {
                 executorService.shutdown();
-                if (executorService.awaitTermination(CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                     LOG.warn(
                             "Failed to close the tidb source function in {} seconds.",
                             CLOSE_TIMEOUT);

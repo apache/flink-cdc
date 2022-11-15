@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -82,6 +83,8 @@ public class OceanBaseTableFactoryTest {
     private static final String CONNECT_TIMEOUT = "30s";
     private static final String HOSTNAME = "127.0.0.1";
     private static final Integer PORT = 2881;
+    private static final String COMPATIBLE_MODE = "mysql";
+    private static final String DRIVER_CLASS = "com.mysql.jdbc.Driver";
     private static final String LOG_PROXY_HOST = "127.0.0.1";
     private static final Integer LOG_PROXY_PORT = 2983;
     private static final String LOG_PROXY_CLIENT_ID = "clientId";
@@ -111,6 +114,9 @@ public class OceanBaseTableFactoryTest {
                         Duration.parse("PT" + CONNECT_TIMEOUT),
                         null,
                         null,
+                        COMPATIBLE_MODE,
+                        DRIVER_CLASS,
+                        new Properties(),
                         LOG_PROXY_HOST,
                         LOG_PROXY_PORT,
                         null,
@@ -130,6 +136,8 @@ public class OceanBaseTableFactoryTest {
         options.put("table-list", TABLE_LIST);
         options.put("hostname", HOSTNAME);
         options.put("port", String.valueOf(PORT));
+        options.put("compatible-mode", COMPATIBLE_MODE);
+        options.put("jdbc.driver", DRIVER_CLASS);
         options.put("logproxy.client.id", LOG_PROXY_CLIENT_ID);
         options.put("rootserver-list", RS_LIST);
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
@@ -148,6 +156,9 @@ public class OceanBaseTableFactoryTest {
                         Duration.parse("PT" + CONNECT_TIMEOUT),
                         "127.0.0.1",
                         2881,
+                        COMPATIBLE_MODE,
+                        DRIVER_CLASS,
+                        new Properties(),
                         LOG_PROXY_HOST,
                         LOG_PROXY_PORT,
                         LOG_PROXY_CLIENT_ID,
@@ -187,6 +198,9 @@ public class OceanBaseTableFactoryTest {
                         Duration.parse("PT" + CONNECT_TIMEOUT),
                         null,
                         null,
+                        COMPATIBLE_MODE,
+                        DRIVER_CLASS,
+                        new Properties(),
                         LOG_PROXY_HOST,
                         LOG_PROXY_PORT,
                         null,

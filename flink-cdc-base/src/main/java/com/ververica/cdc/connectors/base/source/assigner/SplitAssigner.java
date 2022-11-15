@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,8 +55,13 @@ public interface SplitAssigner {
      */
     boolean waitingForFinishedSplits();
 
+    /** Whether the split assigner is finished stream split assigning. */
+    default boolean isStreamSplitAssigned() {
+        throw new UnsupportedOperationException("Not support to assigning StreamSplit.");
+    }
+
     /**
-     * Gets the finished splits information. This is useful meta data to generate a stream split
+     * Gets the finished splits' information. This is useful metadata to generate a stream split
      * that considering finished snapshot splits.
      */
     List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();

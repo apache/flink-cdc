@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -27,7 +28,6 @@ import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -77,6 +77,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean closeIdleReaders;
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
@@ -113,6 +114,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorLower,
             StartupOptions startupOptions,
             boolean scanNewlyAddedTableEnabled,
+            boolean closeIdleReaders,
             Properties jdbcProperties,
             Duration heartbeatInterval,
             @Nullable String chunkKeyColumn) {
@@ -137,6 +139,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.closeIdleReaders = closeIdleReaders;
         this.jdbcProperties = jdbcProperties;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
@@ -147,12 +150,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_BEFORE)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
+        return ChangelogMode.all();
     }
 
     @Override
@@ -195,9 +193,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .closeIdleReaders(closeIdleReaders)
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
-                            .chunkKeyColumn(chunkKeyColumn)
+                            .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -275,6 +274,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         distributionFactorLower,
                         startupOptions,
                         scanNewlyAddedTableEnabled,
+                        closeIdleReaders,
                         jdbcProperties,
                         heartbeatInterval,
                         chunkKeyColumn);
@@ -300,6 +300,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && distributionFactorUpper == that.distributionFactorUpper
                 && distributionFactorLower == that.distributionFactorLower
                 && scanNewlyAddedTableEnabled == that.scanNewlyAddedTableEnabled
+                && closeIdleReaders == that.closeIdleReaders
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
@@ -346,6 +347,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 producedDataType,
                 metadataKeys,
                 scanNewlyAddedTableEnabled,
+                closeIdleReaders,
                 jdbcProperties,
                 heartbeatInterval,
                 chunkKeyColumn);

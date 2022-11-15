@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,7 +146,8 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = 'false',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
-                                + " 'debezium.log.mining.continuous.mine' = 'true'"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true'"
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),

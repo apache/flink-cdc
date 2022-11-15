@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +29,13 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
+import io.debezium.relational.Selectors;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.slf4j.Logger;
@@ -43,11 +46,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
+    private static final String QUOTED_CHARACTER = "`";
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
@@ -55,8 +60,10 @@ public class DebeziumUtils {
     public static JdbcConnection openJdbcConnection(MySqlSourceConfig sourceConfig) {
         JdbcConnection jdbc =
                 new JdbcConnection(
-                        sourceConfig.getDbzConfiguration(),
-                        new JdbcConnectionFactory(sourceConfig));
+                        JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
+                        new JdbcConnectionFactory(sourceConfig),
+                        QUOTED_CHARACTER,
+                        QUOTED_CHARACTER);
         try {
             jdbc.connect();
         } catch (Exception e) {
@@ -133,6 +140,20 @@ public class DebeziumUtils {
                             + "'. Make sure your server is correctly configured",
                     e);
         }
+    }
+
+    /** Create a TableFilter by database name and table name. */
+    public static Tables.TableFilter createTableFilter(String database, String table) {
+        final Selectors.TableSelectionPredicateBuilder eligibleTables =
+                Selectors.tableSelector().includeDatabases(database);
+
+        Predicate<TableId> tablePredicate = eligibleTables.includeTables(table).build();
+
+        Predicate<TableId> finalTablePredicate =
+                tablePredicate.and(
+                        Tables.TableFilter.fromPredicate(MySqlConnectorConfig::isNotBuiltInTable)
+                                ::isIncluded);
+        return finalTablePredicate::test;
     }
 
     // --------------------------------------------------------------------------------------------

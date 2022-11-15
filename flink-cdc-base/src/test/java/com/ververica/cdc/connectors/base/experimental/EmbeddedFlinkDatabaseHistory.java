@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,6 +105,12 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
             schema.overwriteTable(tableChange.getTable());
         }
         listener.recoveryStopped();
+    }
+
+    @Override
+    public void recover(
+            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
+        offsets.forEach((source, position) -> recover(source, position, schema, ddlParser));
     }
 
     @Override

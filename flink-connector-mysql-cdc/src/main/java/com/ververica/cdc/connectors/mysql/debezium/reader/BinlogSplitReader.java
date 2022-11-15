@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +62,7 @@ import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStructContainsChunkKey;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 
@@ -91,7 +93,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
+                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subTaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
@@ -123,6 +125,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     try {
                         binlogSplitReadTask.execute(
                                 new BinlogSplitChangeEventSourceContextImpl(),
+                                statefulTaskContext.getMySqlPartition(),
                                 statefulTaskContext.getOffsetContext());
                     } catch (Exception e) {
                         currentTaskRunning = false;
@@ -193,12 +196,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             currentTaskRunning = false;
             if (executorService != null) {
                 executorService.shutdown();
-                if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                     LOG.warn(
                             "Failed to close the binlog split reader in {} seconds.",
                             READER_CLOSE_TIMEOUT);
                 }
             }
+            statefulTaskContext.getDatabaseSchema().close();
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
         }
@@ -226,20 +230,21 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             if (hasEnterPureBinlogPhase(tableId, position)) {
                 return true;
             }
+
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
                 RowType splitKeyType =
                         ChunkUtils.getChunkKeyColumnType(
                                 statefulTaskContext.getDatabaseSchema().tableFor(tableId),
-                                statefulTaskContext.getSourceConfig().getChunkKeyColumn());
-                Object[] key =
+                                statefulTaskContext.getSourceConfig().getChunkKeyColumns());
+
+                Struct target = getStructContainsChunkKey(sourceRecord);
+                Object[] chunkKey =
                         getSplitKey(
-                                splitKeyType,
-                                sourceRecord,
-                                statefulTaskContext.getSchemaNameAdjuster());
+                                splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
-                                    key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
+                                    chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
                             && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }
@@ -263,13 +268,16 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             pureBinlogPhaseTables.add(tableId);
             return true;
         }
-        // capture dynamically new added tables
-        // TODO: there is still very little chance that we can't capture new added table.
-        //  That the tables dynamically added after discovering captured tables in enumerator
-        //  and before the lowest binlog offset of all table splits. This interval should be
-        //  very short, so we don't support it for now.
-        return !maxSplitHighWatermarkMap.containsKey(tableId)
-                && capturedTableFilter.isIncluded(tableId);
+
+        // Use still need to capture new sharding table if user disable scan new added table,
+        // The history records for all new added tables(including sharding table and normal table)
+        // will be capture after restore from a savepoint if user enable scan new added table
+        if (!statefulTaskContext.getSourceConfig().isScanNewlyAddedTableEnabled()) {
+            // the new added sharding table without history records
+            return !maxSplitHighWatermarkMap.containsKey(tableId)
+                    && capturedTableFilter.isIncluded(tableId);
+        }
+        return false;
     }
 
     private void configureFilter() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.RelationalDatabaseSchema;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -58,18 +59,17 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     @Override
     public TableId getTableId(SourceRecord record) {
-        return null;
+        return SourceRecordUtils.getTableId(record);
     }
 
     @Override
     public boolean isDataChangeRecord(SourceRecord record) {
-        return false;
+        return SourceRecordUtils.isDataChangeRecord(record);
     }
 
     @Override
     public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
-        RowType splitKeyType =
-                getSplitType(getDatabaseSchema().tableFor(SourceRecordUtils.getTableId(record)));
+        RowType splitKeyType = getSplitType(getDatabaseSchema().tableFor(this.getTableId(record)));
         Object[] key = SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
         return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
     }
@@ -157,7 +157,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     }
 
     public SchemaNameAdjuster getSchemaNameAdjuster() {
-        return null;
+        return SchemaNameAdjuster.create();
     }
 
     public abstract RelationalDatabaseSchema getDatabaseSchema();
@@ -169,4 +169,6 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     public abstract JdbcSourceEventDispatcher getDispatcher();
 
     public abstract OffsetContext getOffsetContext();
+
+    public abstract Partition getPartition();
 }

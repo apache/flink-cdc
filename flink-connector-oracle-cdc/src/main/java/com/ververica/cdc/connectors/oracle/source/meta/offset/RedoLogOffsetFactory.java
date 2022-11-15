@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,12 @@ public class RedoLogOffsetFactory extends OffsetFactory {
     public Offset newOffset(Long position) {
         throw new UnsupportedOperationException(
                 "Do not support to create RedoLogOffset by position.");
+    }
+
+    @Override
+    public Offset createTimestampOffset(long timestampMillis) {
+        throw new UnsupportedOperationException(
+                "Do not support to create RedoLogOffset by timestamp.");
     }
 
     @Override

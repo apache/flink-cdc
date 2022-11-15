@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.re
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
 import static com.ververica.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
 /** A serializer for the {@link MySqlSplit}. */
 public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MySqlSplit> {
@@ -70,7 +71,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
 
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
             out.writeInt(SNAPSHOT_SPLIT_FLAG);
-            out.writeUTF(snapshotSplit.getTableId().toString());
+            out.writeUTF(quote(snapshotSplit.getTableId()));
             out.writeUTF(snapshotSplit.splitId());
             out.writeUTF(snapshotSplit.getSplitKeyType().asSerializableString());
 

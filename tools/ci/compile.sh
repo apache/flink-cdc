@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ################################################################################
-#  Copyright 2022 Ververica Inc.
+#  Copyright 2023 Ververica Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ echo "==========================================================================
 
 EXIT_CODE=0
 
-run_mvn clean package -Dmaven.javadoc.skip=true -U -DskipTests | tee $MVN_CLEAN_COMPILE_OUT
+run_mvn clean package -Dmaven.javadoc.skip=true -U -DskipTests -P$1 | tee $MVN_CLEAN_COMPILE_OUT
 
 EXIT_CODE=${PIPESTATUS[0]}
 

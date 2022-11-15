@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Copyright 2022 Ververica Inc.
+Copyright 2023 Ververica Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ under the License.
     <parent>
         <artifactId>flink-cdc-connectors</artifactId>
         <groupId>com.ververica</groupId>
-        <version>2.4-SNAPSHOT</version>
+        <version>2.5-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -56,8 +56,8 @@ under the License.
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-oceanbase-cdc</include>
                                     <include>mysql:mysql-connector-java</include>
-                                    <include>com.oceanbase.logclient:*</include>
-                                    <include>io.netty:netty-all</include>
+                                    <include>com.oceanbase:*</include>
+                                    <include>io.netty:*</include>
                                     <include>com.google.protobuf:protobuf-java</include>
                                     <include>commons-codec:commons-codec</include>
                                     <include>org.lz4:lz4-java</include>

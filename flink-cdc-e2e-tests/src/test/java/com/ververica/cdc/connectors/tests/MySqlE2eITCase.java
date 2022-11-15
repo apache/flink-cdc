@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.supportCheckpointsAfterTasksFinished;
+
 /** End-to-end tests for mysql-cdc connector uber jar. */
 public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
 
@@ -43,6 +45,8 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
     public void testMySqlCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
+                        "SET 'execution.checkpointing.interval' = '3s';",
+                        "SET 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true';",
                         "CREATE TABLE products_source (",
                         " `id` INT NOT NULL,",
                         " name STRING,",
@@ -62,7 +66,10 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                         " 'table-name' = 'products_source',",
                         " 'server-time-zone' = 'UTC',",
                         " 'server-id' = '5800-5900',",
-                        " 'scan.incremental.snapshot.chunk.size' = '4'",
+                        " 'scan.incremental.snapshot.chunk.size' = '4',",
+                        " 'scan.incremental.close-idle-reader.enabled' = '"
+                                + supportCheckpointsAfterTasksFinished()
+                                + "'",
                         ");",
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",

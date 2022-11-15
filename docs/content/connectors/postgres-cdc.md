@@ -14,7 +14,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -22,9 +22,9 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.4-SNAPSHOT/flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.5-SNAPSHOT/flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
 
 How to create a Postgres CDC table
 ----------------
@@ -47,7 +47,9 @@ CREATE TABLE shipments (
   'password' = 'postgres',
   'database-name' = 'postgres',
   'schema-name' = 'public',
-  'table-name' = 'shipments'
+  'table-name' = 'shipments',
+   -- experimental feature: incremental snapshot (default off)
+  'scan.incremental.snapshot.enabled' = 'true'
 );
 
 -- read snapshot and binlogs from shipments table
@@ -103,7 +105,7 @@ Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Database name of the PostgreSQL server to monitor.</td>
-    </tr> 
+    </tr>
     <tr>
       <td>schema-name</td>
       <td>required</td>
@@ -126,22 +128,22 @@ Connector Options
       <td>Integer port number of the PostgreSQL database server.</td>
     </tr>
     <tr>
-      <td>decoding.plugin.name</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">decoderbufs</td>
-      <td>String</td>
-      <td>The name of the Postgres logical decoding plug-in installed on the server. 
-          Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and pgoutput.</td>
-    </tr>    
-    <tr>
       <td>slot.name</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">flink</td>
+      <td>required</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in
           for a particular database/schema. The server uses this slot to stream events to the connector that you are configuring.
           <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
     </tr> 
+    <tr>
+      <td>decoding.plugin.name</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">decoderbufs</td>
+      <td>String</td>
+      <td>The name of the Postgres logical decoding plug-in installed on the server.
+          Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and pgoutput.</td>
+    </tr>
     <tr>
       <td>changelog-mode</td>
       <td>optional</td>
@@ -149,7 +151,14 @@ Connector Options
       <td>String</td>
       <td>The changelog mode used for encoding streaming changes. Supported values are <code>all</code> (which encodes changes as retract stream using all RowKinds) and <code>upsert</code> (which encodes changes as upsert stream that describes idempotent updates on a key).
           <br/> <code>upsert</code> mode can be used for tables with primary keys when replica identity <code>FULL</code> is not an option. Primary keys must be set to use <code>upsert</code> mode.</td>
-    </tr> 
+    </tr>
+    <tr>
+      <td>heartbeat.interval.ms</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">30s</td>
+      <td>Duration</td>
+      <td>The interval of sending heartbeat event for tracing the latest available replication slot offsets</td>
+    </tr>
    <tr>
       <td>debezium.*</td>
       <td>optional</td>
@@ -157,8 +166,8 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Postgres server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td> 
-    </tr>   
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td>
+    </tr>
     <tr>
       <td>debezium.snapshot.select.statement.overrides</td>
       <td>optional</td>
@@ -183,11 +192,122 @@ Connector Options
         <br/> For example: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where to_char(rq, 'yyyy-MM-dd')'</code>.
       </td>
     </tr>
+    <tr>
+          <td>scan.incremental.snapshot.enabled</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">false</td>
+          <td>Boolean</td>
+          <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
+              the incremental snapshot has many advantages, including:
+                (1) source can be parallel during snapshot reading,
+                (2) source can perform checkpoints in the chunk granularity during snapshot reading,
+                (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
+              Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
+          </td>
+    </tr>
     </tbody>
-</table>    
+    </table>
 </div>
+<div>
 
-Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#postgresql-property-slot-name).
+Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-property-slot-name).
+
+### Incremental Snapshot Options
+
+The following options is available only when `scan.incremental.snapshot.enabled=true`:
+
+<div class="highlight">
+<table class="colwidths-auto docutils">
+   <thead>
+      <tr>
+        <th class="text-left" style="width: 25%">Option</th>
+        <th class="text-left" style="width: 8%">Required</th>
+        <th class="text-left" style="width: 7%">Default</th>
+        <th class="text-left" style="width: 10%">Type</th>
+        <th class="text-left" style="width: 50%">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+          <td>scan.incremental.snapshot.chunk.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">8096</td>
+          <td>Integer</td>
+          <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
+    </tr>
+    <tr>
+      <td>scan.startup.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">initial</td>
+      <td>String</td>
+      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"
+           and "latest-offset".
+           Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+    </tr>
+    <tr>
+      <td>chunk-meta.group.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000</td>
+      <td>Integer</td>
+      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
+    </tr>
+    <tr>
+          <td>connect.timeout</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">30s</td>
+          <td>Duration</td>
+          <td>The maximum time that the connector should wait after trying to connect to the PostgreSQL database server before timing out.</td>
+    </tr>
+    <tr>
+          <td>connect.pool.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">30</td>
+          <td>Integer</td>
+          <td>The connection pool size.</td>
+    </tr>
+    <tr>
+          <td>connect.max-retries</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">3</td>
+          <td>Integer</td>
+          <td>The max retry times that the connector should retry to build database server connection.</td>
+    </tr>
+    <tr>
+          <td>scan.snapshot.fetch.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">1024</td>
+          <td>Integer</td>
+          <td>The maximum fetch size for per poll when read table snapshot.</td>
+    </tr>
+    <tr>
+          <td>scan.incremental.snapshot.chunk.key-column</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">(none)</td>
+          <td>String</td>
+          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
+            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+    </tr>
+    <tr>
+          <td>chunk-key.even-distribution.factor.lower-bound</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">0.05d</td>
+          <td>Double</td>
+          <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not.
+              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven.
+              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr>
+    <tr>
+          <td>chunk-key.even-distribution.factor.upper-bound</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">1000.0d</td>
+          <td>Double</td>
+          <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not.
+              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven.
+              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr>
+    </tbody>
+</table>
+</div>
 
 Available Metadata
 ----------------
@@ -212,7 +332,7 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>schema_name</td>
       <td>STRING NOT NULL</td>
       <td>Name of the schema that contain the row.</td>
-    </tr>    
+    </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
@@ -229,7 +349,10 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
 Limitation
 --------
 
-### Can't perform checkpoint during scanning snapshot of tables
+### Can't perform checkpoint during scanning snapshot of tables when incremental snapshot is disabled
+
+When `scan.incremental.snapshot.enabled=false`, we have the following limitation.
+
 During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In order to not perform checkpoints, Postgres CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout checkpoints:
 
 ```
@@ -265,17 +388,77 @@ CREATE TABLE products (
 Features
 --------
 
+### Incremental Snapshot Reading (Experimental)
+
+Incremental snapshot reading is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism, the incremental snapshot has many advantages, including:
+* (1) PostgreSQL CDC Source can be parallel during snapshot reading
+* (2) PostgreSQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
+* (3) PostgreSQL CDC Source doesn't need to acquire global read lock before snapshot reading
+
+During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by primary key of table,
+and then PostgreSQL CDC Source assigns the chunks to multiple readers to read the data of snapshot chunk.
+
 ### Exactly-Once Processing
 
-The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#how-the-postgresql-connector-works). 
-
-### Single Thread Reading
-
-The Postgres CDC source can't work in parallel reading, because there is only one task can receive binlog events. 
+The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#how-the-postgresql-connector-works).
 
 ### DataStream Source
 
-The Postgres CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
+The Postgres CDC connector can also be a DataStream source. There are two modes for the DataStream source:
+
+- incremental snapshot based, which allows parallel reading
+- SourceFunction based, which only supports single thread reading
+
+#### Incremental Snapshot based DataStream (Experimental)
+
+```java
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.postgres.source.PostgresSourceBuilder;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
+public class PostgresParallelSourceExample {
+
+    public static void main(String[] args) throws Exception {
+
+        DebeziumDeserializationSchema<String> deserializer =
+                new JsonDebeziumDeserializationSchema();
+
+        JdbcIncrementalSource<String> postgresIncrementalSource =
+                new PostgresSourceBuilder<String>()
+                        .hostname("localhost")
+                        .port(5432)
+                        .database("postgres")
+                        .schemaList("inventory")
+                        .tableList("inventory.products")
+                        .username("postgres")
+                        .password("postgres")
+                        .slotName("flink")
+                        .decodingPluginName("decoderbufs") // use pgoutput for PostgreSQL 10+
+                        .deserializer(deserializer)
+                        .includeSchemaChanges(true) // output the schema changes as well
+                        .splitSize(2) // the split size of each snapshot split
+                        .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+        env.enableCheckpointing(3000);
+
+        env.fromSource(
+                        postgresIncrementalSource,
+                        WatermarkStrategy.noWatermarks(),
+                        "PostgresParallelSource")
+                .setParallelism(2)
+                .print();
+
+        env.execute("Output Postgres Snapshot");
+    }
+}
+```
+
+#### SourceFunction-based DataStream
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

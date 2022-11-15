@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mongodb.source.utils;
 import com.mongodb.MongoNamespace;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoDatabase;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 /** Utilities to discovery matched collections. */
 public class CollectionDiscoveryUtils {
 
-    public static final String REGEX_META_CHARACTERS = ".$|()[]{}<>^?*+-=!\\";
+    public static final String REGEX_META_CHARACTERS = ".$|()[]{}<>^?*+=!\\";
 
     public static final String ADD_NS_FIELD_NAME = "_ns_";
 
@@ -44,6 +45,10 @@ public class CollectionDiscoveryUtils {
                     String.format(
                             "{'$addFields': {'%s': {'$concat': ['$ns.db', '.', '$ns.coll']}}}",
                             ADD_NS_FIELD_NAME));
+
+    private static final Pattern RANGE_PATTERN =
+            Pattern.compile(
+                    "\\[(([a-z]-[a-z])|([A-Z]-[A-Z])|((0|[1-9][0-9]*)-(0|[1-9][0-9]*)))+\\]");
 
     private CollectionDiscoveryUtils() {}
 
@@ -88,22 +93,21 @@ public class CollectionDiscoveryUtils {
         return collectionNames;
     }
 
-    public static Predicate<String> databaseFilter(List<String> databaseList) {
-        Predicate<String> databaseFilter = CollectionDiscoveryUtils::isNotBuiltInDatabase;
-        if (databaseList != null && !databaseList.isEmpty()) {
-            List<Pattern> databasePatterns = includeListAsPatterns(databaseList);
-            databaseFilter = databaseFilter.and(anyMatch(databasePatterns));
+    private static Predicate<String> stringListFilter(
+            Predicate<String> filter, List<String> stringList) {
+        if (CollectionUtils.isNotEmpty(stringList)) {
+            List<Pattern> databasePatterns = includeListAsPatterns(stringList);
+            filter = filter.and(anyMatch(databasePatterns));
         }
-        return databaseFilter;
+        return filter;
+    }
+
+    public static Predicate<String> databaseFilter(List<String> databaseList) {
+        return stringListFilter(CollectionDiscoveryUtils::isNotBuiltInDatabase, databaseList);
     }
 
     public static Predicate<String> collectionsFilter(List<String> collectionList) {
-        Predicate<String> collectionFilter = CollectionDiscoveryUtils::isNotBuiltInCollections;
-        if (collectionList != null && !collectionList.isEmpty()) {
-            List<Pattern> collectionPatterns = includeListAsPatterns(collectionList);
-            collectionFilter = collectionFilter.and(anyMatch(collectionPatterns));
-        }
-        return collectionFilter;
+        return stringListFilter(CollectionDiscoveryUtils::isNotBuiltInCollections, collectionList);
     }
 
     public static Predicate<String> anyMatch(List<Pattern> patterns) {
@@ -192,6 +196,14 @@ public class CollectionDiscoveryUtils {
             }
         }
         return false;
+    }
+
+    public static boolean containsRegexRange(String literal) {
+        return RANGE_PATTERN.matcher(literal).find();
+    }
+
+    public static boolean inferIsRegularExpression(String literal) {
+        return containsRegexMetaCharacters(literal) || containsRegexRange(literal);
     }
 
     public static Pattern completionPattern(String pattern) {

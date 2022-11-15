@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,7 @@
 
 package com.ververica.cdc.connectors.oceanbase.source;
 
-import com.oceanbase.oms.logmessage.ByteString;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Runtime converter that converts objects of OceanBase into objects of Flink Table & SQL internal
@@ -28,20 +24,5 @@ import java.nio.charset.StandardCharsets;
  */
 public interface OceanBaseDeserializationRuntimeConverter extends Serializable {
 
-    default Object convert(Object object) throws Exception {
-        if (object instanceof ByteString) {
-            return convertChangeEvent(
-                    ((ByteString) object).toString(StandardCharsets.UTF_8.name()));
-        } else {
-            return convertSnapshotEvent(object);
-        }
-    }
-
-    default Object convertSnapshotEvent(Object object) throws Exception {
-        throw new NotImplementedException();
-    }
-
-    default Object convertChangeEvent(String string) throws Exception {
-        throw new NotImplementedException();
-    }
+    Object convert(Object object) throws Exception;
 }

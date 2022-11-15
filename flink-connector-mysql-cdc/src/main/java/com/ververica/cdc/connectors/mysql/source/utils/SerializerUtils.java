@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetSerializer;
 import io.debezium.DebeziumException;
 import io.debezium.util.HexConverter;
@@ -78,6 +79,11 @@ public class SerializerUtils {
                 if (StringUtils.isEmpty(offset.getFilename()) && offset.getPosition() == 0L) {
                     return BinlogOffset.ofEarliest();
                 }
+                // For other cases we treat it as a specific offset
+                return BinlogOffset.builder()
+                        .setOffsetKind(BinlogOffsetKind.SPECIFIC)
+                        .setOffsetMap(offset.getOffset())
+                        .build();
             }
             return offset;
         } else {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,9 @@ package com.ververica.cdc.connectors.postgres;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
+import io.debezium.config.Configuration;
+import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.jdbc.JdbcConfiguration;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +38,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -48,41 +53,63 @@ import static org.junit.Assert.assertNotNull;
  */
 public abstract class PostgresTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+    public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+    public static final String DEFAULT_DB = "postgres";
 
-    private static final DockerImageName PG_IMAGE =
+    // use newer version of postgresql image to support pgoutput plugin
+    // when testing postgres 13, only 13-alpine supports both amd64 and arm64
+    protected static final DockerImageName PG_IMAGE =
             DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
 
-    protected static final PostgreSQLContainer<?> POSTGERS_CONTAINER =
+    public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
-                    .withDatabaseName("postgres")
+                    .withDatabaseName(DEFAULT_DB)
                     .withUsername("postgres")
                     .withPassword("postgres")
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+                    .withLogConsumer(new Slf4jLogConsumer(LOG))
+                    .withCommand(
+                            "postgres",
+                            "-c",
+                            // default
+                            "fsync=off",
+                            "-c",
+                            "max_replication_slots=20");
 
     @BeforeClass
     public static void startContainers() {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(POSTGERS_CONTAINER)).join();
+        Startables.deepStart(Stream.of(POSTGRES_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    protected Connection getJdbcConnection() throws SQLException {
+    protected Connection getJdbcConnection(PostgreSQLContainer container) throws SQLException {
         return DriverManager.getConnection(
-                POSTGERS_CONTAINER.getJdbcUrl(),
-                POSTGERS_CONTAINER.getUsername(),
-                POSTGERS_CONTAINER.getPassword());
+                container.getJdbcUrl(), container.getUsername(), container.getPassword());
+    }
+
+    public static Connection getJdbcConnection(PostgreSQLContainer container, String databaseName)
+            throws SQLException {
+        return DriverManager.getConnection(
+                container.withDatabaseName(databaseName).getJdbcUrl(),
+                container.getUsername(),
+                container.getPassword());
+    }
+
+    public static String getSlotName() {
+        final Random random = new Random();
+        int id = random.nextInt(10000);
+        return "flink_" + id;
     }
 
     /**
      * Executes a JDBC statement using the default jdbc config without autocommitting the
      * connection.
      */
-    protected void initializePostgresTable(String sqlFile) {
+    protected void initializePostgresTable(PostgreSQLContainer container, String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = PostgresTestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnection(container);
                 Statement statement = connection.createStatement()) {
             final List<String> statements =
                     Arrays.stream(
@@ -104,5 +131,10 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    protected PostgresConnection createConnection(Map<String, String> properties) {
+        Configuration config = Configuration.from(properties);
+        return new PostgresConnection(JdbcConfiguration.adapt(config), "test-connection");
     }
 }

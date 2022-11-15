@@ -15,13 +15,11 @@ Create `docker-compose.yml`.
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:3.1.4
+    image: oceanbase/oceanbase-ce:4.0.0.0
     container_name: observer
-    environment:
-      - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.0.3
+    image: whhe/oblogproxy:1.1.0_4x
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
@@ -60,12 +58,44 @@ Execute the following command in the directory where `docker-compose.yml` is loc
 docker-compose up -d
 ```
 
-### Create data for reading snapshot
+### Set password
 
-Open the CLI:
+There is no password for 'root' user by default, but we need a user of 'sys' tenant with non-empty password in oblogproxy. So here we should set a password for 'root@sys' firstly.
+
+Login 'root' user of 'sys' tenant.
 
 ```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot -ppswd
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys
+```
+
+Set a password, note that the password needs to be consistent with the environment variable 'OB_SYS_PASSWORD' of oblogproxy service.
+
+```mysql
+ALTER USER root IDENTIFIED BY 'pswd';
+```
+
+From OceanBase 4.0.0.0 CE, we can only fetch the commit log of non-sys tenant.
+
+Here we use the 'test' tenant for example.
+
+Login with 'root' user of 'test' tenant:
+
+```shell
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test
+```
+
+Set a password:
+
+```mysql
+ALTER USER root IDENTIFIED BY 'test';
+```
+
+### Create data for reading snapshot
+
+Login 'root' user of 'test' tenant.
+
+```shell
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test -ptest
 ```
 
 Insert data:
@@ -111,8 +141,8 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 ```Download links are only available for stable releases.```
 
-- [flink-sql-connector-elasticsearch7-1.16.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/1.16.0/flink-sql-connector-elasticsearch7-1.16.0.jar)
-- [flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar)
+- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
+- [flink-sql-connector-oceanbase-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.5-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.5-SNAPSHOT.jar)
 
 ### Use Flink DDL to create dynamic table in Flink SQL CLI
 
@@ -135,9 +165,9 @@ Flink SQL> CREATE TABLE orders (
  ) WITH (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
-    'username' = 'root',
-    'password' = 'pswd',
-    'tenant-name' = 'sys',
+    'username' = 'root@test',
+    'password' = 'test',
+    'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^orders$',
     'hostname' = 'localhost',
@@ -157,9 +187,9 @@ Flink SQL> CREATE TABLE products (
   ) WITH (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
-    'username' = 'root',
-    'password' = 'pswd',
-    'tenant-name' = 'sys',
+    'username' = 'root@test',
+    'password' = 'test',
+    'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^products$',
     'hostname' = 'localhost',

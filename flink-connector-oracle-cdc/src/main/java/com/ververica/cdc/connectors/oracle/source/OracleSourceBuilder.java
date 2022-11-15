@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +106,7 @@ public class OracleSourceBuilder<T> {
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
      * TIMESTAMP type in Oracle converted to STRING. See more
-     * https://debezium.io/documentation/reference/1.5/connectors/Oracle.html#Oracle-temporal-types
+     * https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-temporal-types
      */
     public OracleSourceBuilder<T> serverTimeZone(String timeZone) {
         this.configFactory.serverTimeZone(timeZone);
@@ -200,6 +200,21 @@ public class OracleSourceBuilder<T> {
     /** The Debezium Oracle connector properties. For example, "snapshot.mode". */
     public OracleSourceBuilder<T> debeziumProperties(Properties properties) {
         this.configFactory.debeziumProperties(properties);
+        return this;
+    }
+
+    /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public OracleSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
+        this.configFactory.closeIdleReaders(closeIdleReaders);
         return this;
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ public class MongoDBSourceConfig implements SourceConfig {
 
     private static final long serialVersionUID = 1L;
 
+    private final String scheme;
     private final String hosts;
     @Nullable private final String username;
     @Nullable private final String password;
@@ -47,8 +48,10 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final int heartbeatIntervalMillis;
     private final int splitMetaGroupSize;
     private final int splitSizeMB;
+    private final boolean closeIdleReaders;
 
     MongoDBSourceConfig(
+            String scheme,
             String hosts,
             @Nullable String username,
             @Nullable String password,
@@ -62,15 +65,16 @@ public class MongoDBSourceConfig implements SourceConfig {
             StartupOptions startupOptions,
             int heartbeatIntervalMillis,
             int splitMetaGroupSize,
-            int splitSizeMB) {
+            int splitSizeMB,
+            boolean closeIdleReaders) {
+        this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
         this.password = password;
         this.databaseList = databaseList;
         this.collectionList = collectionList;
         this.connectionString =
-                buildConnectionString(username, password, hosts, connectionOptions)
-                        .getConnectionString();
+                buildConnectionString(username, password, scheme, hosts, connectionOptions);
         this.batchSize = batchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.pollMaxBatchSize = pollMaxBatchSize;
@@ -79,6 +83,11 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
+        this.closeIdleReaders = closeIdleReaders;
+    }
+
+    public String getScheme() {
+        return scheme;
     }
 
     public String getHosts() {
@@ -150,6 +159,11 @@ public class MongoDBSourceConfig implements SourceConfig {
     }
 
     @Override
+    public boolean isCloseIdleReaders() {
+        return closeIdleReaders;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -166,6 +180,8 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && heartbeatIntervalMillis == that.heartbeatIntervalMillis
                 && splitMetaGroupSize == that.splitMetaGroupSize
                 && splitSizeMB == that.splitSizeMB
+                && closeIdleReaders == that.closeIdleReaders
+                && Objects.equals(scheme, that.scheme)
                 && Objects.equals(hosts, that.hosts)
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
@@ -177,6 +193,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     @Override
     public int hashCode() {
         return Objects.hash(
+                scheme,
                 hosts,
                 username,
                 password,
@@ -190,6 +207,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 startupOptions,
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
-                splitSizeMB);
+                splitSizeMB,
+                closeIdleReaders);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.mongodb.source.utils;
 
-import com.mongodb.ConnectionString;
 import com.mongodb.client.ChangeStreamIterable;
 import com.mongodb.client.MongoChangeStreamCursor;
 import com.mongodb.client.MongoClient;
@@ -56,7 +55,6 @@ import static com.mongodb.client.model.Sorts.ascending;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.DROPPED_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.ID_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.KEY_FIELD;
-import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.NAMESPACE_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.UUID_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.encodeValue;
@@ -345,12 +343,13 @@ public class MongoUtils {
         return MongoClientPool.getInstance().getOrCreateMongoClient(sourceConfig);
     }
 
-    public static ConnectionString buildConnectionString(
+    public static String buildConnectionString(
             @Nullable String username,
             @Nullable String password,
+            String scheme,
             String hosts,
             @Nullable String connectionOptions) {
-        StringBuilder sb = new StringBuilder(MONGODB_SCHEME).append("://");
+        StringBuilder sb = new StringBuilder(scheme).append("://");
 
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             sb.append(encodeValue(username)).append(":").append(encodeValue(password)).append("@");
@@ -362,6 +361,6 @@ public class MongoUtils {
             sb.append("/?").append(connectionOptions);
         }
 
-        return new ConnectionString(sb.toString());
+        return sb.toString();
     }
 }

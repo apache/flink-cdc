@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to initialize {@link OracleSourceConfig}. */
@@ -58,6 +59,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
 
     /** Creates a new {@link OracleSourceConfig} for the given subtask {@code subtaskId}. */
     public OracleSourceConfig create(int subtaskId) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         props.setProperty("connector.class", OracleConnector.class.getCanonicalName());
         // Logical name that identifies and provides a namespace for the particular Oracle
@@ -92,7 +94,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         }
 
         if (schemaList != null) {
-            props.setProperty("schema.whitelist", String.join(",", schemaList));
+            props.setProperty("schema.include.list", String.join(",", schemaList));
         }
 
         if (tableList != null) {
@@ -114,6 +116,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 props,
                 dbzConfiguration,
                 DRIVER_ClASS_NAME,

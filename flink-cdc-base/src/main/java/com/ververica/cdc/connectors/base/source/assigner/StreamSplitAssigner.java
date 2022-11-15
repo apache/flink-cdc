@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.base.source.assigner;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.assigner.state.StreamPendingSplitsState;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
@@ -118,15 +119,44 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
+    public boolean isStreamSplitAssigned() {
+        return isStreamSplitAssigned;
+    }
+
+    @Override
     public void close() {}
 
     // ------------------------------------------------------------------------------------------
 
     public StreamSplit createStreamSplit() {
+        StartupOptions startupOptions = sourceConfig.getStartupOptions();
+
+        Offset startingOffset;
+        switch (startupOptions.startupMode) {
+            case LATEST_OFFSET:
+                startingOffset = dialect.displayCurrentOffset(sourceConfig);
+                break;
+            case EARLIEST_OFFSET:
+                startingOffset = offsetFactory.createInitialOffset();
+                break;
+            case TIMESTAMP:
+                startingOffset =
+                        offsetFactory.createTimestampOffset(startupOptions.startupTimestampMillis);
+                break;
+            case SPECIFIC_OFFSETS:
+                startingOffset =
+                        offsetFactory.newOffset(
+                                startupOptions.specificOffsetFile,
+                                startupOptions.specificOffsetPos.longValue());
+                break;
+            default:
+                throw new IllegalStateException(
+                        "Unsupported startup mode " + startupOptions.startupMode);
+        }
 
         return new StreamSplit(
                 STREAM_SPLIT_ID,
-                dialect.displayCurrentOffset(sourceConfig),
+                startingOffset,
                 offsetFactory.createNoStoppingOffset(),
                 new ArrayList<>(),
                 new HashMap<>(),

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,8 +60,8 @@ public class OceanBaseTestBase extends TestLogger {
     public static final int OB_SERVER_RPC_PORT = 2882;
     public static final int LOG_PROXY_PORT = 2983;
 
-    public static final String OB_SYS_USERNAME = "root";
     public static final String OB_SYS_PASSWORD = "pswd";
+    public static final String OB_TEST_PASSWORD = "test";
 
     public static final String NETWORK_MODE = "host";
 
@@ -91,37 +91,36 @@ public class OceanBaseTestBase extends TestLogger {
 
     // --------------------------------------------------------------------------------------------
     // Attributes about user.
-    // Here we use the root user of 'sys' tenant, which is not recommended for production.
+    // From OceanBase 4.0.0.0 CE, we can only fetch the commit log of non-sys tenant.
     // --------------------------------------------------------------------------------------------
 
     protected static String getTenant() {
-        return "sys";
+        return "test";
     }
 
     protected static String getUsername() {
-        return OB_SYS_USERNAME;
+        return "root@test";
     }
 
     protected static String getPassword() {
-        return OB_SYS_PASSWORD;
+        return OB_TEST_PASSWORD;
     }
 
     @ClassRule
     public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>("oceanbase/oceanbase-ce:3.1.4")
+            new GenericContainer<>("oceanbase/oceanbase-ce:4.0.0.0")
                     .withNetworkMode(NETWORK_MODE)
                     .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
-                    .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
     public static final GenericContainer<?> LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy:1.0.3")
+            new GenericContainer<>("whhe/oblogproxy:1.1.0_4x")
                     .withNetworkMode(NETWORK_MODE)
                     .withExposedPorts(LOG_PROXY_PORT)
-                    .withEnv("OB_SYS_USERNAME", OB_SYS_USERNAME)
+                    .withEnv("OB_SYS_USERNAME", "root")
                     .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT)
@@ -132,6 +131,20 @@ public class OceanBaseTestBase extends TestLogger {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(OB_SERVER, LOG_PROXY)).join();
         LOG.info("Containers are started.");
+
+        setPassword("root@sys", OB_SYS_PASSWORD);
+        setPassword("root@test", OB_TEST_PASSWORD);
+    }
+
+    private static void setPassword(String username, String password) {
+        try (Connection connection = DriverManager.getConnection(getJdbcUrl(""), username, "");
+                Statement statement = connection.createStatement()) {
+            statement.execute(String.format("ALTER USER root IDENTIFIED BY '%s'", password));
+            LOG.info("Set password of {} to {}", username, password);
+        } catch (SQLException e) {
+            LOG.error("Set password of {} failed.", username, e);
+            throw new RuntimeException(e);
+        }
     }
 
     @AfterClass

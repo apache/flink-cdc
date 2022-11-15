@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
@@ -38,6 +39,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -56,6 +58,20 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path sqlServerCdcJar =
             TestUtils.getResource("sqlserver-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+
+    @Parameterized.Parameter(1)
+    public boolean parallelismSnapshot;
+
+    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
+    public static List<Object[]> parameters() {
+        final List<String> flinkVersions = getFlinkVersion();
+        List<Object[]> params = new ArrayList<>();
+        for (String flinkVersion : flinkVersions) {
+            params.add(new Object[] {flinkVersion, true});
+            params.add(new Object[] {flinkVersion, false});
+        }
+        return params;
+    }
 
     @Rule
     public MSSQLServerContainer sqlServer =
@@ -88,6 +104,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     public void testSqlServerCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
+                        "SET 'execution.checkpointing.interval' = '3s';",
                         "CREATE TABLE products_source (",
                         " `id` INT NOT NULL,",
                         " name STRING,",
@@ -101,8 +118,9 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                         " 'username' = '" + sqlServer.getUsername() + "',",
                         " 'password' = '" + sqlServer.getPassword() + "',",
                         " 'database-name' = 'inventory',",
-                        " 'schema-name' = 'dbo',",
-                        " 'table-name' = 'products'",
+                        " 'table-name' = 'dbo.products',",
+                        " 'scan.incremental.snapshot.enabled' = '" + parallelismSnapshot + "',",
+                        " 'scan.incremental.snapshot.chunk.size' = '4'",
                         ");",
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
@@ -126,7 +144,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
         submitSQLJob(sqlLines, sqlServerCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
-        // generate binlogs
+        // generate change stream
         try (Connection conn = getSqlServerJdbcConnection();
                 Statement statement = conn.createStatement()) {
 
@@ -171,7 +189,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                60000L);
+                80000L);
     }
 
     private void initializeSqlServerTable(String sqlFile) {

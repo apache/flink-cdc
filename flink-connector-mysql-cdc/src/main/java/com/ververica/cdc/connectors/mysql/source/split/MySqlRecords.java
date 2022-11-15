@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,9 +75,14 @@ public final class MySqlRecords implements RecordsWithSplitIds<SourceRecords> {
         return finishedSnapshotSplits;
     }
 
-    public static MySqlRecords forRecords(
+    public static MySqlRecords forBinlogRecords(
             final String splitId, final Iterator<SourceRecords> recordsForSplit) {
         return new MySqlRecords(splitId, recordsForSplit, Collections.emptySet());
+    }
+
+    public static MySqlRecords forSnapshotRecords(
+            final String splitId, final Iterator<SourceRecords> recordsForSplit) {
+        return new MySqlRecords(splitId, recordsForSplit, Collections.singleton(splitId));
     }
 
     public static MySqlRecords forFinishedSplit(final String splitId) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@
 
 package com.ververica.cdc.connectors.sqlserver;
 
+import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +70,15 @@ public class SqlServerTestBase extends AbstractTestBase {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();
         LOG.info("Containers are started.");
+    }
+
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping containers...");
+        if (MSSQL_SERVER_CONTAINER != null) {
+            MSSQL_SERVER_CONTAINER.stop();
+        }
+        LOG.info("Containers are stopped.");
     }
 
     protected Connection getJdbcConnection() throws SQLException {
@@ -184,6 +195,30 @@ public class SqlServerTestBase extends AbstractTestBase {
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
+        while (sinkSize(sinkName) == 0) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected static void waitForSinkSize(String sinkName, int expectedSize)
+            throws InterruptedException {
+        while (sinkSize(sinkName) < expectedSize) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected static int sinkSize(String sinkName) {
+        synchronized (TestValuesTableFactory.class) {
+            try {
+                return TestValuesTableFactory.getRawResults(sinkName).size();
+            } catch (IllegalArgumentException e) {
+                // job is not started yet
+                return 0;
+            }
         }
     }
 }

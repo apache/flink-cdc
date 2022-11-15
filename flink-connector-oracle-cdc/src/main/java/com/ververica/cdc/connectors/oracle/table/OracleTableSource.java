@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
@@ -78,6 +77,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final String chunkKeyColumn;
+    private final boolean closeIdleReaders;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -110,7 +110,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             int connectionPoolSize,
             double distributionFactorUpper,
             double distributionFactorLower,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            boolean closeIdleReaders) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -134,16 +135,12 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.closeIdleReaders = closeIdleReaders;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_BEFORE)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
+        return ChangelogMode.all();
     }
 
     @Override
@@ -184,6 +181,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .connectMaxRetries(connectMaxRetries)
                             .distributionFactorUpper(distributionFactorUpper)
                             .distributionFactorLower(distributionFactorLower)
+                            .closeIdleReaders(closeIdleReaders)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -247,7 +245,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         connectionPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
-                        chunkKeyColumn);
+                        chunkKeyColumn,
+                        closeIdleReaders);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -284,7 +283,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
                 && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
-                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(closeIdleReaders, that.closeIdleReaders);
     }
 
     @Override
@@ -312,7 +312,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                closeIdleReaders);
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.apache.flink.api.common.state.CheckpointListener;
 
 import com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.relational.TableId;
 
 import java.util.List;
@@ -38,7 +39,8 @@ public interface ChunkSplitter {
      * Called to split chunks for a table, the assigner could invoke this method multiple times to
      * receive all the splits.
      */
-    List<MySqlSnapshotSplit> splitChunks(TableId tableId) throws Exception;
+    List<MySqlSnapshotSplit> splitChunks(MySqlPartition partition, TableId tableId)
+            throws Exception;
 
     /** Get whether the splitter has more chunks for current table. */
     boolean hasNextChunk();

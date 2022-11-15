@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ public class Db2Source {
             props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
 
             if (tableList != null) {
-                props.setProperty("table.whitelist", String.join(",", tableList));
+                props.setProperty("table.include.list", String.join(",", tableList));
             }
             if (dbzProperties != null) {
                 props.putAll(dbzProperties);

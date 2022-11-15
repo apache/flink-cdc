@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,7 +97,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory'"
+                                + " 'working-mode' = 'memory',"
+                                + " 'jdbc.properties.useSSL' = 'false'"
                                 + ")",
                         getUsername(),
                         getPassword(),
@@ -221,7 +222,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory'"
+                                + " 'working-mode' = 'memory',"
+                                + " 'jdbc.properties.useSSL' = 'false'"
                                 + ")",
                         getUsername(),
                         getPassword(),
@@ -268,16 +270,36 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(sys,inventory_meta,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
-                        "+I(sys,inventory_meta,products,102,car battery,12V car battery,8.1000000000)",
-                        "+I(sys,inventory_meta,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
-                        "+I(sys,inventory_meta,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
-                        "+I(sys,inventory_meta,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
-                        "+I(sys,inventory_meta,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
-                        "+I(sys,inventory_meta,products,107,rocks,box of assorted rocks,5.3000000000)",
-                        "+I(sys,inventory_meta,products,108,jacket,water resistent black wind breaker,0.1000000000)",
-                        "+I(sys,inventory_meta,products,109,spare tire,24 inch spare tire,22.2000000000)",
-                        "+U(sys,inventory_meta,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,102,car battery,12V car battery,8.1000000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,107,rocks,box of assorted rocks,5.3000000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I("
+                                + getTenant()
+                                + ",inventory_meta,products,109,spare tire,24 inch spare tire,22.2000000000)",
+                        "+U("
+                                + getTenant()
+                                + ",inventory_meta,products,106,hammer,18oz carpenter hammer,1.0000000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertContainsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -351,7 +373,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory'"
+                                + " 'working-mode' = 'memory',"
+                                + " 'jdbc.properties.useSSL' = 'false'"
                                 + ")",
                         getUsername(),
                         getPassword(),
@@ -480,7 +503,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.host' = '%s',"
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory'"
+                                + " 'working-mode' = 'memory',"
+                                + " 'jdbc.properties.useSSL' = 'false'"
                                 + ")",
                         getUsername(),
                         getPassword(),
@@ -558,6 +582,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
     public static void assertContainsInAnyOrder(List<String> expected, List<String> actual) {
         assertTrue(expected != null && actual != null);
-        assertTrue(actual.containsAll(expected));
+        assertTrue(
+                String.format("expected: %s, actual: %s", expected, actual),
+                actual.containsAll(expected));
     }
 }

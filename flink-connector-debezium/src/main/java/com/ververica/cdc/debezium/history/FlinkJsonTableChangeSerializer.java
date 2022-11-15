@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.relational.history.TableChanges.TableChangeType;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -57,6 +58,7 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
         document.setString("type", tableChange.getType().name());
         document.setString("id", tableChange.getId().toDoubleQuotedString());
         document.setDocument("table", toDocument(tableChange.getTable()));
+        document.setString("comment", tableChange.getTable().comment());
         return document;
     }
 
@@ -98,10 +100,15 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
         document.setBoolean("optional", column.isOptional());
         document.setBoolean("autoIncremented", column.isAutoIncremented());
         document.setBoolean("generated", column.isGenerated());
+        document.setString("comment", column.comment());
+        document.setBoolean("hasDefaultValue", column.hasDefaultValue());
 
-        // BEGIN FLINK MODIFICATION
-        document.setArray("enumValues", column.enumValues().toArray());
-        // END FLINK MODIFICATION
+        column.defaultValueExpression()
+                .ifPresent(d -> document.setString("defaultValueExpression", d));
+
+        Optional.ofNullable(column.enumValues())
+                .map(List::toArray)
+                .ifPresent(enums -> document.setArray("enumValues", enums));
 
         return document;
     }
@@ -131,6 +138,9 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
                 Table.editor()
                         .tableId(id)
                         .setDefaultCharsetName(document.getString("defaultCharsetName"));
+        if (document.getString("comment") != null) {
+            editor.setComment(document.getString("comment"));
+        }
 
         document.getArray("columns")
                 .streamValues()
@@ -161,22 +171,34 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
                                 columnEditor.scale(scale);
                             }
 
+                            String columnComment = v.getString("comment");
+                            if (columnComment != null) {
+                                columnEditor.comment(columnComment);
+                            }
+
+                            Boolean hasDefaultValue = v.getBoolean("hasDefaultValue");
+                            String defaultValueExpression = v.getString("defaultValueExpression");
+                            if (defaultValueExpression != null) {
+                                columnEditor.defaultValueExpression(defaultValueExpression);
+                            } else if (Boolean.TRUE.equals(hasDefaultValue)) {
+                                columnEditor.defaultValueExpression(null);
+                            }
+
+                            Array enumValues = v.getArray("enumValues");
+                            if (enumValues != null && !enumValues.isEmpty()) {
+                                List<String> enumValueList =
+                                        enumValues
+                                                .streamValues()
+                                                .map(Value::asString)
+                                                .collect(Collectors.toList());
+                                columnEditor.enumValues(enumValueList);
+                            }
+
                             columnEditor
                                     .position(v.getInteger("position"))
                                     .optional(v.getBoolean("optional"))
                                     .autoIncremented(v.getBoolean("autoIncremented"))
                                     .generated(v.getBoolean("generated"));
-
-                            // BEGIN FLINK MODIFICATION
-                            Array enumValues = v.getArray("enumValues");
-                            if (enumValues != null && !enumValues.isEmpty()) {
-                                columnEditor.enumValues(
-                                        enumValues
-                                                .streamValues()
-                                                .map(Value::asString)
-                                                .collect(Collectors.toList()));
-                            }
-                            // END FLINK MODIFICATION
 
                             return columnEditor.create();
                         })

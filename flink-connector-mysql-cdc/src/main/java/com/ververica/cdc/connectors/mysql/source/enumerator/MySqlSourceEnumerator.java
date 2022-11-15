@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,14 +30,13 @@ import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsSt
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitUpdateRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
-import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsSizeEvent;
-import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsSizeRequestEvent;
-import com.ververica.cdc.connectors.mysql.source.events.SuspendBinlogReaderAckEvent;
-import com.ververica.cdc.connectors.mysql.source.events.SuspendBinlogReaderEvent;
-import com.ververica.cdc.connectors.mysql.source.events.WakeupReaderEvent;
+import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberEvent;
+import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -54,9 +53,7 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigning;
-import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningFinished;
-import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSuspended;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
 
 /**
  * A MySQL CDC source enumerator that enumerates receive the split request and assign the split to
@@ -74,7 +71,6 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
-    private boolean binlogReaderIsSuspended = false;
 
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
@@ -84,21 +80,12 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
-
-        // when restored from state, if the split assigner is assigning snapshot
-        // splits or has already assigned all splits, send wakeup event to
-        // SourceReader, SourceReader can omit the event based on its own status.
-        if (isAssigning(splitAssigner.getAssignerStatus())
-                || isAssigningFinished(splitAssigner.getAssignerStatus())) {
-            binlogReaderIsSuspended = true;
-        }
     }
 
     @Override
     public void start() {
         splitAssigner.open();
-        suspendBinlogReaderIfNeed();
-        wakeupBinlogReaderIfNeed();
+        requestBinlogSplitUpdateIfNeed();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
@@ -119,16 +106,16 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void addSplitsBack(List<MySqlSplit> splits, int subtaskId) {
-        LOG.debug("MySQL Source Enumerator adds splits back: {}", splits);
+        LOG.debug("The enumerator adds splits back: {}", splits);
         splitAssigner.addSplits(splits);
     }
 
     @Override
     public void addReader(int subtaskId) {
-        // send SuspendBinlogReaderEvent to source reader if the assigner's status is
-        // suspended
-        if (isSuspended(splitAssigner.getAssignerStatus())) {
-            context.sendEventToSourceReader(subtaskId, new SuspendBinlogReaderEvent());
+        // send BinlogSplitUpdateRequestEvent to source reader after newly added table
+        // snapshot splits finished.
+        if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
+            context.sendEventToSourceReader(subtaskId, new BinlogSplitUpdateRequestEvent());
         }
     }
 
@@ -136,7 +123,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
         if (sourceEvent instanceof FinishedSnapshotSplitsReportEvent) {
             LOG.info(
-                    "The enumerator receives finished split offsets {} from subtask {}.",
+                    "The enumerator under {} receives finished split offsets {} from subtask {}.",
+                    splitAssigner.getAssignerStatus(),
                     sourceEvent,
                     subtaskId);
             FinishedSnapshotSplitsReportEvent reportEvent =
@@ -144,8 +132,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             Map<String, BinlogOffset> finishedOffsets = reportEvent.getFinishedOffsets();
 
             splitAssigner.onFinishedSplits(finishedOffsets);
-
-            wakeupBinlogReaderIfNeed();
+            requestBinlogSplitUpdateIfNeed();
 
             // send acknowledge event
             FinishedSnapshotSplitsAckEvent ackEvent =
@@ -156,13 +143,16 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                     "The enumerator receives request for binlog split meta from subtask {}.",
                     subtaskId);
             sendBinlogMeta(subtaskId, (BinlogSplitMetaRequestEvent) sourceEvent);
-        } else if (sourceEvent instanceof SuspendBinlogReaderAckEvent) {
+        } else if (sourceEvent instanceof BinlogSplitUpdateAckEvent) {
             LOG.info(
-                    "The enumerator receives event that the binlog split reader has been suspended from subtask {}. ",
+                    "The enumerator receives event that the binlog split has been updated from subtask {}. ",
                     subtaskId);
-            handleSuspendBinlogReaderAckEvent(subtaskId);
-        } else if (sourceEvent instanceof LatestFinishedSplitsSizeRequestEvent) {
-            handleLatestFinishedSplitSizeRequest(subtaskId);
+            splitAssigner.onBinlogSplitUpdated();
+        } else if (sourceEvent instanceof LatestFinishedSplitsNumberRequestEvent) {
+            LOG.info(
+                    "The enumerator receives request from subtask {} for the latest finished splits number after added newly tables. ",
+                    subtaskId);
+            handleLatestFinishedSplitNumberRequest(subtaskId);
         }
     }
 
@@ -198,15 +188,23 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 continue;
             }
 
+            if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
+                // close idle readers when snapshot phase finished.
+                context.signalNoMoreSplits(nextAwaiting);
+                awaitingReader.remove();
+                LOG.info("Close idle reader of subtask {}", nextAwaiting);
+                continue;
+            }
+
             Optional<MySqlSplit> split = splitAssigner.getNext();
             if (split.isPresent()) {
                 final MySqlSplit mySqlSplit = split.get();
                 context.assignSplit(mySqlSplit, nextAwaiting);
                 awaitingReader.remove();
-                LOG.info("Assign split {} to subtask {}", mySqlSplit, nextAwaiting);
+                LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
-                wakeupBinlogReaderIfNeed();
+                requestBinlogSplitUpdateIfNeed();
                 break;
             }
         }
@@ -232,27 +230,17 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             }
         }
 
-        suspendBinlogReaderIfNeed();
-        wakeupBinlogReaderIfNeed();
+        requestBinlogSplitUpdateIfNeed();
     }
 
-    private void suspendBinlogReaderIfNeed() {
-        if (isSuspended(splitAssigner.getAssignerStatus())) {
+    private void requestBinlogSplitUpdateIfNeed() {
+        if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
             for (int subtaskId : getRegisteredReader()) {
-                context.sendEventToSourceReader(subtaskId, new SuspendBinlogReaderEvent());
+                LOG.info(
+                        "The enumerator requests subtask {} to update the binlog split after newly added table.",
+                        subtaskId);
+                context.sendEventToSourceReader(subtaskId, new BinlogSplitUpdateRequestEvent());
             }
-            binlogReaderIsSuspended = true;
-        }
-    }
-
-    private void wakeupBinlogReaderIfNeed() {
-        if (isAssigningFinished(splitAssigner.getAssignerStatus()) && binlogReaderIsSuspended) {
-            for (int subtaskId : getRegisteredReader()) {
-                context.sendEventToSourceReader(
-                        subtaskId,
-                        new WakeupReaderEvent(WakeupReaderEvent.WakeUpTarget.BINLOG_READER));
-            }
-            binlogReaderIsSuspended = false;
         }
     }
 
@@ -263,9 +251,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                     splitAssigner.getFinishedSplitInfos();
             if (finishedSnapshotSplitInfos.isEmpty()) {
                 LOG.error(
-                        "The assigner offer empty finished split information, this should not happen");
+                        "The assigner offers empty finished split information, this should not happen");
                 throw new FlinkRuntimeException(
-                        "The assigner offer empty finished split information, this should not happen");
+                        "The assigner offers empty finished split information, this should not happen");
             }
             binlogSplitMeta =
                     Lists.partition(
@@ -285,31 +273,17 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else {
             LOG.error(
-                    "Received invalid request meta group id {}, the valid meta group id range is [0, {}]",
+                    "The enumerator received invalid request meta group id {}, the valid meta group id range is [0, {}]",
                     requestMetaGroupId,
                     binlogSplitMeta.size() - 1);
         }
     }
 
-    private void handleSuspendBinlogReaderAckEvent(int subTask) {
-        LOG.info(
-                "Received event that the binlog split reader has been suspended from subtask {}. ",
-                subTask);
-        splitAssigner.wakeup();
-        if (splitAssigner instanceof MySqlHybridSplitAssigner) {
-            for (int subtaskId : this.getRegisteredReader()) {
-                context.sendEventToSourceReader(
-                        subtaskId,
-                        new WakeupReaderEvent(WakeupReaderEvent.WakeUpTarget.SNAPSHOT_READER));
-            }
-        }
-    }
-
-    private void handleLatestFinishedSplitSizeRequest(int subTask) {
+    private void handleLatestFinishedSplitNumberRequest(int subTask) {
         if (splitAssigner instanceof MySqlHybridSplitAssigner) {
             context.sendEventToSourceReader(
                     subTask,
-                    new LatestFinishedSplitsSizeEvent(
+                    new LatestFinishedSplitsNumberEvent(
                             splitAssigner.getFinishedSplitInfos().size()));
         }
     }

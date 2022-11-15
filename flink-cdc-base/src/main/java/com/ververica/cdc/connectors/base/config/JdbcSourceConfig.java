@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final String username;
     protected final String password;
     protected final List<String> databaseList;
+    protected final List<String> schemaList;
     protected final List<String> tableList;
     protected final int fetchSize;
     protected final String serverTimeZone;
@@ -47,12 +48,14 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     public JdbcSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
+            List<String> schemaList,
             List<String> tableList,
             int splitSize,
             int splitMetaGroupSize,
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
+            boolean closeIdleReaders,
             Properties dbzProperties,
             Configuration dbzConfiguration,
             String driverClassName,
@@ -73,6 +76,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 dbzProperties,
                 dbzConfiguration);
         this.driverClassName = driverClassName;
@@ -81,6 +85,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         this.username = username;
         this.password = password;
         this.databaseList = databaseList;
+        this.schemaList = schemaList;
         this.tableList = tableList;
         this.fetchSize = fetchSize;
         this.serverTimeZone = serverTimeZone;

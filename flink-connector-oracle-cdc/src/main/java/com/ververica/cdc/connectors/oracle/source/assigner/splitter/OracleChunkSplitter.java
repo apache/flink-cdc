@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,7 +74,8 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
             long start = System.currentTimeMillis();
 
             Table table = dialect.queryTableSchema(jdbc, tableId).getTable();
-            Column splitColumn = getSplitColumn(table, sourceConfig);
+            Column splitColumn =
+                    ChunkUtils.getChunkKeyColumn(table, sourceConfig.getChunkKeyColumn());
             final List<ChunkRange> chunks;
             try {
                 chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
@@ -367,7 +368,7 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
     }
 
     private static void maySleep(int count, TableId tableId) {
-        // every 100 queries to sleep 1s
+        // every 10 queries to sleep 0.1s
         if (count % 10 == 0) {
             try {
                 Thread.sleep(100);
@@ -376,9 +377,5 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
             }
             LOG.info("JdbcSourceChunkSplitter has split {} chunks for table {}", count, tableId);
         }
-    }
-
-    public static Column getSplitColumn(Table table, JdbcSourceConfig sourceConfig) {
-        return ChunkUtils.getChunkKeyColumn(table, sourceConfig.getChunkKeyColumn());
     }
 }

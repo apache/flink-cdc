@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
@@ -112,7 +113,7 @@ public class MySqlSourceBuilder<T> {
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
      * TIMESTAMP type in MYSQL converted to STRING. See more
-     * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
+     * https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types
      */
     public MySqlSourceBuilder<T> serverTimeZone(String timeZone) {
         this.configFactory.serverTimeZone(timeZone);
@@ -123,8 +124,8 @@ public class MySqlSourceBuilder<T> {
      * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
      * key column when read the snapshot of table.
      */
-    public MySqlSourceBuilder<T> chunkKeyColumn(String chunkKeyColumn) {
-        this.configFactory.chunkKeyColumn(chunkKeyColumn);
+    public MySqlSourceBuilder<T> chunkKeyColumn(ObjectPath objectPath, String chunkKeyColumn) {
+        this.configFactory.chunkKeyColumn(objectPath, chunkKeyColumn);
         return this;
     }
 
@@ -233,6 +234,21 @@ public class MySqlSourceBuilder<T> {
     /** The interval of heartbeat event. */
     public MySqlSourceBuilder<T> heartbeatInterval(Duration heartbeatInterval) {
         this.configFactory.heartbeatInterval(heartbeatInterval);
+        return this;
+    }
+
+    /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public MySqlSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
+        this.configFactory.closeIdleReaders(closeIdleReaders);
         return this;
     }
 

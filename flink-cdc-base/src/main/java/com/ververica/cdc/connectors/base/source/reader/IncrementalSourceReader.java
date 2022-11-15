@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -133,6 +133,11 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     }
 
     @Override
+    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+        dialect.notifyCheckpointComplete(checkpointId);
+    }
+
+    @Override
     protected void onSplitFinished(Map<String, SourceSplitState> finishedSplitIds) {
         for (SourceSplitState splitState : finishedSplitIds.values()) {
             SourceSplitBase sourceSplit = splitState.toSourceSplit();
@@ -243,7 +248,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                         streamSplit.splitId(),
                         StreamSplit.appendFinishedSplitInfos(streamSplit, metaDataGroup));
 
-                LOG.info("Fill meta data of group {} to stream split", metaDataGroup.size());
+                LOG.info("Fill metadata of group {} to stream split", metaDataGroup.size());
             } else {
                 LOG.warn(
                         "Received out of oder metadata event for split {}, the received meta group id is {}, but expected is {}, ignore it",

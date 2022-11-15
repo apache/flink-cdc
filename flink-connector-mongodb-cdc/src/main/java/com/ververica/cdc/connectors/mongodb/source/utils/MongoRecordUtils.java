@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -175,9 +175,9 @@ public class MongoRecordUtils {
     }
 
     public static Map<String, String> createPartitionMap(
-            String hosts, String database, String collection) {
+            String scheme, String hosts, String database, String collection) {
         StringBuilder builder = new StringBuilder();
-        builder.append("mongodb://");
+        builder.append(String.format("%s://", scheme));
         builder.append(hosts);
         builder.append("/");
         if (StringUtils.isNotEmpty(database)) {
@@ -190,9 +190,9 @@ public class MongoRecordUtils {
         return singletonMap(NAMESPACE_FIELD, builder.toString());
     }
 
-    public static Map<String, Object> createHeartbeatPartitionMap(String hosts) {
+    public static Map<String, Object> createHeartbeatPartitionMap(String scheme, String hosts) {
         StringBuilder builder = new StringBuilder();
-        builder.append("mongodb://");
+        builder.append(String.format("%s://", scheme));
         builder.append(hosts);
         builder.append("/");
         builder.append(HEARTBEAT_TOPIC_NAME);

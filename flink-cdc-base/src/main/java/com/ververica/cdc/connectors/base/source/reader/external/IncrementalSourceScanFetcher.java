@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.base.source.reader.external;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -188,9 +189,17 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
     @Override
     public void close() {
         try {
+            if (taskContext != null) {
+                taskContext.close();
+            }
+
+            if (snapshotSplitReadTask != null) {
+                snapshotSplitReadTask.close();
+            }
+
             if (executorService != null) {
                 executorService.shutdown();
-                if (executorService.awaitTermination(
+                if (!executorService.awaitTermination(
                         READER_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     LOG.warn(
                             "Failed to close the scan fetcher in {} seconds.",
@@ -200,6 +209,11 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         } catch (Exception e) {
             LOG.error("Close scan fetcher error", e);
         }
+    }
+
+    @VisibleForTesting
+    public ExecutorService getExecutorService() {
+        return executorService;
     }
 
     private void assertLowWatermark(SourceRecord lowWatermark) {

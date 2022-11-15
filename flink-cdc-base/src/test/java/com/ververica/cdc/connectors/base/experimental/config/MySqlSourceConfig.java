@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
+            boolean closeIdleReaders,
             Properties dbzProperties,
             Configuration dbzConfiguration,
             String driverClassName,
@@ -60,12 +61,14 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
         super(
                 startupOptions,
                 databaseList,
+                null,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 dbzProperties,
                 dbzConfiguration,
                 driverClassName,

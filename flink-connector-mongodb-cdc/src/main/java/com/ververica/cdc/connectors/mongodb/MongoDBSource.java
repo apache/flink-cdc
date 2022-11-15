@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,12 +36,14 @@ import java.util.Properties;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.COLLECTION_INCLUDE_LIST;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.DATABASE_INCLUDE_LIST;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.HEARTBEAT_TOPIC_NAME;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.OUTPUT_SCHEMA;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
-import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static org.apache.flink.util.Preconditions.checkArgument;
 
@@ -63,7 +65,7 @@ public class MongoDBSource {
 
     /** Builder class of {@link MongoDBSource}. */
     public static class Builder<T> {
-
+        private String scheme = SCHEME.defaultValue();
         private String hosts;
         private String username;
         private String password;
@@ -74,12 +76,23 @@ public class MongoDBSource {
         private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS.defaultValue();
         private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE.defaultValue();
         private Boolean updateLookup = true;
-        private Boolean copyExisting = COPY_EXISTING.defaultValue();
+        private Boolean copyExisting = true;
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
         private String copyExistingPipeline;
         private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
         private DebeziumDeserializationSchema<T> deserializer;
+
+        /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
+        public Builder<T> scheme(String scheme) {
+            checkArgument(
+                    MONGODB_SCHEME.equals(scheme) || MONGODB_SRV_SCHEME.equals(scheme),
+                    String.format(
+                            "The scheme should either be %s or %s",
+                            MONGODB_SCHEME, MONGODB_SRV_SCHEME));
+            this.scheme = scheme;
+            return this;
+        }
 
         /** The comma-separated list of hostname and port pairs of mongodb servers. */
         public Builder<T> hosts(String hosts) {
@@ -260,8 +273,7 @@ public class MongoDBSource {
 
             props.setProperty(
                     MongoSourceConfig.CONNECTION_URI_CONFIG,
-                    String.valueOf(
-                            buildConnectionString(username, password, hosts, connectionOptions)));
+                    buildConnectionString(username, password, scheme, hosts, connectionOptions));
 
             if (databaseList != null) {
                 props.setProperty(DATABASE_INCLUDE_LIST, String.join(",", databaseList));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 
 /** Proxy to communicate with database using JDBC protocol. */
 public class JdbcProxy {
@@ -66,7 +66,8 @@ public class JdbcProxy {
             }
             Collections.sort(results);
             Collections.sort(expectedResult);
-            assertEquals(expectedResult, results);
+            // make it easier to check the result
+            assertArrayEquals(expectedResult.toArray(), results.toArray());
         }
     }
 

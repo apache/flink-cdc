@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.base.options;
 
+import org.apache.flink.annotation.Experimental;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -34,9 +35,8 @@ public class SourceOptions {
                                     + "(1) source can be parallel during snapshot reading, \n"
                                     + "(2) source can perform checkpoints in the chunk granularity during snapshot reading, \n"
                                     + "(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.\n"
-                                    + "If you would like the source run in parallel, each parallel reader should have an unique server id, "
+                                    + "For MySQL, if you would like the source run in parallel, each parallel reader should have an unique server id, "
                                     + "so the 'server-id' must be a range like '5400-6400', and the range must be larger than the parallelism.");
-
     public static final ConfigOption<Integer> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE =
             ConfigOptions.key("scan.incremental.snapshot.chunk.size")
                     .intType()
@@ -111,4 +111,14 @@ public class SourceOptions {
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
+            ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to close idle readers at the end of the snapshot phase. This feature depends on "
+                                    + "FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be "
+                                    + "greater than or equal to 1.14 when enabling this feature.");
 }

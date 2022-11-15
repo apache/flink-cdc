@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Map;
@@ -266,13 +267,20 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convert(Object object) throws Exception {
+            public Object convert(Object object) {
                 int arity = fieldNames.length;
                 GenericRowData row = new GenericRowData(arity);
                 Map<String, Object> fieldMap = (Map<String, Object>) object;
                 for (int i = 0; i < arity; i++) {
                     String fieldName = fieldNames[i];
-                    row.setField(i, fieldConverters[i].convert(fieldMap.get(fieldName)));
+                    Object value = fieldMap.get(fieldName);
+                    try {
+                        row.setField(i, fieldConverters[i].convert(value));
+                    } catch (Exception e) {
+                        throw new RuntimeException(
+                                "Failed to convert field '" + fieldName + "' with value: " + value,
+                                e);
+                    }
                 }
                 return row;
             }
@@ -297,16 +305,11 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 if (object instanceof byte[]) {
                     return "1".equals(new String((byte[]) object, StandardCharsets.UTF_8));
                 }
                 return Boolean.parseBoolean(object.toString()) || "1".equals(object.toString());
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return "1".equals(string);
             }
         };
     }
@@ -317,13 +320,8 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 return Byte.parseByte(object.toString());
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return Byte.parseByte(string);
             }
         };
     }
@@ -334,13 +332,8 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 return Short.parseShort(object.toString());
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return Short.parseShort(string);
             }
         };
     }
@@ -351,7 +344,7 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 if (object instanceof Integer) {
                     return object;
                 } else if (object instanceof Long) {
@@ -362,11 +355,6 @@ public class RowDataOceanBaseDeserializationSchema
                     return Integer.parseInt(object.toString());
                 }
             }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return Integer.parseInt(string);
-            }
         };
     }
 
@@ -376,7 +364,7 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 if (object instanceof Integer) {
                     return ((Integer) object).longValue();
                 } else if (object instanceof Long) {
@@ -384,11 +372,6 @@ public class RowDataOceanBaseDeserializationSchema
                 } else {
                     return Long.parseLong(object.toString());
                 }
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return Long.parseLong(string);
             }
         };
     }
@@ -399,7 +382,7 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 if (object instanceof Float) {
                     return ((Float) object).doubleValue();
                 } else if (object instanceof Double) {
@@ -407,11 +390,6 @@ public class RowDataOceanBaseDeserializationSchema
                 } else {
                     return Double.parseDouble(object.toString());
                 }
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return Double.parseDouble(string);
             }
         };
     }
@@ -422,7 +400,7 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 if (object instanceof Float) {
                     return object;
                 } else if (object instanceof Double) {
@@ -430,11 +408,6 @@ public class RowDataOceanBaseDeserializationSchema
                 } else {
                     return Float.parseFloat(object.toString());
                 }
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return Float.parseFloat(string);
             }
         };
     }
@@ -445,13 +418,11 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
+                if (object instanceof String) {
+                    object = Date.valueOf((String) object);
+                }
                 return (int) TemporalConversions.toLocalDate(object).toEpochDay();
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return (int) Date.valueOf(string).toLocalDate().toEpochDay();
             }
         };
     }
@@ -462,16 +433,14 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 if (object instanceof Long) {
                     return (int) ((Long) object / 1000_000);
                 }
+                if (object instanceof String) {
+                    object = Time.valueOf((String) object);
+                }
                 return TemporalConversions.toLocalTime(object).toSecondOfDay() * 1000;
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return TemporalConversions.toLocalTime(Time.valueOf(string)).toSecondOfDay() * 1000;
             }
         };
     }
@@ -482,20 +451,21 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
+                if (object instanceof String) {
+                    object = Timestamp.valueOf((String) object);
+                }
                 if (object instanceof Timestamp) {
-                    return TimestampData.fromLocalDateTime(((Timestamp) object).toLocalDateTime());
+                    return TimestampData.fromTimestamp((Timestamp) object);
+                }
+                if (object instanceof LocalDateTime) {
+                    return TimestampData.fromLocalDateTime((LocalDateTime) object);
                 }
                 throw new IllegalArgumentException(
                         "Unable to convert to TimestampData from unexpected value '"
                                 + object
                                 + "' of type "
                                 + object.getClass().getName());
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return TimestampData.fromLocalDateTime(Timestamp.valueOf(string).toLocalDateTime());
             }
         };
     }
@@ -507,7 +477,10 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
+                if (object instanceof String) {
+                    object = Timestamp.valueOf((String) object);
+                }
                 if (object instanceof Timestamp) {
                     return TimestampData.fromInstant(
                             ((Timestamp) object)
@@ -515,20 +488,15 @@ public class RowDataOceanBaseDeserializationSchema
                                     .atZone(serverTimeZone)
                                     .toInstant());
                 }
+                if (object instanceof LocalDateTime) {
+                    return TimestampData.fromInstant(
+                            ((LocalDateTime) object).atZone(serverTimeZone).toInstant());
+                }
                 throw new IllegalArgumentException(
                         "Unable to convert to TimestampData from unexpected value '"
                                 + object
                                 + "' of type "
                                 + object.getClass().getName());
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return TimestampData.fromInstant(
-                        Timestamp.valueOf(string)
-                                .toLocalDateTime()
-                                .atZone(serverTimeZone)
-                                .toInstant());
             }
         };
     }
@@ -539,13 +507,8 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 return StringData.fromString(object.toString());
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return StringData.fromString(string);
             }
         };
     }
@@ -556,8 +519,20 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
-                if (object instanceof byte[]) {
+            public Object convert(Object object) {
+                if (object instanceof String) {
+                    try {
+                        long v = Long.parseLong((String) object);
+                        byte[] bytes = ByteBuffer.allocate(8).putLong(v).array();
+                        int i = 0;
+                        while (i < Long.BYTES - 1 && bytes[i] == 0) {
+                            i++;
+                        }
+                        return Arrays.copyOfRange(bytes, i, Long.BYTES);
+                    } catch (NumberFormatException e) {
+                        return ((String) object).getBytes(StandardCharsets.UTF_8);
+                    }
+                } else if (object instanceof byte[]) {
                     String str = new String((byte[]) object, StandardCharsets.US_ASCII);
                     return str.getBytes(StandardCharsets.UTF_8);
                 } else if (object instanceof ByteBuffer) {
@@ -570,21 +545,6 @@ public class RowDataOceanBaseDeserializationSchema
                             "Unsupported BINARY value type: " + object.getClass().getSimpleName());
                 }
             }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                try {
-                    long v = Long.parseLong(string);
-                    byte[] bytes = ByteBuffer.allocate(8).putLong(v).array();
-                    int i = 0;
-                    while (i < Long.BYTES - 1 && bytes[i] == 0) {
-                        i++;
-                    }
-                    return Arrays.copyOfRange(bytes, i, Long.BYTES);
-                } catch (NumberFormatException e) {
-                    return string.getBytes(StandardCharsets.UTF_8);
-                }
-            }
         };
     }
 
@@ -594,8 +554,10 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
-                if (object instanceof byte[]) {
+            public Object convert(Object object) {
+                if (object instanceof String) {
+                    return ((String) object).getBytes(StandardCharsets.UTF_8);
+                } else if (object instanceof byte[]) {
                     return object;
                 } else if (object instanceof ByteBuffer) {
                     ByteBuffer byteBuffer = (ByteBuffer) object;
@@ -606,11 +568,6 @@ public class RowDataOceanBaseDeserializationSchema
                     throw new UnsupportedOperationException(
                             "Unsupported BYTES value type: " + object.getClass().getSimpleName());
                 }
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return string.getBytes(StandardCharsets.UTF_8);
             }
         };
     }
@@ -625,7 +582,7 @@ public class RowDataOceanBaseDeserializationSchema
             private static final long serialVersionUID = 1L;
 
             @Override
-            public Object convertSnapshotEvent(Object object) {
+            public Object convert(Object object) {
                 BigDecimal bigDecimal;
                 if (object instanceof String) {
                     bigDecimal = new BigDecimal((String) object);
@@ -645,11 +602,6 @@ public class RowDataOceanBaseDeserializationSchema
                                     + object.getClass());
                 }
                 return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
-            }
-
-            @Override
-            public Object convertChangeEvent(String string) {
-                return DecimalData.fromBigDecimal(new BigDecimal(string), precision, scale);
             }
         };
     }

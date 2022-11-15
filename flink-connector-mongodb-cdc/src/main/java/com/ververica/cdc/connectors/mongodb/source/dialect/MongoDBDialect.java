@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,8 +120,13 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
     @Override
     public ChangeStreamOffset displayCurrentOffset(MongoDBSourceConfig sourceConfig) {
         MongoClient mongoClient = clientFor(sourceConfig);
-        BsonDocument startupResumeToken =
-                getLatestResumeToken(mongoClient, ChangeStreamDescriptor.deployment());
+        CollectionDiscoveryInfo discoveryInfo = discoverAndCacheDataCollections(sourceConfig);
+        ChangeStreamDescriptor changeStreamDescriptor =
+                getChangeStreamDescriptor(
+                        sourceConfig,
+                        discoveryInfo.getDiscoveredDatabases(),
+                        discoveryInfo.getDiscoveredCollections());
+        BsonDocument startupResumeToken = getLatestResumeToken(mongoClient, changeStreamDescriptor);
 
         ChangeStreamOffset changeStreamOffset;
         if (startupResumeToken != null) {

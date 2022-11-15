@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,8 +53,13 @@ public interface MySqlSplitAssigner {
      */
     boolean waitingForFinishedSplits();
 
+    /** Whether the split assigner is finished stream split assigning. */
+    default boolean isStreamSplitAssigned() {
+        throw new UnsupportedOperationException("Not support to assigning StreamSplit.");
+    }
+
     /**
-     * Gets the finished splits information. This is useful meta data to generate a binlog split
+     * Gets the finished splits' information. This is useful metadata to generate a binlog split
      * that considering finished snapshot splits.
      */
     List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();
@@ -102,14 +107,14 @@ public interface MySqlSplitAssigner {
     /** Gets the split assigner status, see {@code AssignerStatus}. */
     AssignerStatus getAssignerStatus();
 
-    /**
-     * Suspends the assigner under {@link AssignerStatus#INITIAL_ASSIGNING_FINISHED} or {@link
-     * AssignerStatus#NEWLY_ADDED_ASSIGNING_FINISHED}.
-     */
-    void suspend();
+    /** Starts assign newly added tables. */
+    void startAssignNewlyAddedTables();
 
-    /** Wakes up the assigner under {@link AssignerStatus#SUSPENDED}. */
-    void wakeup();
+    /**
+     * Callback to handle the binlog split has been updated in the newly added tables process. This
+     * is useful to check the newly added tables has been finished or not.
+     */
+    void onBinlogSplitUpdated();
 
     /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * pass binlog meta data, i.e. {@link FinishedSnapshotSplitInfo}.
+ * pass binlog metadata, i.e. {@link FinishedSnapshotSplitInfo}.
  */
 public class BinlogSplitMetaEvent implements SourceEvent {
 
@@ -34,10 +34,10 @@ public class BinlogSplitMetaEvent implements SourceEvent {
 
     private final String splitId;
 
-    /** The meta data of binlog split is divided to multiple groups. */
+    /** The metadata of binlog split is divided to multiple groups. */
     private final int metaGroupId;
     /**
-     * The serialized meta data of binlog split, it's serialized/deserialize by {@link
+     * The serialized metadata of binlog split, it's serialized/deserialize by {@link
      * FinishedSnapshotSplitInfo#serialize(FinishedSnapshotSplitInfo)} and {@link
      * FinishedSnapshotSplitInfo#deserialize(byte[])}.
      */

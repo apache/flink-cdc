@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.supportCheckpointsAfterTasksFinished;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGODB_PORT;
@@ -141,6 +142,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         List<String> sqlLines =
                 Arrays.asList(
                         "SET 'execution.checkpointing.interval' = '3s';",
+                        "SET 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true';",
                         "CREATE TABLE products_source (",
                         " _id STRING NOT NULL,",
                         " name STRING,",
@@ -156,7 +158,10 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                         " 'password' = '" + FLINK_USER_PASSWORD + "',",
                         " 'collection' = 'products',",
                         " 'heartbeat.interval.ms' = '1000',",
-                        " 'scan.incremental.snapshot.enabled' = '" + parallelismSnapshot + "'",
+                        " 'scan.incremental.snapshot.enabled' = '" + parallelismSnapshot + "',",
+                        " 'scan.incremental.close-idle-reader.enabled' = '"
+                                + supportCheckpointsAfterTasksFinished()
+                                + "'",
                         ");",
                         "CREATE TABLE mongodb_products_sink (",
                         " `id` STRING NOT NULL,",

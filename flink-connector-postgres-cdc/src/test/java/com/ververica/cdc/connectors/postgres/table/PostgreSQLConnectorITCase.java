@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.postgres.table;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -28,6 +29,8 @@ import com.ververica.cdc.connectors.postgres.PostgresTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -44,6 +47,7 @@ import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
+@RunWith(Parameterized.class)
 public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private final StreamExecutionEnvironment env =
@@ -54,16 +58,33 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
+    private final boolean parallelismSnapshot;
+
+    public PostgreSQLConnectorITCase(boolean parallelismSnapshot) {
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {true}, new Object[] {false}};
+    }
+
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.setParallelism(1);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        if (parallelismSnapshot) {
+            env.setParallelism(4);
+            env.enableCheckpointing(200);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     @Test
     public void testConsumingAllEvents()
             throws SQLException, ExecutionException, InterruptedException {
-        initializePostgresTable("inventory");
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -79,15 +100,19 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'slot.name' = '%s'"
                                 + ")",
-                        POSTGERS_CONTAINER.getHost(),
-                        POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
-                        POSTGERS_CONTAINER.getUsername(),
-                        POSTGERS_CONTAINER.getPassword(),
-                        POSTGERS_CONTAINER.getDatabaseName(),
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
                         "inventory",
-                        "products");
+                        "products",
+                        parallelismSnapshot,
+                        getSlotName());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -108,7 +133,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         waitForSnapshotStarted("sink");
 
-        try (Connection connection = getJdbcConnection();
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
@@ -166,8 +195,81 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
     }
 
     @Test
+    public void testStartupFromLatestOffset() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.startup.mode' = 'latest-offset'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products",
+                        parallelismSnapshot,
+                        getSlotName());
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE debezium_source (EXCLUDING OPTIONS)";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        Thread.sleep(10000L);
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM inventory.products WHERE id=111;");
+        }
+
+        waitForSinkSize("sink", 5);
+
+        String[] expected =
+                new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertThat(actual, containsInAnyOrder(expected));
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
     public void testExceptionForReplicaIdentity() throws Exception {
-        initializePostgresTable("replica_identity");
+        initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -184,16 +286,18 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.slot.name' = '%s'"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'slot.name' = '%s'"
                                 + ")",
-                        POSTGERS_CONTAINER.getHost(),
-                        POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
-                        POSTGERS_CONTAINER.getUsername(),
-                        POSTGERS_CONTAINER.getPassword(),
-                        POSTGERS_CONTAINER.getDatabaseName(),
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
-                        "replica_identity_slot");
+                        parallelismSnapshot,
+                        getSlotName());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -213,7 +317,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "INSERT INTO sink SELECT name, SUM(weight) FROM debezium_source GROUP BY name");
         waitForSnapshotStarted("sink");
 
-        try (Connection connection = getJdbcConnection();
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
@@ -243,7 +351,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     @Test
     public void testAllTypes() throws Throwable {
-        initializePostgresTable("column_type_test");
+        initializePostgresTable(POSTGRES_CONTAINER, "column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -277,15 +385,19 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'slot.name' = '%s'"
                                 + ")",
-                        POSTGERS_CONTAINER.getHost(),
-                        POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
-                        POSTGERS_CONTAINER.getUsername(),
-                        POSTGERS_CONTAINER.getPassword(),
-                        POSTGERS_CONTAINER.getDatabaseName(),
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
                         "inventory",
-                        "full_types");
+                        "full_types",
+                        parallelismSnapshot,
+                        getSlotName());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + "    id INTEGER NOT NULL,"
@@ -308,7 +420,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + "    time_c TIME(0),"
                         + "    default_numeric_c DECIMAL,"
                         + "    geography_c STRING,"
-                        + "    geometry_c STRING"
+                        + "    geometry_c STRING,"
+                        + "    PRIMARY KEY (id) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false'"
@@ -319,9 +432,12 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
 
-        waitForSnapshotStarted("sink");
+        waitForSinkSize("sink", 1);
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
 
-        try (Connection connection = getJdbcConnection();
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute("UPDATE inventory.full_types SET small_c=0 WHERE id=1;");
         }
@@ -331,8 +447,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         List<String> expected =
                 Arrays.asList(
                         "+I(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
-                        "-U(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
-                        "+U(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})");
+                        "-D(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
+                        "+I(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
 
@@ -341,7 +457,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     @Test
     public void testMetadataColumns() throws Throwable {
-        initializePostgresTable("inventory");
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source  ("
@@ -362,16 +478,18 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.slot.name' = '%s'"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'slot.name' = '%s'"
                                 + ")",
-                        POSTGERS_CONTAINER.getHost(),
-                        POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
-                        POSTGERS_CONTAINER.getUsername(),
-                        POSTGERS_CONTAINER.getPassword(),
-                        POSTGERS_CONTAINER.getDatabaseName(),
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
-                        "meta_data_slot");
+                        parallelismSnapshot,
+                        getSlotName());
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -395,8 +513,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
 
         waitForSnapshotStarted("sink");
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
 
-        try (Connection connection = getJdbcConnection();
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
@@ -442,14 +563,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     @Test
     public void testUpsertMode() throws Exception {
-        initializePostgresTable("replica_identity");
+        initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
-                                + " id INT NOT NULL PRIMARY KEY,"
+                                + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'hostname' = '%s',"
@@ -459,17 +581,19 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.slot.name' = '%s',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'changelog-mode' = '%s'"
                                 + ")",
-                        POSTGERS_CONTAINER.getHost(),
-                        POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
-                        POSTGERS_CONTAINER.getUsername(),
-                        POSTGERS_CONTAINER.getPassword(),
-                        POSTGERS_CONTAINER.getDatabaseName(),
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
-                        "replica_identity_slot",
+                        getSlotName(),
+                        parallelismSnapshot,
                         "upsert");
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -490,7 +614,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "INSERT INTO sink SELECT name, SUM(weight) FROM debezium_source GROUP BY name");
         waitForSnapshotStarted("sink");
 
-        try (Connection connection = getJdbcConnection();
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
@@ -549,7 +677,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
         while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
+            Thread.sleep(300);
         }
     }
 

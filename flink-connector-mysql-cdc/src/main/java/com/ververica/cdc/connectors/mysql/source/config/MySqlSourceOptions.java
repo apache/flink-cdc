@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -245,4 +245,14 @@ public class MySqlSourceOptions {
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
                                     + "By default, the chunk key is the first column of the primary key."
                                     + "This column must be a column of the primary key.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
+            ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to close idle readers at the end of the snapshot phase. This feature depends on "
+                                    + "FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be "
+                                    + "greater than or equal to 1.14 when enabling this feature.");
 }

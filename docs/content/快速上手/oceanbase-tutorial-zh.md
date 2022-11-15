@@ -16,13 +16,11 @@
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:3.1.4
+    image: oceanbase/oceanbase-ce:4.0.0.0
     container_name: observer
-    environment:
-      - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.0.3
+    image: whhe/oblogproxy:1.1.0_4x
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
@@ -61,12 +59,42 @@ services:
 docker-compose up -d
 ```
 
-### 准备数据：
+### 设置密码
 
-使用新创建的用户名和密码进行登陆。
+OceanBase 中 root 用户默认是没有密码的，但是 oblogproxy 需要配置一个使用非空密码的系统租户用户，因此这里我们需要先为 root@sys 用户设置一个密码。
+
+登陆 sys 租户的 root 用户：
 
 ```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot -ppswd
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys
+```
+
+设置密码，注意这里的密码需要与上一步中 oblogproxy 服务的环境变量 'OB_SYS_PASSWORD' 保持一样。
+
+```mysql
+ALTER USER root IDENTIFIED BY 'pswd';
+```
+
+OceanBase 从社区版 4.0.0.0 开始只支持对非 sys 租户的增量数据拉取，这里我们使用 test 租户的 root 用户作为示例。
+
+登陆 test 租户的 root 用户：
+
+```shell
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test
+```
+
+设置密码:
+
+```mysql
+ALTER USER root IDENTIFIED BY 'test';
+```
+
+### 准备数据
+
+使用 'root@test' 用户登陆。
+
+```shell
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test -ptest
 ```
 
 ```sql
@@ -110,8 +138,8 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 ```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 
-- [flink-sql-connector-elasticsearch7-1.16.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/1.16.0/flink-sql-connector-elasticsearch7-1.16.0.jar)
-- [flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar)
+- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
+- [flink-sql-connector-oceanbase-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.5-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.5-SNAPSHOT.jar)
 
 ### 在 Flink SQL CLI 中使用 Flink DDL 创建表
 
@@ -134,9 +162,9 @@ Flink SQL> CREATE TABLE orders (
  ) WITH (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
-    'username' = 'root',
-    'password' = 'pswd',
-    'tenant-name' = 'sys',
+    'username' = 'root@test',
+    'password' = 'test',
+    'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^orders$',
     'hostname' = 'localhost',
@@ -156,9 +184,9 @@ Flink SQL> CREATE TABLE products (
   ) WITH (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
-    'username' = 'root',
-    'password' = 'pswd',
-    'tenant-name' = 'sys',
+    'username' = 'root@test',
+    'password' = 'test',
+    'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^products$',
     'hostname' = 'localhost',

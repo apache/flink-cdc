@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ public class StatementUtils {
         // accurate than COUNT(*), but is more efficient for large table.
         final String useDatabaseStatement = String.format("USE %s;", quote(tableId.catalog()));
         final String rowCountQuery = String.format("SHOW TABLE STATUS LIKE '%s';", tableId.table());
-        jdbc.executeWithoutCommitting(useDatabaseStatement);
+        jdbc.execute(useDatabaseStatement);
         return jdbc.queryAndMap(
                 rowCountQuery,
                 rs -> {

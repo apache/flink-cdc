@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -153,10 +152,17 @@ public class MySqlBinlogSplit extends MySqlSplit {
     // -------------------------------------------------------------------
     public static MySqlBinlogSplit appendFinishedSplitInfos(
             MySqlBinlogSplit binlogSplit, List<FinishedSnapshotSplitInfo> splitInfos) {
+        // re-calculate the starting binlog offset after the new table added
+        BinlogOffset startingOffset = binlogSplit.getStartingOffset();
+        for (FinishedSnapshotSplitInfo splitInfo : splitInfos) {
+            if (splitInfo.getHighWatermark().isBefore(startingOffset)) {
+                startingOffset = splitInfo.getHighWatermark();
+            }
+        }
         splitInfos.addAll(binlogSplit.getFinishedSnapshotSplitInfos());
         return new MySqlBinlogSplit(
                 binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
+                startingOffset,
                 binlogSplit.getEndingOffset(),
                 splitInfos,
                 binlogSplit.getTableSchemas(),
@@ -194,9 +200,43 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 normalBinlogSplit.splitId,
                 normalBinlogSplit.getStartingOffset(),
                 normalBinlogSplit.getEndingOffset(),
-                new ArrayList<>(),
-                new HashMap<>(),
+                forwardHighWatermarkToStartingOffset(
+                        normalBinlogSplit.getFinishedSnapshotSplitInfos(),
+                        normalBinlogSplit.getStartingOffset()),
+                normalBinlogSplit.getTableSchemas(),
                 normalBinlogSplit.getTotalFinishedSplitSize(),
                 true);
+    }
+
+    /**
+     * Forwards {@link FinishedSnapshotSplitInfo#getHighWatermark()} to current binlog reading
+     * offset for these snapshot-splits have started the binlog reading, this is pretty useful for
+     * newly added table process that we can continue to consume binlog for these splits from the
+     * updated high watermark.
+     *
+     * @param existedSplitInfos
+     * @param currentBinlogReadingOffset
+     */
+    private static List<FinishedSnapshotSplitInfo> forwardHighWatermarkToStartingOffset(
+            List<FinishedSnapshotSplitInfo> existedSplitInfos,
+            BinlogOffset currentBinlogReadingOffset) {
+        List<FinishedSnapshotSplitInfo> updatedSnapshotSplitInfos = new ArrayList<>();
+        for (FinishedSnapshotSplitInfo existedSplitInfo : existedSplitInfos) {
+            // for split has started read binlog, forward its high watermark to current binlog
+            // reading offset
+            if (existedSplitInfo.getHighWatermark().isBefore(currentBinlogReadingOffset)) {
+                FinishedSnapshotSplitInfo forwardHighWatermarkSnapshotSplitInfo =
+                        new FinishedSnapshotSplitInfo(
+                                existedSplitInfo.getTableId(),
+                                existedSplitInfo.getSplitId(),
+                                existedSplitInfo.getSplitStart(),
+                                existedSplitInfo.getSplitEnd(),
+                                currentBinlogReadingOffset);
+                updatedSnapshotSplitInfos.add(forwardHighWatermarkSnapshotSplitInfo);
+            } else {
+                updatedSnapshotSplitInfos.add(existedSplitInfo);
+            }
+        }
+        return updatedSnapshotSplitInfos;
     }
 }

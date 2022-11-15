@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
     protected final double distributionFactorUpper;
     protected final double distributionFactorLower;
     protected final boolean includeSchemaChanges;
+    protected final boolean closeIdleReaders;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -47,6 +48,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
+            boolean closeIdleReaders,
             Properties dbzProperties,
             Configuration dbzConfiguration) {
         this.startupOptions = startupOptions;
@@ -55,6 +57,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
+        this.closeIdleReaders = closeIdleReaders;
         this.dbzProperties = dbzProperties;
         this.dbzConfiguration = dbzConfiguration;
     }
@@ -85,6 +88,11 @@ public abstract class BaseSourceConfig implements SourceConfig {
     @Override
     public boolean isIncludeSchemaChanges() {
         return includeSchemaChanges;
+    }
+
+    @Override
+    public boolean isCloseIdleReaders() {
+        return closeIdleReaders;
     }
 
     public Properties getDbzProperties() {

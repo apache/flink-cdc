@@ -13,7 +13,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mongodb-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -21,7 +21,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-mongodb-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.4-SNAPSHOT/flink-sql-connector-mongodb-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mongodb-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.5-SNAPSHOT/flink-sql-connector-mongodb-cdc-2.5-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-mongodb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mongodb-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mongodb-cdc), the released version will be available in the Maven central warehouse.
 
@@ -147,6 +147,13 @@ Connector Options
       <td>Specify what connector to use, here should be <code>mongodb-cdc</code>.</td>
     </tr>
     <tr>
+      <td>scheme</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">mongodb</td>
+      <td>String</td>
+      <td>The protocol connected to MongoDB. eg. <code>mongodb or mongodb+srv.</code></td>
+    </tr>
+    <tr>
       <td>hosts</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -199,11 +206,19 @@ Connector Options
       </td>
     </tr>
     <tr>
-      <td>copy.existing</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether copy existing data from source collections.</td>
+        <td>scan.startup.mode</td>
+        <td>optional</td>
+        <td style="word-wrap: break-word;">initial</td>
+        <td>String</td>
+        <td>Optional startup mode for MongoDB CDC consumer, valid enumerations are "initial", "latest-offset" and "timestamp".
+            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+    </tr>
+    <tr>
+        <td>scan.startup.timestamp-millis</td>
+        <td>optional</td>
+        <td style="word-wrap: break-word;">(none)</td>
+        <td>Long</td>
+        <td>Timestamp in millis of the start point, only used for <code>'timestamp'</code> startup mode.</td>
     </tr>
     <tr>
       <td>copy.existing.queue.size</td>
@@ -218,13 +233,6 @@ Connector Options
       <td style="word-wrap: break-word;">1024</td>
       <td>Integer</td>
       <td>The cursor batch size.</td>
-    </tr>
-    <tr>
-      <td>batch.size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">0</td>
-      <td>Integer</td>
-      <td>Change stream cursor batch size. Specifies the maximum number of change events to return in each batch of the response from the MongoDB cluster. The default is 0 meaning it uses the server's default value.</td>
     </tr>
     <tr>
       <td>poll.max.batch.size</td>
@@ -260,6 +268,13 @@ Connector Options
       <td style="word-wrap: break-word;">64</td>
       <td>Integer</td>
       <td>The chunk size mb of incremental snapshot.</td>
+    </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
     </tr>
     </tbody>
 </table>
@@ -330,20 +345,40 @@ Features
 
 The MongoDB CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change stream events with **exactly-once processing** even failures happen. 
 
-### Snapshot When Startup Or Not
+### Startup Reading Position
 
-The config option `copy.existing` specifies whether do snapshot when MongoDB CDC consumer startup. <br>Defaults to `true`.
+The config option `scan.startup.mode` specifies the startup mode for MongoDB CDC consumer. The valid enumerations are:
 
-### Snapshot Data Filters
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest oplog.
+- `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
+  the end of the oplog which means only have the changes since the connector was started.
+- `timestamp`: Skip snapshot phase and start reading oplog events from a specific timestamp.
 
-The config option `copy.existing.pipeline` describing the filters when copying existing data.<br>
-This can filter only required data and improve the use of indexes by the copying manager.
-
-In the following example, the `$match` aggregation operator ensures that only documents in which the closed field is set to false are copied.
-
+For example in DataStream API:
+```java
+MongoDBSource.builder()
+    .startupOptions(StartupOptions.latest()) // Start from latest offset
+    .startupOptions(StartupOptions.timestamp(1667232000000L) // Start from timestamp
+    .build()
 ```
-'copy.existing.pipeline' = '[ { "$match": { "closed": "false" } } ]'
+
+and with SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.startup.mode' = 'latest-offset', -- Start from latest offset
+    ...
+    'scan.incremental.snapshot.enabled' = 'true', -- To use timestamp startup mode should enable incremental snapshot.
+    'scan.startup.mode' = 'timestamp', -- Start from timestamp
+    'scan.startup.timestamp-millis' = '1667232000000' -- Timestamp under timestamp startup mode
+    ...
+)
 ```
+
+**Notes:**
+- 'timestamp' startup mode is not supported by legacy source. To use timestamp startup mode, you need to enable incremental snapshot.
+
 
 ### Change Streams
 
@@ -437,9 +472,9 @@ public class MongoDBIncrementalSourceExample {
 
 Data Type Mapping
 ----------------
-[BSON](https://docs.mongodb.com/manual/reference/bson-types/) short for **Binary JSON** is a bin­ary-en­coded seri­al­iz­a­tion of JSON-like format used to store documents and make remote procedure calls in MongoDB.
+[BSON](https://docs.mongodb.com/manual/reference/bson-types/) short for **Binary JSON** is a binary-encoded serialization of JSON-like format used to store documents and make remote procedure calls in MongoDB.
 
-[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
+[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
 
 In order to enable Flink SQL to process data from heterogeneous data sources, the data types of heterogeneous data sources need to be uniformly converted to Flink SQL data types.
 
@@ -559,7 +594,7 @@ Reference
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
-- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/)
+- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/)
 
 FAQ
 --------

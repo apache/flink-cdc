@@ -63,8 +63,8 @@ docker-compose down
 
 *Download links are available only for stable releases, SNAPSHOT dependency need build by yourself. *
 
-- [flink-sql-connector-elasticsearch7-1.16.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/1.16.0/flink-sql-connector-elasticsearch7-1.16.0.jar)
-- [flink-sql-connector-sqlserver-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.4-SNAPSHOT/flink-sql-connector-sqlserver-cdc-2.4-SNAPSHOT.jar)
+- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
+- [flink-sql-connector-sqlserver-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.5-SNAPSHOT/flink-sql-connector-sqlserver-cdc-2.5-SNAPSHOT.jar)
 
 
 **Preparing data in SqlServer database**
@@ -143,8 +143,7 @@ Flink SQL> CREATE TABLE products (
     'username' = 'sa',
     'password' = 'Password!',
     'database-name' = 'inventory',
-    'schema-name' = 'dbo',
-    'table-name' = 'products'
+    'table-name' = 'dbo.products'
   );
 
 Flink SQL> CREATE TABLE orders (
@@ -161,8 +160,7 @@ Flink SQL> CREATE TABLE orders (
     'username' = 'sa',
     'password' = 'Password!',
     'database-name' = 'inventory',
-    'schema-name' = 'dbo',
-    'table-name' = 'orders'
+    'table-name' = 'dbo.orders'
 );
 
 Flink SQL> CREATE TABLE enriched_orders (

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mongodb.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
@@ -25,6 +26,7 @@ import org.junit.Test;
 
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
+import static org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH;
 
 /** Example Tests for {@link MongoDBSource}. */
 public class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {
@@ -42,9 +44,13 @@ public class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {
                         .username(FLINK_USER)
                         .password(FLINK_USER_PASSWORD)
                         .deserializer(new JsonDebeziumDeserializationSchema())
+                        .closeIdleReaders(true)
                         .build();
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        Configuration config = new Configuration();
+        config.set(ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
         // enable checkpoint
         env.enableCheckpointing(3000);
         // set the source parallelism to 2

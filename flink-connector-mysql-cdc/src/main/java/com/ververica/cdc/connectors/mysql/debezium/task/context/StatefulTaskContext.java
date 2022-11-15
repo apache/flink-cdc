@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,11 +27,13 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.GtidSet;
+import io.debezium.connector.mysql.GtidUtils;
 import io.debezium.connector.mysql.MySqlChangeEventSourceMetricsFactory;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
@@ -42,6 +44,7 @@ import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
@@ -55,6 +58,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
@@ -81,11 +85,12 @@ public class StatefulTaskContext {
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
     private MySqlOffsetContext offsetContext;
+    private MySqlPartition mySqlPartition;
     private TopicSelector<TableId> topicSelector;
-    private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
-    private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
+    private SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
+    private StreamingChangeEventSourceMetrics<MySqlPartition> streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
-    private EventDispatcher.SnapshotReceiver snapshotReceiver;
+    private EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
     private SignalEventDispatcher signalEventDispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
@@ -111,8 +116,13 @@ public class StatefulTaskContext {
                         .getDbzConfiguration()
                         .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 mySqlSplit.getTableSchemas().values());
+
+        Optional.ofNullable(databaseSchema).ifPresent(MySqlDatabaseSchema::close);
         this.databaseSchema =
                 DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
+
+        this.mySqlPartition = new MySqlPartition(connectorConfig.getLogicalName());
+
         this.offsetContext =
                 loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
@@ -152,7 +162,7 @@ public class StatefulTaskContext {
 
         this.signalEventDispatcher =
                 new SignalEventDispatcher(
-                        offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
+                        offsetContext.getOffset(), topicSelector.getPrimaryTopic(), queue);
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
@@ -165,18 +175,17 @@ public class StatefulTaskContext {
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
         this.errorHandler =
-                new MySqlErrorHandler(
-                        connectorConfig.getLogicalName(), queue, taskContext, sourceConfig);
+                new MySqlErrorHandler(connectorConfig, queue, taskContext, sourceConfig);
     }
 
     private void validateAndLoadDatabaseHistory(
             MySqlOffsetContext offset, MySqlDatabaseSchema schema) {
         schema.initializeStorage();
-        schema.recover(offset);
+        schema.recover(Offsets.of(mySqlPartition, offset));
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
-    private MySqlOffsetContext loadStartingOffsetState(
+    protected MySqlOffsetContext loadStartingOffsetState(
             OffsetContext.Loader<MySqlOffsetContext> loader, MySqlSplit mySqlSplit) {
         BinlogOffset offset =
                 mySqlSplit.isSnapshotSplit()
@@ -221,10 +230,21 @@ public class StatefulTaskContext {
                     "Connector used GTIDs previously, but MySQL does not know of any GTIDs or they are not enabled");
             return false;
         }
-        // GTIDs are enabled
-        GtidSet gtidSet = new GtidSet(gtidStr);
+
         // Get the GTID set that is available in the server ...
         GtidSet availableGtidSet = new GtidSet(availableGtidStr);
+
+        // GTIDs are enabled
+        LOG.info("Merging server GTID set {} with restored GTID set {}", availableGtidSet, gtidStr);
+
+        // Based on the current server's GTID, the GTID in MySqlOffsetContext is adjusted to ensure
+        // the completeness of
+        // the GTID. This is done to address the issue of being unable to recover from a checkpoint
+        // in certain startup
+        // modes.
+        GtidSet gtidSet = GtidUtils.fixRestoredGtidSet(availableGtidSet, new GtidSet(gtidStr));
+        LOG.info("Merged GTID set is {}", gtidSet);
+
         if (gtidSet.isContainedWithin(availableGtidSet)) {
             LOG.info(
                     "MySQL current GTID set {} does contain the GTID set {} required by the connector.",
@@ -359,7 +379,7 @@ public class StatefulTaskContext {
         return dispatcher;
     }
 
-    public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
+    public EventDispatcher.SnapshotReceiver<MySqlPartition> getSnapshotReceiver() {
         return snapshotReceiver;
     }
 
@@ -379,17 +399,20 @@ public class StatefulTaskContext {
         return offsetContext;
     }
 
+    public MySqlPartition getMySqlPartition() {
+        return mySqlPartition;
+    }
+
     public TopicSelector<TableId> getTopicSelector() {
         return topicSelector;
     }
 
-    public SnapshotChangeEventSourceMetrics getSnapshotChangeEventSourceMetrics() {
-        snapshotChangeEventSourceMetrics.reset();
+    public SnapshotChangeEventSourceMetrics<MySqlPartition> getSnapshotChangeEventSourceMetrics() {
         return snapshotChangeEventSourceMetrics;
     }
 
-    public StreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
-        streamingChangeEventSourceMetrics.reset();
+    public StreamingChangeEventSourceMetrics<MySqlPartition>
+            getStreamingChangeEventSourceMetrics() {
         return streamingChangeEventSourceMetrics;
     }
 

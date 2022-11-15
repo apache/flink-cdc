@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,6 +106,10 @@ public class MySqlTypeUtils {
         String typeName = column.typeName();
         switch (typeName) {
             case TINYINT:
+                // MySQL haven't boolean type, it uses tinyint(1) to represents boolean type
+                // user should not use tinyint(1) to store number although jdbc url parameter
+                // tinyInt1isBit=false can help change the return value, it's not a general way
+                // btw: mybatis and mysql-connector-java map tinyint(1) to boolean by default
                 return column.length() == 1 ? DataTypes.BOOLEAN() : DataTypes.TINYINT();
             case TINYINT_UNSIGNED:
             case TINYINT_UNSIGNED_ZEROFILL:

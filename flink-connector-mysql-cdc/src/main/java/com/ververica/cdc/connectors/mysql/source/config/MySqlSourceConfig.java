@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.mysql.source.config;
 
+import org.apache.flink.table.catalog.ObjectPath;
+
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import io.debezium.config.Configuration;
@@ -27,6 +29,7 @@ import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -54,8 +57,9 @@ public class MySqlSourceConfig implements Serializable {
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean closeIdleReaders;
     private final Properties jdbcProperties;
-    @Nullable private final String chunkKeyColumn;
+    private final Map<ObjectPath, String> chunkKeyColumns;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -84,9 +88,10 @@ public class MySqlSourceConfig implements Serializable {
             double distributionFactorLower,
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
+            boolean closeIdleReaders,
             Properties dbzProperties,
             Properties jdbcProperties,
-            @Nullable String chunkKeyColumn) {
+            Map<ObjectPath, String> chunkKeyColumns) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -106,11 +111,12 @@ public class MySqlSourceConfig implements Serializable {
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.closeIdleReaders = closeIdleReaders;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
         this.jdbcProperties = jdbcProperties;
-        this.chunkKeyColumn = chunkKeyColumn;
+        this.chunkKeyColumns = chunkKeyColumns;
     }
 
     public String getHostname() {
@@ -190,6 +196,10 @@ public class MySqlSourceConfig implements Serializable {
         return scanNewlyAddedTableEnabled;
     }
 
+    public boolean isCloseIdleReaders() {
+        return closeIdleReaders;
+    }
+
     public Properties getDbzProperties() {
         return dbzProperties;
     }
@@ -210,8 +220,7 @@ public class MySqlSourceConfig implements Serializable {
         return jdbcProperties;
     }
 
-    @Nullable
-    public String getChunkKeyColumn() {
-        return chunkKeyColumn;
+    public Map<ObjectPath, String> getChunkKeyColumns() {
+        return chunkKeyColumns;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,11 +53,13 @@ import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.document.Array;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -78,6 +80,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getFetchTimestamp;
@@ -89,6 +92,8 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHear
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
+import static java.lang.String.format;
+import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -115,7 +120,11 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         MySqlSplit binlogSplit;
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
-                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                            sourceConfig,
+                            jdbc);
             binlogSplit =
                     MySqlBinlogSplit.fillTableSchemas(
                             createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
@@ -160,6 +169,62 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         List<String> restRecords = consumeRecords(restartReader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
+    }
+
+    @Test
+    public void testRemoveSplitAccordingToNewFilter() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        List<String> tableNames =
+                Arrays.asList(
+                        inventoryDatabase.getDatabaseName() + ".products",
+                        inventoryDatabase.getDatabaseName() + ".customers");
+        final MySqlSourceConfig sourceConfig =
+                new MySqlSourceConfigFactory()
+                        .startupOptions(StartupOptions.initial())
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(getTableNameRegex(tableNames.toArray(new String[0])))
+                        .includeSchemaChanges(false)
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .username(customerDatabase.getUsername())
+                        .password(customerDatabase.getPassword())
+                        .serverTimeZone(ZoneId.of("UTC").toString())
+                        .createConfig(0);
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        tableNames.stream().map(TableId::parse).collect(Collectors.toList()),
+                        false);
+        assigner.open();
+        List<MySqlSplit> splits = new ArrayList<>();
+        MySqlSnapshotSplit split = (MySqlSnapshotSplit) assigner.getNext().get();
+        splits.add(split);
+
+        // should contain only one split
+        split = (MySqlSnapshotSplit) assigner.getNext().get();
+        assertFalse(assigner.getNext().isPresent());
+        splits.add(split);
+
+        // create source config for reader but only with one table
+        final MySqlSourceConfig sourceConfig4Reader =
+                new MySqlSourceConfigFactory()
+                        .startupOptions(StartupOptions.initial())
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(
+                                getTableNameRegex(tableNames.subList(0, 1).toArray(new String[0])))
+                        .includeSchemaChanges(false)
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .username(customerDatabase.getUsername())
+                        .password(customerDatabase.getPassword())
+                        .serverTimeZone(ZoneId.of("UTC").toString())
+                        .createConfig(0);
+        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig4Reader, 1);
+        reader.start();
+        reader.addSplits(splits);
+        List<MySqlSplit> mySqlSplits = reader.snapshotState(1L);
+        assertEquals(1, mySqlSplits.size());
     }
 
     @Test
@@ -533,6 +598,16 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             public void close() {
                 // do nothing
             }
+        }
+    }
+
+    private String getTableNameRegex(String[] captureCustomerTables) {
+        checkState(captureCustomerTables.length > 0);
+        if (captureCustomerTables.length == 1) {
+            return captureCustomerTables[0];
+        } else {
+            // pattern that matches multiple tables
+            return format("(%s)", StringUtils.join(captureCustomerTables, "|"));
         }
     }
 }

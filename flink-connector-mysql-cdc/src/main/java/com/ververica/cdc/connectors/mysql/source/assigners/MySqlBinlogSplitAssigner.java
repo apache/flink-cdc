@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import java.util.Optional;
 /** A {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
-    private static final String BINLOG_SPLIT_ID = "binlog-split";
+    public static final String BINLOG_SPLIT_ID = "binlog-split";
 
     private final MySqlSourceConfig sourceConfig;
 
@@ -110,10 +110,15 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public void suspend() {}
+    public boolean isStreamSplitAssigned() {
+        return isBinlogSplitAssigned;
+    }
 
     @Override
-    public void wakeup() {}
+    public void startAssignNewlyAddedTables() {}
+
+    @Override
+    public void onBinlogSplitUpdated() {}
 
     @Override
     public void close() {}

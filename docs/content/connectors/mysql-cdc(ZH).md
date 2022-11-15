@@ -6,7 +6,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 | Connector                                                | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
 |-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| [mysql-cdc](mysql-cdc(ZH).md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.21     |
+| [mysql-cdc](mysql-cdc(ZH).md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27     |
 
 依赖
 ------------
@@ -20,7 +20,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- 请使用已发布的版本依赖，snapshot版本的依赖需要本地自行编译。 -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -28,7 +28,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载 [flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.4-SNAPSHOT/flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.5-SNAPSHOT/flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar) 到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-mysql-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
@@ -56,7 +56,7 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 mysql> FLUSH PRIVILEGES;
 ```
 
-查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-creating-user).
+查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-creating-user).
 
 
 注意事项
@@ -236,21 +236,21 @@ Flink SQL> SELECT * FROM orders;
       <td>scan.startup.specific-offset.gtid-set</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
+      <td>String</td>
       <td>在 "specific-offset" 启动模式下，启动位点的 GTID 集合。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-events</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
+      <td>Long</td>
       <td>在指定的启动位点后需要跳过的事件数量。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-rows</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
+      <td>Long</td>
       <td>在指定的启动位点后需要跳过的数据行数量。</td>
     </tr>
     <tr>
@@ -260,7 +260,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
           它控制 MYSQL 中的时间戳类型如何转换为字符串。
-          更多请参考 <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
+          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
           如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
       </td>
     </tr>
@@ -315,7 +315,14 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+    </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
     </tr>
     </tbody>
 </table>
@@ -688,7 +695,7 @@ $ ./bin/flink run \
       --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 数据类型映射
 ----------------

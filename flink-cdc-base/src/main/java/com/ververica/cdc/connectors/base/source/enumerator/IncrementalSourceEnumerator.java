@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,6 +160,14 @@ public class IncrementalSourceEnumerator
             // it from the list of waiting readers
             if (!context.registeredReaders().containsKey(nextAwaiting)) {
                 awaitingReader.remove();
+                continue;
+            }
+
+            if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
+                // close idle readers when snapshot phase finished.
+                context.signalNoMoreSplits(nextAwaiting);
+                awaitingReader.remove();
+                LOG.info("Close idle reader of subtask {}", nextAwaiting);
                 continue;
             }
 

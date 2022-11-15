@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,8 +45,8 @@ import static org.junit.Assert.assertNotNull;
 public class UniqueDatabase {
 
     private static final String[] CREATE_DATABASE_DDL =
-            new String[] {"CREATE DATABASE $DBNAME$;", "USE $DBNAME$;"};
-    private static final String DROP_DATABASE_DDL = "DROP DATABASE IF EXISTS $DBNAME$;";
+            new String[] {"CREATE DATABASE `$DBNAME$`;", "USE `$DBNAME$`;"};
+    private static final String DROP_DATABASE_DDL = "DROP DATABASE IF EXISTS `$DBNAME$`;";
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     private final MySqlContainer container;

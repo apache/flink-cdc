@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
@@ -26,7 +27,9 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -39,6 +42,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
@@ -68,10 +72,11 @@ public class MySqlSourceConfigFactory implements Serializable {
             CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
-    private String chunkKeyColumn;
+    private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -134,7 +139,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
      * TIMESTAMP type in MYSQL converted to STRING. See more
-     * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
+     * https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types
      */
     public MySqlSourceConfigFactory serverTimeZone(String timeZone) {
         this.serverTimeZone = timeZone;
@@ -145,8 +150,17 @@ public class MySqlSourceConfigFactory implements Serializable {
      * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
      * key column when read the snapshot of table.
      */
-    public MySqlSourceConfigFactory chunkKeyColumn(String chunkKeyColumn) {
-        this.chunkKeyColumn = chunkKeyColumn;
+    public MySqlSourceConfigFactory chunkKeyColumn(ObjectPath objectPath, String chunkKeyColumn) {
+        this.chunkKeyColumns.put(objectPath, chunkKeyColumn);
+        return this;
+    }
+
+    /**
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
+     */
+    public MySqlSourceConfigFactory chunkKeyColumn(Map<ObjectPath, String> chunkKeyColumns) {
+        this.chunkKeyColumns.putAll(chunkKeyColumns);
         return this;
     }
 
@@ -248,16 +262,37 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public MySqlSourceConfigFactory closeIdleReaders(boolean closeIdleReaders) {
+        this.closeIdleReaders = closeIdleReaders;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
-        Properties props = new Properties();
         // hard code server name, because we don't need to distinguish it, docs:
         // Logical name that identifies and provides a namespace for the particular
         // MySQL database server/cluster being monitored. The logical name should be
         // unique across all other connectors, since it is used as a prefix for all
         // Kafka topic names emanating from this connector.
         // Only alphanumeric characters and underscores should be used.
-        props.setProperty("database.server.name", "mysql_binlog_source");
+        return createConfig(subtaskId, "mysql_binlog_source");
+    }
+
+    /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
+    public MySqlSourceConfig createConfig(int subtaskId, String serverName) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
+        Properties props = new Properties();
+        props.setProperty("database.server.name", serverName);
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
@@ -330,8 +365,9 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorLower,
                 includeSchemaChanges,
                 scanNewlyAddedTableEnabled,
+                closeIdleReaders,
                 props,
                 jdbcProperties,
-                chunkKeyColumn);
+                chunkKeyColumns);
     }
 }

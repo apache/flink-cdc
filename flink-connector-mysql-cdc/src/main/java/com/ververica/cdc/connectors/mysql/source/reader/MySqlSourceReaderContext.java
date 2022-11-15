@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,26 +25,36 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
 public class MySqlSourceReaderContext {
 
     private final SourceReaderContext sourceReaderContext;
-    private volatile boolean stopBinlogSplitReader;
+    private volatile boolean isBinlogSplitReaderSuspended;
+    private volatile boolean hasAssignedBinlogSplit;
 
     public MySqlSourceReaderContext(final SourceReaderContext sourceReaderContext) {
         this.sourceReaderContext = sourceReaderContext;
-        this.stopBinlogSplitReader = false;
+        this.isBinlogSplitReaderSuspended = false;
+        this.hasAssignedBinlogSplit = false;
     }
 
     public SourceReaderContext getSourceReaderContext() {
         return sourceReaderContext;
     }
 
-    public boolean needStopBinlogSplitReader() {
-        return stopBinlogSplitReader;
+    public boolean isBinlogSplitReaderSuspended() {
+        return isBinlogSplitReaderSuspended;
     }
 
-    public void setStopBinlogSplitReader() {
-        this.stopBinlogSplitReader = true;
+    public void suspendBinlogSplitReader() {
+        this.isBinlogSplitReaderSuspended = true;
     }
 
-    public void resetStopBinlogSplitReader() {
-        this.stopBinlogSplitReader = false;
+    public void wakeupSuspendedBinlogSplitReader() {
+        this.isBinlogSplitReaderSuspended = false;
+    }
+
+    public boolean isHasAssignedBinlogSplit() {
+        return hasAssignedBinlogSplit;
+    }
+
+    public void setHasAssignedBinlogSplit(boolean hasAssignedBinlogSplit) {
+        this.hasAssignedBinlogSplit = hasAssignedBinlogSplit;
     }
 }

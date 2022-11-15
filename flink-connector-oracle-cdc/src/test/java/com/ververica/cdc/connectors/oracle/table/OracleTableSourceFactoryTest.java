@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,7 +118,9 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -152,7 +154,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -190,7 +193,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -214,6 +218,8 @@ public class OracleTableSourceFactoryTest {
                 String.valueOf(chunkSize));
         options.put(SourceOptions.CHUNK_META_GROUP_SIZE.key(), String.valueOf(splitMetaGroupSize));
         options.put(SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
+        options.put(SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.key(), "true");
+
         options.put(
                 JdbcSourceOptions.CONNECT_TIMEOUT.key(),
                 String.format("%ds", connectTimeout.getSeconds()));
@@ -251,7 +257,8 @@ public class OracleTableSourceFactoryTest {
                         connectPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
-                        null);
+                        null,
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -286,7 +293,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -321,7 +329,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -360,7 +369,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");

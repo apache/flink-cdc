@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,8 @@ public class SourceRecordUtils {
 
     public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
             "io.debezium.connector.mysql.SchemaChangeKey";
+    public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
+            "io.debezium.connector.common.Heartbeat";
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
 
     /** Converts a {@link ResultSet} row to an array of Objects. */
@@ -99,8 +101,16 @@ public class SourceRecordUtils {
     public static boolean isDataChangeRecord(SourceRecord record) {
         Schema valueSchema = record.valueSchema();
         Struct value = (Struct) record.value();
-        return valueSchema.field(Envelope.FieldName.OPERATION) != null
+        return value != null
+                && valueSchema != null
+                && valueSchema.field(Envelope.FieldName.OPERATION) != null
                 && value.getString(Envelope.FieldName.OPERATION) != null;
+    }
+
+    public static boolean isHeartbeatEvent(SourceRecord record) {
+        Schema valueSchema = record.valueSchema();
+        return valueSchema != null
+                && SCHEMA_HEARTBEAT_EVENT_KEY_NAME.equalsIgnoreCase(valueSchema.name());
     }
 
     public static TableId getTableId(SourceRecord dataRecord) {

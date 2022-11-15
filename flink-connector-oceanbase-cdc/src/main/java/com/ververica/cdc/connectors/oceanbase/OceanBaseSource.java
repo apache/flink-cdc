@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
+import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -56,6 +57,9 @@ public class OceanBaseSource {
         // snapshot reading config
         private String hostname;
         private Integer port;
+        private String compatibleMode;
+        private String jdbcDriver;
+        private Properties jdbcProperties;
 
         // incremental reading config
         private String logProxyHost;
@@ -123,6 +127,21 @@ public class OceanBaseSource {
             return this;
         }
 
+        public Builder<T> compatibleMode(String compatibleMode) {
+            this.compatibleMode = compatibleMode;
+            return this;
+        }
+
+        public Builder<T> jdbcDriver(String jdbcDriver) {
+            this.jdbcDriver = jdbcDriver;
+            return this;
+        }
+
+        public Builder<T> jdbcProperties(Properties jdbcProperties) {
+            this.jdbcProperties = jdbcProperties;
+            return this;
+        }
+
         public Builder<T> logProxyHost(String logProxyHost) {
             this.logProxyHost = logProxyHost;
             return this;
@@ -168,6 +187,11 @@ public class OceanBaseSource {
                 case INITIAL:
                     checkNotNull(hostname, "hostname shouldn't be null on startup mode 'initial'");
                     checkNotNull(port, "port shouldn't be null on startup mode 'initial'");
+                    checkNotNull(
+                            compatibleMode,
+                            "compatibleMode shouldn't be null on startup mode 'initial'");
+                    checkNotNull(
+                            jdbcDriver, "jdbcDriver shouldn't be null on startup mode 'initial'");
                     startupTimestamp = 0L;
                     break;
                 case LATEST_OFFSET:
@@ -183,6 +207,12 @@ public class OceanBaseSource {
                             startupMode + " mode is not supported.");
             }
 
+            if (!startupMode.equals(StartupMode.INITIAL)
+                    && (StringUtils.isNotEmpty(databaseName)
+                            || StringUtils.isNotEmpty(tableName))) {
+                throw new IllegalArgumentException(
+                        "If startup mode is not 'INITIAL', 'database-name' and 'table-name' must not be configured");
+            }
             if (StringUtils.isNotEmpty(databaseName) || StringUtils.isNotEmpty(tableName)) {
                 if (StringUtils.isEmpty(databaseName) || StringUtils.isEmpty(tableName)) {
                     throw new IllegalArgumentException(
@@ -231,7 +261,7 @@ public class OceanBaseSource {
             obReaderConfig.setStartTimestamp(startupTimestamp);
             obReaderConfig.setTimezone(serverTimeZone);
 
-            return new OceanBaseRichSourceFunction<T>(
+            return new OceanBaseRichSourceFunction<>(
                     StartupMode.INITIAL.equals(startupMode),
                     username,
                     password,
@@ -242,6 +272,9 @@ public class OceanBaseSource {
                     connectTimeout,
                     hostname,
                     port,
+                    compatibleMode,
+                    jdbcDriver,
+                    jdbcProperties,
                     logProxyHost,
                     logProxyPort,
                     clientConf,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,12 @@ public class MongoDBSourceBuilder<T> {
 
     private final MongoDBSourceConfigFactory configFactory = new MongoDBSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
+
+    /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
+    public MongoDBSourceBuilder<T> scheme(String scheme) {
+        this.configFactory.scheme(scheme);
+        return this;
+    }
 
     /** The comma-separated list of hostname and port pairs of mongodb servers. */
     public MongoDBSourceBuilder<T> hosts(String hosts) {
@@ -130,18 +136,13 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
-     * copy.existing
+     * scan.startup.mode
      *
-     * <p>Copy existing data from source collections and convert them to Change Stream events on
-     * their respective topics. Any changes to the data that occur during the copy process are
-     * applied once the copy is completed.
+     * <p>Optional startup mode for MongoDB CDC consumer, valid enumerations are initial,
+     * latest-offset, timestamp. Default: initial
      */
-    public MongoDBSourceBuilder<T> copyExisting(boolean copyExisting) {
-        if (copyExisting) {
-            this.configFactory.startupOptions(StartupOptions.initial());
-        } else {
-            this.configFactory.startupOptions(StartupOptions.latest());
-        }
+    public MongoDBSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
+        this.configFactory.startupOptions(startupOptions);
         return this;
     }
 
@@ -178,6 +179,23 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * scan.incremental.close-idle-reader.enabled
+     *
+     * <p>Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public MongoDBSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
+        this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
+    /**
      * The deserializer used to convert from consumed {@link
      * org.apache.kafka.connect.source.SourceRecord}.
      */
@@ -192,7 +210,6 @@ public class MongoDBSourceBuilder<T> {
      * @return a MongoDBParallelSource with the settings made for this builder.
      */
     public MongoDBSource<T> build() {
-        configFactory.validate();
         return new MongoDBSource<>(configFactory, checkNotNull(deserializer));
     }
 }

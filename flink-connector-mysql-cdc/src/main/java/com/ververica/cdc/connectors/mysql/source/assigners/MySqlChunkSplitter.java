@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
@@ -112,11 +113,12 @@ public class MySqlChunkSplitter implements ChunkSplitter {
     }
 
     @Override
-    public List<MySqlSnapshotSplit> splitChunks(TableId tableId) throws Exception {
+    public List<MySqlSnapshotSplit> splitChunks(MySqlPartition partition, TableId tableId)
+            throws Exception {
         if (!hasNextChunk()) {
-            analyzeTable(tableId);
+            analyzeTable(partition, tableId);
             Optional<List<MySqlSnapshotSplit>> evenlySplitChunks =
-                    trySplitAllEvenlySizedChunks(tableId);
+                    trySplitAllEvenlySizedChunks(partition, tableId);
             if (evenlySplitChunks.isPresent()) {
                 return evenlySplitChunks.get();
             } else {
@@ -124,7 +126,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                     this.currentSplittingTableId = tableId;
                     this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
                     this.nextChunkId = 0;
-                    return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+                    return Collections.singletonList(
+                            splitOneUnevenlySizedChunk(partition, tableId));
                 }
             }
         } else {
@@ -132,21 +135,22 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                     currentSplittingTableId.equals(tableId),
                     "Can not split a new table before the previous table splitting finish.");
             if (currentSplittingTable == null) {
-                analyzeTable(currentSplittingTableId);
+                analyzeTable(partition, currentSplittingTableId);
             }
             synchronized (lock) {
-                return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+                return Collections.singletonList(splitOneUnevenlySizedChunk(partition, tableId));
             }
         }
     }
 
     /** Analyze the meta information for given table. */
-    private void analyzeTable(TableId tableId) {
+    private void analyzeTable(MySqlPartition partition, TableId tableId) {
         try {
-            currentSplittingTable = mySqlSchema.getTableSchema(jdbcConnection, tableId).getTable();
+            currentSplittingTable =
+                    mySqlSchema.getTableSchema(partition, jdbcConnection, tableId).getTable();
             splitColumn =
                     ChunkUtils.getChunkKeyColumn(
-                            currentSplittingTable, sourceConfig.getChunkKeyColumn());
+                            currentSplittingTable, sourceConfig.getChunkKeyColumns());
             splitType = ChunkUtils.getChunkKeyColumnType(splitColumn);
             minMaxOfSplitColumn = queryMinMax(jdbcConnection, tableId, splitColumn.name());
             approximateRowCnt = queryApproximateRowCnt(jdbcConnection, tableId);
@@ -156,7 +160,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
     }
 
     /** Generates one snapshot split (chunk) for the give table path. */
-    private MySqlSnapshotSplit splitOneUnevenlySizedChunk(TableId tableId) throws SQLException {
+    private MySqlSnapshotSplit splitOneUnevenlySizedChunk(MySqlPartition partition, TableId tableId)
+            throws SQLException {
         final int chunkSize = sourceConfig.getSplitSize();
         final Object chunkStartVal = nextChunkStart.getValue();
         LOG.info(
@@ -182,12 +187,24 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         if (chunkEnd != null && ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) <= 0) {
             nextChunkStart = ChunkSplitterState.ChunkBound.middleOf(chunkEnd);
             return createSnapshotSplit(
-                    jdbcConnection, tableId, nextChunkId++, splitType, chunkStartVal, chunkEnd);
+                    jdbcConnection,
+                    partition,
+                    tableId,
+                    nextChunkId++,
+                    splitType,
+                    chunkStartVal,
+                    chunkEnd);
         } else {
             currentSplittingTableId = null;
             nextChunkStart = ChunkSplitterState.ChunkBound.END_BOUND;
             return createSnapshotSplit(
-                    jdbcConnection, tableId, nextChunkId++, splitType, chunkStartVal, null);
+                    jdbcConnection,
+                    partition,
+                    tableId,
+                    nextChunkId++,
+                    splitType,
+                    chunkStartVal,
+                    null);
         }
     }
 
@@ -198,14 +215,16 @@ public class MySqlChunkSplitter implements ChunkSplitter {
      * using evenly-sized chunks which is much efficient, using unevenly-sized chunks which will
      * request many queries and is not efficient.
      */
-    private Optional<List<MySqlSnapshotSplit>> trySplitAllEvenlySizedChunks(TableId tableId) {
+    private Optional<List<MySqlSnapshotSplit>> trySplitAllEvenlySizedChunks(
+            MySqlPartition partition, TableId tableId) {
         LOG.debug("Try evenly splitting table {} into chunks", tableId);
         final Object min = minMaxOfSplitColumn[0];
         final Object max = minMaxOfSplitColumn[1];
         if (min == null || max == null || min.equals(max)) {
             // empty table, or only one row, return full table scan as a chunk
             return Optional.of(
-                    generateSplits(tableId, Collections.singletonList(ChunkRange.all())));
+                    generateSplits(
+                            partition, tableId, Collections.singletonList(ChunkRange.all())));
         }
 
         final int chunkSize = sourceConfig.getSplitSize();
@@ -216,7 +235,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             List<ChunkRange> chunks =
                     splitEvenlySizedChunks(
                             tableId, min, max, approximateRowCnt, chunkSize, dynamicChunkSize);
-            return Optional.of(generateSplits(tableId, chunks));
+            return Optional.of(generateSplits(partition, tableId, chunks));
         } else {
             LOG.debug("beginning unevenly splitting table {} into chunks", tableId);
             return Optional.empty();
@@ -224,7 +243,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
     }
 
     /** Generates all snapshot splits (chunks) from chunk ranges. */
-    private List<MySqlSnapshotSplit> generateSplits(TableId tableId, List<ChunkRange> chunks) {
+    private List<MySqlSnapshotSplit> generateSplits(
+            MySqlPartition partition, TableId tableId, List<ChunkRange> chunks) {
         // convert chunks into splits
         List<MySqlSnapshotSplit> splits = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
@@ -232,6 +252,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             MySqlSnapshotSplit split =
                     createSnapshotSplit(
                             jdbcConnection,
+                            partition,
                             tableId,
                             i,
                             splitType,
@@ -315,6 +336,18 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
+
+            // queryMin will return null when the chunkEnd is the max value,
+            // this will happen when the mysql table ignores the capitalization.
+            // see more detail at the test MySqlConnectorITCase#testReadingWithMultiMaxValue.
+            // In the test, the max value of order_id will return 'e' and when we get the chunkEnd =
+            // 'E',
+            // this method will return 'E' and will not return null.
+            // When this method is invoked next time, queryMin will return null here.
+            // So we need return null when we reach the max value here.
+            if (chunkEnd == null) {
+                return null;
+            }
         }
         if (ObjectUtils.compare(chunkEnd, max) >= 0) {
             return null;
@@ -325,6 +358,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
 
     private MySqlSnapshotSplit createSnapshotSplit(
             JdbcConnection jdbc,
+            MySqlPartition partition,
             TableId tableId,
             int chunkId,
             RowType splitKeyType,
@@ -334,7 +368,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         Object[] splitStart = chunkStart == null ? null : new Object[] {chunkStart};
         Object[] splitEnd = chunkEnd == null ? null : new Object[] {chunkEnd};
         Map<TableId, TableChange> schema = new HashMap<>();
-        schema.put(tableId, mySqlSchema.getTableSchema(jdbc, tableId));
+        schema.put(tableId, mySqlSchema.getTableSchema(partition, jdbc, tableId));
         return new MySqlSnapshotSplit(
                 tableId,
                 splitId(tableId, chunkId),
@@ -426,7 +460,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
     }
 
     private static void maySleep(int count, TableId tableId) {
-        // every 100 queries to sleep 1s
+        // every 10 queries to sleep 0.1s
         if (count % 10 == 0) {
             try {
                 Thread.sleep(100);
@@ -450,5 +484,6 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         if (jdbcConnection != null) {
             jdbcConnection.close();
         }
+        mySqlSchema.close();
     }
 }

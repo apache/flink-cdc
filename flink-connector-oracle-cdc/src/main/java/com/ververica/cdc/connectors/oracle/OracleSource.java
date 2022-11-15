@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.oracle;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.ververica.cdc.debezium.internal.DebeziumOffset;
 import io.debezium.connector.oracle.OracleConnector;
 
 import javax.annotation.Nullable;
@@ -161,13 +160,14 @@ public class OracleSource {
             props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
             props.setProperty("database.dbname", checkNotNull(database));
             if (schemaList != null) {
-                props.setProperty("schema.whitelist", String.join(",", schemaList));
+                props.setProperty("schema.include.list", String.join(",", schemaList));
             }
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }
+            // we need this in order not to lose any transaction during snapshot to streaming switch
+            props.setProperty("internal.log.mining.transaction.snapshot.boundary.mode", "all");
 
-            DebeziumOffset specificOffset = null;
             switch (startupOptions.startupMode) {
                 case INITIAL:
                     props.setProperty("snapshot.mode", "initial");
@@ -193,7 +193,7 @@ public class OracleSource {
             }
 
             return new DebeziumSourceFunction<>(
-                    deserializer, props, specificOffset, new OracleValidator(props));
+                    deserializer, props, null, new OracleValidator(props));
         }
     }
 }

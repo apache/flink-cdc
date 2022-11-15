@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -56,6 +57,7 @@ public class Handover implements Closeable {
     private List<ChangeEvent<SourceRecord, SourceRecord>> next;
 
     @GuardedBy("lock")
+    @Nullable
     private Throwable error;
 
     private boolean wakeupProducer;
@@ -159,6 +161,18 @@ public class Handover implements Closeable {
      */
     public boolean hasError() {
         return error != null;
+    }
+
+    /**
+     * Return the error, if its set.
+     *
+     * @return the error, if its set
+     */
+    @Nullable
+    public Throwable getError() {
+        synchronized (lock) {
+            return this.error;
+        }
     }
 
     /**

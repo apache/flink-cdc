@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import com.mongodb.MongoNamespace;
 import com.mongodb.client.ChangeStreamIterable;
 import com.mongodb.client.MongoChangeStreamCursor;
 import com.mongodb.client.MongoClient;
+import com.mongodb.client.model.changestream.OperationType;
 import com.mongodb.kafka.connect.source.heartbeat.HeartbeatManager;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
@@ -47,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.CLUSTER_TIME_FIELD;
@@ -57,6 +59,7 @@ import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.ID_F
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.NAMESPACE_COLLECTION_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.NAMESPACE_DATABASE_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.NAMESPACE_FIELD;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.OPERATION_TYPE_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.SNAPSHOT_KEY_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.SOURCE_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.TIMESTAMP_KEY_FIELD;
@@ -130,26 +133,42 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                                         .map(this::normalizeHeartbeatRecord)
                                         .orElse(null);
                     }
+                    // update nextUpdateTime
+                    nextUpdate = time.milliseconds() + sourceConfig.getPollAwaitTimeMillis();
                 } else {
                     BsonDocument changeStreamDocument = next.get();
-                    MongoNamespace namespace = getMongoNamespace(changeStreamDocument);
+                    OperationType operationType = getOperationType(changeStreamDocument);
 
-                    BsonDocument resumeToken = changeStreamDocument.getDocument(ID_FIELD);
-                    BsonDocument valueDocument =
-                            normalizeChangeStreamDocument(changeStreamDocument);
+                    switch (operationType) {
+                        case INSERT:
+                        case UPDATE:
+                        case REPLACE:
+                        case DELETE:
+                            MongoNamespace namespace = getMongoNamespace(changeStreamDocument);
 
-                    LOG.trace("Adding {} to {}", valueDocument, namespace.getFullName());
+                            BsonDocument resumeToken = changeStreamDocument.getDocument(ID_FIELD);
+                            BsonDocument valueDocument =
+                                    normalizeChangeStreamDocument(changeStreamDocument);
 
-                    changeRecord =
-                            createSourceRecord(
-                                    createPartitionMap(
-                                            sourceConfig.getHosts(),
-                                            namespace.getDatabaseName(),
-                                            namespace.getCollectionName()),
-                                    createSourceOffsetMap(resumeToken, false),
-                                    namespace.getFullName(),
-                                    changeStreamDocument.getDocument(ID_FIELD),
-                                    valueDocument);
+                            LOG.trace("Adding {} to {}", valueDocument, namespace.getFullName());
+
+                            changeRecord =
+                                    createSourceRecord(
+                                            createPartitionMap(
+                                                    sourceConfig.getScheme(),
+                                                    sourceConfig.getHosts(),
+                                                    namespace.getDatabaseName(),
+                                                    namespace.getCollectionName()),
+                                            createSourceOffsetMap(resumeToken, false),
+                                            namespace.getFullName(),
+                                            changeStreamDocument.getDocument(ID_FIELD),
+                                            valueDocument);
+                            break;
+                        default:
+                            // Ignore drop、drop_database、rename and other record to prevent
+                            // documentKey from being empty.
+                            LOG.info("Ignored {} record: {}", operationType, changeStreamDocument);
+                    }
                 }
 
                 if (changeRecord != null) {
@@ -202,11 +221,14 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         return streamSplit;
     }
 
+    @Override
+    public void close() {}
+
     private MongoChangeStreamCursor<BsonDocument> openChangeStreamCursor(
             ChangeStreamDescriptor changeStreamDescriptor) {
         ChangeStreamOffset offset =
-                new ChangeStreamOffset(streamSplit.getStartingOffset().getOffset());
-
+                new ChangeStreamOffset(
+                        (Map<String, String>) streamSplit.getStartingOffset().getOffset());
         ChangeStreamIterable<Document> changeStreamIterable =
                 getChangeStreamIterable(sourceConfig, changeStreamDescriptor);
 
@@ -275,7 +297,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                     changeStreamCursor,
                     sourceConfig.getHeartbeatIntervalMillis(),
                     HEARTBEAT_TOPIC_NAME,
-                    createHeartbeatPartitionMap(sourceConfig.getHosts()));
+                    createHeartbeatPartitionMap(sourceConfig.getScheme(), sourceConfig.getHosts()));
         }
         return null;
     }
@@ -342,6 +364,11 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         return new MongoNamespace(
                 ns.getString(NAMESPACE_DATABASE_FIELD).getValue(),
                 ns.getString(NAMESPACE_COLLECTION_FIELD).getValue());
+    }
+
+    private OperationType getOperationType(BsonDocument changeStreamDocument) {
+        return OperationType.fromString(
+                changeStreamDocument.getString(OPERATION_TYPE_FIELD).getValue());
     }
 
     private boolean isBoundedRead() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHisto
  * <p>Note: currently, the source function can't run in multiple parallel instances.
  *
  * <p>Please refer to Debezium's documentation for the available configuration properties:
- * https://debezium.io/documentation/reference/1.5/development/engine.html#engine-properties
+ * https://debezium.io/documentation/reference/1.9/development/engine.html#engine-properties
  */
 @PublicEvolving
 public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
@@ -305,7 +305,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         if (handover.hasError()) {
             LOG.debug("snapshotState() called on closed source");
             throw new FlinkRuntimeException(
-                    "Call snapshotState() on closed source, checkpoint failed.");
+                    "Call snapshotState() on closed source, checkpoint failed.",
+                    handover.getError());
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
             snapshotHistoryRecordsState();
@@ -441,7 +442,24 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 "sourceIdleTime", (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
 
         // start the real debezium consumer
-        debeziumChangeFetcher.runFetchLoop();
+        try {
+            debeziumChangeFetcher.runFetchLoop();
+        } catch (Throwable t) {
+            if (t.getMessage() != null
+                    && t.getMessage()
+                            .contains(
+                                    "A slave with the same server_uuid/server_id as this slave has connected to the master")) {
+                throw new RuntimeException(
+                        "The 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
+                                + "The server id conflict may happen in the following situations: \n"
+                                + "1. The server id has been used by other mysql cdc table in the current job.\n"
+                                + "2. The server id has been used by the mysql cdc table in other jobs.\n"
+                                + "3. The server id has been used by other sync tools like canal, debezium and so on.\n",
+                        t);
+            } else {
+                throw t;
+            }
+        }
     }
 
     @Override

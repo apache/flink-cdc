@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.utils;
 
 import io.debezium.DebeziumException;
+import io.debezium.relational.TableId;
 import io.debezium.util.HexConverter;
 
 import java.io.ByteArrayInputStream;
@@ -76,5 +77,15 @@ public class SerializerUtils {
                             "Failed to deserialize split boundary with value '%s'", serialized),
                     e);
         }
+    }
+
+    /**
+     * Check whether the catalog should be used before the schema.
+     *
+     * @param tableId the table id
+     * @return false if catalog is not defined but the schema is defined; otherwise return true
+     */
+    public static boolean shouldUseCatalogBeforeSchema(TableId tableId) {
+        return !(tableId.catalog() == null && tableId.schema() != null);
     }
 }

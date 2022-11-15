@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,15 @@ package com.ververica.cdc.connectors.db2.table;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
+
+import com.ververica.cdc.connectors.db2.utils.OptionUtils;
 
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -112,6 +115,8 @@ public class Db2TableSourceFactory implements DynamicTableSourceFactory {
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
         StartupOptions startupOptions = getStartupOptions(config);
+
+        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new Db2TableSource(
                 physicalSchema,

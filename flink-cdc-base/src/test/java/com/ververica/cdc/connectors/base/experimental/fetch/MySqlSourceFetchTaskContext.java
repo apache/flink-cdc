@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlErrorHandler;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.connector.mysql.MySqlTaskContext;
 import io.debezium.connector.mysql.MySqlTopicSelector;
@@ -46,6 +47,7 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -75,10 +77,11 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
     private MySqlOffsetContext offsetContext;
-    private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
+    private SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
     private MySqlStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private TopicSelector<TableId> topicSelector;
-    private JdbcSourceEventDispatcher dispatcher;
+    private JdbcSourceEventDispatcher<MySqlPartition> dispatcher;
+    private MySqlPartition mySqlPartition;
     private ChangeEventQueue<DataChangeEvent> queue;
     private MySqlErrorHandler errorHandler;
 
@@ -109,6 +112,8 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.offsetContext =
                 loadStartingOffsetState(
                         new MySqlOffsetContext.Loader(connectorConfig), sourceSplitBase);
+        this.mySqlPartition = new MySqlPartition(connectorConfig.getLogicalName());
+
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
         this.taskContext =
@@ -131,7 +136,7 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         // .buffering()
                         .build();
         this.dispatcher =
-                new JdbcSourceEventDispatcher(
+                new JdbcSourceEventDispatcher<>(
                         connectorConfig,
                         topicSelector,
                         databaseSchema,
@@ -152,7 +157,7 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 (MySqlStreamingChangeEventSourceMetrics)
                         changeEventSourceMetricsFactory.getStreamingMetrics(
                                 taskContext, queue, metadataProvider);
-        this.errorHandler = new MySqlErrorHandler(connectorConfig.getLogicalName(), queue);
+        this.errorHandler = new MySqlErrorHandler(connectorConfig, queue);
     }
 
     @Override
@@ -166,6 +171,11 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     public BinaryLogClient getBinaryLogClient() {
         return binaryLogClient;
+    }
+
+    @Override
+    public MySqlPartition getPartition() {
+        return mySqlPartition;
     }
 
     public MySqlTaskContextImpl getTaskContext() {
@@ -182,7 +192,7 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return offsetContext;
     }
 
-    public SnapshotChangeEventSourceMetrics getSnapshotChangeEventSourceMetrics() {
+    public SnapshotChangeEventSourceMetrics<MySqlPartition> getSnapshotChangeEventSourceMetrics() {
         return snapshotChangeEventSourceMetrics;
     }
 
@@ -206,7 +216,7 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
-    public JdbcSourceEventDispatcher getDispatcher() {
+    public JdbcSourceEventDispatcher<MySqlPartition> getDispatcher() {
         return dispatcher;
     }
 
@@ -225,16 +235,20 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return MySqlUtils.getBinlogPosition(sourceRecord);
     }
 
+    @Override
+    public void close() throws Exception {
+        connection.close();
+    }
+
     /** Loads the connector's persistent offset (if present) via the given loader. */
     private MySqlOffsetContext loadStartingOffsetState(
-            OffsetContext.Loader loader, SourceSplitBase mySqlSplit) {
+            OffsetContext.Loader<MySqlOffsetContext> loader, SourceSplitBase mySqlSplit) {
         Offset offset =
                 mySqlSplit.isSnapshotSplit()
                         ? BinlogOffset.INITIAL_OFFSET
                         : mySqlSplit.asStreamSplit().getStartingOffset();
 
-        MySqlOffsetContext mySqlOffsetContext =
-                (MySqlOffsetContext) loader.load(offset.getOffset());
+        MySqlOffsetContext mySqlOffsetContext = loader.load(offset.getOffset());
 
         if (!isBinlogAvailable(mySqlOffsetContext)) {
             throw new IllegalStateException(
@@ -274,11 +288,11 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private void validateAndLoadDatabaseHistory(
             MySqlOffsetContext offset, MySqlDatabaseSchema schema) {
         schema.initializeStorage();
-        schema.recover(offset);
+        schema.recover(Offsets.of(mySqlPartition, offset));
     }
 
     /** A subclass implementation of {@link MySqlTaskContext} which reuses one BinaryLogClient. */
-    public class MySqlTaskContextImpl extends MySqlTaskContext {
+    public static class MySqlTaskContextImpl extends MySqlTaskContext {
 
         private final BinaryLogClient reusedBinaryLogClient;
 
