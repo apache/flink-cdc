@@ -236,21 +236,21 @@ Flink SQL> SELECT * FROM orders;
       <td>scan.startup.specific-offset.gtid-set</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
+      <td>String</td>
       <td>在 "specific-offset" 启动模式下，启动位点的 GTID 集合。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-events</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
+      <td>Long</td>
       <td>在指定的启动位点后需要跳过的事件数量。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-rows</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
+      <td>Long</td>
       <td>在指定的启动位点后需要跳过的数据行数量。</td>
     </tr>
     <tr>
