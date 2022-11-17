@@ -87,12 +87,12 @@ under the License.
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <hamcrest.version>1.3</hamcrest.version>
-        <version.awaitility>4.2.0</version.awaitility>
+        <version.awaitility>4.0.1</version.awaitility>
         <slf4j.version>1.7.15</slf4j.version>
-        <log4j.version>2.19.0</log4j.version>
+        <log4j.version>2.17.1</log4j.version>
         <spotless.version>2.4.2</spotless.version>
         <oblogclient.version>1.0.6</oblogclient.version>
-        <dns-cache-manipulator.version>1.7.2</dns-cache-manipulator.version>
+        <dns-cache-manipulator.version>1.7.1</dns-cache-manipulator.version>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>
