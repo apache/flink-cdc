@@ -18,10 +18,13 @@ package com.ververica.cdc.connectors.mysql.source.offset;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.annotation.VisibleForTesting;
 
 import io.debezium.connector.mysql.GtidSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.errors.ConnectException;
+
+import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.util.Map;
@@ -94,7 +97,8 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         return builder().setOffsetKind(NON_STOPPING).build();
     }
 
-    BinlogOffset(Map<String, String> offset) {
+    @VisibleForTesting
+    public BinlogOffset(Map<String, String> offset) {
         this.offset = offset;
     }
 
@@ -132,7 +136,11 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         return longOffsetValue(offset, SERVER_ID_KEY);
     }
 
+    @Nullable
     public BinlogOffsetKind getOffsetKind() {
+        if (offset.get(OFFSET_KIND_KEY) == null) {
+            return null;
+        }
         return BinlogOffsetKind.valueOf(offset.get(OFFSET_KIND_KEY));
     }
 
