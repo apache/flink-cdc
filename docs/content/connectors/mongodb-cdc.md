@@ -220,13 +220,6 @@ Connector Options
       <td>The cursor batch size.</td>
     </tr>
     <tr>
-      <td>batch.size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">0</td>
-      <td>Integer</td>
-      <td>Change stream cursor batch size. Specifies the maximum number of change events to return in each batch of the response from the MongoDB cluster. The default is 0 meaning it uses the server's default value.</td>
-    </tr>
-    <tr>
       <td>poll.max.batch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>

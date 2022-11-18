@@ -246,14 +246,14 @@ Connector Options
       <td>scan.startup.specific-offset.skip-events</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
+      <td>Long</td>
       <td>Optional number of events to skip after the specific starting offset</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-rows</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
+      <td>Long</td>
       <td>Optional number of rows to skip after the specific starting offset</td>
     </tr>
     <tr>
