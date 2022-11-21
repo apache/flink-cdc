@@ -24,7 +24,7 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 Download [flink-sql-connector-oracle-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.4-SNAPSHOT/flink-sql-connector-oracle-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-oracle-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oracle-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-oracle-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oracle-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc), the released version will be available in the Maven central warehouse.
 
 Setup Oracle
 ----------------
@@ -98,6 +98,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
      GRANT LOGMINING TO flinkuser;
 
      GRANT CREATE TABLE TO flinkuser;
+     -- need not to execute if set scan.incremental.snapshot.enabled=true(default)
      GRANT LOCK ANY TABLE TO flinkuser;
      GRANT ALTER ANY TABLE TO flinkuser;
      GRANT CREATE SEQUENCE TO flinkuser;
@@ -169,6 +170,7 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      GRANT SELECT ANY TRANSACTION TO flinkuser CONTAINER=ALL;
      GRANT LOGMINING TO flinkuser CONTAINER=ALL;
      GRANT CREATE TABLE TO flinkuser CONTAINER=ALL;
+     -- need not to execute if set scan.incremental.snapshot.enabled=true(default)
      GRANT LOCK ANY TABLE TO flinkuser CONTAINER=ALL;
      GRANT CREATE SEQUENCE TO flinkuser CONTAINER=ALL;
 
@@ -216,6 +218,9 @@ Flink SQL> SELECT * FROM products;
 ```
 **Note:**
 When working with the CDB + PDB model, you are expected to add an extra option `'debezium.database.pdb.name' = 'xxx'` in Flink DDL to specific the name of the PDB to connect to.
+
+**Note:**
+While the connector might work with a variety of Oracle versions and editions, only Oracle 9i, 10g, 11g and 12c have been tested.
 
 Connector Options
 ----------------
@@ -302,38 +307,46 @@ Connector Options
       <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
            and "latest-offset". 
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
-    </tr> 
-    <tr>
-      <td>chunk-meta.group.size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">1000</td>
-      <td>Integer</td>
-      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
     </tr>
     <tr>
-          <td>connect.timeout</td>
+          <td>scan.incremental.snapshot.enabled</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">30s</td>
-          <td>Duration</td>
-          <td>The maximum time that the connector should wait after trying to connect to the Oracle database server before timing out.</td>
-    </tr> 
+          <td style="word-wrap: break-word;">true</td>
+          <td>Boolean</td>
+          <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
+              the incremental snapshot has many advantages, including:
+                (1) source can be parallel during snapshot reading, 
+                (2) source can perform checkpoints in the chunk granularity during snapshot reading, 
+                (3) source doesn't need to acquire ROW SHARE MODE lock before snapshot reading.
+          </td>
+    </tr>
     <tr>
-          <td>chunk-key.even-distribution.factor.lower-bound</td>
+          <td>scan.incremental.snapshot.chunk.size</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">0.05d</td>
-          <td>Double</td>
-          <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
-              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
-              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
-    </tr> 
+          <td style="word-wrap: break-word;">8096</td>
+          <td>Integer</td>
+          <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
+    </tr>
     <tr>
-          <td>chunk-key.even-distribution.factor.upper-bound</td>
+          <td>scan.snapshot.fetch.size</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">1000.0d</td>
-          <td>Double</td>
-          <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
-              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
-              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+          <td style="word-wrap: break-word;">1024</td>
+          <td>Integer</td>
+          <td>The maximum fetch size for per poll when read table snapshot.</td>
+    </tr>
+    <tr>
+          <td>connect.max-retries</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">3</td>
+          <td>Integer</td>
+          <td>The max retry times that the connector should retry to build Oracle database server connection.</td>
+    </tr>
+    <tr>
+          <td>connection.pool.size</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">20</td>
+          <td>Integer</td>
+          <td>The connection pool size.</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -418,11 +431,13 @@ CREATE TABLE products (
     'password' = 'flinkpw',
     'database-name' = 'XE',
     'schema-name' = 'inventory',
-    'table-name' = 'products'
+    'table-name' = 'products',
+    'debezium.log.mining.strategy' = 'online_catalog',
+    'debezium.log.mining.continuous.mine' = 'true'
 );
 ```
 
-**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL. 
+**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL.
 
 Features
 --------
@@ -487,7 +502,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">Oracle type<a href="https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Data-Types.html"></a></th>
+        <th class="text-left"><a href="https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Data-Types.html">Oracle type</a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>
@@ -569,7 +584,8 @@ Data Type Mapping
         VARCHAR2(n)<br>
         CLOB<br>
         NCLOB<br>
-        XMLType
+        XMLType<br>
+        SYS.XMLTYPE
       </td>
       <td>STRING</td>
     </tr>
