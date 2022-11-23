@@ -31,25 +31,25 @@ public class ServerIdRange implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** Start of the range (inclusive). */
-    private final int startServerId;
+    private final long startServerId;
 
     /** End of the range (inclusive). */
-    private final int endServerId;
+    private final long endServerId;
 
-    public ServerIdRange(int startServerId, int endServerId) {
+    public ServerIdRange(long startServerId, long endServerId) {
         this.startServerId = startServerId;
         this.endServerId = endServerId;
     }
 
-    public int getStartServerId() {
+    public long getStartServerId() {
         return startServerId;
     }
 
-    public int getEndServerId() {
+    public long getEndServerId() {
         return endServerId;
     }
 
-    public int getServerId(int subTaskId) {
+    public long getServerId(int subTaskId) {
         checkArgument(subTaskId >= 0, "Subtask ID %s shouldn't be a negative number.", subTaskId);
         if (subTaskId > getNumberOfServerIds()) {
             throw new IllegalArgumentException(
@@ -63,7 +63,7 @@ public class ServerIdRange implements Serializable {
         return startServerId + subTaskId;
     }
 
-    public int getNumberOfServerIds() {
+    public long getNumberOfServerIds() {
         return endServerId - startServerId + 1;
     }
 
@@ -95,14 +95,14 @@ public class ServerIdRange implements Serializable {
             return new ServerIdRange(
                     parseServerId(idArray[0].trim()), parseServerId(idArray[1].trim()));
         } else {
-            int serverId = parseServerId(range);
+            long serverId = parseServerId(range);
             return new ServerIdRange(serverId, serverId);
         }
     }
 
-    private static int parseServerId(String serverIdValue) {
+    private static long parseServerId(String serverIdValue) {
         try {
-            return Integer.parseInt(serverIdValue);
+            return Long.parseLong(serverIdValue);
         } catch (NumberFormatException e) {
             throw new IllegalStateException(
                     String.format("The server id %s is not a valid numeric.", serverIdValue), e);

@@ -288,7 +288,7 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.put("bigint.unsigned.handling.mode", "precise");
 
         if (serverIdRange != null) {
-            int serverId = serverIdRange.getServerId(subtaskId);
+            long serverId = serverIdRange.getServerId(subtaskId);
             props.setProperty("database.server.id", String.valueOf(serverId));
         }
         if (databaseList != null) {
