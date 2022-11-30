@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -25,32 +23,52 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
 import com.mongodb.client.MongoDatabase;
-import com.ververica.cdc.connectors.mongodb.MongoDBTestBase;
+import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import org.bson.Document;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.util.List;
 
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkSize;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests to check mongodb-cdc works well under namespace.regex. */
-public class MongoDBRegexFilterITCase extends MongoDBTestBase {
+@RunWith(Parameterized.class)
+public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
-                    env,
-                    EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+                    env, EnvironmentSettings.newInstance().inStreamingMode().build());
+
+    private final boolean parallelismSnapshot;
+
+    public MongoDBRegexFilterITCase(boolean parallelismSnapshot) {
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {false}, new Object[] {true}};
+    }
 
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.setParallelism(1);
+        if (parallelismSnapshot) {
+            env.setParallelism(DEFAULT_PARALLELISM);
+            env.enableCheckpointing(200);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     /** match multiple databases and collections: collection = ^(db0|db1)\.coll_a\d?$ . */
@@ -58,9 +76,9 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
     public void testMatchMultipleDatabasesAndCollections() throws Exception {
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection = ^(db0|db1)\.coll_a\d?$
         String collectionRegex = String.format("^(%s|%s)\\.coll_a\\d?$", db0, db1);
@@ -101,11 +119,11 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
     public void testMatchMultipleDatabases() throws Exception {
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
         // db2: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db2 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db2 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match database: ^(db0|db1)$
         String databaseRegex = String.format("%s|%s", db0, db1);
@@ -155,9 +173,9 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
     public void testMatchSingleQualifiedCollectionPattern() throws Exception {
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection ^(db0|db1)\.coll_a\d?$
         String collectionRegex = String.format("^%s\\.coll_b\\d?$", db0);
@@ -194,9 +212,9 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
     public void testMatchSingleDatabaseWithCollectionPattern() throws Exception {
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = ROUTER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection .*coll_b\d?
         String collectionRegex = ".*coll_b\\d?";
@@ -237,11 +255,14 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
                         + " coll_name STRING METADATA FROM 'collection_name' VIRTUAL,"
                         + " PRIMARY KEY (_id) NOT ENFORCED"
                         + ") WITH ("
-                        + ignoreIfNull("hosts", MONGODB_CONTAINER.getHostAndPort())
+                        + ignoreIfNull("hosts", ROUTER.getHostAndPort())
                         + ignoreIfNull("username", FLINK_USER)
                         + ignoreIfNull("password", FLINK_USER_PASSWORD)
                         + ignoreIfNull("database", database)
                         + ignoreIfNull("collection", collection)
+                        + " 'scan.incremental.snapshot.enabled' = '"
+                        + parallelismSnapshot
+                        + "',"
                         + " 'connector' = 'mongodb-cdc'"
                         + ")";
 
@@ -273,7 +294,7 @@ public class MongoDBRegexFilterITCase extends MongoDBTestBase {
     }
 
     private void insertRecordsInDatabase(String database) {
-        MongoDatabase db = getMongoDatabase(database);
+        MongoDatabase db = mongodbClient.getDatabase(database);
         db.getCollection("coll_a1").insertOne(new Document("seq", "A102"));
         db.getCollection("coll_a2").insertOne(new Document("seq", "A202"));
         db.getCollection("coll_b1").insertOne(new Document("seq", "B102"));

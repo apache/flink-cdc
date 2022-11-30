@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -23,7 +21,6 @@ import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +42,8 @@ import java.util.stream.Stream;
 public class OracleE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleE2eITCase.class);
+    private static final String ORACLE_SYSTEM_USER = "system";
+    private static final String ORACLE_SYSTEM_PASSWORD = "oracle";
     private static final String ORACLE_TEST_USER = "dbzuser";
     private static final String ORACLE_TEST_PASSWORD = "dbz";
     private static final String ORACLE_DRIVER_CLASS = "oracle.jdbc.driver.OracleDriver";
@@ -55,17 +54,17 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path oracleCdcJar = TestUtils.getResource("oracle-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @Rule
-    public final OracleContainer oracle =
-            new OracleContainer(ORACLE_IMAGE)
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(INTER_CONTAINER_ORACLE_ALIAS)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    public OracleContainer oracle;
 
     @Before
     public void before() {
         super.before();
         LOG.info("Starting containers...");
+        oracle =
+                new OracleContainer(ORACLE_IMAGE)
+                        .withNetwork(NETWORK)
+                        .withNetworkAliases(INTER_CONTAINER_ORACLE_ALIAS)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
         Startables.deepStart(Stream.of(oracle)).join();
         LOG.info("Containers are started.");
     }
@@ -92,13 +91,15 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         " 'connector' = 'oracle-cdc',",
                         " 'hostname' = '" + INTER_CONTAINER_ORACLE_ALIAS + "',",
                         " 'port' = '" + ORACLE_PORT + "',",
-                        " 'username' = '" + ORACLE_TEST_USER + "',",
-                        " 'password' = '" + ORACLE_TEST_PASSWORD + "',",
+                        " 'username' = '" + ORACLE_SYSTEM_USER + "',",
+                        " 'password' = '" + ORACLE_SYSTEM_PASSWORD + "',",
                         " 'database-name' = 'XE',",
-                        " 'schema-name' = 'debezium',",
+                        " 'schema-name' = 'DEBEZIUM',",
+                        " 'scan.incremental.snapshot.enabled' = 'true',",
                         " 'debezium.log.mining.strategy' = 'online_catalog',",
                         " 'debezium.log.mining.continuous.mine' = 'true',",
-                        " 'table-name' = 'products'",
+                        " 'table-name' = 'PRODUCTS',",
+                        " 'scan.incremental.snapshot.chunk.size' = '4'",
                         ");",
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",

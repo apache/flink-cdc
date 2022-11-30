@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -20,8 +18,6 @@ package com.ververica.cdc.connectors.base.source.meta.split;
 
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 
-import org.apache.kafka.connect.source.SourceRecord;
-
 import javax.annotation.Nullable;
 
 import java.util.Collections;
@@ -31,11 +27,11 @@ import java.util.Set;
 /**
  * An implementation of {@link RecordsWithSplitIds} which contains the records of one table split.
  */
-public final class ChangeEventRecords implements RecordsWithSplitIds<SourceRecord> {
+public final class ChangeEventRecords implements RecordsWithSplitIds<SourceRecords> {
 
     @Nullable private String splitId;
-    @Nullable private Iterator<SourceRecord> recordsForCurrentSplit;
-    @Nullable private final Iterator<SourceRecord> recordsForSplit;
+    @Nullable private Iterator<SourceRecords> recordsForCurrentSplit;
+    @Nullable private final Iterator<SourceRecords> recordsForSplit;
     private final Set<String> finishedSnapshotSplits;
 
     public ChangeEventRecords(
@@ -61,8 +57,8 @@ public final class ChangeEventRecords implements RecordsWithSplitIds<SourceRecor
 
     @Nullable
     @Override
-    public SourceRecord nextRecordFromSplit() {
-        final Iterator<SourceRecord> recordsForSplit = this.recordsForCurrentSplit;
+    public SourceRecords nextRecordFromSplit() {
+        final Iterator<SourceRecords> recordsForSplit = this.recordsForCurrentSplit;
         if (recordsForSplit != null) {
             if (recordsForSplit.hasNext()) {
                 return recordsForSplit.next();
@@ -80,7 +76,7 @@ public final class ChangeEventRecords implements RecordsWithSplitIds<SourceRecor
     }
 
     public static ChangeEventRecords forRecords(
-            final String splitId, final Iterator<SourceRecord> recordsForSplit) {
+            final String splitId, final Iterator<SourceRecords> recordsForSplit) {
         return new ChangeEventRecords(splitId, recordsForSplit, Collections.emptySet());
     }
 

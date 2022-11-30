@@ -1,13 +1,11 @@
 package com.ververica.cdc.connectors.mysql.source.reader;
 
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -27,6 +25,7 @@ import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetric
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.heartbeat.Heartbeat;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -44,7 +43,7 @@ public class MySqlRecordEmitterTest {
     @Test
     public void testHeartbeatEventHandling() throws Exception {
         Heartbeat heartbeat = Heartbeat.create(Duration.ofMillis(100), "fake-topic", "fake-key");
-        BinlogOffset fakeOffset = new BinlogOffset("fake-file", 15213L);
+        BinlogOffset fakeOffset = BinlogOffset.ofBinlogFilePosition("fake-file", 15213L);
         MySqlRecordEmitter<Void> recordEmitter = createRecordEmitter();
         MySqlBinlogSplitState splitState = createBinlogSplitState();
         heartbeat.forcedBeat(
@@ -52,7 +51,10 @@ public class MySqlRecordEmitterTest {
                 fakeOffset.getOffset(),
                 record -> {
                     try {
-                        recordEmitter.emitRecord(record, new TestingReaderOutput<>(), splitState);
+                        recordEmitter.emitRecord(
+                                SourceRecords.fromSingleRecord(record),
+                                new TestingReaderOutput<>(),
+                                splitState);
                     } catch (Exception e) {
                         throw new RuntimeException("Failed to emit heartbeat record", e);
                     }
@@ -83,8 +85,8 @@ public class MySqlRecordEmitterTest {
         return new MySqlBinlogSplitState(
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        BinlogOffset.INITIAL_OFFSET,
-                        BinlogOffset.NO_STOPPING_OFFSET,
+                        BinlogOffset.ofEarliest(),
+                        BinlogOffset.ofNonStopping(),
                         Collections.emptyList(),
                         Collections.emptyMap(),
                         0));

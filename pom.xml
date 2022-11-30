@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
+Copyright 2022 Ververica Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
   http://www.apache.org/licenses/LICENSE-2.0
 Unless required by applicable law or agreed to in writing,
 software distributed under the License is distributed on an
@@ -29,7 +27,7 @@ under the License.
 
     <groupId>com.ververica</groupId>
     <artifactId>flink-cdc-connectors</artifactId>
-    <version>2.3-SNAPSHOT</version>
+    <version>2.4-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -43,6 +41,7 @@ under the License.
         <module>flink-connector-oceanbase-cdc</module>
         <module>flink-connector-sqlserver-cdc</module>
         <module>flink-connector-tidb-cdc</module>
+        <module>flink-connector-db2-cdc</module>
         <module>flink-sql-connector-mysql-cdc</module>
         <module>flink-sql-connector-postgres-cdc</module>
         <module>flink-sql-connector-mongodb-cdc</module>
@@ -50,6 +49,7 @@ under the License.
         <module>flink-sql-connector-oceanbase-cdc</module>
         <module>flink-sql-connector-sqlserver-cdc</module>
         <module>flink-sql-connector-tidb-cdc</module>
+        <module>flink-sql-connector-db2-cdc</module>
         <module>flink-cdc-e2e-tests</module>
     </modules>
 
@@ -73,7 +73,7 @@ under the License.
     </distributionManagement>
 
     <properties>
-        <flink.version>1.13.5</flink.version>
+        <flink.version>1.16.0</flink.version>
         <debezium.version>1.6.4.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
@@ -83,7 +83,7 @@ under the License.
           See more https://github.com/testcontainers/testcontainers-java/issues/4297. -->
         <testcontainers.version>1.15.3</testcontainers.version>
         <java.version>1.8</java.version>
-        <scala.binary.version>2.11</scala.binary.version>
+        <scala.binary.version>2.12</scala.binary.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <hamcrest.version>1.3</hamcrest.version>
@@ -91,7 +91,7 @@ under the License.
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <spotless.version>2.4.2</spotless.version>
-        <oblogclient.version>1.0.3</oblogclient.version>
+        <oblogclient.version>1.0.6</oblogclient.version>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>
@@ -109,7 +109,13 @@ under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-api-java-bridge_${scala.binary.version}</artifactId>
+            <artifactId>flink-connector-base</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-api-java-bridge</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -121,7 +127,7 @@ under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
+            <artifactId>flink-streaming-java</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -131,11 +137,11 @@ under the License.
             <version>${slf4j.version}</version>
         </dependency>
 
-        <!--  Use fixed version 18.0-13.0 of flink shaded guava  -->
+        <!--  Use fixed version 30.1.1-jre-16.0 of flink shaded guava  -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-guava</artifactId>
-            <version>18.0-13.0</version>
+            <version>30.1.1-jre-16.0</version>
         </dependency>
 
         <!-- test dependencies -->
@@ -214,13 +220,10 @@ under the License.
                     <numUnapprovedLicenses>0</numUnapprovedLicenses>
                     <licenses>
                         <!-- Enforce this license:
-                            Licensed to the Apache Software Foundation (ASF) under one
-                            or more contributor license agreements.  See the NOTICE file
-                            distributed with this work for additional information
-                            regarding copyright ownership.  The ASF licenses this file
-                            to you under the Apache License, Version 2.0 (the
-                            "License"); you may not use this file except in compliance
-                            with the License.  You may obtain a copy of the License at
+                            Copyright 2022 Ververica Inc.
+                            Licensed under the Apache License, Version 2.0 (the "License");
+                            you may not use this file except in compliance with the License.
+                            You may obtain a copy of the License at
                               http://www.apache.org/licenses/LICENSE-2.0
                             Unless required by applicable law or agreed to in writing,
                             software distributed under the License is distributed on an
@@ -235,8 +238,9 @@ under the License.
                             <licenseFamilyName>Apache License 2.0</licenseFamilyName>
                             <notes/>
                             <patterns>
-                                <pattern>Licensed to the Apache Software Foundation (ASF) under
-                                    one
+                                <pattern>Copyright 2022 Ververica Inc.
+                                </pattern>
+                                <pattern>Licensed under the Apache License, Version 2.0
                                 </pattern>
                             </patterns>
                         </license>
@@ -260,11 +264,13 @@ under the License.
                         <exclude>docs/make.bat</exclude>
                         <exclude>docs/_templates/version.html</exclude>
                         <exclude>docs/_static/button.js</exclude>
+                        <exclude>docs/_build/**</exclude>
                         <!-- Site -->
                         <exclude>docs/site/**</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                         <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
+                        <exclude>flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile</exclude>
                     </excludes>
                 </configuration>
             </plugin>
@@ -335,6 +341,13 @@ under the License.
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.maven.surefire</groupId>
+                        <artifactId>surefire-junit47</artifactId>
+                        <version>2.22.0</version>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>default-test</id>

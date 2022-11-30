@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -89,6 +87,9 @@ public final class RowDataDebeziumDeserializeSchema
     /** Validator to validate the row value. */
     private final ValueValidator validator;
 
+    /** Changelog Mode to use for encoding changes in Flink internal data structure. */
+    private final DebeziumChangelogMode changelogMode;
+
     /** Returns a builder to build {@link RowDataDebeziumDeserializeSchema}. */
     public static Builder newBuilder() {
         return new Builder();
@@ -100,7 +101,8 @@ public final class RowDataDebeziumDeserializeSchema
             TypeInformation<RowData> resultTypeInfo,
             ValueValidator validator,
             ZoneId serverTimeZone,
-            DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
+            DeserializationRuntimeConverterFactory userDefinedConverterFactory,
+            DebeziumChangelogMode changelogMode) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
         this.physicalConverter =
@@ -110,6 +112,7 @@ public final class RowDataDebeziumDeserializeSchema
                         userDefinedConverterFactory);
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
+        this.changelogMode = checkNotNull(changelogMode);
     }
 
     @Override
@@ -128,10 +131,12 @@ public final class RowDataDebeziumDeserializeSchema
             delete.setRowKind(RowKind.DELETE);
             emit(record, delete, out);
         } else {
-            GenericRowData before = extractBeforeRow(value, valueSchema);
-            validator.validate(before, RowKind.UPDATE_BEFORE);
-            before.setRowKind(RowKind.UPDATE_BEFORE);
-            emit(record, before, out);
+            if (changelogMode == DebeziumChangelogMode.ALL) {
+                GenericRowData before = extractBeforeRow(value, valueSchema);
+                validator.validate(before, RowKind.UPDATE_BEFORE);
+                before.setRowKind(RowKind.UPDATE_BEFORE);
+                emit(record, before, out);
+            }
 
             GenericRowData after = extractAfterRow(value, valueSchema);
             validator.validate(after, RowKind.UPDATE_AFTER);
@@ -181,6 +186,7 @@ public final class RowDataDebeziumDeserializeSchema
         private ZoneId serverTimeZone = ZoneId.of("UTC");
         private DeserializationRuntimeConverterFactory userDefinedConverterFactory =
                 DeserializationRuntimeConverterFactory.DEFAULT;
+        private DebeziumChangelogMode changelogMode = DebeziumChangelogMode.ALL;
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -213,6 +219,11 @@ public final class RowDataDebeziumDeserializeSchema
             return this;
         }
 
+        public Builder setChangelogMode(DebeziumChangelogMode changelogMode) {
+            this.changelogMode = changelogMode;
+            return this;
+        }
+
         public RowDataDebeziumDeserializeSchema build() {
             return new RowDataDebeziumDeserializeSchema(
                     physicalRowType,
@@ -220,7 +231,8 @@ public final class RowDataDebeziumDeserializeSchema
                     resultTypeInfo,
                     validator,
                     serverTimeZone,
-                    userDefinedConverterFactory);
+                    userDefinedConverterFactory,
+                    changelogMode);
         }
     }
 

@@ -73,13 +73,13 @@ This command automatically starts all the containers defined in the Docker Compo
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
 ### Preparing Flink and JAR package required
-1. Download [Flink 1.13.2](https://archive.apache.org/dist/flink/flink-1.13.2/flink-1.13.2-bin-scala_2.11.tgz) and unzip it to the directory `flink-1.13.2`
-2. Download following JAR package required and put them under `flink-1.13.2/lib/`:
+1. Download [Flink 1.16.0](https://archive.apache.org/dist/flink/flink-1.16.0/flink-1.16.0-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.16.0`
+2. Download following JAR package required and put them under `flink-1.16.0/lib/`:
 
    **Download links are available only for stable releases, SNAPSHOT dependency need build by yourself. **
-    - [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
-    - [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar)
-    - [flink-sql-connector-postgres-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.3-SNAPSHOT/flink-sql-connector-postgres-cdc-2.3-SNAPSHOT.jar)
+    - [flink-sql-connector-elasticsearch7-1.16.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/1.16.0/flink-sql-connector-elasticsearch7-1.16.0.jar)
+    - [flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.4-SNAPSHOT/flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar)
+    - [flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.4-SNAPSHOT/flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar)
 
 ### Preparing data in databases
 #### Preparing data in MySQL
@@ -151,7 +151,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
 1. Use the following command to change to the Flink directory:
     ```
-    cd flink-1.13.2
+    cd flink-1.16.0
     ```
    
 2. Use the following command to start a Flink cluster:
@@ -311,7 +311,7 @@ After finishing the tutorial, run the following command to stop all containers i
 ```shell
 docker-compose down
 ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.13.2`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.16.0`:
 ```shell
 ./bin/stop-cluster.sh
 ```

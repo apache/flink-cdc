@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *	 http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -18,6 +16,10 @@
 
 package com.ververica.cdc.connectors.mysql.table;
 
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -28,16 +30,14 @@ public final class StartupOptions implements Serializable {
     private static final long serialVersionUID = 1L;
 
     public final StartupMode startupMode;
-    public final String specificOffsetFile;
-    public final Integer specificOffsetPos;
-    public final Long startupTimestampMillis;
+    @Nullable public final BinlogOffset binlogOffset;
 
     /**
      * Performs an initial snapshot on the monitored database tables upon first startup, and
      * continue to read the latest binlog.
      */
     public static StartupOptions initial() {
-        return new StartupOptions(StartupMode.INITIAL, null, null, null);
+        return new StartupOptions(StartupMode.INITIAL, null);
     }
 
     /**
@@ -46,7 +46,7 @@ public final class StartupOptions implements Serializable {
      * binlog is guaranteed to contain the entire history of the database.
      */
     public static StartupOptions earliest() {
-        return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null);
+        return new StartupOptions(StartupMode.EARLIEST_OFFSET, BinlogOffset.ofEarliest());
     }
 
     /**
@@ -54,16 +54,25 @@ public final class StartupOptions implements Serializable {
      * the end of the binlog which means only have the changes since the connector was started.
      */
     public static StartupOptions latest() {
-        return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null);
+        return new StartupOptions(StartupMode.LATEST_OFFSET, BinlogOffset.ofLatest());
     }
 
     /**
      * Never to perform snapshot on the monitored database tables upon first startup, and directly
      * read binlog from the specified offset.
      */
-    public static StartupOptions specificOffset(String specificOffsetFile, int specificOffsetPos) {
+    public static StartupOptions specificOffset(String specificOffsetFile, long specificOffsetPos) {
         return new StartupOptions(
-                StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null);
+                StartupMode.SPECIFIC_OFFSETS,
+                BinlogOffset.ofBinlogFilePosition(specificOffsetFile, specificOffsetPos));
+    }
+
+    public static StartupOptions specificOffset(String gtidSet) {
+        return new StartupOptions(StartupMode.SPECIFIC_OFFSETS, BinlogOffset.ofGtidSet(gtidSet));
+    }
+
+    public static StartupOptions specificOffset(BinlogOffset binlogOffset) {
+        return new StartupOptions(StartupMode.SPECIFIC_OFFSETS, binlogOffset);
     }
 
     /**
@@ -76,33 +85,16 @@ public final class StartupOptions implements Serializable {
      * @param startupTimestampMillis timestamp for the startup offsets, as milliseconds from epoch.
      */
     public static StartupOptions timestamp(long startupTimestampMillis) {
-        return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis);
+        return new StartupOptions(
+                StartupMode.TIMESTAMP, BinlogOffset.ofTimestampSec(startupTimestampMillis / 1000));
     }
 
-    private StartupOptions(
-            StartupMode startupMode,
-            String specificOffsetFile,
-            Integer specificOffsetPos,
-            Long startupTimestampMillis) {
+    private StartupOptions(StartupMode startupMode, BinlogOffset binlogOffset) {
         this.startupMode = startupMode;
-        this.specificOffsetFile = specificOffsetFile;
-        this.specificOffsetPos = specificOffsetPos;
-        this.startupTimestampMillis = startupTimestampMillis;
-
-        switch (startupMode) {
-            case INITIAL:
-            case EARLIEST_OFFSET:
-            case LATEST_OFFSET:
-                break;
-            case SPECIFIC_OFFSETS:
-                checkNotNull(specificOffsetFile, "specificOffsetFile shouldn't be null");
-                checkNotNull(specificOffsetPos, "specificOffsetPos shouldn't be null");
-                break;
-            case TIMESTAMP:
-                checkNotNull(startupTimestampMillis, "startupTimestampMillis shouldn't be null");
-                break;
-            default:
-                throw new UnsupportedOperationException(startupMode + " mode is not supported.");
+        this.binlogOffset = binlogOffset;
+        if (startupMode != StartupMode.INITIAL) {
+            checkNotNull(
+                    binlogOffset, "Binlog offset is required if startup mode is %s", startupMode);
         }
     }
 
@@ -115,15 +107,11 @@ public final class StartupOptions implements Serializable {
             return false;
         }
         StartupOptions that = (StartupOptions) o;
-        return startupMode == that.startupMode
-                && Objects.equals(specificOffsetFile, that.specificOffsetFile)
-                && Objects.equals(specificOffsetPos, that.specificOffsetPos)
-                && Objects.equals(startupTimestampMillis, that.startupTimestampMillis);
+        return startupMode == that.startupMode && Objects.equals(binlogOffset, that.binlogOffset);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-                startupMode, specificOffsetFile, specificOffsetPos, startupTimestampMillis);
+        return Objects.hash(startupMode, binlogOffset);
     }
 }

@@ -52,9 +52,14 @@ import org.bson.BsonRegularExpression;
 import org.bson.BsonTimestamp;
 import org.bson.BsonUndefined;
 import org.bson.BsonValue;
+import org.bson.codecs.BsonArrayCodec;
+import org.bson.codecs.EncoderContext;
+import org.bson.json.JsonWriter;
 import org.bson.types.Decimal128;
 
 import java.io.Serializable;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -62,6 +67,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,7 +176,7 @@ public class MongoDBConnectorDeserializationSchema
         if (valueSchema.field(fieldName) != null) {
             String docString = value.getString(fieldName);
             if (docString != null) {
-                return BsonDocument.parse(value.getString(fieldName));
+                return BsonDocument.parse(docString);
             }
         }
         return null;
@@ -463,6 +469,10 @@ public class MongoDBConnectorDeserializationSchema
         return LocalDateTime.ofInstant(instant, localTimeZone);
     }
 
+    private ZonedDateTime convertInstantToZonedDateTime(Instant instant) {
+        return ZonedDateTime.ofInstant(instant, localTimeZone);
+    }
+
     private Instant convertToInstant(BsonTimestamp bsonTimestamp) {
         return Instant.ofEpochSecond(bsonTimestamp.getTime());
     }
@@ -556,6 +566,10 @@ public class MongoDBConnectorDeserializationSchema
         if (docObj.isString()) {
             return StringData.fromString(docObj.asString().getValue());
         }
+        if (docObj.isDocument()) {
+            // convert document to json string
+            return StringData.fromString(docObj.asDocument().toJson());
+        }
         if (docObj.isBinary()) {
             BsonBinary bsonBinary = docObj.asBinary();
             if (BsonBinarySubType.isUuid(bsonBinary.getType())) {
@@ -584,12 +598,34 @@ public class MongoDBConnectorDeserializationSchema
         if (docObj.isDateTime()) {
             Instant instant = convertToInstant(docObj.asDateTime());
             return StringData.fromString(
-                    convertInstantToLocalDateTime(instant).format(ISO_OFFSET_DATE_TIME));
+                    convertInstantToZonedDateTime(instant).format(ISO_OFFSET_DATE_TIME));
         }
         if (docObj.isTimestamp()) {
             Instant instant = convertToInstant(docObj.asTimestamp());
             return StringData.fromString(
-                    convertInstantToLocalDateTime(instant).format(ISO_OFFSET_DATE_TIME));
+                    convertInstantToZonedDateTime(instant).format(ISO_OFFSET_DATE_TIME));
+        }
+        if (docObj.isArray()) {
+            // convert bson array to json string
+            Writer writer = new StringWriter();
+            JsonWriter jsonArrayWriter =
+                    new JsonWriter(writer) {
+                        @Override
+                        public void writeStartArray() {
+                            doWriteStartArray();
+                            setState(State.VALUE);
+                        }
+
+                        @Override
+                        public void writeEndArray() {
+                            doWriteEndArray();
+                            setState(getNextState());
+                        }
+                    };
+
+            new BsonArrayCodec()
+                    .encode(jsonArrayWriter, docObj.asArray(), EncoderContext.builder().build());
+            return StringData.fromString(writer.toString());
         }
         if (docObj.isRegularExpression()) {
             BsonRegularExpression regex = docObj.asRegularExpression();

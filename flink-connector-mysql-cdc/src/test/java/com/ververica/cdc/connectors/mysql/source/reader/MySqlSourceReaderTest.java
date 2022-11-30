@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -23,6 +21,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
+import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
@@ -32,6 +31,7 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
@@ -40,20 +40,28 @@ import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAss
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.document.Array;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.sql.Connection;
@@ -64,12 +72,23 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getFetchTimestamp;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getMessageTimestamp;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getWatermark;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHeartbeatEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -94,8 +113,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         MySqlSplit binlogSplit;
-        try (MySqlConnection jdbc =
-                DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
             binlogSplit =
@@ -103,9 +121,9 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                             createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
         }
 
-        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig);
+        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, 1);
         reader.start();
-        reader.addSplits(Arrays.asList(binlogSplit));
+        reader.addSplits(Collections.singletonList(binlogSplit));
 
         // step-1: make 6 change events in one MySQL transaction
         TableId tableId = binlogSplit.getTableSchemas().keySet().iterator().next();
@@ -118,7 +136,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Hangzhou, 123567891234]"
                 };
         // the 2 records are produced by 1 operations
-        List<String> actualRecords = consumeRecords(reader, dataType, 1);
+        List<String> actualRecords = consumeRecords(reader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRecords), actualRecords);
         List<MySqlSplit> splitsState = reader.snapshotState(1L);
         // check the binlog split state
@@ -126,7 +144,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         reader.close();
 
         // step-3: mock failover from a restored state
-        MySqlSourceReader<SourceRecord> restartReader = createReader(sourceConfig);
+        MySqlSourceReader<SourceRecord> restartReader = createReader(sourceConfig, 3);
         restartReader.start();
         restartReader.addSplits(splitsState);
 
@@ -139,7 +157,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Shanghai, 123567891234]"
                 };
         // the 4 records are produced by 3 operations
-        List<String> restRecords = consumeRecords(restartReader, dataType, 3);
+        List<String> restRecords = consumeRecords(restartReader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
     }
@@ -174,11 +192,13 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         // and the split is a full range one
         assertNull(snapshotSplit.getSplitStart());
         assertNull(snapshotSplit.getSplitEnd());
+        assigner.close();
 
         final AtomicBoolean finishReading = new AtomicBoolean(false);
         final CountDownLatch updatingExecuted = new CountDownLatch(1);
         TestingReaderContext testingReaderContext = new TestingReaderContext();
-        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, testingReaderContext);
+        MySqlSourceReader<SourceRecord> reader =
+                createReader(sourceConfig, testingReaderContext, 0);
         reader.start();
 
         Thread updateWorker =
@@ -240,25 +260,31 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         }
     }
 
-    private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration)
+    private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration, int limit)
             throws Exception {
-        return createReader(configuration, new TestingReaderContext());
+        return createReader(configuration, new TestingReaderContext(), limit);
     }
 
     private MySqlSourceReader<SourceRecord> createReader(
-            MySqlSourceConfig configuration, SourceReaderContext readerContext) throws Exception {
-        final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementsQueue =
+            MySqlSourceConfig configuration, SourceReaderContext readerContext, int limit)
+            throws Exception {
+        final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
         // make  SourceReaderContext#metricGroup compatible between Flink 1.13 and Flink 1.14
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
         metricGroupMethod.setAccessible(true);
         final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
-
-        final MySqlRecordEmitter<SourceRecord> recordEmitter =
-                new MySqlRecordEmitter<>(
-                        new ForwardDeserializeSchema(),
-                        new MySqlSourceReaderMetrics(metricGroup),
-                        configuration.isIncludeSchemaChanges());
+        final RecordEmitter<SourceRecords, SourceRecord, MySqlSplitState> recordEmitter =
+                limit > 0
+                        ? new MysqlLimitedRecordEmitter(
+                                new ForwardDeserializeSchema(),
+                                new MySqlSourceReaderMetrics(metricGroup),
+                                configuration.isIncludeSchemaChanges(),
+                                limit)
+                        : new MySqlRecordEmitter<>(
+                                new ForwardDeserializeSchema(),
+                                new MySqlSourceReaderMetrics(metricGroup),
+                                configuration.isIncludeSchemaChanges());
         final MySqlSourceReaderContext mySqlSourceReaderContext =
                 new MySqlSourceReaderContext(readerContext);
         return new MySqlSourceReader<>(
@@ -302,7 +328,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         .toArray(String[]::new);
 
         return new MySqlSourceConfigFactory()
-                .startupOptions(StartupOptions.initial())
+                .startupOptions(StartupOptions.latest())
                 .databaseList(customerDatabase.getDatabaseName())
                 .tableList(captureTableIds)
                 .includeSchemaChanges(false)
@@ -317,11 +343,10 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
     }
 
     private List<String> consumeRecords(
-            MySqlSourceReader<SourceRecord> sourceReader, DataType recordType, int changeEventNum)
-            throws Exception {
+            MySqlSourceReader<SourceRecord> sourceReader, DataType recordType) throws Exception {
         // Poll all the n records of the single split.
         final SimpleReaderOutput output = new SimpleReaderOutput();
-        while (output.getResults().size() < changeEventNum) {
+        while (output.getResults().size() == 0) {
             sourceReader.pollNext(output);
         }
         final RecordsFormatter formatter = new RecordsFormatter(recordType);
@@ -356,6 +381,11 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         public void markIdle() {}
 
         @Override
+        public void markActive() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public SourceOutput<SourceRecord> createOutputForSplit(java.lang.String splitId) {
             return this;
         }
@@ -377,6 +407,132 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         @Override
         public TypeInformation<SourceRecord> getProducedType() {
             return TypeInformation.of(SourceRecord.class);
+        }
+    }
+
+    /**
+     * A implementation of {@link RecordEmitter} which only emit records in given limit number, this
+     * class is used for test purpose.
+     */
+    private static class MysqlLimitedRecordEmitter
+            implements RecordEmitter<SourceRecords, SourceRecord, MySqlSplitState> {
+
+        private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
+        private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
+                new FlinkJsonTableChangeSerializer();
+
+        private final DebeziumDeserializationSchema<SourceRecord> debeziumDeserializationSchema;
+        private final MySqlSourceReaderMetrics sourceReaderMetrics;
+        private final boolean includeSchemaChanges;
+        private final OutputCollector<SourceRecord> outputCollector;
+        private final int limit;
+
+        public MysqlLimitedRecordEmitter(
+                DebeziumDeserializationSchema<SourceRecord> debeziumDeserializationSchema,
+                MySqlSourceReaderMetrics sourceReaderMetrics,
+                boolean includeSchemaChanges,
+                int limit) {
+            this.debeziumDeserializationSchema = debeziumDeserializationSchema;
+            this.sourceReaderMetrics = sourceReaderMetrics;
+            this.includeSchemaChanges = includeSchemaChanges;
+            this.outputCollector = new OutputCollector<>();
+            Preconditions.checkState(limit > 0);
+            this.limit = limit;
+        }
+
+        @Override
+        public void emitRecord(
+                SourceRecords sourceRecords,
+                SourceOutput<SourceRecord> output,
+                MySqlSplitState splitState)
+                throws Exception {
+            final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
+            int sendCnt = 0;
+            while (elementIterator.hasNext()) {
+                if (sendCnt >= limit) {
+                    return;
+                }
+                processElement(elementIterator.next(), output, splitState);
+                sendCnt++;
+            }
+        }
+
+        private void processElement(
+                SourceRecord element, SourceOutput<SourceRecord> output, MySqlSplitState splitState)
+                throws Exception {
+            if (isWatermarkEvent(element)) {
+                BinlogOffset watermark = getWatermark(element);
+                if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+                    splitState.asSnapshotSplitState().setHighWatermark(watermark);
+                }
+            } else if (isSchemaChangeEvent(element) && splitState.isBinlogSplitState()) {
+                HistoryRecord historyRecord = getHistoryRecord(element);
+                Array tableChanges =
+                        historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
+                TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
+                for (TableChanges.TableChange tableChange : changes) {
+                    splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
+                }
+                if (includeSchemaChanges) {
+                    BinlogOffset position = getBinlogPosition(element);
+                    splitState.asBinlogSplitState().setStartingOffset(position);
+                    emitElement(element, output);
+                }
+            } else if (isDataChangeRecord(element)) {
+                updateStartingOffsetForSplit(splitState, element);
+                reportMetrics(element);
+                emitElement(element, output);
+            } else if (isHeartbeatEvent(element)) {
+                updateStartingOffsetForSplit(splitState, element);
+            } else {
+                // unknown element
+                LOG.info("Meet unknown element {}, just skip.", element);
+            }
+        }
+
+        private void updateStartingOffsetForSplit(
+                MySqlSplitState splitState, SourceRecord element) {
+            if (splitState.isBinlogSplitState()) {
+                BinlogOffset position = getBinlogPosition(element);
+                splitState.asBinlogSplitState().setStartingOffset(position);
+            }
+        }
+
+        private void emitElement(SourceRecord element, SourceOutput<SourceRecord> output)
+                throws Exception {
+            outputCollector.output = output;
+            debeziumDeserializationSchema.deserialize(element, outputCollector);
+        }
+
+        private void reportMetrics(SourceRecord element) {
+            long now = System.currentTimeMillis();
+            // record the latest process time
+            sourceReaderMetrics.recordProcessTime(now);
+            Long messageTimestamp = getMessageTimestamp(element);
+
+            if (messageTimestamp != null && messageTimestamp > 0L) {
+                // report fetch delay
+                Long fetchTimestamp = getFetchTimestamp(element);
+                if (fetchTimestamp != null && fetchTimestamp >= messageTimestamp) {
+                    sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
+                }
+                // report emit delay
+                sourceReaderMetrics.recordEmitDelay(now - messageTimestamp);
+            }
+        }
+
+        private static class OutputCollector<T> implements Collector<T> {
+            private SourceOutput<T> output;
+
+            @Override
+            public void collect(T record) {
+                output.collect(record);
+            }
+
+            @Override
+            public void close() {
+                // do nothing
+            }
         }
     }
 }

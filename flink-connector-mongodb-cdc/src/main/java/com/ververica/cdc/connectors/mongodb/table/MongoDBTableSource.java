@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,17 +22,20 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.ververica.cdc.connectors.mongodb.MongoDBSource;
+import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
+import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceBuilder;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -49,7 +50,7 @@ import java.util.stream.Stream;
 
 import static com.mongodb.MongoNamespace.checkCollectionNameValidity;
 import static com.mongodb.MongoNamespace.checkDatabaseNameValidity;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.containsRegexMetaCharacters;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.containsRegexMetaCharacters;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -58,6 +59,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetadata {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MongoDBTableSource.class);
+
     private final ResolvedSchema physicalSchema;
     private final String hosts;
     private final String connectionOptions;
@@ -65,16 +68,16 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String password;
     private final String database;
     private final String collection;
-    private final Boolean errorsLogEnable;
-    private final String errorsTolerance;
     private final Boolean copyExisting;
-    private final String copyExistingPipeline;
-    private final Integer copyExistingMaxThreads;
     private final Integer copyExistingQueueSize;
+    private final Integer batchSize;
     private final Integer pollMaxBatchSize;
     private final Integer pollAwaitTimeMillis;
     private final Integer heartbeatIntervalMillis;
     private final ZoneId localTimeZone;
+    private final boolean enableParallelRead;
+    private final Integer splitMetaGroupSize;
+    private final Integer splitSizeMB;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -94,16 +97,16 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String database,
             @Nullable String collection,
             @Nullable String connectionOptions,
-            @Nullable String errorsTolerance,
-            @Nullable Boolean errorsLogEnable,
             @Nullable Boolean copyExisting,
-            @Nullable String copyExistingPipeline,
-            @Nullable Integer copyExistingMaxThreads,
             @Nullable Integer copyExistingQueueSize,
+            @Nullable Integer batchSize,
             @Nullable Integer pollMaxBatchSize,
             @Nullable Integer pollAwaitTimeMillis,
             @Nullable Integer heartbeatIntervalMillis,
-            ZoneId localTimeZone) {
+            ZoneId localTimeZone,
+            boolean enableParallelRead,
+            @Nullable Integer splitMetaGroupSize,
+            @Nullable Integer splitSizeMB) {
         this.physicalSchema = physicalSchema;
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -111,18 +114,18 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.database = database;
         this.collection = collection;
         this.connectionOptions = connectionOptions;
-        this.errorsTolerance = errorsTolerance;
-        this.errorsLogEnable = errorsLogEnable;
         this.copyExisting = copyExisting;
-        this.copyExistingPipeline = copyExistingPipeline;
-        this.copyExistingMaxThreads = copyExistingMaxThreads;
         this.copyExistingQueueSize = copyExistingQueueSize;
+        this.batchSize = batchSize;
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.localTimeZone = localTimeZone;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
+        this.enableParallelRead = enableParallelRead;
+        this.splitMetaGroupSize = splitMetaGroupSize;
+        this.splitSizeMB = splitSizeMB;
     }
 
     @Override
@@ -145,45 +148,68 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 new MongoDBConnectorDeserializationSchema(
                         physicalDataType, metadataConverters, typeInfo, localTimeZone);
 
-        MongoDBSource.Builder<RowData> builder =
-                MongoDBSource.<RowData>builder().hosts(hosts).deserializer(deserializer);
-
+        String databaseList = null;
+        String collectionList = null;
         if (StringUtils.isNotEmpty(database) && StringUtils.isNotEmpty(collection)) {
             // explicitly specified database and collection.
             if (!containsRegexMetaCharacters(database)
                     && !containsRegexMetaCharacters(collection)) {
                 checkDatabaseNameValidity(database);
                 checkCollectionNameValidity(collection);
-                builder.databaseList(database);
-                builder.collectionList(database + "." + collection);
+                databaseList = database;
+                collectionList = database + "." + collection;
             } else {
-                builder.databaseList(database);
-                builder.collectionList(collection);
+                databaseList = database;
+                collectionList = collection;
             }
         } else if (StringUtils.isNotEmpty(database)) {
-            builder.databaseList(database);
+            databaseList = database;
         } else if (StringUtils.isNotEmpty(collection)) {
-            builder.collectionList(collection);
+            collectionList = collection;
         } else {
             // Watching all changes on the cluster by default, we do nothing here
         }
 
-        Optional.ofNullable(username).ifPresent(builder::username);
-        Optional.ofNullable(password).ifPresent(builder::password);
-        Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
-        Optional.ofNullable(errorsLogEnable).ifPresent(builder::errorsLogEnable);
-        Optional.ofNullable(errorsTolerance).ifPresent(builder::errorsTolerance);
-        Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
-        Optional.ofNullable(copyExistingPipeline).ifPresent(builder::copyExistingPipeline);
-        Optional.ofNullable(copyExistingMaxThreads).ifPresent(builder::copyExistingMaxThreads);
-        Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
-        Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
-        Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
-        Optional.ofNullable(heartbeatIntervalMillis).ifPresent(builder::heartbeatIntervalMillis);
+        if (enableParallelRead) {
+            MongoDBSourceBuilder<RowData> builder =
+                    MongoDBSource.<RowData>builder().hosts(hosts).deserializer(deserializer);
 
-        DebeziumSourceFunction<RowData> sourceFunction = builder.build();
+            Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
+            Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
+            Optional.ofNullable(username).ifPresent(builder::username);
+            Optional.ofNullable(password).ifPresent(builder::password);
+            Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
+            Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
+            Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
+            Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
+            Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
+            Optional.ofNullable(heartbeatIntervalMillis)
+                    .ifPresent(builder::heartbeatIntervalMillis);
+            Optional.ofNullable(splitMetaGroupSize).ifPresent(builder::splitMetaGroupSize);
+            Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
 
-        return SourceFunctionProvider.of(sourceFunction, false);
+            return SourceProvider.of(builder.build());
+        } else {
+            com.ververica.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
+                    com.ververica.cdc.connectors.mongodb.MongoDBSource.<RowData>builder()
+                            .hosts(hosts)
+                            .deserializer(deserializer);
+
+            Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
+            Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
+            Optional.ofNullable(username).ifPresent(builder::username);
+            Optional.ofNullable(password).ifPresent(builder::password);
+            Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
+            Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
+            Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
+            Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
+            Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
+            Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
+            Optional.ofNullable(heartbeatIntervalMillis)
+                    .ifPresent(builder::heartbeatIntervalMillis);
+
+            return SourceFunctionProvider.of(builder.build(), false);
+        }
     }
 
     protected MetadataConverter[] getMetadataConverters() {
@@ -228,16 +254,16 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         database,
                         collection,
                         connectionOptions,
-                        errorsTolerance,
-                        errorsLogEnable,
                         copyExisting,
-                        copyExistingPipeline,
-                        copyExistingMaxThreads,
                         copyExistingQueueSize,
+                        batchSize,
                         pollMaxBatchSize,
                         pollAwaitTimeMillis,
                         heartbeatIntervalMillis,
-                        localTimeZone);
+                        localTimeZone,
+                        enableParallelRead,
+                        splitMetaGroupSize,
+                        splitSizeMB);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -259,16 +285,16 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(database, that.database)
                 && Objects.equals(collection, that.collection)
                 && Objects.equals(connectionOptions, that.connectionOptions)
-                && Objects.equals(errorsTolerance, that.errorsTolerance)
-                && Objects.equals(errorsLogEnable, that.errorsLogEnable)
                 && Objects.equals(copyExisting, that.copyExisting)
-                && Objects.equals(copyExistingPipeline, that.copyExistingPipeline)
-                && Objects.equals(copyExistingMaxThreads, that.copyExistingMaxThreads)
                 && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
+                && Objects.equals(batchSize, that.batchSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
                 && Objects.equals(heartbeatIntervalMillis, that.heartbeatIntervalMillis)
                 && Objects.equals(localTimeZone, that.localTimeZone)
+                && Objects.equals(enableParallelRead, that.enableParallelRead)
+                && Objects.equals(splitMetaGroupSize, that.splitMetaGroupSize)
+                && Objects.equals(splitSizeMB, that.splitSizeMB)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys);
     }
@@ -283,16 +309,16 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 database,
                 collection,
                 connectionOptions,
-                errorsTolerance,
-                errorsLogEnable,
                 copyExisting,
-                copyExistingPipeline,
-                copyExistingMaxThreads,
                 copyExistingQueueSize,
+                batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
                 heartbeatIntervalMillis,
                 localTimeZone,
+                enableParallelRead,
+                splitMetaGroupSize,
+                splitSizeMB,
                 producedDataType,
                 metadataKeys);
     }

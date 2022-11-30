@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -19,7 +17,6 @@
 package com.ververica.cdc.connectors.oracle.table;
 
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -27,72 +24,41 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_MODE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
+import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
+import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.PORT;
+import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.SCHEMA_NAME;
+import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.URL;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.util.Preconditions.checkState;
 
-/**
- * Factory for creating configured instance of {@link
- * com.ververica.cdc.connectors.oracle.table.OracleTableSource}.
- */
+/** Factory for creating configured instance of {@link OracleTableSource}. */
 public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "oracle-cdc";
-
-    private static final ConfigOption<String> HOSTNAME =
-            ConfigOptions.key("hostname")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("IP address or hostname of the Oracle database server.");
-
-    private static final ConfigOption<Integer> PORT =
-            ConfigOptions.key("port")
-                    .intType()
-                    .defaultValue(1521)
-                    .withDescription("Integer port number of the Oracle database server.");
-
-    private static final ConfigOption<String> USERNAME =
-            ConfigOptions.key("username")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Name of the Oracle database to use when connecting to the Oracle database server.");
-
-    private static final ConfigOption<String> PASSWORD =
-            ConfigOptions.key("password")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Password to use when connecting to the oracle database server.");
-
-    private static final ConfigOption<String> DATABASE_NAME =
-            ConfigOptions.key("database-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Database name of the Oracle server to monitor.");
-
-    private static final ConfigOption<String> SCHEMA_NAME =
-            ConfigOptions.key("schema-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Schema name of the Oracle database to monitor.");
-
-    private static final ConfigOption<String> TABLE_NAME =
-            ConfigOptions.key("table-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Table name of the Oracle database to monitor.");
-
-    public static final ConfigOption<String> SCAN_STARTUP_MODE =
-            ConfigOptions.key("scan.startup.mode")
-                    .stringType()
-                    .defaultValue("initial")
-                    .withDescription(
-                            "Optional startup mode for Oracle CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"latest-offset\"");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -101,6 +67,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
 
         final ReadableConfig config = helper.getOptions();
+        String url = config.get(URL);
         String hostname = config.get(HOSTNAME);
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
@@ -111,8 +78,32 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         StartupOptions startupOptions = getStartupOptions(config);
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
+        int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
+        Duration connectTimeout = config.get(CONNECT_TIMEOUT);
+        int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
+        int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        String chunkKeyColumn =
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
+        String serverTimezone = config.get(SERVER_TIME_ZONE);
+
+        if (enableParallelRead) {
+            validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
+            validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
+            validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
+            validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
+            validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
+            validateDistributionFactorUpper(distributionFactorUpper);
+            validateDistributionFactorLower(distributionFactorLower);
+        }
+
         return new OracleTableSource(
                 physicalSchema,
+                url,
                 port,
                 hostname,
                 databaseName,
@@ -121,7 +112,17 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 username,
                 password,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
-                startupOptions);
+                startupOptions,
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                chunkKeyColumn);
     }
 
     @Override
@@ -132,7 +133,6 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(HOSTNAME);
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(DATABASE_NAME);
@@ -144,9 +144,20 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(URL);
+        options.add(HOSTNAME);
         options.add(PORT);
         options.add(SCAN_STARTUP_MODE);
-
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(CHUNK_META_GROUP_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
+        options.add(CONNECT_TIMEOUT);
+        options.add(CONNECT_MAX_RETRIES);
+        options.add(CONNECTION_POOL_SIZE);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         return options;
     }
 
@@ -172,5 +183,39 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 modeString));
         }
+    }
+
+    /** Checks the value of given integer option is valid. */
+    private void validateIntegerOption(
+            ConfigOption<Integer> option, int optionValue, int exclusiveMin) {
+        checkState(
+                optionValue > exclusiveMin,
+                String.format(
+                        "The value of option '%s' must larger than %d, but is %d",
+                        option.key(), exclusiveMin, optionValue));
+    }
+
+    /** Checks the value of given evenly distribution factor upper bound is valid. */
+    private void validateDistributionFactorUpper(double distributionFactorUpper) {
+        checkState(
+                doubleCompare(distributionFactorUpper, 1.0d) >= 0,
+                String.format(
+                        "The value of option '%s' must larger than or equals %s, but is %s",
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                        1.0d,
+                        distributionFactorUpper));
+    }
+
+    /** Checks the value of given evenly distribution factor lower bound is valid. */
+    private void validateDistributionFactorLower(double distributionFactorLower) {
+        checkState(
+                doubleCompare(distributionFactorLower, 0.0d) >= 0
+                        && doubleCompare(distributionFactorLower, 1.0d) <= 0,
+                String.format(
+                        "The value of option '%s' must between %s and %s inclusively, but is %s",
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                        0.0d,
+                        1.0d,
+                        distributionFactorLower));
     }
 }

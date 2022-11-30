@@ -14,7 +14,7 @@ In order to setup the SQLServer CDC connector, the following table provides depe
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-sqlserver-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.3-SNAPSHOT</version>
+  <version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -22,9 +22,43 @@ In order to setup the SQLServer CDC connector, the following table provides depe
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-sqlserver-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.3-SNAPSHOT/flink-sql-connector-sqlserver-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-sqlserver-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.4-SNAPSHOT/flink-sql-connector-sqlserver-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-sqlserver-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-sqlserver-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-sqlserver-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-sqlserver-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-sqlserver-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-sqlserver-cdc), the released version will be available in the Maven central warehouse.
+
+Setup SQLServer Database
+----------------
+A SQL Server administrator must enable change data capture on the source tables that you want to capture. The database must already be enabled for CDC. To enable CDC on a table, a SQL Server administrator runs the stored procedure ```sys.sp_cdc_enable_table``` for the table.
+
+**Prerequisites:**
+* CDC is enabled on the SQL Server database.
+* The SQL Server Agent is running.
+* You are a member of the db_owner fixed database role for the database.
+
+**Procedure:**
+* Connect to the SQL Server database by database management studio.
+* Run the following SQL statement to enable CDC on the table.
+```sql
+USE MyDB
+GO
+
+EXEC sys.sp_cdc_enable_table
+@source_schema = N'dbo',     -- Specifies the schema of the source table.
+@source_name   = N'MyTable', -- Specifies the name of the table that you want to capture.
+@role_name     = N'MyRole',  -- Specifies a role MyRole to which you can add users to whom you want to grant SELECT permission on the captured columns of the source table. Users in the sysadmin or db_owner role also have access to the specified change tables. Set the value of @role_name to NULL, to allow only members in the sysadmin or db_owner to have full access to captured information.
+@filegroup_name = N'MyDB_CT',-- Specifies the filegroup where SQL Server places the change table for the captured table. The named filegroup must already exist. It is best not to locate change tables in the same filegroup that you use for source tables.
+@supports_net_changes = 0
+GO
+```
+* Verifying that the user has access to the CDC table
+```sql
+--The following example runs the stored procedure sys.sp_cdc_help_change_data_capture on the database MyDB:
+USE MyDB;
+GO
+EXEC sys.sp_cdc_help_change_data_capture
+GO
+```
+The query returns configuration information for each table in the database that is enabled for CDC and that contains change data that the caller is authorized to access. If the result is empty, verify that the user has privileges to access both the capture instance and the CDC tables.
 
 How to create a SQLServer CDC table
 ----------------
@@ -140,7 +174,7 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from SQLServer.
           For example: <code>'debezium.snapshot.mode' = 'initial_only'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.5/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium's SQLServer Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium's SQLServer Connector properties</a></td> 
     </tr>   
     </tbody>
 </table>    
@@ -224,15 +258,15 @@ Features
 
 ### Exactly-Once Processing
 
-The SQLServer CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.5/connectors/sqlserver.html#how-the-sqlserver-connector-works).
+The SQLServer CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.6/connectors/sqlserver.html#how-the-sqlserver-connector-works).
 
 ### Startup Reading Position
 
 The config option `scan.startup.mode` specifies the startup mode for SQLServer CDC consumer. The valid enumerations are:
 
 - `initial` (default): Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.
-- `initial_only`: Takes a snapshot of structure and data like initial but instead does not transition into streaming changes once the snapshot has completed.
-- `latest_offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.
+- `initial-only`: Takes a snapshot of structure and data like initial but instead does not transition into streaming changes once the snapshot has completed.
+- `latest-offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 

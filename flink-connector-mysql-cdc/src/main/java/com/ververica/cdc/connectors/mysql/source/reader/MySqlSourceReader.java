@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -47,17 +45,16 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
-import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -73,7 +70,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils.getNext
 /** The source reader for MySQL source splits. */
 public class MySqlSourceReader<T>
         extends SingleThreadMultiplexSourceReaderBase<
-                SourceRecord, T, MySqlSplit, MySqlSplitState> {
+                SourceRecords, T, MySqlSplit, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
 
@@ -85,9 +82,9 @@ public class MySqlSourceReader<T>
     private MySqlBinlogSplit suspendedBinlogSplit;
 
     public MySqlSourceReader(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecord>> elementQueue,
+            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<MySqlSplitReader> splitReaderSupplier,
-            RecordEmitter<SourceRecord, T, MySqlSplitState> recordEmitter,
+            RecordEmitter<SourceRecords, T, MySqlSplitState> recordEmitter,
             Configuration config,
             MySqlSourceReaderContext context,
             MySqlSourceConfig sourceConfig) {
@@ -141,11 +138,15 @@ public class MySqlSourceReader<T>
         if (suspendedBinlogSplit != null) {
             unfinishedSplits.add(suspendedBinlogSplit);
         }
+
+        logCurrentBinlogOffsets(unfinishedSplits, checkpointId);
+
         return unfinishedSplits;
     }
 
     @Override
     protected void onSplitFinished(Map<String, MySqlSplitState> finishedSplitIds) {
+        boolean requestNextSplit = true;
         for (MySqlSplitState mySqlSplitState : finishedSplitIds.values()) {
             MySqlSplit mySqlSplit = mySqlSplitState.toMySqlSplit();
             if (mySqlSplit.isBinlogSplit()) {
@@ -156,12 +157,17 @@ public class MySqlSourceReader<T>
                 mySqlSourceReaderContext.resetStopBinlogSplitReader();
                 suspendedBinlogSplit = toSuspendedBinlogSplit(mySqlSplit.asBinlogSplit());
                 context.sendSourceEventToCoordinator(new SuspendBinlogReaderAckEvent());
+                // do not request next split when the reader is suspended, the suspended reader will
+                // automatically request the next split after it has been wakeup
+                requestNextSplit = false;
             } else {
                 finishedUnackedSplits.put(mySqlSplit.splitId(), mySqlSplit.asSnapshotSplit());
             }
         }
         reportFinishedSnapshotSplitsIfNeed();
-        context.sendSplitRequest();
+        if (requestNextSplit) {
+            context.sendSplitRequest();
+        }
     }
 
     @Override
@@ -204,8 +210,7 @@ public class MySqlSourceReader<T>
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(MySqlBinlogSplit split) {
         final String splitId = split.splitId();
         if (split.getTableSchemas().isEmpty()) {
-            try (MySqlConnection jdbc =
-                    DebeziumUtils.createMySqlConnection(sourceConfig.getDbzConfiguration())) {
+            try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
                 Map<TableId, TableChanges.TableChange> tableSchemas =
                         TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
                 LOG.info("The table schema discovery for binlog split {} success", splitId);
@@ -299,7 +304,7 @@ public class MySqlSourceReader<T>
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
             LOG.info("The meta of binlog split {} has been collected success", splitId);
-            this.addSplits(Arrays.asList(binlogSplit));
+            this.addSplits(Collections.singletonList(binlogSplit));
         }
     }
 
@@ -328,11 +333,24 @@ public class MySqlSourceReader<T>
                         receivedMetaGroupId,
                         expectedMetaGroupId);
             }
-            requestBinlogSplitMetaIfNeeded(binlogSplit);
+            requestBinlogSplitMetaIfNeeded(uncompletedBinlogSplits.get(binlogSplit.splitId()));
         } else {
             LOG.warn(
                     "Received binlog meta event for split {}, but the uncompleted split map does not contain it",
                     metadataEvent.getSplitId());
+        }
+    }
+
+    private void logCurrentBinlogOffsets(List<MySqlSplit> splits, long checkpointId) {
+        if (!LOG.isInfoEnabled()) {
+            return;
+        }
+        for (MySqlSplit split : splits) {
+            if (!split.isBinlogSplit()) {
+                return;
+            }
+            BinlogOffset offset = split.asBinlogSplit().getStartingOffset();
+            LOG.info("Binlog offset on checkpoint {}: {}", checkpointId, offset);
         }
     }
 

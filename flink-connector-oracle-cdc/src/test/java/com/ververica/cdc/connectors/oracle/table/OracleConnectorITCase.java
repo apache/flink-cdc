@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -29,6 +27,8 @@ import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.OracleContainer;
@@ -39,17 +39,22 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.assertEqualsInAnyOrder;
+import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_PWD;
+import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_USER;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for Oracle binlog SQL source. */
+@RunWith(Parameterized.class)
 public class OracleConnectorITCase extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleConnectorITCase.class);
@@ -61,8 +66,19 @@ public class OracleConnectorITCase extends AbstractTestBase {
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
-                    env,
-                    EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+                    env, EnvironmentSettings.newInstance().inStreamingMode().build());
+
+    // enable the parallelismSnapshot (i.e: The new source OracleParallelSource)
+    private final boolean parallelismSnapshot;
+
+    public OracleConnectorITCase(boolean parallelismSnapshot) {
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {true}, new Object[] {false}};
+    }
 
     @Before
     public void before() throws Exception {
@@ -72,7 +88,12 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
         TestValuesTableFactory.clearAllData();
 
-        env.setParallelism(1);
+        if (parallelismSnapshot) {
+            env.setParallelism(4);
+            env.enableCheckpointing(200);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     @After
@@ -96,6 +117,10 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -104,6 +129,116 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
+                        "debezium",
+                        "products");
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " weightSum DECIMAL(10,3),"
+                        + " PRIMARY KEY (name) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
+
+        waitForSnapshotStarted("sink");
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
+            statement.execute("DELETE FROM debezium.products WHERE ID=112");
+        }
+
+        waitForSinkSize("sink", 20);
+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | id  | name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 111 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
+
+        String[] expected =
+                new String[] {
+                    "+I[scooter, 3.140]",
+                    "+I[car battery, 8.100]",
+                    "+I[12-pack drill bits, 0.800]",
+                    "+I[hammer, 2.625]",
+                    "+I[rocks, 5.100]",
+                    "+I[jacket, 0.600]",
+                    "+I[spare tire, 22.200]"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testConsumingAllEventsByChunkKeyColumn()
+            throws SQLException, ExecutionException, InterruptedException {
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " DESCRIPTION STRING,"
+                                + " WEIGHT DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.key-column' = 'ID',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "products");
         String sinkDDL =
@@ -156,7 +291,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        LOG.info("actual:{}", actual);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
     }
@@ -172,13 +308,18 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " ID INT NOT NULL,"
                                 + " NAME STRING,"
                                 + " DESCRIPTION STRING,"
-                                + " WEIGHT DECIMAL(10,3)"
+                                + " WEIGHT DECIMAL(10,3),"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'oracle-cdc',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -187,6 +328,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "products");
         String sinkDDL =
@@ -210,7 +352,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
 
-        waitForSnapshotStarted("sink");
+        waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -219,7 +361,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)");
             statement.execute(
                     "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
@@ -227,10 +369,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
-
-        // waiting for change events finished.
         waitForSinkSize("sink", 16);
-
         List<String> expected =
                 Arrays.asList(
                         "+I[XE, DEBEZIUM, PRODUCTS, 101, scooter, Small 2-wheel scooter, 3.140]",
@@ -251,6 +390,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         "-D[XE, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(expected);
         Collections.sort(actual);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -272,6 +412,9 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s' ,"
@@ -281,6 +424,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "products");
         String sinkDDL =
@@ -367,6 +511,9 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
                                 + " 'database-name' = 'XE',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -375,6 +522,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                         oracleContainer.getOraclePort(),
                         "dbzuser",
                         "dbz",
+                        parallelismSnapshot,
                         "debezium",
                         "test_numeric_table");
         String sinkDDL =
@@ -415,6 +563,203 @@ public class OracleConnectorITCase extends AbstractTestBase {
         List<String> actual = TestValuesTableFactory.getRawResults("test_numeric_sink");
         Collections.sort(actual);
         assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testXmlType() throws Exception {
+        // Prepare xml type data
+        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE debezium.xmltype_table ("
+                            + " ID NUMBER(4),"
+                            + " T15VARCHAR sys.xmltype,"
+                            + " PRIMARY KEY (ID))");
+            statement.execute(
+                    "INSERT INTO debezium.xmltype_table "
+                            + "VALUES (11, sys.xmlType.createXML('<name><a id=\"1\" value=\"some values\">test xmlType</a></name>'))");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE test_xmltype_table ("
+                                + " ID INT,"
+                                + " T15VARCHAR STRING,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        parallelismSnapshot,
+                        "debezium",
+                        "xmltype_table");
+        String sinkDDL =
+                "CREATE TABLE test_xmltype_sink ("
+                        + " id INT,"
+                        + " T15VARCHAR STRING,"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '1'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql("INSERT INTO test_xmltype_sink SELECT * FROM test_xmltype_table");
+
+        waitForSnapshotStarted("test_xmltype_sink");
+
+        // waiting for change events finished.
+        waitForSinkSize("test_xmltype_sink", 1);
+
+        String lineSeparator = System.getProperty("line.separator");
+        String expectedResult =
+                String.format(
+                        "+I[11, <name>%s"
+                                + "   <a id=\"1\" value=\"some values\">test xmlType</a>%s"
+                                + "</name>]",
+                        lineSeparator, lineSeparator);
+
+        List<String> expected = Arrays.asList(expectedResult);
+
+        List<String> actual = TestValuesTableFactory.getRawResults("test_xmltype_sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testAllDataTypes() throws Throwable {
+        OracleTestUtils.createAndInitialize(
+                OracleTestUtils.ORACLE_CONTAINER, "column_type_test.sql");
+
+        tEnv.getConfig().setLocalTimeZone(ZoneId.of("Asia/Shanghai"));
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE full_types ("
+                                + " ID INT,"
+                                + " VAL_VARCHAR STRING,"
+                                + " VAL_VARCHAR2 STRING,"
+                                + " VAL_NVARCHAR2 STRING,"
+                                + " VAL_CHAR STRING,"
+                                + " VAL_NCHAR STRING,"
+                                + " VAL_BF FLOAT,"
+                                + " VAL_BD DOUBLE,"
+                                + " VAL_F FLOAT,"
+                                + " VAL_F_10 FLOAT,"
+                                + " VAL_NUM DECIMAL(10, 6),"
+                                + " VAL_DP DOUBLE,"
+                                + " VAL_R DECIMAL(38,2),"
+                                + " VAL_DECIMAL DECIMAL(10, 6),"
+                                + " VAL_NUMERIC DECIMAL(10, 6),"
+                                + " VAL_NUM_VS DECIMAL(10, 3),"
+                                + " VAL_INT DECIMAL(38,0),"
+                                + " VAL_INTEGER DECIMAL(38,0),"
+                                + " VAL_SMALLINT DECIMAL(38,0),"
+                                + " VAL_NUMBER_38_NO_SCALE DECIMAL(38,0),"
+                                + " VAL_NUMBER_38_SCALE_0 DECIMAL(38,0),"
+                                + " VAL_NUMBER_1 BOOLEAN,"
+                                + " VAL_NUMBER_2 TINYINT,"
+                                + " VAL_NUMBER_4 SMALLINT,"
+                                + " VAL_NUMBER_9 INT,"
+                                + " VAL_NUMBER_18 BIGINT,"
+                                + " VAL_NUMBER_2_NEGATIVE_SCALE TINYINT,"
+                                + " VAL_NUMBER_4_NEGATIVE_SCALE SMALLINT,"
+                                + " VAL_NUMBER_9_NEGATIVE_SCALE INT,"
+                                + " VAL_NUMBER_18_NEGATIVE_SCALE BIGINT,"
+                                + " VAL_NUMBER_36_NEGATIVE_SCALE DECIMAL(38,0),"
+                                + " VAL_DATE TIMESTAMP,"
+                                + " VAL_TS TIMESTAMP,"
+                                + " VAL_TS_PRECISION2 TIMESTAMP(2 ),"
+                                + " VAL_TS_PRECISION4 TIMESTAMP(4),"
+                                + " VAL_TS_PRECISION9 TIMESTAMP(6),"
+                                + " VAL_TSTZ STRING,"
+                                + " VAL_TSLTZ TIMESTAMP_LTZ,"
+                                + " VAL_INT_YTM BIGINT,"
+                                + " VAL_INT_DTS BIGINT,"
+                                + " T15VARCHAR STRING,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'database-name' = 'XE',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        oracleContainer.getHost(),
+                        oracleContainer.getOraclePort(),
+                        CONNECTOR_USER,
+                        CONNECTOR_PWD,
+                        parallelismSnapshot,
+                        "debezium",
+                        "full_types");
+
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '2'"
+                        + ") LIKE full_types (EXCLUDING OPTIONS)";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
+
+        // waiting for change events finished.
+        waitForSinkSize("sink", 1);
+
+        String[] expected =
+                new String[] {
+                    "+I[1, vc2, vc2, nvc2, c  , nc , "
+                            + "1.1, 2.22, 3.33, 8.888, 4.444400, 5.555, 6.66, "
+                            + "1234.567891, 1234.567891, 77.323, 1, 22, 333, 4444, 5555, "
+                            + "true, 99, 9999, 999999999, 999999999999999999, "
+                            + "90, 9900, 999999990, 999999999999999900, 99999999999999999999999999999999999900, "
+                            + "2022-10-30T00:00, "
+                            + "2022-10-30T12:34:56.007890, "
+                            + "2022-10-30T12:34:56.130, "
+                            + "2022-10-30T12:34:56.125500, "
+                            + "2022-10-30T12:34:56.125457, "
+                            + "2022-10-30T01:34:56.00789-11:00, "
+                            + "2022-10-29T17:34:56.007890Z, "
+                            + "-110451600000000, "
+                            + "-93784560000, "
+                            + "<name>\n"
+                            + "   <a id=\"1\" value=\"some values\">test xmlType</a>\n"
+                            + "</name>]"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        Collections.sort(actual);
+        assertEquals(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
 

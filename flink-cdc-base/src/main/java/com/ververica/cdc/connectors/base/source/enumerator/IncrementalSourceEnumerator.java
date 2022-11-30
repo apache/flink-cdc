@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,7 +22,7 @@ import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
@@ -51,8 +49,8 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * A CDC source enumerator that enumerates receive the split request and assign the split to source
- * readers.
+ * Incremental source enumerator that enumerates receive the split request and assign the split to
+ * source readers.
  */
 @Experimental
 public class IncrementalSourceEnumerator
@@ -64,9 +62,9 @@ public class IncrementalSourceEnumerator
     private final SourceConfig sourceConfig;
     private final SplitAssigner splitAssigner;
 
-    // using TreeSet to prefer assigning binlog split to task-0 for easier debug
+    // using TreeSet to prefer assigning stream split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
-    private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
+    private List<List<FinishedSnapshotSplitInfo>> finishedSnapshotSplitMeta;
 
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
@@ -101,7 +99,7 @@ public class IncrementalSourceEnumerator
 
     @Override
     public void addSplitsBack(List<SourceSplitBase> splits, int subtaskId) {
-        LOG.debug("MySQL Source Enumerator adds splits back: {}", splits);
+        LOG.debug("Incremental Source Enumerator adds splits back: {}", splits);
         splitAssigner.addSplits(splits);
     }
 
@@ -127,9 +125,9 @@ public class IncrementalSourceEnumerator
             context.sendEventToSourceReader(subtaskId, ackEvent);
         } else if (sourceEvent instanceof StreamSplitMetaRequestEvent) {
             LOG.debug(
-                    "The enumerator receives request for binlog split meta from subtask {}.",
+                    "The enumerator receives request for stream split meta from subtask {}.",
                     subtaskId);
-            sendBinlogMeta(subtaskId, (StreamSplitMetaRequestEvent) sourceEvent);
+            sendStreamMetaRequestEvent(subtaskId, (StreamSplitMetaRequestEvent) sourceEvent);
         }
     }
 
@@ -141,7 +139,7 @@ public class IncrementalSourceEnumerator
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         splitAssigner.notifyCheckpointComplete(checkpointId);
-        // binlog split may be available after checkpoint complete
+        // stream split may be available after checkpoint complete
         assignSplits();
     }
 
@@ -167,10 +165,10 @@ public class IncrementalSourceEnumerator
 
             Optional<SourceSplitBase> split = splitAssigner.getNext();
             if (split.isPresent()) {
-                final SourceSplitBase mySqlSplit = split.get();
-                context.assignSplit(mySqlSplit, nextAwaiting);
+                final SourceSplitBase sourceSplit = split.get();
+                context.assignSplit(sourceSplit, nextAwaiting);
                 awaitingReader.remove();
-                LOG.info("Assign split {} to subtask {}", mySqlSplit, nextAwaiting);
+                LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
                 break;
@@ -201,9 +199,9 @@ public class IncrementalSourceEnumerator
         }
     }
 
-    private void sendBinlogMeta(int subTask, StreamSplitMetaRequestEvent requestEvent) {
+    private void sendStreamMetaRequestEvent(int subTask, StreamSplitMetaRequestEvent requestEvent) {
         // initialize once
-        if (binlogSplitMeta == null) {
+        if (finishedSnapshotSplitMeta == null) {
             final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
                     splitAssigner.getFinishedSplitInfos();
             if (finishedSnapshotSplitInfos.isEmpty()) {
@@ -212,14 +210,15 @@ public class IncrementalSourceEnumerator
                 throw new FlinkRuntimeException(
                         "The assigner offer empty finished split information, this should not happen");
             }
-            binlogSplitMeta =
+            finishedSnapshotSplitMeta =
                     Lists.partition(
                             finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
 
-        if (binlogSplitMeta.size() > requestMetaGroupId) {
-            List<FinishedSnapshotSplitInfo> metaToSend = binlogSplitMeta.get(requestMetaGroupId);
+        if (finishedSnapshotSplitMeta.size() > requestMetaGroupId) {
+            List<FinishedSnapshotSplitInfo> metaToSend =
+                    finishedSnapshotSplitMeta.get(requestMetaGroupId);
             StreamSplitMetaEvent metadataEvent =
                     new StreamSplitMetaEvent(
                             requestEvent.getSplitId(),
@@ -232,7 +231,7 @@ public class IncrementalSourceEnumerator
             LOG.error(
                     "Received invalid request meta group id {}, the invalid meta group id range is [0, {}]",
                     requestMetaGroupId,
-                    binlogSplitMeta.size() - 1);
+                    finishedSnapshotSplitMeta.size() - 1);
         }
     }
 }

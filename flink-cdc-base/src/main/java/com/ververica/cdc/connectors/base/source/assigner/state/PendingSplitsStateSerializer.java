@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -23,10 +21,12 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
+import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,18 +35,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The {@link SimpleVersionedSerializer Serializer} for the {@link PendingSplitsState} of MySQL CDC
- * source.
- */
+import static com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer.readTableSchemas;
+import static com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer.writeTableSchemas;
+
+/** The {@link SimpleVersionedSerializer Serializer} for the {@link PendingSplitsState}. */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
     private static final int SNAPSHOT_PENDING_SPLITS_STATE_FLAG = 1;
-    private static final int BINLOG_PENDING_SPLITS_STATE_FLAG = 2;
+    private static final int STREAM_PENDING_SPLITS_STATE_FLAG = 2;
     private static final int HYBRID_PENDING_SPLITS_STATE_FLAG = 3;
 
     private final SourceSplitSerializer splitSerializer;
@@ -73,8 +73,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             out.writeInt(SNAPSHOT_PENDING_SPLITS_STATE_FLAG);
             serializeSnapshotPendingSplitsState((SnapshotPendingSplitsState) state, out);
         } else if (state instanceof StreamPendingSplitsState) {
-            out.writeInt(BINLOG_PENDING_SPLITS_STATE_FLAG);
-            serializeBinlogPendingSplitsState((StreamPendingSplitsState) state, out);
+            out.writeInt(STREAM_PENDING_SPLITS_STATE_FLAG);
+            serializeStreamPendingSplitsState((StreamPendingSplitsState) state, out);
         } else if (state instanceof HybridPendingSplitsState) {
             out.writeInt(HYBRID_PENDING_SPLITS_STATE_FLAG);
             serializeHybridPendingSplitsState((HybridPendingSplitsState) state, out);
@@ -99,7 +99,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 2:
                 return deserializeLegacyPendingSplitsState(serialized);
             case 3:
-                return deserializePendingSplitsState(serialized);
+            case 4:
+                return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
         }
@@ -114,24 +115,25 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             return deserializeLegacySnapshotPendingSplitsState(splitVersion, in);
         } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
             return deserializeLegacyHybridPendingSplitsState(splitVersion, in);
-        } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeBinlogPendingSplitsState(in);
+        } else if (stateFlag == STREAM_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeStreamPendingSplitsState(in);
         } else {
             throw new IOException(
                     "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
         }
     }
 
-    public PendingSplitsState deserializePendingSplitsState(byte[] serialized) throws IOException {
+    public PendingSplitsState deserializePendingSplitsState(int version, byte[] serialized)
+            throws IOException {
         final DataInputDeserializer in = new DataInputDeserializer(serialized);
         final int splitVersion = in.readInt();
         final int stateFlag = in.readInt();
         if (stateFlag == SNAPSHOT_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeSnapshotPendingSplitsState(splitVersion, in);
+            return deserializeSnapshotPendingSplitsState(version, splitVersion, in);
         } else if (stateFlag == HYBRID_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeHybridPendingSplitsState(splitVersion, in);
-        } else if (stateFlag == BINLOG_PENDING_SPLITS_STATE_FLAG) {
-            return deserializeBinlogPendingSplitsState(in);
+            return deserializeHybridPendingSplitsState(version, splitVersion, in);
+        } else if (stateFlag == STREAM_PENDING_SPLITS_STATE_FLAG) {
+            return deserializeStreamPendingSplitsState(in);
         } else {
             throw new IOException(
                     "Unsupported to deserialize PendingSplitsState flag: " + stateFlag);
@@ -145,12 +147,13 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     private void serializeSnapshotPendingSplitsState(
             SnapshotPendingSplitsState state, DataOutputSerializer out) throws IOException {
         writeTableIds(state.getAlreadyProcessedTables(), out);
-        writeMySqlSplits(state.getRemainingSplits(), out);
+        writeRemainingSplits(state.getRemainingSplits(), out);
         writeAssignedSnapshotSplits(state.getAssignedSplits(), out);
         writeFinishedOffsets(state.getSplitFinishedOffsets(), out);
         out.writeBoolean(state.isAssignerFinished());
         writeTableIds(state.getRemainingTables(), out);
         out.writeBoolean(state.isTableIdCaseSensitive());
+        writeTableSchemas(state.getTableSchemas(), out);
     }
 
     private void serializeHybridPendingSplitsState(
@@ -159,7 +162,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         out.writeBoolean(state.isStreamSplitAssigned());
     }
 
-    private void serializeBinlogPendingSplitsState(
+    private void serializeStreamPendingSplitsState(
             StreamPendingSplitsState state, DataOutputSerializer out) throws IOException {
         out.writeBoolean(state.isStreamSplitAssigned());
     }
@@ -171,15 +174,34 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     private SnapshotPendingSplitsState deserializeLegacySnapshotPendingSplitsState(
             int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(in);
-        List<SnapshotSplit> remainingSplits = readMySqlSnapshotSplits(splitVersion, in);
+        List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
         Map<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
+
+        final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
+        final Map<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
+                new HashMap<>();
+        final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
+        remainingSplits.forEach(
+                split -> {
+                    tableSchemas.putAll(split.getTableSchemas());
+                    remainingSchemalessSplits.add(split.toSchemalessSnapshotSplit());
+                });
+        assignedSnapshotSplits
+                .entrySet()
+                .forEach(
+                        entry -> {
+                            tableSchemas.putAll(entry.getValue().getTableSchemas());
+                            assignedSchemalessSnapshotSplits.put(
+                                    entry.getKey(), entry.getValue().toSchemalessSnapshotSplit());
+                        });
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
         boolean isAssignerFinished = in.readBoolean();
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
-                remainingSplits,
-                assignedSnapshotSplits,
+                remainingSchemalessSplits,
+                assignedSchemalessSnapshotSplits,
+                tableSchemas,
                 finishedOffsets,
                 isAssignerFinished,
                 new ArrayList<>(),
@@ -191,24 +213,45 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             int splitVersion, DataInputDeserializer in) throws IOException {
         SnapshotPendingSplitsState snapshotPendingSplitsState =
                 deserializeLegacySnapshotPendingSplitsState(splitVersion, in);
-        boolean isBinlogSplitAssigned = in.readBoolean();
-        return new HybridPendingSplitsState(snapshotPendingSplitsState, isBinlogSplitAssigned);
+        boolean isStreamSplitAssigned = in.readBoolean();
+        return new HybridPendingSplitsState(snapshotPendingSplitsState, isStreamSplitAssigned);
     }
 
     private SnapshotPendingSplitsState deserializeSnapshotPendingSplitsState(
-            int splitVersion, DataInputDeserializer in) throws IOException {
+            int version, int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(in);
-        List<SnapshotSplit> remainingSplits = readMySqlSnapshotSplits(splitVersion, in);
+        List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
         Map<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
         boolean isAssignerFinished = in.readBoolean();
         List<TableId> remainingTableIds = readTableIds(in);
         boolean isTableIdCaseSensitive = in.readBoolean();
+        final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
+        final Map<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
+                new HashMap<>();
+        final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
+        remainingSplits.forEach(
+                split -> {
+                    tableSchemas.putAll(split.getTableSchemas());
+                    remainingSchemalessSplits.add(split.toSchemalessSnapshotSplit());
+                });
+        assignedSnapshotSplits
+                .entrySet()
+                .forEach(
+                        entry -> {
+                            tableSchemas.putAll(entry.getValue().getTableSchemas());
+                            assignedSchemalessSnapshotSplits.put(
+                                    entry.getKey(), entry.getValue().toSchemalessSnapshotSplit());
+                        });
+        if (version >= 4) {
+            tableSchemas.putAll(readTableSchemas(splitVersion, in));
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
-                remainingSplits,
-                assignedSnapshotSplits,
+                remainingSchemalessSplits,
+                assignedSchemalessSnapshotSplits,
+                tableSchemas,
                 finishedOffsets,
                 isAssignerFinished,
                 remainingTableIds,
@@ -217,14 +260,14 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(
-            int splitVersion, DataInputDeserializer in) throws IOException {
+            int version, int splitVersion, DataInputDeserializer in) throws IOException {
         SnapshotPendingSplitsState snapshotPendingSplitsState =
-                deserializeSnapshotPendingSplitsState(splitVersion, in);
-        boolean isBinlogSplitAssigned = in.readBoolean();
-        return new HybridPendingSplitsState(snapshotPendingSplitsState, isBinlogSplitAssigned);
+                deserializeSnapshotPendingSplitsState(version, splitVersion, in);
+        boolean isStreamSplitAssigned = in.readBoolean();
+        return new HybridPendingSplitsState(snapshotPendingSplitsState, isStreamSplitAssigned);
     }
 
-    private StreamPendingSplitsState deserializeBinlogPendingSplitsState(DataInputDeserializer in)
+    private StreamPendingSplitsState deserializeStreamPendingSplitsState(DataInputDeserializer in)
             throws IOException {
         return new StreamPendingSplitsState(in.readBoolean());
     }
@@ -249,19 +292,18 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             String splitId = in.readUTF();
-            Offset binlogOffset = splitSerializer.readOffsetPosition(offsetVersion, in);
-            //            Offset binlogOffset = readBinlogPosition(offsetVersion, in);
-            splitsInfo.put(splitId, binlogOffset);
+            Offset offsetPosition = splitSerializer.readOffsetPosition(offsetVersion, in);
+            splitsInfo.put(splitId, offsetPosition);
         }
         return splitsInfo;
     }
 
     private void writeAssignedSnapshotSplits(
-            Map<String, SnapshotSplit> assignedSplits, DataOutputSerializer out)
+            Map<String, SchemalessSnapshotSplit> assignedSplits, DataOutputSerializer out)
             throws IOException {
         final int size = assignedSplits.size();
         out.writeInt(size);
-        for (Map.Entry<String, SnapshotSplit> entry : assignedSplits.entrySet()) {
+        for (Map.Entry<String, SchemalessSnapshotSplit> entry : assignedSplits.entrySet()) {
             out.writeUTF(entry.getKey());
             byte[] splitBytes = splitSerializer.serialize(entry.getValue());
             out.writeInt(splitBytes.length);
@@ -275,35 +317,35 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             String splitId = in.readUTF();
-            SnapshotSplit mySqlSplit = readMySqlSplit(splitVersion, in).asSnapshotSplit();
-            assignedSplits.put(splitId, mySqlSplit);
+            SnapshotSplit snapshotSplit = readSnapshotSplit(splitVersion, in).asSnapshotSplit();
+            assignedSplits.put(splitId, snapshotSplit);
         }
         return assignedSplits;
     }
 
-    private <T extends SourceSplitBase> void writeMySqlSplits(
-            Collection<T> mySqlSplits, DataOutputSerializer out) throws IOException {
-        final int size = mySqlSplits.size();
+    private <T extends SourceSplitBase> void writeRemainingSplits(
+            Collection<T> remainingSplits, DataOutputSerializer out) throws IOException {
+        final int size = remainingSplits.size();
         out.writeInt(size);
-        for (SourceSplitBase split : mySqlSplits) {
+        for (SourceSplitBase split : remainingSplits) {
             byte[] splitBytes = splitSerializer.serialize(split);
             out.writeInt(splitBytes.length);
             out.write(splitBytes);
         }
     }
 
-    private List<SnapshotSplit> readMySqlSnapshotSplits(int splitVersion, DataInputDeserializer in)
+    private List<SnapshotSplit> readSnapshotSplits(int splitVersion, DataInputDeserializer in)
             throws IOException {
-        List<SnapshotSplit> mySqlSplits = new ArrayList<>();
+        List<SnapshotSplit> snapshotSplits = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
-            SnapshotSplit mySqlSplit = readMySqlSplit(splitVersion, in).asSnapshotSplit();
-            mySqlSplits.add(mySqlSplit);
+            SnapshotSplit snapshotSplit = readSnapshotSplit(splitVersion, in).asSnapshotSplit();
+            snapshotSplits.add(snapshotSplit);
         }
-        return mySqlSplits;
+        return snapshotSplits;
     }
 
-    private SourceSplitBase readMySqlSplit(int splitVersion, DataInputDeserializer in)
+    private SourceSplitBase readSnapshotSplit(int splitVersion, DataInputDeserializer in)
             throws IOException {
         int splitBytesLen = in.readInt();
         byte[] splitBytes = new byte[splitBytesLen];

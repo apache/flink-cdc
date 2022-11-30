@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -27,11 +25,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * A structure describes a fine grained offset in a binlog event including binlog position and gtid
- * set etc.
+ * A structure describes a fine-grained offset in a change event including change log position.
  *
- * <p>This structure can also be used to deal the binlog event in transaction, a transaction may
- * contains multiple change events, and each change event may contain multiple rows. When restart
+ * <p>This structure can also be used to deal the change event in transaction, a transaction may
+ * contain multiple change events, and each change event may contain multiple rows. When restart
  * from a specific {@link Offset}, we need to skip the processed change events and the processed
  * rows.
  */

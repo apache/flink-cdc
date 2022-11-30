@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -18,17 +16,22 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventType;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -45,12 +48,16 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
@@ -61,11 +68,11 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isData
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
  * snapshot data that {@link SnapshotSplitReader} read.
  */
-public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSplit> {
+public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
-    private final ExecutorService executor;
+    private final ExecutorService executorService;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -76,14 +83,18 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
+    private final Set<TableId> pureBinlogPhaseTables;
     private Tables.TableFilter capturedTableFilter;
+
+    private static final long READER_CLOSE_TIMEOUT = 30L;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
+        this.pureBinlogPhaseTables = new HashSet<>();
     }
 
     public void submitSplit(MySqlSplit mySqlSplit) {
@@ -104,9 +115,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                         statefulTaskContext.getTaskContext(),
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
-                        currentBinlogSplit);
+                        currentBinlogSplit,
+                        createEventFilter(currentBinlogSplit.getStartingOffset()));
 
-        executor.submit(
+        executorService.submit(
                 () -> {
                     try {
                         binlogSplitReadTask.execute(
@@ -139,7 +151,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
 
     @Nullable
     @Override
-    public Iterator<SourceRecord> pollSplitRecords() throws InterruptedException {
+    public Iterator<SourceRecords> pollSplitRecords() throws InterruptedException {
         checkReadException();
         final List<SourceRecord> sourceRecords = new ArrayList<>();
         if (currentTaskRunning) {
@@ -149,7 +161,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                     sourceRecords.add(event.getRecord());
                 }
             }
-            return sourceRecords.iterator();
+            List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+            sourceRecordsSet.add(new SourceRecords(sourceRecords));
+            return sourceRecordsSet.iterator();
         } else {
             return null;
         }
@@ -173,6 +187,17 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             }
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
+            }
+            // set currentTaskRunning to false to terminate the
+            // while loop in MySqlStreamingChangeEventSource's execute method
+            currentTaskRunning = false;
+            if (executorService != null) {
+                executorService.shutdown();
+                if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                    LOG.warn(
+                            "Failed to close the binlog split reader in {} seconds.",
+                            READER_CLOSE_TIMEOUT);
+                }
             }
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
@@ -204,8 +229,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
                 RowType splitKeyType =
-                        ChunkUtils.getSplitType(
-                                statefulTaskContext.getDatabaseSchema().tableFor(tableId));
+                        ChunkUtils.getChunkKeyColumnType(
+                                statefulTaskContext.getDatabaseSchema().tableFor(tableId),
+                                statefulTaskContext.getSourceConfig().getChunkKeyColumn());
                 Object[] key =
                         getSplitKey(
                                 splitKeyType,
@@ -228,9 +254,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
+        if (pureBinlogPhaseTables.contains(tableId)) {
+            return true;
+        }
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
+            pureBinlogPhaseTables.add(tableId);
             return true;
         }
         // capture dynamically new added tables
@@ -247,7 +277,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
                 currentBinlogSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
-        // latest-offset mode
+        // specific offset mode
         if (finishedSplitInfos.isEmpty()) {
             for (TableId tableId : currentBinlogSplit.getTableSchemas().keySet()) {
                 tableIdBinlogPositionMap.put(tableId, currentBinlogSplit.getStartingOffset());
@@ -271,9 +301,30 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecord, MySqlSpli
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
+        this.pureBinlogPhaseTables.clear();
+    }
+
+    private Predicate<Event> createEventFilter(BinlogOffset startingOffset) {
+        // If the startup mode is set as TIMESTAMP, we need to apply a filter on event to drop
+        // events earlier than the specified timestamp.
+        if (BinlogOffsetKind.TIMESTAMP.equals(startingOffset.getOffsetKind())) {
+            long startTimestampSec = startingOffset.getTimestampSec();
+            // Notes:
+            // 1. Heartbeat event doesn't contain timestamp, so we just keep it
+            // 2. Timestamp of event is in epoch millisecond
+            return event ->
+                    EventType.HEARTBEAT.equals(event.getHeader().getEventType())
+                            || event.getHeader().getTimestamp() >= startTimestampSec * 1000;
+        }
+        return event -> true;
     }
 
     public void stopBinlogReadTask() {
         this.currentTaskRunning = false;
+    }
+
+    @VisibleForTesting
+    public ExecutorService getExecutorService() {
+        return executorService;
     }
 }

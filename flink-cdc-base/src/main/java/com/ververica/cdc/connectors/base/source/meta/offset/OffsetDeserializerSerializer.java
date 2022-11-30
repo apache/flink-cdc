@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -58,11 +56,11 @@ public interface OffsetDeserializerSerializer extends Serializable {
     default Offset readOffsetPosition(DataInputDeserializer in) throws IOException {
         boolean offsetNonNull = in.readBoolean();
         if (offsetNonNull) {
-            int binlogOffsetBytesLength = in.readInt();
-            byte[] binlogOffsetBytes = new byte[binlogOffsetBytesLength];
-            in.readFully(binlogOffsetBytes);
+            int offsetBytesLength = in.readInt();
+            byte[] offsetBytes = new byte[offsetBytesLength];
+            in.readFully(offsetBytes);
             OffsetDeserializer offsetDeserializer = createOffsetDeserializer();
-            return offsetDeserializer.deserialize(binlogOffsetBytes);
+            return offsetDeserializer.deserialize(offsetBytes);
         } else {
             return null;
         }
@@ -71,9 +69,9 @@ public interface OffsetDeserializerSerializer extends Serializable {
     default void writeOffsetPosition(Offset offset, DataOutputSerializer out) throws IOException {
         out.writeBoolean(offset != null);
         if (offset != null) {
-            byte[] binlogOffsetBytes = OffsetSerializer.INSTANCE.serialize(offset);
-            out.writeInt(binlogOffsetBytes.length);
-            out.write(binlogOffsetBytes);
+            byte[] offsetBytes = OffsetSerializer.INSTANCE.serialize(offset);
+            out.writeInt(offsetBytes.length);
+            out.write(offsetBytes);
         }
     }
 

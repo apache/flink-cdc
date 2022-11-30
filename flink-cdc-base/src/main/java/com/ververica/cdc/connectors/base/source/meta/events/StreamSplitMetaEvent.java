@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -22,13 +20,13 @@ import org.apache.flink.api.connector.source.SourceEvent;
 
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
 import java.util.List;
 
 /**
  * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * JdbcIncrementalSourceReader} to pass binlog meta data, i.e. {@link FinishedSnapshotSplitInfo}.
+ * IncrementalSourceReader} to pass change log metadata, i.e. {@link FinishedSnapshotSplitInfo}.
  */
 public class StreamSplitMetaEvent implements SourceEvent {
 
@@ -36,10 +34,10 @@ public class StreamSplitMetaEvent implements SourceEvent {
 
     private final String splitId;
 
-    /** The meta data of binlog split is divided to multiple groups. */
+    /** The metadata of stream split is divided to multiple groups. */
     private final int metaGroupId;
     /**
-     * The serialized meta data of binlog split, it's serialized/deserialize by {@link
+     * The serialized metadata of stream split, it's serialized/deserialized by {@link
      * FinishedSnapshotSplitInfo#serialize()} and {@link
      * FinishedSnapshotSplitInfo#deserialize(byte[])}.
      */

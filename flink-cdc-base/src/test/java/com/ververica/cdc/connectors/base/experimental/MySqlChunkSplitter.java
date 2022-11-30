@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -188,7 +186,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
                 // the minimum dynamic chunk size is at least 1
                 final int dynamicChunkSize = Math.max((int) (distributionFactor * chunkSize), 1);
                 return splitEvenlySizedChunks(
-                        tableId, min, max, approximateRowCnt, dynamicChunkSize);
+                        tableId, min, max, approximateRowCnt, chunkSize, dynamicChunkSize);
             } else {
                 return splitUnevenlySizedChunks(
                         jdbc, tableId, splitColumnName, min, max, chunkSize);
@@ -203,12 +201,18 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
      * and tumble chunks in step size.
      */
     private List<ChunkRange> splitEvenlySizedChunks(
-            TableId tableId, Object min, Object max, long approximateRowCnt, int chunkSize) {
+            TableId tableId,
+            Object min,
+            Object max,
+            long approximateRowCnt,
+            int chunkSize,
+            int dynamicChunkSize) {
         LOG.info(
-                "Use evenly-sized chunk optimization for table {}, the approximate row count is {}, the chunk size is {}",
+                "Use evenly-sized chunk optimization for table {}, the approximate row count is {}, the chunk size is {}, the dynamic chunk size is {}",
                 tableId,
                 approximateRowCnt,
-                chunkSize);
+                chunkSize,
+                dynamicChunkSize);
         if (approximateRowCnt <= chunkSize) {
             // there is no more than one chunk, return full table as a chunk
             return Collections.singletonList(ChunkRange.all());
@@ -216,11 +220,16 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
 
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
-        Object chunkEnd = ObjectUtils.plus(min, chunkSize);
+        Object chunkEnd = ObjectUtils.plus(min, dynamicChunkSize);
         while (ObjectUtils.compare(chunkEnd, max) <= 0) {
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             chunkStart = chunkEnd;
-            chunkEnd = ObjectUtils.plus(chunkEnd, chunkSize);
+            try {
+                chunkEnd = ObjectUtils.plus(chunkEnd, dynamicChunkSize);
+            } catch (ArithmeticException e) {
+                // Stop chunk split to avoid dead loop when number overflows.
+                break;
+            }
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,7 +22,7 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import io.debezium.relational.TableId;
 import org.slf4j.Logger;
@@ -189,7 +187,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     // --------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {
-        final List<MySqlSnapshotSplit> assignedSnapshotSplit =
+        final List<MySqlSchemalessSnapshotSplit> assignedSnapshotSplit =
                 snapshotSplitAssigner.getAssignedSplits().values().stream()
                         .sorted(Comparator.comparing(MySqlSplit::splitId))
                         .collect(Collectors.toList());
@@ -199,7 +197,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
 
         BinlogOffset minBinlogOffset = null;
-        for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
+        for (MySqlSchemalessSnapshotSplit split : assignedSnapshotSplit) {
             // find the min binlog offset
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
             if (minBinlogOffset == null || binlogOffset.isBefore(minBinlogOffset)) {
@@ -220,8 +218,8 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new MySqlBinlogSplit(
                 BINLOG_SPLIT_ID,
-                minBinlogOffset == null ? BinlogOffset.INITIAL_OFFSET : minBinlogOffset,
-                BinlogOffset.NO_STOPPING_OFFSET,
+                minBinlogOffset == null ? BinlogOffset.ofEarliest() : minBinlogOffset,
+                BinlogOffset.ofNonStopping(),
                 divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
                 new HashMap<>(),
                 finishedSnapshotSplitInfos.size());

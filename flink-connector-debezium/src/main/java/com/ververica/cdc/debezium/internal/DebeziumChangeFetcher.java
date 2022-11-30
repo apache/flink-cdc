@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -30,6 +28,7 @@ import io.debezium.engine.DebeziumEngine;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,6 +163,14 @@ public class DebeziumChangeFetcher<T> {
             }
         } catch (Handover.ClosedException e) {
             // ignore
+        } catch (RetriableException e) {
+            // Retriable exception should be ignored by DebeziumChangeFetcher,
+            // refer https://issues.redhat.com/browse/DBZ-2531 for more information.
+            // Because Retriable exception is ignored by the DebeziumEngine and
+            // the retry is handled in io.debezium.connector.common.BaseSourceTask.poll()
+            LOG.info(
+                    "Ignore the RetriableException, the underlying DebeziumEngine will restart automatically",
+                    e);
         }
     }
 

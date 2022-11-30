@@ -12,7 +12,7 @@ In order to setup the OceanBase CDC connector, the following table provides depe
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-oceanbase-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.3-SNAPSHOT</version>
+  <version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -20,9 +20,9 @@ In order to setup the OceanBase CDC connector, the following table provides depe
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.3-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oceanbase-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-oceanbase-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oceanbase-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc), the released version will be available in the Maven central warehouse.
 
 Setup OceanBase and LogProxy Server
 ----------------------
@@ -41,13 +41,19 @@ Setup OceanBase and LogProxy Server
 
 3. Create a user in the tenant you want to monitor, this is used to read data for snapshot and change event.
 
-4. Get the `rootservice_list`. You can use the following command to get the value:
+4. For users of OceanBase Community Edition, you need to get the `rootserver-list`. You can use the following command to get the value:
 
     ```shell
     mysql> show parameters like 'rootservice_list';
     ```
 
-5. Setup OceanBase LogProxy following the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
+   For users of OceanBase Enterprise Edition, you need to get the `config-url`. You can use the following command to get the value:
+
+    ```shell
+    mysql> show parameters like 'obconfig_url';
+    ```
+
+5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
 
 How to create a OceanBase CDC table
 ----------------
@@ -79,14 +85,24 @@ Flink SQL> CREATE TABLE orders (
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = '127.0.0.1',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+);
 
 -- read snapshot and binlogs from orders table
 Flink SQL> SELECT * FROM orders;
 ```
 
+You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial](https://ververica.github.io/flink-cdc-connectors/release-2.3//content/quickstart/oceanbase-tutorial.html) for more information.
+
 Connector Options
 ----------------
+
+The OceanBase CDC Connector contains some options for both sql and stream api as the following sheet. 
+
+*Note*: The connector supports two ways to specify the table list to listen to, and will get the union of the results when both way are used at the same time.
+1. Use `database-name` and `table-name` to match database and table names in regex. As the `obcdc` (former `liboblog`) only supports `fnmatch` now, we can't use regex directly to filter change events, so these two options can only be used in `initial` startup mode.
+2. Use `table-list` to match the exact value of database and table names.
 
 <div class="highlight">
     <table class="colwidths-auto docutils">
@@ -142,21 +158,28 @@ Connector Options
                 <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Tenant name of OceanBase to monitor.</td>
+                <td>Tenant name of OceanBase to monitor, should be exact value.</td>
             </tr>
             <tr>
                 <td>database-name</td>
-                <td>required</td>
+                <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Database name of OceanBase to monitor.</td>
+                <td>Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
             </tr>
             <tr>
                 <td>table-name</td>
-                <td>required</td>
+                <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Table name of OceanBase to monitor.</td>
+                <td>Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+            </tr>
+            <tr>
+                <td>table-list</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>List of full names of tables, separated by commas, e.g. "db1.table1, db2.table2".</td>
             </tr>
             <tr>
                 <td>hostname</td>
@@ -168,7 +191,7 @@ Connector Options
             <tr>
                 <td>port</td>
                 <td>optional</td>
-                <td style="word-wrap: break-word;">(none))</td>
+                <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Integer port number to connect to OceanBase. It can be the SQL port of OceanBase server, which is 2881 by default, or the port of OceanBase proxy service, which is 2883 by default.</td>
             </tr>
@@ -182,16 +205,9 @@ Connector Options
             <tr>
                 <td>server-time-zone</td>
                 <td>optional</td>
-                <td style="word-wrap: break-word;">UTC</td>
+                <td style="word-wrap: break-word;">+00:00</td>
                 <td>String</td>
-                <td>The session time zone in database server, e.g. "Asia/Shanghai". It controls how the TIMESTAMP type in OceanBase converted to STRING in snapshot reading, please make sure to set it same with the timezone of `oblogproxy` deployment. </td>
-            </tr>
-            <tr>
-                <td>rootserver-list</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
-                <td>String</td>
-                <td>The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`.</td>
+                <td>The session timezone which controls how temporal types are converted to STRING in OceanBase. Can be UTC offset in format "±hh:mm", or named time zones if the time zone information tables in the mysql database have been created and populated.</td>
             </tr>
             <tr>
                 <td>logproxy.host</td>
@@ -206,6 +222,34 @@ Connector Options
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Port number of OceanBase log proxy service.</td>
+            </tr>
+            <tr>
+                <td>logproxy.client.id</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">By rule.</td>
+                <td>String</td>
+                <td>Id of a log proxy client connection, will be in format {flink_ip}_{process_id}_{timestamp}_{thread_id}_{tenant} by default.</td>
+            </tr>
+            <tr>
+                <td>rootserver-list</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`, required for OceanBase CE.</td>
+            </tr>
+            <tr>
+                <td>config-url</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>The url to get the server info from the config server, required for OceanBase EE.</td>
+            </tr>
+            <tr>
+                <td>working-mode</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">storage</td>
+                <td>String</td>
+                <td>Working mode of `obcdc` in LogProxy, can be `storage` or `memory`.</td>
             </tr>
         </tbody>
     </table>
@@ -276,7 +320,9 @@ CREATE TABLE products (
    'port' = '2881',
    'rootserver-list' = '127.0.0.1:2882:2881',
    'logproxy.host' = '127.0.0.1',
-   'logproxy.port' = '2983');
+   'logproxy.port' = '2983',
+   'working-mode' = 'memory'
+);
 ```
 
 Features
@@ -305,49 +351,77 @@ The OceanBase CDC Connector using [oblogclient](https://github.com/oceanbase/obl
 The OceanBase CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
 
 ```java
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.UniqueConstraint;
+import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
+import org.apache.flink.table.types.logical.RowType;
+
 import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
-import com.ververica.cdc.connectors.oceanbase.table.OceanBaseTableSourceFactory;
+import com.ververica.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
+import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+
+import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.Collections;
 
 public class OceanBaseSourceExample {
+   public static void main(String[] args) throws Exception {
+      ResolvedSchema resolvedSchema =
+              new ResolvedSchema(
+                      Arrays.asList(
+                              Column.physical("id", DataTypes.INT().notNull()),
+                              Column.physical("name", DataTypes.STRING().notNull())),
+                      Collections.emptyList(),
+                      UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
-  public static void main(String[] args) throws Exception {
-    SourceFunction<String> oceanBaseSource =
-        OceanBaseSource.<String>builder()
-            .rsList("127.0.0.1:2882:2881")  // set root server list
-            .startupMode(StartupMode.INITIAL) // set startup mode
-            .username("user@test_tenant")  // set cluster username
-            .password("pswd")  // set cluster password
-            .tenantName("test_tenant")  // set captured tenant name, do not support regex
-            .databaseName("test_db")  // set captured database, support regex
-            .tableName("test_table")  // set captured table, support regex
-            .hostname("127.0.0.1")  // set hostname of OceanBase server or proxy
-            .port(2881)  // set the sql port for OceanBase server or proxy
-            .logProxyHost("127.0.0.1")  // set the hostname of log proxy
-            .logProxyPort(2983)  // set the port of log proxy
-            .deserializer(new JsonDebeziumDeserializationSchema())  // converts SourceRecord to JSON String
-            .build();
+      RowType physicalDataType =
+              (RowType) resolvedSchema.toPhysicalRowDataType().getLogicalType();
+      TypeInformation<RowData> resultTypeInfo = InternalTypeInfo.of(physicalDataType);
+      String serverTimeZone = "+00:00";
 
-    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+      OceanBaseDeserializationSchema<RowData> deserializer =
+              RowDataOceanBaseDeserializationSchema.newBuilder()
+                      .setPhysicalRowType(physicalDataType)
+                      .setResultTypeInfo(resultTypeInfo)
+                      .setServerTimeZone(ZoneId.of(serverTimeZone))
+                      .build();
 
-    // enable checkpoint
-    env.enableCheckpointing(3000);
-    
-    env.addSource(oceanBaseSource).print().setParallelism(1);
+      SourceFunction<RowData> oceanBaseSource =
+              OceanBaseSource.<RowData>builder()
+                      .rsList("127.0.0.1:2882:2881")
+                      .startupMode(StartupMode.INITIAL)
+                      .username("user@test_tenant")
+                      .password("pswd")
+                      .tenantName("test_tenant")
+                      .databaseName("test_db")
+                      .tableName("test_table")
+                      .hostname("127.0.0.1")
+                      .port(2881)
+                      .logProxyHost("127.0.0.1")
+                      .logProxyPort(2983)
+                      .serverTimeZone(serverTimezone)
+                      .deserializer(deserializer)
+                      .build();
 
-    env.execute("Print OceanBase Snapshot + Commit Log");
-  }
+      StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+      // enable checkpoint
+      env.enableCheckpointing(3000);
+
+      env.addSource(oceanBaseSource).print().setParallelism(1);
+      env.execute("Print OceanBase Snapshot + Change Events");
+   }
 }
 ```
 Data Type Mapping
 ----------------
-
-When the startup mode is not `INITIAL`, we will not be able to get the precision and scale of a column. In order to be compatible with different startup modes, we will not map one OceanBase type of different precision to different FLink types.
-
-For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) or BIT(1). BOOLEAN is equivalent to TINYINT(1) in OceanBase, so columns of BOOLEAN and TINYINT types will be mapped to TINYINT in Flink, and BIT(1) will be mapped to BINARY(1) in Flink.
 
 <div class="wy-table-responsive">
     <table class="colwidths-auto docutils">
@@ -361,7 +435,13 @@ For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) o
         <tbody>
             <tr>
                 <td>BOOLEAN<br>
-                    TINYINT</td>
+                    TINYINT(1)<br>
+                    BIT(1)</td>
+                <td>BOOLEAN</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TINYINT</td>
                 <td>TINYINT</td>
                 <td></td>
             </tr>
@@ -439,11 +519,13 @@ For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) o
                 <td></td>
             </tr>
             <tr>
-                <td>TIMESTAMP [(p)]<br>
-                    DATETIME [(p)]
-                </td>
-                <td>TIMESTAMP [(p)]
-                </td>
+                <td>DATETIME [(p)]</td>
+                <td>TIMESTAMP [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP [(p)]</td>
+                <td>TIMESTAMP_LTZ [(p)]</td>
                 <td></td>
             </tr>
             <tr>
@@ -503,8 +585,13 @@ For example, you can get a boolean from a column with type BOOLEAN, TINYINT(1) o
             </tr>
             <tr>
                 <td>SET</td>
+                <td>ARRAY&lt;STRING&gt;</td>
+                <td>As the SET data type in OceanBase is a string object that can have zero or more values, it should always be mapped to an array of string</td>
+            </tr>
+            <tr>
+                <td>JSON</td>
                 <td>STRING</td>
-                <td></td>
+                <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
             </tr>
         </tbody>
     </table>

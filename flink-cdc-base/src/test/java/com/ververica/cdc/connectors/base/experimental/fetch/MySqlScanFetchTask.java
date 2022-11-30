@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,10 +19,10 @@ package com.ververica.cdc.connectors.base.experimental.fetch;
 import com.ververica.cdc.connectors.base.experimental.fetch.MySqlStreamFetchTask.MySqlBinlogSplitReadTask;
 import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
-import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
+import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
@@ -189,7 +187,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 sourcePartition,
                 backFillBinlogSplit,
                 backFillBinlogSplit.getEndingOffset(),
-                WatermarkKind.BINLOG_END);
+                WatermarkKind.END);
     }
 
     /** A wrapped task to fetch snapshot split of table. */

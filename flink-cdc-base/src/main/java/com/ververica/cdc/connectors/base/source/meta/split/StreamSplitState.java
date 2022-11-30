@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -26,7 +24,7 @@ import javax.annotation.Nullable;
 
 import java.util.Map;
 
-/** The state of split to describe the binlog of table(s). */
+/** The state of split to describe the change log of table(s). */
 public class StreamSplitState extends SourceSplitState {
 
     @Nullable private Offset startingOffset;
@@ -68,19 +66,19 @@ public class StreamSplitState extends SourceSplitState {
 
     @Override
     public StreamSplit toSourceSplit() {
-        final StreamSplit binlogSplit = split.asStreamSplit();
+        final StreamSplit streamSplit = split.asStreamSplit();
         return new StreamSplit(
-                binlogSplit.splitId(),
+                streamSplit.splitId(),
                 getStartingOffset(),
                 getEndingOffset(),
-                binlogSplit.asStreamSplit().getFinishedSnapshotSplitInfos(),
+                streamSplit.asStreamSplit().getFinishedSnapshotSplitInfos(),
                 getTableSchemas(),
-                binlogSplit.getTotalFinishedSplitSize());
+                streamSplit.getTotalFinishedSplitSize());
     }
 
     @Override
     public String toString() {
-        return "MySqlBinlogSplitState{"
+        return "StreamSplitState{"
                 + "startingOffset="
                 + startingOffset
                 + ", endingOffset="

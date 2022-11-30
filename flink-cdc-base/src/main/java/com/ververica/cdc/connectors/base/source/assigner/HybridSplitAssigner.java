@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -25,7 +23,7 @@ import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsStat
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
-import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
+import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import io.debezium.relational.TableId;
@@ -42,28 +40,28 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Assigner for Hybrid split which contains snapshot splits and stream splits. */
-public class HybridSplitAssigner implements SplitAssigner {
+public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(HybridSplitAssigner.class);
-    private static final String BINLOG_SPLIT_ID = "binlog-split";
+    private static final String STREAM_SPLIT_ID = "stream-split";
 
     private final int splitMetaGroupSize;
 
     private boolean isStreamSplitAssigned;
 
-    private final SnapshotSplitAssigner snapshotSplitAssigner;
+    private final SnapshotSplitAssigner<C> snapshotSplitAssigner;
 
-    private OffsetFactory offsetFactory;
+    private final OffsetFactory offsetFactory;
 
     public HybridSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
-                new SnapshotSplitAssigner(
+                new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
                         remainingTables,
@@ -71,34 +69,37 @@ public class HybridSplitAssigner implements SplitAssigner {
                         dialect,
                         offsetFactory),
                 false,
-                sourceConfig.getSplitMetaGroupSize());
-        this.offsetFactory = offsetFactory;
+                sourceConfig.getSplitMetaGroupSize(),
+                offsetFactory);
     }
 
     public HybridSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             HybridPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
-                new SnapshotSplitAssigner(
+                new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
                         checkpoint.getSnapshotPendingSplits(),
                         dialect,
                         offsetFactory),
                 checkpoint.isStreamSplitAssigned(),
-                sourceConfig.getSplitMetaGroupSize());
+                sourceConfig.getSplitMetaGroupSize(),
+                offsetFactory);
     }
 
     private HybridSplitAssigner(
-            SnapshotSplitAssigner snapshotSplitAssigner,
+            SnapshotSplitAssigner<C> snapshotSplitAssigner,
             boolean isStreamSplitAssigned,
-            int splitMetaGroupSize) {
+            int splitMetaGroupSize,
+            OffsetFactory offsetFactory) {
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
+        this.offsetFactory = offsetFactory;
     }
 
     @Override
@@ -109,18 +110,18 @@ public class HybridSplitAssigner implements SplitAssigner {
     @Override
     public Optional<SourceSplitBase> getNext() {
         if (snapshotSplitAssigner.noMoreSplits()) {
-            // binlog split assigning
+            // stream split assigning
             if (isStreamSplitAssigned) {
                 // no more splits for the assigner
                 return Optional.empty();
             } else if (snapshotSplitAssigner.isFinished()) {
                 // we need to wait snapshot-assigner to be finished before
-                // assigning the binlog split. Otherwise, records emitted from binlog split
+                // assigning the stream split. Otherwise, records emitted from stream split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isStreamSplitAssigned = true;
                 return Optional.of(createStreamSplit());
             } else {
-                // binlog split is not ready by now
+                // stream split is not ready by now
                 return Optional.empty();
             }
         } else {
@@ -151,7 +152,7 @@ public class HybridSplitAssigner implements SplitAssigner {
             if (split.isSnapshotSplit()) {
                 snapshotSplits.add(split);
             } else {
-                // we don't store the split, but will re-create binlog split later
+                // we don't store the split, but will re-create stream split later
                 isStreamSplitAssigned = false;
             }
         }
@@ -177,7 +178,7 @@ public class HybridSplitAssigner implements SplitAssigner {
     // --------------------------------------------------------------------------------------------
 
     public StreamSplit createStreamSplit() {
-        final List<SnapshotSplit> assignedSnapshotSplit =
+        final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
                 snapshotSplitAssigner.getAssignedSplits().values().stream()
                         .sorted(Comparator.comparing(SourceSplitBase::splitId))
                         .collect(Collectors.toList());
@@ -185,12 +186,12 @@ public class HybridSplitAssigner implements SplitAssigner {
         Map<String, Offset> splitFinishedOffsets = snapshotSplitAssigner.getSplitFinishedOffsets();
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
 
-        Offset minBinlogOffset = null;
-        for (SnapshotSplit split : assignedSnapshotSplit) {
-            // find the min binlog offset
-            Offset binlogOffset = splitFinishedOffsets.get(split.splitId());
-            if (minBinlogOffset == null || binlogOffset.isBefore(minBinlogOffset)) {
-                minBinlogOffset = binlogOffset;
+        Offset minOffset = null;
+        for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
+            // find the min offset of change log
+            Offset changeLogOffset = splitFinishedOffsets.get(split.splitId());
+            if (minOffset == null || changeLogOffset.isBefore(minOffset)) {
+                minOffset = changeLogOffset;
             }
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
@@ -198,7 +199,7 @@ public class HybridSplitAssigner implements SplitAssigner {
                             split.splitId(),
                             split.getSplitStart(),
                             split.getSplitEnd(),
-                            binlogOffset,
+                            changeLogOffset,
                             offsetFactory));
         }
 
@@ -207,8 +208,8 @@ public class HybridSplitAssigner implements SplitAssigner {
 
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new StreamSplit(
-                BINLOG_SPLIT_ID,
-                minBinlogOffset == null ? offsetFactory.createInitialOffset() : minBinlogOffset,
+                STREAM_SPLIT_ID,
+                minOffset == null ? offsetFactory.createInitialOffset() : minOffset,
                 offsetFactory.createNoStoppingOffset(),
                 divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
                 new HashMap<>(),

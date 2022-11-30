@@ -7,7 +7,7 @@ The MySQL CDC connector allows for reading snapshot data and incremental data fr
 
 | Connector                                                | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
 |-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| [mysql-cdc](mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.21     |
+| [mysql-cdc](mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27     |
 
 Dependencies
 ------------
@@ -21,7 +21,7 @@ In order to setup the MySQL CDC connector, the following table provides dependen
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.3-SNAPSHOT</version>
+  <version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -29,9 +29,9 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3-SNAPSHOT/flink-sql-connector-mysql-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.4-SNAPSHOT/flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mysql-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mysql-cdc), the released version will be available in the Maven central warehouse. 
+**Note:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mysql-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mysql-cdc), the released version will be available in the Maven central warehouse. 
 
 Setup MySQL server
 ----------------
@@ -57,7 +57,7 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 mysql> FLUSH PRIVILEGES;
 ```
 
-See more about the [permission explanation](https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-creating-user).
+See more about the [permission explanation](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-creating-user).
 
 
 Notes
@@ -65,7 +65,7 @@ Notes
 
 ### Set a different SERVER ID for each reader
 
-Every MySQL database client for reading binlog should have an unique id, called server id. MySQL server will use this id to maintain network connection and the binlog position. Therefore, if different jobs share a same server id, it may result to read from wrong binlog position. 
+Every MySQL database client for reading binlog should have a unique id, called server id. MySQL server will use this id to maintain network connection and the binlog position. Therefore, if different jobs share a same server id, it may result to read from wrong binlog position. 
 Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html), 
 e.g.  assuming the source parallelism is 4, then we can use `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` to assign unique server id for each of the 4 source readers. 
 
@@ -176,7 +176,7 @@ Connector Options
       <td>server-id</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>Integer</td>
+      <td>String</td>
       <td>A numeric ID or a numeric ID range of this database client, The numeric ID syntax is like '5400', 
           the numeric ID range syntax is like '5400-5408', The numeric ID range syntax is recommended when 'scan.incremental.snapshot.enabled' enabled.
           Every ID must be unique across all currently-running database processes in the MySQL cluster. This connector joins the MySQL cluster
@@ -218,18 +218,54 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial"
-           and "latest-offset". 
-           Please see <a href="#startup-reading-position">Startup Reading Position</a>section for more detailed information.</td>
-    </tr> 
+      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset" and "timestamp".
+           Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+    </tr>
+    <tr>
+      <td>scan.startup.specific-offset.file</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Optional binlog file name used in case of "specific-offset" startup mode</td>
+    </tr>
+    <tr>
+      <td>scan.startup.specific-offset.pos</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional binlog file position used in case of "specific-offset" startup mode</td>
+    </tr>
+    <tr>
+      <td>scan.startup.specific-offset.gtid-set</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Optional GTID set used in case of "specific-offset" startup mode</td>
+    </tr>
+    <tr>
+      <td>scan.startup.specific-offset.skip-events</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional number of events to skip after the specific starting offset</td>
+    </tr>
+    <tr>
+      <td>scan.startup.specific-offset.skip-rows</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional number of rows to skip after the specific starting offset</td>
+    </tr>
     <tr>
       <td>server-time-zone</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">UTC</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai". 
           It controls how the TIMESTAMP type in MYSQL converted to STRING.
-          See more <a href="https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types">here</a>.</td>
+          See more <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-temporal-types">here</a>.
+          If not set, then ZoneId.systemDefault() is used to determine the server time zone.
+      </td>
     </tr>
     <tr>
       <td>debezium.min.row.
@@ -282,7 +318,7 @@ During a snapshot operation, the connector will query each included table to pro
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from MySQL server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
     </tbody>
 </table>
@@ -343,6 +379,57 @@ CREATE TABLE products (
     'table-name' = 'orders'
 );
 ```
+
+The extended CREATE TABLE example demonstrates the usage of regex to match multi-tables:
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+    'table-name' = '(t[5-8]|tt)'
+);
+```
+<table class="colwidths-auto docutils">
+  <thead>
+     <tr>
+       <th class="text-left" style="width: 15%">example</th>
+       <th class="text-left" style="width: 30%">expression</th>
+       <th class="text-left" style="width: 55%">description</th>
+     </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>prefix match</td>
+      <td>^(test).*</td>
+      <td>This matches the database name or table name starts with prefix of test, e.g test1、test2. </td>
+    </tr>
+    <tr>
+      <td>suffix match</td>
+      <td>.*[p$]</td>
+      <td>This matches the database name or table name ends with suffix of p, e.g cdcp、edcp. </td>
+    </tr>
+    <tr>
+      <td>specific match</td>
+      <td>txc</td>
+      <td>This matches the database name or table name according to a specific name, e.g txc. </td>
+    </tr>
+  </tbody>
+</table>
+It will use database.table as a pattern to match tables, as above examples using (^(test).*|^(tpc).*|txc|.*[p$]|t{2}).(t[5-8]|tt) matches txc.tt、test2.test5.
 
 Features
 --------
@@ -474,10 +561,47 @@ both snapshot phase and binlog phase, MySQL CDC connector read with **exactly-on
 The config option `scan.startup.mode` specifies the startup mode for MySQL CDC consumer. The valid enumerations are:
 
 - `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
+- `earliest-offset`: Skip snapshot phase and start reading binlog events from the earliest accessible binlog offset.
 - `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
 the end of the binlog which means only have the changes since the connector was started.
+- `specific-offset`: Skip snapshot phase and start reading binlog events from a specific offset. The offset could be
+specified with binlog filename and position, or a GTID set if GTID is enabled on server.
+- `timestamp`: Skip snapshot phase and start reading binlog events from a specific timestamp.
 
-_Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not using them together. If you speicifying both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
+For example in DataStream API:
+```java
+MySQLSource.builder()
+    .startupOptions(StartupOptions.earliest()) // Start from earliest offset
+    .startupOptions(StartupOptions.latest()) // Start from latest offset
+    .startupOptions(StartupOptions.specificOffset("mysql-bin.000003", 4L) // Start from binlog file and offset
+    .startupOptions(StartupOptions.specificOffset("24DA167-0C0C-11E8-8442-00059A3C7B00:1-19")) // Start from GTID set
+    .startupOptions(StartupOptions.timestamp(1667232000000L) // Start from timestamp
+    ...
+    .build()
+```
+
+and with SQL:
+
+```SQL
+CREATE TABLE mysql_source (...) WITH (
+    'connector' = 'mysql-cdc',
+    'scan.startup.mode' = 'earliest-offset', -- Start from earliest offset
+    'scan.startup.mode' = 'latest-offset', -- Start from latest offset
+    'scan.startup.mode' = 'specific-offset', -- Start from specific offset
+    'scan.startup.mode' = 'timestamp', -- Start from timestamp
+    'scan.startup.specific-offset.file' = 'mysql-bin.000003', -- Binlog filename under specific offset startup mode
+    'scan.startup.specific-offset.pos' = '4', -- Binlog position under specific offset mode
+    'scan.startup.specific-offset.gtid-set' = '24DA167-0C0C-11E8-8442-00059A3C7B00:1-19', -- GTID set under specific offset startup mode
+    'scan.startup.timestamp-millis' = '1667232000000' -- Timestamp under timestamp startup mode
+    ...
+)
+```
+
+**Notes:**
+1. MySQL source will print the current binlog position into logs with INFO level on checkpoint, with the prefix
+"Binlog offset on checkpoint {checkpoint-id}". It could be useful if you want to restart the job from a specific checkpointed position.
+2. If schema of capturing tables was changed previously, starting with earliest offset, specific offset or timestamp
+could fail as the Debezium reader keeps the current latest table schema internally and earlier records with unmatched schema cannot be correctly parsed.
 
 ### DataStream Source
 
@@ -529,7 +653,7 @@ The following operations show how to enable this feature to resolve above scenar
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .scanNewlyAddedTableEnabled(true) // eanbel scan the newly added tables fature
+        .scanNewlyAddedTableEnabled(true) // enable scan the newly added tables feature
         .databaseList("db") // set captured database
         .tableList("db.product, db.user, db.address") // set captured tables [product, user, address]
         .username("yourUsername")
@@ -572,7 +696,7 @@ $ ./bin/flink run \
       --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.14/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/deployment/cli/#command-line-interface) for more details.
 
 Data Type Mapping
 ----------------
@@ -581,9 +705,9 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
-        <th class="text-left">NOTE</th>
+        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
     <tbody>
@@ -595,7 +719,9 @@ Data Type Mapping
     <tr>
       <td>
         SMALLINT<br>
-        TINYINT UNSIGNED</td>
+        TINYINT UNSIGNED<br>
+        TINYINT UNSIGNED ZEROFILL
+      </td>
       <td>SMALLINT</td>
       <td></td>
     </tr>
@@ -603,33 +729,52 @@ Data Type Mapping
       <td>
         INT<br>
         MEDIUMINT<br>
-        SMALLINT UNSIGNED</td>
+        SMALLINT UNSIGNED<br>
+        SMALLINT UNSIGNED ZEROFILL
+      </td>
       <td>INT</td>
       <td></td>
     </tr>
     <tr>
       <td>
         BIGINT<br>
-        INT UNSIGNED</td>
+        INT UNSIGNED<br>
+        INT UNSIGNED ZEROFILL<br>
+        MEDIUMINT UNSIGNED<br>
+        MEDIUMINT UNSIGNED ZEROFILL
+      </td>
       <td>BIGINT</td>
       <td></td>
     </tr>
    <tr>
-      <td>BIGINT UNSIGNED</td>
+      <td>
+        BIGINT UNSIGNED<br>
+        BIGINT UNSIGNED ZEROFILL<br>
+        SERIAL
+      </td>
       <td>DECIMAL(20, 0)</td>
       <td></td>
     </tr>
     <tr>
       <td>
-        REAL<br>
         FLOAT<br>
+        FLOAT UNSIGNED<br>
+        FLOAT UNSIGNED ZEROFILL
         </td>
       <td>FLOAT</td>
       <td></td>
     </tr>
     <tr>
       <td>
-        DOUBLE
+        REAL<br>
+        REAL UNSIGNED<br>
+        REAL UNSIGNED ZEROFILL<br>
+        DOUBLE<br>
+        DOUBLE UNSIGNED<br>
+        DOUBLE UNSIGNED ZEROFILL<br>
+        DOUBLE PRECISION<br>
+        DOUBLE PRECISION UNSIGNED<br>
+        DOUBLE PRECISION UNSIGNED ZEROFILL
       </td>
       <td>DOUBLE</td>
       <td></td>
@@ -637,7 +782,14 @@ Data Type Mapping
     <tr>
       <td>
         NUMERIC(p, s)<br>
+        NUMERIC(p, s) UNSIGNED<br>
+        NUMERIC(p, s) UNSIGNED ZEROFILL<br>
         DECIMAL(p, s)<br>
+        DECIMAL(p, s) UNSIGNED<br>
+        DECIMAL(p, s) UNSIGNED ZEROFILL<br>
+        FIXED(p, s)<br>
+        FIXED(p, s) UNSIGNED<br>
+        FIXED(p, s) UNSIGNED ZEROFILL<br>
         where p <= 38<br>
       </td>
       <td>DECIMAL(p, s)</td>
@@ -646,7 +798,14 @@ Data Type Mapping
     <tr>
       <td>
         NUMERIC(p, s)<br>
+        NUMERIC(p, s) UNSIGNED<br>
+        NUMERIC(p, s) UNSIGNED ZEROFILL<br>
         DECIMAL(p, s)<br>
+        DECIMAL(p, s) UNSIGNED<br>
+        DECIMAL(p, s) UNSIGNED ZEROFILL<br>
+        FIXED(p, s)<br>
+        FIXED(p, s) UNSIGNED<br>
+        FIXED(p, s) UNSIGNED ZEROFILL<br>
         where 38 < p <= 65<br>
       </td>
       <td>STRING</td>

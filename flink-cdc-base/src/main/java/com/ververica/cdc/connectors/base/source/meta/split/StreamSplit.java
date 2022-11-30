@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -28,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** The split to describe the binlog of MySql table(s). */
+/** The split to describe the change log of database table(s). */
 public class StreamSplit extends SourceSplitBase {
 
     private final Offset startingOffset;
@@ -110,7 +108,7 @@ public class StreamSplit extends SourceSplitBase {
 
     @Override
     public String toString() {
-        return "MySqlBinlogSplit{"
+        return "StreamSplit{"
                 + "splitId='"
                 + splitId
                 + '\''
@@ -122,29 +120,29 @@ public class StreamSplit extends SourceSplitBase {
     }
 
     // -------------------------------------------------------------------
-    // factory utils to build new MySqlBinlogSplit instance
+    // factory utils to build new StreamSplit instance
     // -------------------------------------------------------------------
     public static StreamSplit appendFinishedSplitInfos(
-            StreamSplit binlogSplit, List<FinishedSnapshotSplitInfo> splitInfos) {
-        splitInfos.addAll(binlogSplit.getFinishedSnapshotSplitInfos());
+            StreamSplit streamSplit, List<FinishedSnapshotSplitInfo> splitInfos) {
+        splitInfos.addAll(streamSplit.getFinishedSnapshotSplitInfos());
         return new StreamSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
+                streamSplit.splitId,
+                streamSplit.getStartingOffset(),
+                streamSplit.getEndingOffset(),
                 splitInfos,
-                binlogSplit.getTableSchemas(),
-                binlogSplit.getTotalFinishedSplitSize());
+                streamSplit.getTableSchemas(),
+                streamSplit.getTotalFinishedSplitSize());
     }
 
     public static StreamSplit fillTableSchemas(
-            StreamSplit binlogSplit, Map<TableId, TableChange> tableSchemas) {
-        tableSchemas.putAll(binlogSplit.getTableSchemas());
+            StreamSplit streamSplit, Map<TableId, TableChange> tableSchemas) {
+        tableSchemas.putAll(streamSplit.getTableSchemas());
         return new StreamSplit(
-                binlogSplit.splitId,
-                binlogSplit.getStartingOffset(),
-                binlogSplit.getEndingOffset(),
-                binlogSplit.getFinishedSnapshotSplitInfos(),
+                streamSplit.splitId,
+                streamSplit.getStartingOffset(),
+                streamSplit.getEndingOffset(),
+                streamSplit.getFinishedSnapshotSplitInfos(),
                 tableSchemas,
-                binlogSplit.getTotalFinishedSplitSize());
+                streamSplit.getTotalFinishedSplitSize());
     }
 }

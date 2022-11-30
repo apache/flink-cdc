@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -27,9 +25,11 @@ import com.ververica.cdc.connectors.base.source.assigner.state.SnapshotPendingSp
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
+import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,16 +47,17 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Assigner for snapshot split. */
-public class SnapshotSplitAssigner implements SplitAssigner {
+public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssigner {
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitAssigner.class);
 
     private final List<TableId> alreadyProcessedTables;
-    private final List<SnapshotSplit> remainingSplits;
-    private final Map<String, SnapshotSplit> assignedSplits;
+    private final List<SchemalessSnapshotSplit> remainingSplits;
+    private final Map<String, SchemalessSnapshotSplit> assignedSplits;
+    private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, Offset> splitFinishedOffsets;
     private boolean assignerFinished;
 
-    private final SourceConfig sourceConfig;
+    private final C sourceConfig;
     private final int currentParallelism;
     private final LinkedList<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
@@ -65,21 +66,22 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     private boolean isTableIdCaseSensitive;
 
     @Nullable private Long checkpointIdToFinish;
-    private final DataSourceDialect dialect;
+    private final DataSourceDialect<C> dialect;
     private final OffsetFactory offsetFactory;
 
     public SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
                 sourceConfig,
                 currentParallelism,
                 new ArrayList<>(),
                 new ArrayList<>(),
+                new HashMap<>(),
                 new HashMap<>(),
                 new HashMap<>(),
                 false,
@@ -91,10 +93,10 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     public SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             SnapshotPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
                 sourceConfig,
@@ -102,6 +104,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
                 checkpoint.getAlreadyProcessedTables(),
                 checkpoint.getRemainingSplits(),
                 checkpoint.getAssignedSplits(),
+                checkpoint.getTableSchemas(),
                 checkpoint.getSplitFinishedOffsets(),
                 checkpoint.isAssignerFinished(),
                 checkpoint.getRemainingTables(),
@@ -112,23 +115,25 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     }
 
     private SnapshotSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
-            List<SnapshotSplit> remainingSplits,
-            Map<String, SnapshotSplit> assignedSplits,
+            List<SchemalessSnapshotSplit> remainingSplits,
+            Map<String, SchemalessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
             boolean assignerFinished,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
+        this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerFinished = assignerFinished;
         this.remainingTables = new LinkedList<>(remainingTables);
@@ -160,18 +165,27 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     public Optional<SourceSplitBase> getNext() {
         if (!remainingSplits.isEmpty()) {
             // return remaining splits firstly
-            Iterator<SnapshotSplit> iterator = remainingSplits.iterator();
-            SnapshotSplit split = iterator.next();
+            Iterator<SchemalessSnapshotSplit> iterator = remainingSplits.iterator();
+            SchemalessSnapshotSplit split = iterator.next();
             iterator.remove();
             assignedSplits.put(split.splitId(), split);
-            return Optional.of(split);
+            return Optional.of(split.toSnapshotSplit(tableSchemas.get(split.getTableId())));
         } else {
             // it's turn for new table
             TableId nextTable = remainingTables.pollFirst();
             if (nextTable != null) {
                 // split the given table into chunks (snapshot splits)
                 Collection<SnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
-                remainingSplits.addAll(splits);
+                final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
+                if (!splits.isEmpty()) {
+                    tableSchema.putAll(splits.iterator().next().getTableSchemas());
+                }
+                final List<SchemalessSnapshotSplit> schemalessSnapshotSplits =
+                        splits.stream()
+                                .map(SnapshotSplit::toSchemalessSnapshotSplit)
+                                .collect(Collectors.toList());
+                remainingSplits.addAll(schemalessSnapshotSplits);
+                tableSchemas.putAll(tableSchema);
                 alreadyProcessedTables.add(nextTable);
                 return getNext();
             } else {
@@ -193,20 +207,20 @@ public class SnapshotSplitAssigner implements SplitAssigner {
             throw new FlinkRuntimeException(
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
-        final List<SnapshotSplit> assignedSnapshotSplit =
+        final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
                 assignedSplits.values().stream()
                         .sorted(Comparator.comparing(SourceSplitBase::splitId))
                         .collect(Collectors.toList());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        for (SnapshotSplit split : assignedSnapshotSplit) {
-            Offset binlogOffset = splitFinishedOffsets.get(split.splitId());
+        for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
+            Offset finishedOffset = splitFinishedOffsets.get(split.splitId());
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),
                             split.splitId(),
                             split.getSplitStart(),
                             split.getSplitEnd(),
-                            binlogOffset,
+                            finishedOffset,
                             offsetFactory));
         }
         return finishedSnapshotSplitInfos;
@@ -217,7 +231,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
         this.splitFinishedOffsets.putAll(splitFinishedOffsets);
         if (allSplitsFinished()) {
             // Skip the waiting checkpoint when current parallelism is 1 which means we do not need
-            // to care about the global output data order of snapshot splits and binlog split.
+            // to care about the global output data order of snapshot splits and stream split.
             if (currentParallelism == 1) {
                 assignerFinished = true;
                 LOG.info(
@@ -233,7 +247,8 @@ public class SnapshotSplitAssigner implements SplitAssigner {
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
         for (SourceSplitBase split : splits) {
-            remainingSplits.add(split.asSnapshotSplit());
+            tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
+            remainingSplits.add(split.asSnapshotSplit().toSchemalessSnapshotSplit());
             // we should remove the add-backed splits from the assigned list,
             // because they are failed
             assignedSplits.remove(split.splitId());
@@ -248,6 +263,7 @@ public class SnapshotSplitAssigner implements SplitAssigner {
                         alreadyProcessedTables,
                         remainingSplits,
                         assignedSplits,
+                        tableSchemas,
                         splitFinishedOffsets,
                         assignerFinished,
                         remainingTables,
@@ -287,8 +303,12 @@ public class SnapshotSplitAssigner implements SplitAssigner {
         return assignerFinished;
     }
 
-    public Map<String, SnapshotSplit> getAssignedSplits() {
+    public Map<String, SchemalessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
+    }
+
+    public Map<TableId, TableChanges.TableChange> getTableSchemas() {
+        return tableSchemas;
     }
 
     public Map<String, Offset> getSplitFinishedOffsets() {

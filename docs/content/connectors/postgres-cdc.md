@@ -14,7 +14,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.3-SNAPSHOT</version>
+  <version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -22,9 +22,9 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.3-SNAPSHOT/flink-sql-connector-postgres-cdc-2.3-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.4-SNAPSHOT/flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-XXX.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
 
 How to create a Postgres CDC table
 ----------------
@@ -141,7 +141,15 @@ Connector Options
       <td>The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in
           for a particular database/schema. The server uses this slot to stream events to the connector that you are configuring.
           <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
-    </tr>  
+    </tr> 
+    <tr>
+      <td>changelog-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">all</td>
+      <td>String</td>
+      <td>The changelog mode used for encoding streaming changes. Supported values are <code>all</code> (which encodes changes as retract stream using all RowKinds) and <code>upsert</code> (which encodes changes as upsert stream that describes idempotent updates on a key).
+          <br/> <code>upsert</code> mode can be used for tables with primary keys when replica identity <code>FULL</code> is not an option. Primary keys must be set to use <code>upsert</code> mode.</td>
+    </tr> 
    <tr>
       <td>debezium.*</td>
       <td>optional</td>
@@ -149,13 +157,37 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Postgres server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.5/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td> 
     </tr>   
+    <tr>
+      <td>debezium.snapshot.select.statement.overrides</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>If you encounter a situation where there is a large amount of data in the table and you don't need all the historical data. You can try to specify the underlying configuration in debezium to select the data range you want to snapshot. This parameter only affects snapshots and does not affect subsequent data reading consumption.
+        <br/> Note: PostgreSQL must use schema name and table name.
+        <br/> For example: <code>'debezium.snapshot.select.statement.overrides' = 'schema.table'</code>.
+        <br/> After specifying the above attributes, you must also add the following attributes:
+        <code> debezium.snapshot.select.statement.overrides.[schema].[table] </code>
+      </td>
+    </tr>
+    <tr>
+      <td>debezium.snapshot.select.statement.overrides.[schema].[table]</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>You can specify SQL statements to limit the data range of snapshot.
+        <br/> Note1: Schema and table need to be specified in the SQL statement, and the SQL should conform to the syntax of the data source.Currently.
+        <br/> For example: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where 1 != 1'</code>.
+        <br/> Note2: The Flink SQL client submission task does not support functions with single quotation marks in the content.
+        <br/> For example: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where to_char(rq, 'yyyy-MM-dd')'</code>.
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>
 
-Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.5/connectors/postgresql.html#postgresql-property-slot-name).
+Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#postgresql-property-slot-name).
 
 Available Metadata
 ----------------
@@ -235,7 +267,7 @@ Features
 
 ### Exactly-Once Processing
 
-The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.5/connectors/postgresql.html#how-the-postgresql-connector-works). 
+The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#how-the-postgresql-connector-works). 
 
 ### Single Thread Reading
 

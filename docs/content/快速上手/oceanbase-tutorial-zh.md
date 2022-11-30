@@ -1,5 +1,11 @@
 # 演示: OceanBase CDC 导入 Elasticsearch
 
+## 视频教程
+
+- [YouTube](https://www.youtube.com/watch?v=ODGE-73Dntg&t=2s)
+- [Bilibili](https://www.bilibili.com/video/BV1Zg411a7ZB/?spm_id_from=333.999.0.0)
+
+
 ### 准备教程所需要的组件
 
 #### 配置并启动容器
@@ -10,13 +16,13 @@
 version: '2.1'
 services:
   observer:
-    image: whhe/obce-mini:3.1.2_CE
+    image: oceanbase/oceanbase-ce:3.1.4
     container_name: observer
     environment:
       - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.0.0
+    image: whhe/oblogproxy:1.0.3
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
@@ -104,8 +110,8 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 ```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 
-- [flink-sql-connector-elasticsearch7_2.11-1.13.2.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7_2.11/1.13.2/flink-sql-connector-elasticsearch7_2.11-1.13.2.jar)
-- [flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.3-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.3-SNAPSHOT.jar)
+- [flink-sql-connector-elasticsearch7-1.16.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/1.16.0/flink-sql-connector-elasticsearch7-1.16.0.jar)
+- [flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar)
 
 ### 在 Flink SQL CLI 中使用 Flink DDL 创建表
 
@@ -123,7 +129,7 @@ Flink SQL> CREATE TABLE orders (
    customer_name STRING,
    price DECIMAL(10, 5),
    product_id INT,
-   order_status TINYINT,
+   order_status BOOLEAN,
    PRIMARY KEY (order_id) NOT ENFORCED
  ) WITH (
     'connector' = 'oceanbase-cdc',
@@ -131,13 +137,15 @@ Flink SQL> CREATE TABLE orders (
     'username' = 'root',
     'password' = 'pswd',
     'tenant-name' = 'sys',
-    'database-name' = 'ob',
-    'table-name' = 'orders',
+    'database-name' = '^ob$',
+    'table-name' = '^orders$',
     'hostname' = 'localhost',
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = 'localhost',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+ );
 
 -- 创建商品表 
 Flink SQL> CREATE TABLE products (
@@ -151,13 +159,15 @@ Flink SQL> CREATE TABLE products (
     'username' = 'root',
     'password' = 'pswd',
     'tenant-name' = 'sys',
-    'database-name' = 'ob',
-    'table-name' = 'products',
+    'database-name' = '^ob$',
+    'table-name' = '^products$',
     'hostname' = 'localhost',
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
     'logproxy.host' = 'localhost',
-    'logproxy.port' = '2983');
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+  );
 
 -- 创建关联后的订单数据表
 Flink SQL> CREATE TABLE enriched_orders (
@@ -166,7 +176,7 @@ Flink SQL> CREATE TABLE enriched_orders (
    customer_name STRING,
    price DECIMAL(10, 5),
    product_id INT,
-   order_status TINYINT,
+   order_status BOOLEAN,
    product_name STRING,
    product_description STRING,
    PRIMARY KEY (order_id) NOT ENFORCED

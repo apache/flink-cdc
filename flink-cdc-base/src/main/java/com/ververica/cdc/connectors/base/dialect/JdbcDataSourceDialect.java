@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -37,8 +35,7 @@ import java.util.Map;
 
 /** The dialect of JDBC data source. */
 @Experimental
-public interface JdbcDataSourceDialect
-        extends DataSourceDialect<TableId, TableChange, JdbcSourceConfig> {
+public interface JdbcDataSourceDialect extends DataSourceDialect<JdbcSourceConfig> {
 
     /** Discovers the list of table to capture. */
     @Override
@@ -77,5 +74,6 @@ public interface JdbcDataSourceDialect
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
 
     @Override
-    JdbcSourceFetchTaskContext createFetchTaskContext(SourceSplitBase sourceSplitBase);
+    JdbcSourceFetchTaskContext createFetchTaskContext(
+            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig);
 }

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -25,18 +23,24 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_MAX_RETRIES;
@@ -46,18 +50,20 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
-import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
@@ -67,6 +73,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
 public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MySqlTableSourceFactory.class);
 
     private static final String IDENTIFIER = "mysql-cdc";
 
@@ -89,7 +96,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
-        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+        ZoneId serverTimeZone = getServerTimeZone(config);
 
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
@@ -98,15 +105,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
-        double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
-        double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        double distributionFactorUpper = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema);
-            validateStartupOptionIfEnableParallel(startupOptions);
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
@@ -139,7 +145,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 startupOptions,
                 scanNewlyAddedTableEnabled,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
-                heartbeatInterval);
+                heartbeatInterval,
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));
     }
 
     @Override
@@ -167,6 +174,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS);
+        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
@@ -174,11 +184,12 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
         options.add(CONNECTION_POOL_SIZE);
-        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
-        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         return options;
     }
 
@@ -199,15 +210,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 return StartupOptions.latest();
 
             case SCAN_STARTUP_MODE_VALUE_EARLIEST:
+                return StartupOptions.earliest();
+
             case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET:
+                validateSpecificOffset(config);
+                return getSpecificOffset(config);
+
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
-                throw new ValidationException(
-                        String.format(
-                                "Unsupported option value '%s', the options [%s, %s, %s] are not supported correctly, please do not use them until they're correctly supported",
-                                modeString,
-                                SCAN_STARTUP_MODE_VALUE_EARLIEST,
-                                SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET,
-                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP));
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
 
             default:
                 throw new ValidationException(
@@ -220,6 +230,43 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         }
     }
 
+    private static void validateSpecificOffset(ReadableConfig config) {
+        Optional<String> gtidSet = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
+        Optional<String> binlogFilename = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+        Optional<Long> binlogPosition = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        if (!gtidSet.isPresent() && !(binlogFilename.isPresent() && binlogPosition.isPresent())) {
+            throw new ValidationException(
+                    String.format(
+                            "Unable to find a valid binlog offset. Either %s, or %s and %s are required.",
+                            SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET.key(),
+                            SCAN_STARTUP_SPECIFIC_OFFSET_FILE.key(),
+                            SCAN_STARTUP_SPECIFIC_OFFSET_POS.key()));
+        }
+    }
+
+    private static StartupOptions getSpecificOffset(ReadableConfig config) {
+        BinlogOffsetBuilder offsetBuilder = BinlogOffset.builder();
+
+        // GTID set
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET)
+                .ifPresent(offsetBuilder::setGtidSet);
+
+        // Binlog file + pos
+        Optional<String> binlogFilename = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+        Optional<Long> binlogPosition = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        if (binlogFilename.isPresent() && binlogPosition.isPresent()) {
+            offsetBuilder.setBinlogFilePosition(binlogFilename.get(), binlogPosition.get());
+        } else {
+            offsetBuilder.setBinlogFilePosition("", 0);
+        }
+
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS)
+                .ifPresent(offsetBuilder::setSkipEvents);
+        config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS)
+                .ifPresent(offsetBuilder::setSkipRows);
+        return StartupOptions.specificOffset(offsetBuilder.build());
+    }
+
     private void validatePrimaryKeyIfEnableParallel(ResolvedSchema physicalSchema) {
         if (!physicalSchema.getPrimaryKey().isPresent()) {
             throw new ValidationException(
@@ -227,17 +274,6 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                             "The primary key is necessary when enable '%s' to 'true'",
                             SCAN_INCREMENTAL_SNAPSHOT_ENABLED));
         }
-    }
-
-    private void validateStartupOptionIfEnableParallel(StartupOptions startupOptions) {
-        // validate mode
-        Preconditions.checkState(
-                startupOptions.startupMode == StartupMode.INITIAL
-                        || startupOptions.startupMode == StartupMode.LATEST_OFFSET,
-                String.format(
-                        "MySql Parallel Source only supports startup mode 'initial' and 'latest-offset',"
-                                + " but actual is %s",
-                        startupOptions.startupMode));
     }
 
     private String validateAndGetServerId(ReadableConfig configuration) {
@@ -290,7 +326,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 doubleCompare(distributionFactorUpper, 1.0d) >= 0,
                 String.format(
                         "The value of option '%s' must larger than or equals %s, but is %s",
-                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
                         1.0d,
                         distributionFactorUpper));
     }
@@ -302,9 +338,15 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         && doubleCompare(distributionFactorLower, 1.0d) <= 0,
                 String.format(
                         "The value of option '%s' must between %s and %s inclusively, but is %s",
-                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /** Replaces the default timezone placeholder with local timezone, if applicable. */
+    private static ZoneId getServerTimeZone(ReadableConfig config) {
+        Optional<String> timeZoneOptional = config.getOptional(SERVER_TIME_ZONE);
+        return timeZoneOptional.map(ZoneId::of).orElseGet(ZoneId::systemDefault);
     }
 }

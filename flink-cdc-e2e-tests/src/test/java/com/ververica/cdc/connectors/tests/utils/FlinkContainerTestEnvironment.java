@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -123,8 +121,11 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.13.6", "1.14.4");
+        return Arrays.asList("1.13.6", "1.14.4", "1.15.2", "1.16.0");
     }
+
+    private static final List<String> FLINK_VERSION_WITH_SCALA_212 =
+            Arrays.asList("1.15.2", "1.16.0");
 
     @Before
     public void before() {
@@ -260,6 +261,9 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     }
 
     private String getFlinkDockerImageTag() {
+        if (FLINK_VERSION_WITH_SCALA_212.contains(flinkVersion)) {
+            return String.format("flink:%s-scala_2.12", flinkVersion);
+        }
         return String.format("flink:%s-scala_2.11", flinkVersion);
     }
 

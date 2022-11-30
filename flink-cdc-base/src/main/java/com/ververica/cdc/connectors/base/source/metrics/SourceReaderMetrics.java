@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,15 +19,15 @@ package com.ververica.cdc.connectors.base.source.metrics;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 
-import com.ververica.cdc.connectors.base.source.reader.JdbcIncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
-/** A collection class for handling metrics in {@link JdbcIncrementalSourceReader}. */
+/** A collection class for handling metrics in {@link IncrementalSourceReader}. */
 public class SourceReaderMetrics {
 
     private final MetricGroup metricGroup;
 
     /**
-     * The last record processing time, which is updated after {@link JdbcIncrementalSourceReader}
+     * The last record processing time, which is updated after {@link IncrementalSourceReader}
      * fetches a batch of data. It's mainly used to report metrics sourceIdleTime for sourceIdleTime
      * = System.currentTimeMillis() - processTime.
      */
@@ -53,13 +51,13 @@ public class SourceReaderMetrics {
 
     public void registerMetrics() {
         metricGroup.gauge(
-                SoureReaderMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
+                SourceReaderMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
                 (Gauge<Long>) this::getFetchDelay);
         metricGroup.gauge(
-                SoureReaderMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
+                SourceReaderMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
                 (Gauge<Long>) this::getEmitDelay);
         metricGroup.gauge(
-                SoureReaderMetricConstants.SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
+                SourceReaderMetricConstants.SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
     }
 
     public long getFetchDelay() {

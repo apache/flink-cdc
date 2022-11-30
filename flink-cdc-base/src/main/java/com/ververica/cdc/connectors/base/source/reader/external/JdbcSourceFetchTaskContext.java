@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,17 +22,23 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
-import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
-import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
 import io.debezium.config.CommonConnectorConfig;
-import io.debezium.connector.base.ChangeEventQueue;
-import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.data.Envelope;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.RelationalDatabaseSchema;
 import io.debezium.relational.Table;
+import io.debezium.relational.TableId;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /** The context for fetch task that fetching data of snapshot split from JDBC data source. */
 public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
@@ -52,7 +56,93 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
         this.schemaNameAdjuster = SchemaNameAdjuster.create();
     }
 
-    public abstract void configure(SourceSplitBase sourceSplitBase);
+    @Override
+    public TableId getTableId(SourceRecord record) {
+        return null;
+    }
+
+    @Override
+    public boolean isDataChangeRecord(SourceRecord record) {
+        return false;
+    }
+
+    @Override
+    public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
+        RowType splitKeyType =
+                getSplitType(getDatabaseSchema().tableFor(SourceRecordUtils.getTableId(record)));
+        Object[] key = SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
+        return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
+    }
+
+    @Override
+    public void rewriteOutputBuffer(
+            Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord) {
+        Struct key = (Struct) changeRecord.key();
+        Struct value = (Struct) changeRecord.value();
+        if (value != null) {
+            Envelope.Operation operation =
+                    Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
+            switch (operation) {
+                case CREATE:
+                case UPDATE:
+                    Envelope envelope = Envelope.fromSchema(changeRecord.valueSchema());
+                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                    Struct after = value.getStruct(Envelope.FieldName.AFTER);
+                    Instant fetchTs =
+                            Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
+                    SourceRecord record =
+                            new SourceRecord(
+                                    changeRecord.sourcePartition(),
+                                    changeRecord.sourceOffset(),
+                                    changeRecord.topic(),
+                                    changeRecord.kafkaPartition(),
+                                    changeRecord.keySchema(),
+                                    changeRecord.key(),
+                                    changeRecord.valueSchema(),
+                                    envelope.read(after, source, fetchTs));
+                    outputBuffer.put(key, record);
+                    break;
+                case DELETE:
+                    outputBuffer.remove(key);
+                    break;
+                case READ:
+                    throw new IllegalStateException(
+                            String.format(
+                                    "Data change record shouldn't use READ operation, the the record is %s.",
+                                    changeRecord));
+            }
+        }
+    }
+
+    @Override
+    public List<SourceRecord> formatMessageTimestamp(Collection<SourceRecord> snapshotRecords) {
+        return snapshotRecords.stream()
+                .map(
+                        record -> {
+                            Envelope envelope = Envelope.fromSchema(record.valueSchema());
+                            Struct value = (Struct) record.value();
+                            Struct updateAfter = value.getStruct(Envelope.FieldName.AFTER);
+                            // set message timestamp (source.ts_ms) to 0L
+                            Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                            source.put(Envelope.FieldName.TIMESTAMP, 0L);
+                            // extend the fetch timestamp(ts_ms)
+                            Instant fetchTs =
+                                    Instant.ofEpochMilli(
+                                            value.getInt64(Envelope.FieldName.TIMESTAMP));
+                            SourceRecord sourceRecord =
+                                    new SourceRecord(
+                                            record.sourcePartition(),
+                                            record.sourceOffset(),
+                                            record.topic(),
+                                            record.kafkaPartition(),
+                                            record.keySchema(),
+                                            record.key(),
+                                            record.valueSchema(),
+                                            envelope.read(updateAfter, source, fetchTs));
+                            return sourceRecord;
+                        })
+                .collect(Collectors.toList());
+    }
 
     public SourceConfig getSourceConfig() {
         return sourceConfig;
@@ -79,8 +169,4 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     public abstract JdbcSourceEventDispatcher getDispatcher();
 
     public abstract OffsetContext getOffsetContext();
-
-    public abstract ChangeEventQueue<DataChangeEvent> getQueue();
-
-    public abstract Offset getStreamOffset(SourceRecord sourceRecord);
 }

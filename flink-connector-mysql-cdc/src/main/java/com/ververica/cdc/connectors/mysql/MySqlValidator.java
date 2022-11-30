@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -30,9 +28,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Properties;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static io.debezium.config.Configuration.from;
 
 /**
@@ -68,11 +72,13 @@ public class MySqlValidator implements Validator {
                 connection = DebeziumUtils.openJdbcConnection(sourceConfig);
             } else {
                 // for the legacy source
-                connection = DebeziumUtils.createMySqlConnection(from(dbzProperties));
+                connection =
+                        DebeziumUtils.createMySqlConnection(from(dbzProperties), new Properties());
             }
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);
+            checkTimeZone(connection);
         } catch (SQLException ex) {
             throw new TableException(
                     "Unexpected error while connecting to MySQL and validating", ex);
@@ -157,5 +163,56 @@ public class MySqlValidator implements Validator {
                                     + "binlog_row_image=FULL and restart the connector.",
                             rowImage, BINLOG_FORMAT_IMAGE_FULL));
         }
+    }
+
+    /** Check whether the server timezone matches the configured timezone. */
+    private void checkTimeZone(JdbcConnection connection) throws SQLException {
+        String timeZoneProperty = dbzProperties.getProperty("database.serverTimezone");
+        if (timeZoneProperty == null) {
+            LOG.warn(
+                    "{} is not set, which might cause data inconsistencies for time-related fields.",
+                    SERVER_TIME_ZONE.key());
+            return;
+        }
+
+        int timeDiffInSeconds =
+                connection.queryAndMap(
+                        "SELECT TIME_TO_SEC(TIMEDIFF(NOW(), UTC_TIMESTAMP()))",
+                        rs -> rs.next() ? rs.getInt(1) : -1);
+
+        ZoneId zoneId = ZoneId.of(timeZoneProperty);
+        boolean inDayLightTime = TimeZone.getTimeZone(zoneId).inDaylightTime(new Date());
+        int timeZoneOffsetInSeconds =
+                zoneId.getRules().getOffset(LocalDateTime.now()).getTotalSeconds();
+
+        if (!timeDiffMatchesZoneOffset(
+                timeDiffInSeconds, timeZoneOffsetInSeconds, inDayLightTime)) {
+            throw new ValidationException(
+                    String.format(
+                            "The MySQL server has a timezone offset (%d seconds %s UTC) which does not match "
+                                    + "the configured timezone %s. Specify the right %s to avoid inconsistencies "
+                                    + "for time-related fields.",
+                            Math.abs(timeDiffInSeconds),
+                            timeDiffInSeconds >= 0 ? "ahead of" : "behind",
+                            zoneId.getId(),
+                            SERVER_TIME_ZONE.key()));
+        }
+    }
+
+    private boolean timeDiffMatchesZoneOffset(
+            int timeDiffInSeconds, int timeZoneOffsetInSeconds, boolean inDayLightTime) {
+        // Trivial case for non-DST timezone
+        if (!inDayLightTime) {
+            return timeDiffInSeconds == timeZoneOffsetInSeconds;
+        }
+
+        // There are two cases when Daylight Saving Time is in effect,
+        // 1) MySQL timezone has been adjusted to DST, like using 'Pacific Daylight Time' when DST
+        // starts.
+        // 2) MySQL timezone has been fixed to non-DST, like using 'Pacific Standard Time' all year
+        // long.
+        // thus we need to accept both.
+        return timeDiffInSeconds == timeZoneOffsetInSeconds
+                || timeDiffInSeconds == timeZoneOffsetInSeconds - TimeUnit.HOURS.toSeconds(1);
     }
 }
