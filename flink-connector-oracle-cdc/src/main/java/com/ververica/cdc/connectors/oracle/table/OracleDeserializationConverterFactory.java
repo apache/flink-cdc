@@ -16,22 +16,33 @@
 
 package com.ververica.cdc.connectors.oracle.table;
 
-import org.apache.flink.table.data.TimestampData;
-import org.apache.flink.table.types.logical.LogicalType;
-
+import com.esri.core.geometry.ogc.OGCGeometry;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.ververica.cdc.debezium.table.DeserializationRuntimeConverter;
 import com.ververica.cdc.debezium.table.DeserializationRuntimeConverterFactory;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
+import io.debezium.data.geometry.Geometry;
+import io.debezium.data.geometry.Point;
+import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
-/** Used to create {@link DeserializationRuntimeConverterFactory} specified to Oracle. */
+/**
+ * Used to create {@link DeserializationRuntimeConverterFactory} specified to Oracle.
+ */
 public class OracleDeserializationConverterFactory {
 
     public static DeserializationRuntimeConverterFactory instance() {
@@ -47,7 +58,9 @@ public class OracleDeserializationConverterFactory {
         };
     }
 
-    /** Creates a runtime converter which assuming input object is not null. */
+    /**
+     * Creates a runtime converter which assuming input object is not null.
+     */
     private static Optional<DeserializationRuntimeConverter> createNumericConverter(
             LogicalType type, ZoneId serverTimeZone) {
         switch (type.getTypeRoot()) {
@@ -65,14 +78,64 @@ public class OracleDeserializationConverterFactory {
                 return createFloatConverter();
             case DOUBLE:
                 return createDoubleConverter();
-                // Debezium use io.debezium.time.ZonedTimestamp to map Oracle TIMESTAMP WITH LOCAL
-                // TIME ZONE type, the value is a string representation of a timestamp in UTC.
+            // Debezium use io.debezium.time.ZonedTimestamp to map Oracle TIMESTAMP WITH LOCAL
+            // TIME ZONE type, the value is a string representation of a timestamp in UTC.
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return convertToLocalTimeZoneTimestamp();
+            case CHAR:
+            case VARCHAR:
+                return createStringConverter();
             default:
                 // fallback to default converter
                 return Optional.empty();
         }
+    }
+
+    private static Optional<DeserializationRuntimeConverter> createStringConverter() {
+        final ObjectMapper objectMapper = new ObjectMapper();
+        final ObjectWriter objectWriter = objectMapper.writer();
+        return Optional.of(
+                new DeserializationRuntimeConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        // the Geometry datatype in MySQL will be converted to
+                        // a String with Json format
+                        if (Point.LOGICAL_NAME.equals(schema.name())
+                                || Geometry.LOGICAL_NAME.equals(schema.name())) {
+                            try {
+                                Struct geometryStruct = (Struct) dbzObj;
+                                byte[] wkb = geometryStruct.getBytes("wkb");
+                                String geoJson =
+                                        OGCGeometry.fromBinary(ByteBuffer.wrap(wkb)).asGeoJson();
+                                JsonNode originGeoNode = objectMapper.readTree(geoJson);
+                                Optional<Integer> srid =
+                                        Optional.ofNullable(geometryStruct.getInt32("srid"));
+                                Map<String, Object> geometryInfo = new HashMap<>();
+                                String geometryType = originGeoNode.get("type").asText();
+                                geometryInfo.put("type", geometryType);
+                                if (geometryType.equals("GeometryCollection")) {
+                                    geometryInfo.put("geometries", originGeoNode.get("geometries"));
+                                } else {
+                                    geometryInfo.put(
+                                            "coordinates", originGeoNode.get("coordinates"));
+                                }
+                                geometryInfo.put("srid", srid.orElse(0));
+                                return StringData.fromString(
+                                        objectWriter.writeValueAsString(geometryInfo));
+                            } catch (Exception e) {
+                                throw new IllegalArgumentException(
+                                        String.format(
+                                                "Failed to convert %s to geometry JSON.", dbzObj),
+                                        e);
+                            }
+                        } else {
+                            return StringData.fromString(dbzObj.toString());
+                        }
+                    }
+                });
     }
 
     private static Optional<DeserializationRuntimeConverter> convertToLocalTimeZoneTimestamp() {
