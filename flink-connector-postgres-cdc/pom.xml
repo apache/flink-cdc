@@ -59,7 +59,7 @@ under the License.
             <!-- fix CVE-2022-31197 https://www.oscs1024.com/hd/CVE-2022-31197  -->
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.2.26</version>
+            <version>42.2.27</version>
         </dependency>
         <!-- test dependencies on Debezium -->
 
