@@ -100,7 +100,7 @@ fi
 
 MVN_TEST_MODULES=$(get_test_modules_for_stage ${STAGE})
 
-run_with_watchdog "run_mvn $MVN_COMMON_OPTIONS $PROFILE $MVN_TEST_MODULES verify" $CALLBACK_ON_TIMEOUT
+run_with_watchdog "run_mvn $MVN_COMMON_OPTIONS $PROFILE $MVN_TEST_MODULES -U verify" $CALLBACK_ON_TIMEOUT
 EXIT_CODE=$?
 
 # =============================================================================
