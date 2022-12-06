@@ -1,20 +1,23 @@
 # Oracle CDC Connector
 
-The Oracle CDC connector allows for reading snapshot data and incremental data from Oracle database. This document describes how to setup the Oracle CDC connector to run SQL queries against Oracle databases.
+The Oracle CDC connector allows for reading snapshot data and incremental data from Oracle database. This document
+describes how to setup the Oracle CDC connector to run SQL queries against Oracle databases.
 
 Dependencies
 ------------
 
-In order to setup the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+In order to setup the Oracle CDC connector, the following table provides dependency information for both projects using
+a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
 ```xml
+
 <dependency>
-  <groupId>com.ververica</groupId>
-  <artifactId>flink-connector-oracle-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+    <groupId>com.ververica</groupId>
+    <artifactId>flink-connector-oracle-cdc</artifactId>
+    <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+    <version>2.4-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -22,17 +25,22 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 **Download link is available only for stable releases.**
 
-Download [flink-sql-connector-oracle-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.4-SNAPSHOT/flink-sql-connector-oracle-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oracle-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.4-SNAPSHOT/flink-sql-connector-oracle-cdc-2.4-SNAPSHOT.jar)
+and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-oracle-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oracle-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-oracle-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users
+need to download the source code and compile the corresponding jar. Users should use the released version, such
+as [flink-sql-connector-oracle-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc)
+, the released version will be available in the Maven central warehouse.
 
 Setup Oracle
 ----------------
-You have to enable log archiving for Oracle database and define an Oracle user with appropriate permissions on all databases that the Debezium Oracle connector monitors.
+You have to enable log archiving for Oracle database and define an Oracle user with appropriate permissions on all
+databases that the Debezium Oracle connector monitors.
 
 ### For Non-CDB database
 
-1. Enable log archiving 
+1. Enable log archiving
 
    (1.1). Connect to the database as DBA
     ```sql
@@ -51,19 +59,20 @@ You have to enable log archiving for Oracle database and define an Oracle user w
     alter database archivelog;
     alter database open;
    ```
-    **Note:**
+   **Note:**
 
     - Enable log archiving requires database restart, pay attention when try to do it
     - The archived logs will occupy a large amount of disk space, so consider clean the expired logs the periodically
-   
-    (1.3). Check whether log archiving is enabled
+
+   (1.3). Check whether log archiving is enabled
     ```sql
     -- Should now "Database log mode: Archive Mode"
     archive log list;
     ```
    **Note:**
-   
-   Supplemental logging must be enabled for captured tables or the database in order for data changes to capture the <em>before</em> state of changed database rows.
+
+   Supplemental logging must be enabled for captured tables or the database in order for data changes to capture
+   the <em>before</em> state of changed database rows.
    The following illustrates how to configure this on the table/database level.
    ```sql
    -- Enable supplemental logging for a specific table:
@@ -116,10 +125,11 @@ You have to enable log archiving for Oracle database and define an Oracle user w
      GRANT SELECT ON V_$ARCHIVE_DEST_STATUS TO flinkuser;
      exit;
    ```
-   
+
 ### For CDB database
 
 Overall, the steps for configuring CDB database is quite similar to non-CDB database, but the commands may be different.
+
 1. Enable log archiving
    ```sql
    ORACLE_SID=ORCLCDB
@@ -187,8 +197,9 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      GRANT SELECT ON V_$ARCHIVE_DEST_STATUS TO flinkuser CONTAINER=ALL;
      exit
    ```
-   
-See more about the [Setting up Oracle](https://debezium.io/documentation/reference/1.6/connectors/oracle.html#setting-up-oracle)
+
+See more about
+the [Setting up Oracle](https://debezium.io/documentation/reference/1.6/connectors/oracle.html#setting-up-oracle)
 
 How to create an Oracle CDC table
 ----------------
@@ -216,11 +227,14 @@ Flink SQL> CREATE TABLE products (
 -- read snapshot and binlogs from products table
 Flink SQL> SELECT * FROM products;
 ```
-**Note:**
-When working with the CDB + PDB model, you are expected to add an extra option `'debezium.database.pdb.name' = 'xxx'` in Flink DDL to specific the name of the PDB to connect to.
 
 **Note:**
-While the connector might work with a variety of Oracle versions and editions, only Oracle 9i, 10g, 11g and 12c have been tested.
+When working with the CDB + PDB model, you are expected to add an extra option `'debezium.database.pdb.name' = 'xxx'` in
+Flink DDL to specific the name of the PDB to connect to.
+
+**Note:**
+While the connector might work with a variety of Oracle versions and editions, only Oracle 9i, 10g, 11g and 12c have
+been tested.
 
 Connector Options
 ----------------
@@ -365,7 +379,12 @@ Limitation
 --------
 
 ### Can't perform checkpoint during scanning snapshot of tables
-During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In order to not perform checkpoints, Oracle CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout checkpoints:
+
+During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In
+order to not perform checkpoints, Oracle CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint
+will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database
+table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout
+checkpoints:
 
 ```
 execution.checkpointing.interval: 10min
@@ -412,49 +431,59 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
 </table>
 
 The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    schema_name STRING METADATA FROM 'schema_name' VIRTUAL, 
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+CREATE TABLE products
+(
+    db_name      STRING METADATA FROM 'database_name' VIRTUAL,
+    schema_name  STRING METADATA FROM 'schema_name' VIRTUAL,
+    table_name   STRING METADATA FROM 'table_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    ID INT NOT NULL,
-    NAME STRING,
-    DESCRIPTION STRING,
-    WEIGHT DECIMAL(10, 3),
-    PRIMARY KEY(id) NOT ENFORCED
+    ID           INT NOT NULL,
+    NAME         STRING,
+    DESCRIPTION  STRING,
+    WEIGHT       DECIMAL(10, 3),
+    PRIMARY KEY (id) NOT ENFORCED
 ) WITH (
-    'connector' = 'oracle-cdc',
-    'hostname' = 'localhost',
-    'port' = '1521',
-    'username' = 'flinkuser',
-    'password' = 'flinkpw',
-    'database-name' = 'XE',
-    'schema-name' = 'inventory',
-    'table-name' = 'products',
-    'debezium.log.mining.strategy' = 'online_catalog',
-    'debezium.log.mining.continuous.mine' = 'true'
-);
+      'connector' = 'oracle-cdc',
+      'hostname' = 'localhost',
+      'port' = '1521',
+      'username' = 'flinkuser',
+      'password' = 'flinkpw',
+      'database-name' = 'XE',
+      'schema-name' = 'inventory',
+      'table-name' = 'products',
+      'debezium.log.mining.strategy' = 'online_catalog',
+      'debezium.log.mining.continuous.mine' = 'true'
+      );
 ```
 
-**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL.
+**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted,
+Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted
+field name in Oracle when define an `oracle-cdc` table in Flink SQL.
 
 Features
 --------
 
 ### Exactly-Once Processing
 
-The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.6/connectors/oracle.html#how-the-oracle-connector-works).
+The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read
+change events with **exactly-once processing** even failures happen. Please
+read [How the connector works](https://debezium.io/documentation/reference/1.6/connectors/oracle.html#how-the-oracle-connector-works)
+.
 
 ### Startup Reading Position
 
 The config option `scan.startup.mode` specifies the startup mode for Oracle CDC consumer. The valid enumerations are:
 
-- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to
+  read the latest binlog.
 - `latest-offset`: Never to perform a snapshot on the monitored database tables upon first startup, just read from
   the change since the connector was started.
 
-_Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
+_Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not
+use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it
+may make `scan.startup.mode` doesn't work._
 
 ### Single Thread Reading
 
@@ -471,26 +500,26 @@ import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.connectors.oracle.OracleSource;
 
 public class OracleSourceExample {
-  public static void main(String[] args) throws Exception {
-     SourceFunction<String> sourceFunction = OracleSource.<String>builder()
-             .url("jdbc:oracle:thin:@{hostname}:{port}:{database}")
-             .port(1521)
-             .database("XE") // monitor XE database
-             .schemaList("inventory") // monitor inventory schema
-             .tableList("inventory.products") // monitor products table
-             .username("flinkuser")
-             .password("flinkpw")
-             .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
-             .build();
+    public static void main(String[] args) throws Exception {
+        SourceFunction<String> sourceFunction = OracleSource.<String>builder()
+                .url("jdbc:oracle:thin:@{hostname}:{port}:{database}")
+                .port(1521)
+                .database("XE") // monitor XE database
+                .schemaList("inventory") // monitor inventory schema
+                .tableList("inventory.products") // monitor products table
+                .username("flinkuser")
+                .password("flinkpw")
+                .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+                .build();
 
-     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-     env
-        .addSource(sourceFunction)
-        .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering   
-     
-     env.execute();
-  }
+        env
+                .addSource(sourceFunction)
+                .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering   
+
+        env.execute();
+    }
 }
 ```
 
@@ -533,9 +562,14 @@ Data Type Mapping
       <td>DECIMAL(p - s, 0)</td>
     </tr>
     <tr>
-      <td>NUMBER(p, s > 0)
+      <td>NUMBER(p, s > 0) s >= 38 or (s < 38 , p + s > 38)
       </td>
-      <td>DECIMAL(p, s)</td>
+      <td>STRING</td>
+    </tr>
+    <tr>
+      <td>NUMBER(p, s > 0) s < 38,p + s = <38 
+      </td>
+      <td>DECIMAL(p + s , s) </td>
     </tr>
     <tr>
       <td>NUMBER(p, s <= 0), p - s > 38
@@ -608,5 +642,6 @@ Data Type Mapping
 
 FAQ
 --------
+
 * [FAQ(English)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
 * [FAQ(中文)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
