@@ -191,7 +191,7 @@ under the License.
                 <executions>
                     <execution>
                         <id>copy-jars</id>
-                        <phase>process-resources</phase>
+                        <phase>package</phase>
                         <goals>
                             <goal>copy</goal>
                         </goals>
