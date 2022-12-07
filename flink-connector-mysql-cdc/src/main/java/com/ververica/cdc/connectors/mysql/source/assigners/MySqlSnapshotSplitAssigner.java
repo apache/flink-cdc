@@ -275,9 +275,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public Optional<MySqlSplit> getNext() {
-        checkSplitterErrors();
         waitTableDiscoveryReady();
         synchronized (lock) {
+            checkSplitterErrors();
             if (!remainingSplits.isEmpty()) {
                 // return remaining splits firstly
                 Iterator<MySqlSchemalessSnapshotSplit> iterator = remainingSplits.iterator();
