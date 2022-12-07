@@ -567,6 +567,83 @@ public class OracleConnectorITCase extends AbstractTestBase {
     }
 
     @Test
+    public void testTimestampLtzType() throws Exception {
+        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE debezium.test_timestampLtz_table ("
+                            + " ID NUMBER(18,0),"
+                            + "VAL_TSLTZ TIMESTAMP (9) WITH TIME ZONE,"
+                            + " PRIMARY KEY (ID))");
+            statement.execute(
+                    "INSERT INTO debezium.test_numeric_table "
+                            + "VALUES (11000000000, 2022-12-06T00:30:52+08:00)");
+            statement.execute(
+                    "INSERT INTO debezium.test_numeric_table "
+                            + "VALUES (11000000001, 2022-12-06T00:30:52Z)");
+
+            String sourceDDL =
+                    String.format(
+                            "CREATE TABLE test_timeatmap_ltz_table ("
+                                    + " ID BIGINT,"
+                                    + " VAL_TSLTZ TIMESTAMP_LTZ,"
+                                    + " PRIMARY KEY (ID) NOT ENFORCED"
+                                    + ") WITH ("
+                                    + " 'connector' = 'oracle-cdc',"
+                                    + " 'hostname' = '%s',"
+                                    + " 'port' = '%s',"
+                                    + " 'username' = '%s',"
+                                    + " 'password' = '%s',"
+                                    + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                    + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                    + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                    + " 'database-name' = 'XE',"
+                                    + " 'schema-name' = '%s',"
+                                    + " 'table-name' = '%s'"
+                                    + ")",
+                            oracleContainer.getHost(),
+                            oracleContainer.getOraclePort(),
+                            "dbzuser",
+                            "dbz",
+                            parallelismSnapshot,
+                            "debezium",
+                            "test_timeatmap_ltz_table");
+            String sinkDDL =
+                    "CREATE TABLE test_timeatmap_ltz_sink ("
+                            + " id BIGINT,"
+                            + " VAL_TSLTZ TIMESTAMP_LTZ,"
+                            + " PRIMARY KEY (id) NOT ENFORCED"
+                            + ") WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false',"
+                            + " 'sink-expected-messages-num' = '20'"
+                            + ")";
+            tEnv.executeSql(sourceDDL);
+            tEnv.executeSql(sinkDDL);
+
+            // async submit job
+            TableResult result =
+                    tEnv.executeSql(
+                            "INSERT INTO test_timeatmap_ltz_sink SELECT * FROM test_timeatmap_ltz_table");
+
+            waitForSnapshotStarted("test_timeatmap_ltz_sink");
+
+            // waiting for change events finished.
+            waitForSinkSize("test_timeatmap_ltz_sink", 2);
+
+            List<String> expected =
+                    Arrays.asList(
+                            "+I[11000000000, 2022-12-06T00:30:52Z]",
+                            "+I[11000000001, 2022-12-06T00:30:52Z]");
+
+            List<String> actual = TestValuesTableFactory.getRawResults("test_timeatmap_ltz_sink");
+            Collections.sort(actual);
+            assertEquals(expected, actual);
+            result.getJobClient().get().cancel().get();
+        }
+    }
+
+    @Test
     public void testXmlType() throws Exception {
         // Prepare xml type data
         try (Connection connection = OracleTestUtils.testConnection(oracleContainer);

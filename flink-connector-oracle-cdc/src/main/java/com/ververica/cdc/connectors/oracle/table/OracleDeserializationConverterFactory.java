@@ -87,6 +87,9 @@ public class OracleDeserializationConverterFactory {
                         if (dbzObj instanceof String) {
                             String str = (String) dbzObj;
                             // TIMESTAMP_LTZ type is encoded in string type
+                            // such as '2011-12-03T10:15:30',
+                            // '2011-12-03T10:15:30+01:00' or
+                            // '2011-12-03T10:15:30+01:00[Europe/Paris]'
                             Instant instant =
                                     DateTimeFormatter.ISO_DATE_TIME.parse(str, Instant::from);
                             return TimestampData.fromInstant(instant);
