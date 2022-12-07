@@ -305,7 +305,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         if (handover.hasError()) {
             LOG.debug("snapshotState() called on closed source");
             throw new FlinkRuntimeException(
-                    "Call snapshotState() on closed source, checkpoint failed.");
+                    "Call snapshotState() on closed source, checkpoint failed.",
+                    handover.getError());
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
             snapshotHistoryRecordsState();
