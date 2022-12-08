@@ -36,6 +36,7 @@ import java.util.Arrays;
 
 import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
+import static io.debezium.connector.AbstractSourceInfo.DEBEZIUM_CONNECTOR_KEY;
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 
@@ -44,8 +45,8 @@ public class SourceRecordUtils {
 
     private SourceRecordUtils() {}
 
-    public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
-            "io.debezium.connector.mysql.SchemaChangeKey";
+    public static final String SCHEMA_CHANGE_EVENT_KEY_NAME_FORMAT =
+            "io.debezium.connector.%s.SchemaChangeKey";
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
 
     /** Converts a {@link ResultSet} row to an array of Objects. */
@@ -93,7 +94,12 @@ public class SourceRecordUtils {
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
-        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
+        Struct value = (Struct) sourceRecord.value();
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        String connector = source.getString(DEBEZIUM_CONNECTOR_KEY);
+        String schemaChangeEventKeyName =
+                String.format(SCHEMA_CHANGE_EVENT_KEY_NAME_FORMAT, connector);
+        return keySchema != null && schemaChangeEventKeyName.equalsIgnoreCase(keySchema.name());
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {
