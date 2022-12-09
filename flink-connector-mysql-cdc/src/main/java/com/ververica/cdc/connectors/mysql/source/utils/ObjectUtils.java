@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Objects;
 
 /** Utilities for operation on {@link Object}. */
 public class ObjectUtils {
@@ -84,8 +85,37 @@ public class ObjectUtils {
         if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
             return ((Comparable) obj1).compareTo(obj2);
         } else {
+            if (obj1 instanceof byte[] && obj1.getClass().equals(obj2.getClass())) {
+                return compareByteArray((byte[]) obj1, (byte[]) obj2);
+            }
             return obj1.toString().compareTo(obj2.toString());
         }
+    }
+
+    public static boolean equals(Object obj1, Object obj2) {
+        if (obj1 instanceof byte[] && obj1.getClass().equals(obj2.getClass())) {
+            return compareByteArray((byte[]) obj1, (byte[]) obj2) == 0;
+        } else {
+            return Objects.equals(obj1, obj2);
+        }
+    }
+
+    private static int compareByteArray(byte[] byteArray1, byte[] byteArray2) {
+        String s1 = bytesToHex(byteArray1);
+        String s2 = bytesToHex(byteArray2);
+        return s1.compareTo(s2);
+    }
+
+    public static String bytesToHex(byte[] bytes) {
+        StringBuffer sb = new StringBuffer();
+        for (int i = 0; i < bytes.length; i++) {
+            String hex = Integer.toHexString(bytes[i] & 0xFF);
+            if (hex.length() < 2) {
+                sb.append(0);
+            }
+            sb.append(hex);
+        }
+        return sb.toString();
     }
 
     /**

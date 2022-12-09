@@ -46,7 +46,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
@@ -311,7 +310,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         // chunk end might be null when max values are removed
         Object chunkEnd =
                 queryNextChunkMax(jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
-        if (Objects.equals(previousChunkEnd, chunkEnd)) {
+        if (ObjectUtils.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
