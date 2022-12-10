@@ -39,6 +39,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SHUFFLE_SNAPSHOT_SPLIT_ENABLED;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
@@ -68,6 +69,7 @@ public class MySqlSourceConfigFactory implements Serializable {
             CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private boolean shuffleSnapshotSplitEnabled = SHUFFLE_SNAPSHOT_SPLIT_ENABLED.defaultValue();
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
@@ -225,6 +227,13 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should shuffle snapshot split or not. */
+    public MySqlSourceConfigFactory shuffleSnapshotSplitEnabled(
+            boolean shuffleSnapshotSplitEnabled) {
+        this.shuffleSnapshotSplitEnabled = shuffleSnapshotSplitEnabled;
+        return this;
+    }
+
     /** Custom properties that will overwrite the default JDBC connection URL. */
     public MySqlSourceConfigFactory jdbcProperties(Properties jdbcProperties) {
         this.jdbcProperties = jdbcProperties;
@@ -330,6 +339,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorLower,
                 includeSchemaChanges,
                 scanNewlyAddedTableEnabled,
+                shuffleSnapshotSplitEnabled,
                 props,
                 jdbcProperties,
                 chunkKeyColumn);

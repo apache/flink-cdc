@@ -76,6 +76,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean shuffleSnapshotSplitEnabled;
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
@@ -112,6 +113,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorLower,
             StartupOptions startupOptions,
             boolean scanNewlyAddedTableEnabled,
+            boolean shuffleSnapshotSplitsEnabled,
             Properties jdbcProperties,
             Duration heartbeatInterval,
             @Nullable String chunkKeyColumn) {
@@ -136,6 +138,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.shuffleSnapshotSplitEnabled = shuffleSnapshotSplitsEnabled;
         this.jdbcProperties = jdbcProperties;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
@@ -189,6 +192,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .shuffleSnapshotSplitEnabled(shuffleSnapshotSplitEnabled)
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
                             .chunkKeyColumn(chunkKeyColumn)
@@ -269,6 +273,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         distributionFactorLower,
                         startupOptions,
                         scanNewlyAddedTableEnabled,
+                        shuffleSnapshotSplitEnabled,
                         jdbcProperties,
                         heartbeatInterval,
                         chunkKeyColumn);
@@ -294,6 +299,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && distributionFactorUpper == that.distributionFactorUpper
                 && distributionFactorLower == that.distributionFactorLower
                 && scanNewlyAddedTableEnabled == that.scanNewlyAddedTableEnabled
+                && shuffleSnapshotSplitEnabled == that.shuffleSnapshotSplitEnabled
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
                 && Objects.equals(database, that.database)
@@ -340,6 +346,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 producedDataType,
                 metadataKeys,
                 scanNewlyAddedTableEnabled,
+                shuffleSnapshotSplitEnabled,
                 jdbcProperties,
                 heartbeatInterval,
                 chunkKeyColumn);

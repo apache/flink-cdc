@@ -203,6 +203,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should shuffle snapshot split or not. */
+    public MySqlSourceBuilder<T> shuffleSnapshotSplitEnabled(boolean shuffleSnapshotSplitEnabled) {
+        this.configFactory.shuffleSnapshotSplitEnabled(shuffleSnapshotSplitEnabled);
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);

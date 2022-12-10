@@ -64,6 +64,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_ID;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SHUFFLE_SNAPSHOT_SPLIT_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
@@ -108,6 +109,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         double distributionFactorUpper = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        boolean shuffleSnapshotSplitEnabled = config.get(SHUFFLE_SNAPSHOT_SPLIT_ENABLED);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
@@ -144,6 +146,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 distributionFactorLower,
                 startupOptions,
                 scanNewlyAddedTableEnabled,
+                shuffleSnapshotSplitEnabled,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));

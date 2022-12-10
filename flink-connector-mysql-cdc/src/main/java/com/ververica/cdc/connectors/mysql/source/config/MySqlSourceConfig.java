@@ -54,6 +54,7 @@ public class MySqlSourceConfig implements Serializable {
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean shuffleSnapshotSplitEnabled;
     private final Properties jdbcProperties;
     @Nullable private final String chunkKeyColumn;
 
@@ -84,6 +85,7 @@ public class MySqlSourceConfig implements Serializable {
             double distributionFactorLower,
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
+            boolean shuffleSnapshotSplitEnabled,
             Properties dbzProperties,
             Properties jdbcProperties,
             @Nullable String chunkKeyColumn) {
@@ -106,6 +108,7 @@ public class MySqlSourceConfig implements Serializable {
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.shuffleSnapshotSplitEnabled = shuffleSnapshotSplitEnabled;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
@@ -188,6 +191,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isScanNewlyAddedTableEnabled() {
         return scanNewlyAddedTableEnabled;
+    }
+
+    public boolean isShuffleSnapshotSplitEnabled() {
+        return shuffleSnapshotSplitEnabled;
     }
 
     public Properties getDbzProperties() {

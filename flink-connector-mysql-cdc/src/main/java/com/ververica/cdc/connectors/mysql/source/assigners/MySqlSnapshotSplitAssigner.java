@@ -44,10 +44,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -238,26 +241,28 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         boolean hasRecordSchema = false;
         // split the given table into chunks (snapshot splits)
         do {
-            synchronized (lock) {
-                List<MySqlSnapshotSplit> splits;
-                try {
-                    splits = chunkSplitter.splitChunks(nextTable);
-                } catch (Exception e) {
-                    throw new IllegalStateException(
-                            "Error when splitting chunks for " + nextTable, e);
-                }
+            List<MySqlSnapshotSplit> splits;
+            try {
+                splits = chunkSplitter.splitChunks(nextTable);
+            } catch (Exception e) {
+                throw new IllegalStateException("Error when splitting chunks for " + nextTable, e);
+            }
 
+            synchronized (lock) {
                 if (!hasRecordSchema && !splits.isEmpty()) {
                     hasRecordSchema = true;
                     final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
                     tableSchema.putAll(splits.iterator().next().getTableSchemas());
                     tableSchemas.putAll(tableSchema);
                 }
-                final List<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits =
+                final LinkedList<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits =
                         splits.stream()
                                 .map(MySqlSnapshotSplit::toSchemalessSnapshotSplit)
-                                .collect(Collectors.toList());
+                                .collect(Collectors.toCollection(LinkedList::new));
                 chunkNum += splits.size();
+                if (!remainingSplits.isEmpty() && sourceConfig.isShuffleSnapshotSplitEnabled()) {
+                    shuffleSnapshotSplit(schemaLessSnapshotSplits);
+                }
                 remainingSplits.addAll(schemaLessSnapshotSplits);
                 if (!chunkSplitter.hasNextChunk()) {
                     remainingTables.remove(nextTable);
@@ -480,6 +485,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         return splitFinishedOffsets;
     }
 
+    public List<TableId> getRemainingTables() {
+        return remainingTables;
+    }
+
     // -------------------------------------------------------------------------------------------
 
     /**
@@ -533,5 +542,31 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             return new MySqlChunkSplitter(mySqlSchema, sourceConfig, chunkSplitterState);
         }
         return new MySqlChunkSplitter(mySqlSchema, sourceConfig);
+    }
+
+    /**
+     * shuffle split to remaining split lists. In this way, the data of multiple tables can be read
+     * evenly.
+     *
+     * @param addSplits
+     */
+    private void shuffleSnapshotSplit(LinkedList<MySqlSchemalessSnapshotSplit> addSplits) {
+        Set<TableId> uniqueSet = new HashSet<>();
+        for (int i = 0; i < remainingSplits.size() && !addSplits.isEmpty(); i++) {
+            TableId tableId = remainingSplits.get(i).getTableId();
+            if (uniqueSet.contains(tableId)) {
+                remainingSplits.add(i, addSplits.pollFirst());
+                uniqueSet.clear();
+                // The new data is added to the remaining list
+                // this index position is the newly added data, we need to skip it
+                i++;
+            }
+            uniqueSet.add(tableId);
+        }
+
+        // When add splits list is not empty, need to add data to remaining list end
+        if (!addSplits.isEmpty()) {
+            remainingSplits.addAll(addSplits);
+        }
     }
 }

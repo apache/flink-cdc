@@ -245,4 +245,12 @@ public class MySqlSourceOptions {
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
                                     + "By default, the chunk key is the first column of the primary key."
                                     + "This column must be a column of the primary key.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SHUFFLE_SNAPSHOT_SPLIT_ENABLED =
+            ConfigOptions.key("shuffle.snapshot-split.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to shuffle snapshot split or not, by default is false.");
 }
