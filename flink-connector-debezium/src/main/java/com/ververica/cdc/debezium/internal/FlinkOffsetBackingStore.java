@@ -19,26 +19,20 @@ package com.ververica.cdc.debezium.internal;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.embedded.EmbeddedEngine;
 import io.debezium.engine.DebeziumEngine;
-import org.apache.kafka.common.utils.ThreadUtils;
-import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.storage.Converter;
+import org.apache.kafka.connect.storage.MemoryOffsetBackingStore;
 import org.apache.kafka.connect.storage.OffsetBackingStore;
 import org.apache.kafka.connect.storage.OffsetStorageWriter;
-import org.apache.kafka.connect.util.Callback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -54,14 +48,11 @@ import java.util.concurrent.TimeoutException;
  *
  * @see DebeziumSourceFunction
  */
-public class FlinkOffsetBackingStore implements OffsetBackingStore {
+public class FlinkOffsetBackingStore extends MemoryOffsetBackingStore {
     private static final Logger LOG = LoggerFactory.getLogger(FlinkOffsetBackingStore.class);
 
     public static final String OFFSET_STATE_VALUE = "offset.storage.flink.state.value";
     public static final int FLUSH_TIMEOUT_SECONDS = 10;
-
-    protected Map<ByteBuffer, ByteBuffer> data = new HashMap<>();
-    protected ExecutorService executor;
 
     @Override
     public void configure(WorkerConfig config) {
@@ -142,59 +133,8 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
     }
 
     @Override
-    public void start() {
-        if (executor == null) {
-            executor =
-                    Executors.newFixedThreadPool(
-                            1,
-                            ThreadUtils.createThreadFactory(
-                                    this.getClass().getSimpleName() + "-%d", false));
-        }
-    }
-
-    @Override
     public void stop() {
-        if (executor != null) {
-            executor.shutdown();
-            // Best effort wait for any get() and set() tasks (and caller's callbacks) to complete.
-            try {
-                executor.awaitTermination(30, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            if (!executor.shutdownNow().isEmpty()) {
-                throw new ConnectException(
-                        "Failed to stop FlinkOffsetBackingStore. Exiting without cleanly "
-                                + "shutting down pending tasks and/or callbacks.");
-            }
-            executor = null;
-        }
-    }
-
-    @Override
-    public Future<Map<ByteBuffer, ByteBuffer>> get(final Collection<ByteBuffer> keys) {
-        return executor.submit(
-                () -> {
-                    Map<ByteBuffer, ByteBuffer> result = new HashMap<>();
-                    for (ByteBuffer key : keys) {
-                        result.put(key, data.get(key));
-                    }
-                    return result;
-                });
-    }
-
-    @Override
-    public Future<Void> set(
-            final Map<ByteBuffer, ByteBuffer> values, final Callback<Void> callback) {
-        return executor.submit(
-                () -> {
-                    for (Map.Entry<ByteBuffer, ByteBuffer> entry : values.entrySet()) {
-                        data.put(entry.getKey(), entry.getValue());
-                    }
-                    if (callback != null) {
-                        callback.onCompletion(null, null);
-                    }
-                    return null;
-                });
+        super.stop();
+        LOG.info("Stopped FlinkOffsetBackingStore");
     }
 }
