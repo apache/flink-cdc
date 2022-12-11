@@ -262,8 +262,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 chunkNum += splits.size();
                 if (!remainingSplits.isEmpty() && sourceConfig.isShuffleSnapshotSplitEnabled()) {
                     shuffleSnapshotSplit(schemaLessSnapshotSplits);
+                } else {
+                    remainingSplits.addAll(schemaLessSnapshotSplits);
                 }
-                remainingSplits.addAll(schemaLessSnapshotSplits);
                 if (!chunkSplitter.hasNextChunk()) {
                     remainingTables.remove(nextTable);
                 }
@@ -554,14 +555,18 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         Set<TableId> uniqueSet = new HashSet<>();
         for (int i = 0; i < remainingSplits.size() && !addSplits.isEmpty(); i++) {
             TableId tableId = remainingSplits.get(i).getTableId();
-            if (uniqueSet.contains(tableId)) {
-                remainingSplits.add(i, addSplits.pollFirst());
+            if (tableId.equals(addSplits.getFirst().getTableId())) {
                 uniqueSet.clear();
-                // The new data is added to the remaining list
-                // this index position is the newly added data, we need to skip it
-                i++;
+            } else {
+                if (uniqueSet.contains(tableId)) {
+                    remainingSplits.add(i, addSplits.pollFirst());
+                    uniqueSet.clear();
+                    // The new data is added to the remaining list
+                    // this index position is the newly added data, we need to skip it
+                    i++;
+                }
+                uniqueSet.add(tableId);
             }
-            uniqueSet.add(tableId);
         }
 
         // When add splits list is not empty, need to add data to remaining list end
