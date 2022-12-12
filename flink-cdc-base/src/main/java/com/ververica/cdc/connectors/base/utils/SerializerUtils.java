@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.utils;
 
 import io.debezium.DebeziumException;
+import io.debezium.relational.TableId;
 import io.debezium.util.HexConverter;
 
 import java.io.ByteArrayInputStream;
@@ -76,5 +77,11 @@ public class SerializerUtils {
                             "Failed to deserialize split boundary with value '%s'", serialized),
                     e);
         }
+    }
+
+    public static boolean shouldUseCatalogBeforeSchema(TableId tableId) {
+        // if catalog is not defined but the schema is defined return this flag as false
+        // otherwise return true
+        return !(tableId.catalog() == null && tableId.schema() != null);
     }
 }

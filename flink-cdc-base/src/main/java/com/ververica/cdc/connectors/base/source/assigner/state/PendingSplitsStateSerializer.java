@@ -25,6 +25,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSpl
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
+import com.ververica.cdc.connectors.base.utils.SerializerUtils;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 
@@ -358,6 +359,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         final int size = tableIds.size();
         out.writeInt(size);
         for (TableId tableId : tableIds) {
+            boolean useCatalogBeforeSchema = SerializerUtils.shouldUseCatalogBeforeSchema(tableId);
+            out.writeBoolean(useCatalogBeforeSchema);
             out.writeUTF(tableId.toString());
         }
     }
@@ -366,8 +369,9 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         List<TableId> tableIds = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
+            boolean useCatalogBeforeSchema = in.readBoolean();
             String tableIdStr = in.readUTF();
-            tableIds.add(TableId.parse(tableIdStr));
+            tableIds.add(TableId.parse(tableIdStr, useCatalogBeforeSchema));
         }
         return tableIds;
     }

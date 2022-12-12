@@ -44,6 +44,9 @@ public interface FetchTask<Split> {
     /** Returns the split that the task used. */
     Split getSplit();
 
+    /** Stops current task, most of the implementations don't need this. */
+    default void stop() {}
+
     /** Base context used in the execution of fetch task. */
     interface Context {
         void configure(SourceSplitBase sourceSplitBase);

@@ -48,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.CLUSTER_TIME_FIELD;
@@ -223,8 +224,8 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private MongoChangeStreamCursor<BsonDocument> openChangeStreamCursor(
             ChangeStreamDescriptor changeStreamDescriptor) {
         ChangeStreamOffset offset =
-                new ChangeStreamOffset(streamSplit.getStartingOffset().getOffset());
-
+                new ChangeStreamOffset(
+                        (Map<String, String>) streamSplit.getStartingOffset().getOffset());
         ChangeStreamIterable<Document> changeStreamIterable =
                 getChangeStreamIterable(sourceConfig, changeStreamDescriptor);
 

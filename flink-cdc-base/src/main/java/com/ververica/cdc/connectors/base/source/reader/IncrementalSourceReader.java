@@ -133,6 +133,11 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     }
 
     @Override
+    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+        dialect.notifyCheckpointComplete(checkpointId);
+    }
+
+    @Override
     protected void onSplitFinished(Map<String, SourceSplitState> finishedSplitIds) {
         for (SourceSplitState splitState : finishedSplitIds.values()) {
             SourceSplitBase sourceSplit = splitState.toSourceSplit();
