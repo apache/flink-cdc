@@ -16,13 +16,12 @@
 
 package com.ververica.cdc.connectors.oracle.table;
 
-import org.apache.flink.table.data.TimestampData;
-import org.apache.flink.table.types.logical.LogicalType;
-
 import com.ververica.cdc.debezium.table.DeserializationRuntimeConverter;
 import com.ververica.cdc.debezium.table.DeserializationRuntimeConverterFactory;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
+import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
@@ -32,7 +31,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
-/** Used to create {@link DeserializationRuntimeConverterFactory} specified to Oracle. */
+/**
+ * Used to create {@link DeserializationRuntimeConverterFactory} specified to Oracle.
+ */
 public class OracleDeserializationConverterFactory {
 
     public static DeserializationRuntimeConverterFactory instance() {
@@ -48,7 +49,9 @@ public class OracleDeserializationConverterFactory {
         };
     }
 
-    /** Creates a runtime converter which assuming input object is not null. */
+    /**
+     * Creates a runtime converter which assuming input object is not null.
+     */
     private static Optional<DeserializationRuntimeConverter> createNumericConverter(
             LogicalType type, ZoneId serverTimeZone) {
         switch (type.getTypeRoot()) {
@@ -66,8 +69,8 @@ public class OracleDeserializationConverterFactory {
                 return createFloatConverter();
             case DOUBLE:
                 return createDoubleConverter();
-                // Debezium use io.debezium.time.ZonedTimestamp to map Oracle TIMESTAMP WITH LOCAL
-                // TIME ZONE type, the value is a string representation of a timestamp in UTC.
+            // Debezium use io.debezium.time.ZonedTimestamp to map Oracle TIMESTAMP WITH LOCAL
+            // TIME ZONE type, the value is a string representation of a timestamp in UTC.
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return convertToLocalTimeZoneTimestamp();
             default:
@@ -87,9 +90,6 @@ public class OracleDeserializationConverterFactory {
                         if (dbzObj instanceof String) {
                             String str = (String) dbzObj;
                             // TIMESTAMP_LTZ type is encoded in string type
-                            // such as '2011-12-03T10:15:30',
-                            // '2011-12-03T10:15:30+01:00' or
-                            // '2011-12-03T10:15:30+01:00[Europe/Paris]'
                             Instant instant =
                                     DateTimeFormatter.ISO_DATE_TIME.parse(str, Instant::from);
                             return TimestampData.fromInstant(instant);
