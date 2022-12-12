@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -143,7 +144,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
-        this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
+        this.remainingSplits = Collections.synchronizedList(remainingSplits);
         this.assignedSplits = assignedSplits;
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
@@ -238,27 +239,27 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         boolean hasRecordSchema = false;
         // split the given table into chunks (snapshot splits)
         do {
-            synchronized (lock) {
-                List<MySqlSnapshotSplit> splits;
-                try {
-                    splits = chunkSplitter.splitChunks(nextTable);
-                } catch (Exception e) {
-                    throw new IllegalStateException(
-                            "Error when splitting chunks for " + nextTable, e);
-                }
+            List<MySqlSnapshotSplit> splits;
+            try {
+                splits = chunkSplitter.splitChunks(nextTable);
+            } catch (Exception e) {
+                throw new IllegalStateException("Error when splitting chunks for " + nextTable, e);
+            }
 
-                if (!hasRecordSchema && !splits.isEmpty()) {
-                    hasRecordSchema = true;
-                    final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
-                    tableSchema.putAll(splits.iterator().next().getTableSchemas());
-                    tableSchemas.putAll(tableSchema);
-                }
-                final List<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits =
-                        splits.stream()
-                                .map(MySqlSnapshotSplit::toSchemalessSnapshotSplit)
-                                .collect(Collectors.toList());
-                chunkNum += splits.size();
-                remainingSplits.addAll(schemaLessSnapshotSplits);
+            if (!hasRecordSchema && !splits.isEmpty()) {
+                hasRecordSchema = true;
+                final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
+                tableSchema.putAll(splits.iterator().next().getTableSchemas());
+                tableSchemas.putAll(tableSchema);
+            }
+            final List<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits =
+                    splits.stream()
+                            .map(MySqlSnapshotSplit::toSchemalessSnapshotSplit)
+                            .collect(Collectors.toList());
+            chunkNum += splits.size();
+
+            synchronized (lock) {
+                addToRemainingSplits(schemaLessSnapshotSplits);
                 if (!chunkSplitter.hasNextChunk()) {
                     remainingTables.remove(nextTable);
                 }
@@ -353,13 +354,15 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void addSplits(Collection<MySqlSplit> splits) {
-        for (MySqlSplit split : splits) {
-            tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
-            remainingSplits.add(split.asSnapshotSplit().toSchemalessSnapshotSplit());
-            // we should remove the add-backed splits from the assigned list,
-            // because they are failed
-            assignedSplits.remove(split.splitId());
-            splitFinishedOffsets.remove(split.splitId());
+        synchronized (lock) {
+            for (MySqlSplit split : splits) {
+                tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
+                remainingSplits.add(0, split.asSnapshotSplit().toSchemalessSnapshotSplit());
+                // we should remove the add-backed splits from the assigned list,
+                // because they are failed
+                assignedSplits.remove(split.splitId());
+                splitFinishedOffsets.remove(split.splitId());
+            }
         }
     }
 
@@ -521,6 +524,29 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (uncaughtSplitterException != null) {
             throw new FlinkRuntimeException(
                     "Chunk splitting has encountered exception", uncaughtSplitterException);
+        }
+    }
+
+    private void addToRemainingSplits(List<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits) {
+        for (MySqlSchemalessSnapshotSplit snapshotSplit : schemaLessSnapshotSplits) {
+            if (snapshotSplit.getSplitEnd() != null) {
+                remainingSplits.add(snapshotSplit);
+            } else {
+                // assigned the last MySqlSchemalessSnapshotSplit ahead of time
+                int i = remainingSplits.size() - 1;
+                for (; i >= 0; i--) {
+                    remainingSplits.get(i).getTableId();
+                    if (snapshotSplit.getTableId().equals(remainingSplits.get(i).getTableId())
+                            && remainingSplits.get(i).getSplitStart() == null) {
+                        remainingSplits.add(i + 1, snapshotSplit);
+                        break;
+                    }
+                }
+
+                if (i < 0) {
+                    remainingSplits.add(snapshotSplit);
+                }
+            }
         }
     }
 

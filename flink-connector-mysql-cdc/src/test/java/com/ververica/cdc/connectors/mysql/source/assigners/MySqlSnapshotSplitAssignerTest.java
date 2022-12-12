@@ -67,7 +67,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".customers_even_dist"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -101,7 +101,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                             customerDatabase.getDatabaseName() + ".customers_even_dist",
                             customerDatabase.getDatabaseName() + ".customers_sparse_dist"
                         });
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -121,7 +121,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"},
                         "product_kind");
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -139,7 +139,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".evenly_shopping_cart"},
                         "product_no");
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -172,7 +172,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".shopping_cart_big"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -188,7 +188,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".address"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -203,7 +203,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".shopping_cart_dec"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -222,7 +222,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".customer_card"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -242,7 +242,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         new String[] {
                             customerDatabase.getDatabaseName() + ".customers_sparse_dist"
                         });
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
 
         // test sparse table with smaller distribution factor upper
         List<String> expected1 =
@@ -258,7 +258,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         new String[] {
                             customerDatabase.getDatabaseName() + ".customers_sparse_dist"
                         });
-        assertEquals(expected1, splits1);
+        assertEqualsInAnyOrder(expected1, splits1);
 
         // test sparse table that the approximate row count is bigger than chunk size
         List<String> expected2 =
@@ -271,7 +271,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         new String[] {
                             customerDatabase.getDatabaseName() + ".customers_sparse_dist"
                         });
-        assertEquals(expected2, splits2);
+        assertEqualsInAnyOrder(expected2, splits2);
     }
 
     @Test
@@ -290,7 +290,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         new String[] {
                             customerDatabase.getDatabaseName() + ".customers_dense_dist"
                         });
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
 
         // test dense table with bigger dense distribution factor lower
         List<String> expected1 =
@@ -303,7 +303,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         new String[] {
                             customerDatabase.getDatabaseName() + ".customers_dense_dist"
                         });
-        assertEquals(expected1, splits1);
+        assertEqualsInAnyOrder(expected1, splits1);
     }
 
     @Test
@@ -334,7 +334,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -351,7 +351,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".shopping_cart"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -369,7 +369,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".customers_even_dist"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -381,7 +381,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {customerDatabase.getDatabaseName() + ".customers_even_dist"});
-        assertEquals(expected, splits);
+        assertEqualsInAnyOrder(expected, splits);
     }
 
     @Test
@@ -440,6 +440,28 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         assigner.open();
         assertTrue(assigner.getNext().isPresent());
         assertFalse(assigner.needToDiscoveryTables());
+    }
+
+    @Test
+    public void testPriorityAssignEndSplits() {
+        List<String> expected =
+                Arrays.asList(
+                        "customers_even_dist null [105]",
+                        "customers_even_dist [109] null",
+                        "customers_even_dist [105] [109]",
+                        "customers_sparse_dist null [10]",
+                        "customers_sparse_dist [18] null",
+                        "customers_sparse_dist [10] [18]");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {
+                            customerDatabase.getDatabaseName() + ".customers_even_dist",
+                            customerDatabase.getDatabaseName() + ".customers_sparse_dist"
+                        });
+        assertEquals(expected, splits);
     }
 
     private List<String> getTestAssignSnapshotSplits(
