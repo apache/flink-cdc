@@ -27,6 +27,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.TestLogger;
 
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.After;
 import org.junit.Before;
@@ -81,6 +82,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                             "jobmanager.rpc.address: jobmanager",
                             "taskmanager.numberOfTaskSlots: 10",
                             "parallelism.default: 4",
+                            "execution.checkpointing.interval: 10000",
                             // this is needed for oracle-cdc tests.
                             // see https://stackoverflow.com/a/47062742/4915129
                             "env.java.opts: -Doracle.jdbc.timezoneAsRegion=false"));
@@ -102,7 +104,8 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     @ClassRule
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
-                    new MySqlContainer()
+                    new MySqlContainer(
+                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
                             .withConfigurationOverride("docker/mysql/my.cnf")
                             .withSetupSQL("docker/mysql/setup.sql")
                             .withDatabaseName("flink-test")
@@ -167,6 +170,12 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
             taskManager.stop();
         }
         mysqlInventoryDatabase.dropDatabase();
+    }
+
+    /** Allow overriding the default flink properties. */
+    public void overrideFlinkProperties(String properties) {
+        jobManager.withEnv("FLINK_PROPERTIES", properties);
+        taskManager.withEnv("FLINK_PROPERTIES", properties);
     }
 
     /**

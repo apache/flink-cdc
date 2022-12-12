@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
@@ -56,11 +57,23 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     protected static final String PG_DRIVER_CLASS = "org.postgresql.Driver";
     private static final String INTER_CONTAINER_PG_ALIAS = "postgres";
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+
+    // debezium/postgres:9.6-alpine supports both ARM and AMD architectures
     private static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
+            DockerImageName.parse("debezium/postgres:9.6-alpine")
+                    .asCompatibleSubstituteFor("postgres");
 
     private static final Path postgresCdcJar = TestUtils.getResource("postgres-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+
+    private static final String FLINK_PROPERTIES =
+            String.join(
+                    "\n",
+                    Arrays.asList(
+                            "jobmanager.rpc.address: jobmanager",
+                            "taskmanager.numberOfTaskSlots: 10",
+                            "parallelism.default: 1",
+                            "execution.checkpointing.interval: 10000"));
 
     @ClassRule
     public static final PostgreSQLContainer<?> POSTGRES =
@@ -76,6 +89,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     public void before() {
         super.before();
         initializePostgresTable("postgres_inventory");
+        overrideFlinkProperties(FLINK_PROPERTIES);
     }
 
     @After
@@ -83,54 +97,103 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
         super.after();
     }
 
+    List<String> sourceSql =
+            Arrays.asList(
+                    "CREATE TABLE products_source (",
+                    " `id` INT NOT NULL,",
+                    " name STRING,",
+                    " description STRING,",
+                    " weight DECIMAL(10,3),",
+                    " primary key (`id`) not enforced",
+                    ") WITH (",
+                    " 'connector' = 'postgres-cdc',",
+                    " 'hostname' = '" + INTER_CONTAINER_PG_ALIAS + "',",
+                    " 'port' = '" + POSTGRESQL_PORT + "',",
+                    " 'username' = '" + PG_TEST_USER + "',",
+                    " 'password' = '" + PG_TEST_PASSWORD + "',",
+                    " 'database-name' = '" + POSTGRES.getDatabaseName() + "',",
+                    " 'schema-name' = 'inventory',",
+                    " 'table-name' = 'products',",
+                    " 'slot.name' = 'flink',",// dropping the slot allows WAL segments to be discarded by the database
+                    " 'debezium.slot.drop_on_stop' = 'true'",
+                    ");");
+
+    List<String> sourceSqlWithIncrementalSnapshot =
+            Arrays.asList(
+                    "CREATE TABLE products_source (",
+                    " `id` INT NOT NULL,",
+                    " name STRING,",
+                    " description STRING,",
+                    " weight DECIMAL(10,3),",
+                    " primary key (`id`) not enforced",
+                    ") WITH (",
+                    " 'connector' = 'postgres-cdc',",
+                    " 'hostname' = '" + INTER_CONTAINER_PG_ALIAS + "',",
+                    " 'port' = '" + POSTGRESQL_PORT + "',",
+                    " 'username' = '" + PG_TEST_USER + "',",
+                    " 'password' = '" + PG_TEST_PASSWORD + "',",
+                    " 'database-name' = '" + POSTGRES.getDatabaseName() + "',",
+                    " 'schema-name' = 'inventory',",
+                    " 'table-name' = 'products',",
+                    " 'scan.incremental.snapshot.chunk.size' = '5',",
+                    " 'scan.incremental.snapshot.enabled' = 'true',",
+                    " 'scan.startup.mode' = 'initial'",
+                    ");");
+    List<String> sinkSql =
+            Arrays.asList(
+                    "CREATE TABLE products_sink (",
+                    " `id` INT NOT NULL,",
+                    " name STRING,",
+                    " description STRING,",
+                    " weight DECIMAL(10,3),",
+                    " primary key (`id`) not enforced",
+                    ") WITH (",
+                    " 'connector' = 'jdbc',",
+                    String.format(
+                            " 'url' = 'jdbc:mysql://%s:3306/%s',",
+                            INTER_CONTAINER_MYSQL_ALIAS, mysqlInventoryDatabase.getDatabaseName()),
+                    " 'table-name' = 'products_sink',",
+                    " 'username' = '" + MYSQL_TEST_USER + "',",
+                    " 'password' = '" + MYSQL_TEST_PASSWORD + "'",
+                    ");",
+                    "INSERT INTO products_sink",
+                    "SELECT * FROM products_source;");
+
     @Test
-    public void testPostgresCDC() throws Exception {
+    public void testPostgresCdcIncremental() throws Exception {
+        try (Connection conn = getPgJdbcConnection();
+                Statement statement = conn.createStatement()) {
+            // gather the initial statistics of the table for splitting
+            statement.execute("ANALYZE;");
+        }
+
         List<String> sqlLines =
-                Arrays.asList(
-                        "CREATE TABLE products_source (",
-                        " `id` INT NOT NULL,",
-                        " name STRING,",
-                        " description STRING,",
-                        " weight DECIMAL(10,3),",
-                        " primary key (`id`) not enforced",
-                        ") WITH (",
-                        " 'connector' = 'postgres-cdc',",
-                        " 'hostname' = '" + INTER_CONTAINER_PG_ALIAS + "',",
-                        " 'port' = '" + POSTGRESQL_PORT + "',",
-                        " 'username' = '" + PG_TEST_USER + "',",
-                        " 'password' = '" + PG_TEST_PASSWORD + "',",
-                        " 'database-name' = '" + POSTGRES.getDatabaseName() + "',",
-                        " 'schema-name' = 'inventory',",
-                        " 'table-name' = 'products',",
-                        " 'slot.name' = 'flink',",
-                        // dropping the slot allows WAL segments to be discarded by the database
-                        " 'debezium.slot.drop_on_stop' = 'true'",
-                        ");",
-                        "CREATE TABLE products_sink (",
-                        " `id` INT NOT NULL,",
-                        " name STRING,",
-                        " description STRING,",
-                        " weight DECIMAL(10,3),",
-                        " primary key (`id`) not enforced",
-                        ") WITH (",
-                        " 'connector' = 'jdbc',",
-                        String.format(
-                                " 'url' = 'jdbc:mysql://%s:3306/%s',",
-                                INTER_CONTAINER_MYSQL_ALIAS,
-                                mysqlInventoryDatabase.getDatabaseName()),
-                        " 'table-name' = 'products_sink',",
-                        " 'username' = '" + MYSQL_TEST_USER + "',",
-                        " 'password' = '" + MYSQL_TEST_PASSWORD + "'",
-                        ");",
-                        "INSERT INTO products_sink",
-                        "SELECT * FROM products_source;");
+                Stream.concat(sourceSqlWithIncrementalSnapshot.stream(), sinkSql.stream())
+                        .collect(Collectors.toList());
+        testPostgresCDC(sqlLines);
+    }
+
+    @Test
+    public void testPostgresCdcNonIncremental() throws Exception {
+
+        List<String> sqlLines =
+                Stream.concat(sourceSql.stream(), sinkSql.stream()).collect(Collectors.toList());
+        testPostgresCDC(sqlLines);
+    }
+
+    public void testPostgresCDC(List<String> sqlLines) throws Exception {
 
         submitSQLJob(sqlLines, postgresCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(30000);
 
-        // generate binlogs
+        // generate WAL
         try (Connection conn = getPgJdbcConnection();
                 Statement statement = conn.createStatement()) {
+
+            // at this point, the replication slot 'flink' should already be created; otherwise, the
+            // test will fail
             statement.execute(
                     "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");

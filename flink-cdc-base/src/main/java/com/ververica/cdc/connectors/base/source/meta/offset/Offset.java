@@ -39,7 +39,8 @@ public abstract class Offset implements Comparable<Offset>, Serializable {
 
     protected Map<String, String> offset;
 
-    public Map<String, String> getOffset() {
+    // some implementations require a non-string value type for the offset map
+    public Map<String, ?> getOffset() {
         return offset;
     }
 

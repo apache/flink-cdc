@@ -58,18 +58,17 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     @Override
     public TableId getTableId(SourceRecord record) {
-        return null;
+        return SourceRecordUtils.getTableId(record);
     }
 
     @Override
     public boolean isDataChangeRecord(SourceRecord record) {
-        return false;
+        return SourceRecordUtils.isDataChangeRecord(record);
     }
 
     @Override
     public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
-        RowType splitKeyType =
-                getSplitType(getDatabaseSchema().tableFor(SourceRecordUtils.getTableId(record)));
+        RowType splitKeyType = getSplitType(getDatabaseSchema().tableFor(this.getTableId(record)));
         Object[] key = SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
         return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
     }
@@ -157,7 +156,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     }
 
     public SchemaNameAdjuster getSchemaNameAdjuster() {
-        return null;
+        return SchemaNameAdjuster.create();
     }
 
     public abstract RelationalDatabaseSchema getDatabaseSchema();

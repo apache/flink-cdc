@@ -30,6 +30,18 @@ under the License.
 
     <dependencies>
 
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-base</artifactId>
+            <version>${project.version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>kafka-log4j-appender</artifactId>
+                    <groupId>org.apache.kafka</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- Debezium dependencies -->
         <dependency>
             <groupId>com.ververica</groupId>
@@ -56,10 +68,10 @@ under the License.
         </dependency>
 
         <dependency>
-            <!-- fix CVE-2022-31197 https://www.oscs1024.com/hd/CVE-2022-31197  -->
+            <!-- fix CVE-2022-26520 https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-26520  -->
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.2.27</version>
+            <version>42.5.1</version>
         </dependency>
 
         <!-- test dependencies on Debezium -->
@@ -150,6 +162,7 @@ under the License.
             <version>2.4.0</version>
             <scope>test</scope>
         </dependency>
+
 
         <!-- tests will have log4j as the default logging framework available -->
 

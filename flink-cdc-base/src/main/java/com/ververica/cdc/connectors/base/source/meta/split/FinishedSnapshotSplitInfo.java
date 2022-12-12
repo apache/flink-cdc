@@ -137,6 +137,9 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
     }
 
     public byte[] serialize(final DataOutputSerializer out) throws IOException {
+        boolean useCatalogBeforeSchema =
+                SerializerUtils.shouldUseCatalogBeforeSchema(this.getTableId());
+        out.writeBoolean(useCatalogBeforeSchema);
         out.writeUTF(this.getTableId().toString());
         out.writeUTF(this.getSplitId());
         out.writeUTF(SerializerUtils.rowToSerializedString(this.getSplitStart()));

@@ -60,6 +60,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
         super(
                 startupOptions,
                 databaseList,
+                null,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,

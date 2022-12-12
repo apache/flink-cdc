@@ -55,6 +55,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     private final Set<TableId> pureStreamPhaseTables;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
+    private volatile boolean currentTaskRunning;
     private volatile Throwable readException;
 
     private FetchTask<SourceSplitBase> streamFetchTask;
@@ -70,6 +71,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
+        this.currentTaskRunning = true;
         this.pureStreamPhaseTables = new HashSet<>();
     }
 
@@ -85,6 +87,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                     try {
                         streamFetchTask.execute(taskContext);
                     } catch (Exception e) {
+                        currentTaskRunning = false;
                         LOG.error(
                                 String.format(
                                         "Execute stream read task for stream split %s fail",
@@ -97,7 +100,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
 
     @Override
     public boolean isFinished() {
-        return currentStreamSplit == null || !streamFetchTask.isRunning();
+        return currentStreamSplit == null || !currentTaskRunning;
     }
 
     @Nullable
@@ -105,17 +108,19 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     public Iterator<SourceRecords> pollSplitRecords() throws InterruptedException {
         checkReadException();
         final List<SourceRecord> sourceRecords = new ArrayList<>();
-        if (streamFetchTask.isRunning()) {
+        if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
             for (DataChangeEvent event : batch) {
                 if (shouldEmit(event.getRecord())) {
                     sourceRecords.add(event.getRecord());
                 }
             }
+            List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+            sourceRecordsSet.add(new SourceRecords(sourceRecords));
+            return sourceRecordsSet.iterator();
+        } else {
+            return null;
         }
-        List<SourceRecords> sourceRecordsSet = new ArrayList<>();
-        sourceRecordsSet.add(new SourceRecords(sourceRecords));
-        return sourceRecordsSet.iterator();
     }
 
     private void checkReadException() {
@@ -131,6 +136,8 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     @Override
     public void close() {
         try {
+            // gracefully stop streamFetchTask, e.g. during shutdown
+            stopReadTask();
             if (executorService != null) {
                 executorService.shutdown();
                 if (!executorService.awaitTermination(
@@ -232,5 +239,12 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdOffsetPositionMap;
         this.pureStreamPhaseTables.clear();
+    }
+
+    public void stopReadTask() {
+        this.currentTaskRunning = false;
+        if (streamFetchTask != null) {
+            streamFetchTask.stop();
+        }
     }
 }

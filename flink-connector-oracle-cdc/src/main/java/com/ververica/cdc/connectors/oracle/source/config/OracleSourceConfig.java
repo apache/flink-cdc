@@ -64,6 +64,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
         super(
                 startupOptions,
                 databaseList,
+                null,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,
