@@ -47,12 +47,15 @@ import com.ververica.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
 import com.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import com.ververica.cdc.debezium.internal.Handover;
 import com.ververica.cdc.debezium.internal.SchemaRecord;
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
+import io.debezium.embedded.EmbeddedEngine;
 import io.debezium.engine.DebeziumEngine;
 import io.debezium.engine.spi.OffsetCommitPolicy;
 import io.debezium.heartbeat.Heartbeat;
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import org.apache.commons.collections.map.LinkedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -364,18 +367,18 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void run(SourceContext<T> sourceContext) throws Exception {
-        properties.setProperty("name", "engine");
-        properties.setProperty("offset.storage", FlinkOffsetBackingStore.class.getCanonicalName());
+        properties.setProperty(EmbeddedEngine.ENGINE_NAME.name(), "engine");
+        properties.setProperty(EmbeddedEngine.OFFSET_STORAGE.name(), FlinkOffsetBackingStore.class.getCanonicalName());
         if (restoredOffsetState != null) {
             // restored from state
             properties.setProperty(FlinkOffsetBackingStore.OFFSET_STATE_VALUE, restoredOffsetState);
         }
         // DO NOT include schema change, e.g. DDL
-        properties.setProperty("include.schema.changes", "false");
+        properties.setProperty(RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_CHANGES.name(), "false");
         // disable the offset flush totally
-        properties.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
+        properties.setProperty(EmbeddedEngine.OFFSET_FLUSH_INTERVAL_MS.name(), String.valueOf(Long.MAX_VALUE));
         // disable tombstones
-        properties.setProperty("tombstones.on.delete", "false");
+        properties.setProperty(CommonConnectorConfig.TOMBSTONES_ON_DELETE.name(), "false");
         if (engineInstanceName == null) {
             // not restore from recovery
             engineInstanceName = UUID.randomUUID().toString();
