@@ -64,6 +64,7 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
     public static final String SERVER_ID_KEY = "server_id";
     public static final String BINLOG_FILENAME_OFFSET_KEY = "file";
     public static final String BINLOG_POSITION_OFFSET_KEY = "pos";
+    public static final String CONNECTOR_KEY = "connector";
 
     private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
 
@@ -181,12 +182,15 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
         private Struct schemaChangeRecordValue(SchemaChangeEvent event) throws IOException {
             Struct sourceInfo = event.getSource();
             Map<String, Object> source = new HashMap<>();
-            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
-            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
-            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
-            source.put(SERVER_ID_KEY, serverId);
-            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
-            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
+            String connector = sourceInfo.getString(CONNECTOR_KEY);
+            if (connector.equals("mysql")) {
+                String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
+                Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
+                Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
+                source.put(SERVER_ID_KEY, serverId);
+                source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
+                source.put(BINLOG_POSITION_OFFSET_KEY, pos);
+            }
             HistoryRecord historyRecord =
                     new HistoryRecord(
                             source,
