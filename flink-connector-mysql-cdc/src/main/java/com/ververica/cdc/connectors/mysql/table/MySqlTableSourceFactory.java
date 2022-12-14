@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mysql.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
@@ -344,9 +345,22 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         distributionFactorLower));
     }
 
-    /** Replaces the default timezone placeholder with local timezone, if applicable. */
+    /** Replaces the default timezone placeholder with session timezone, if applicable. */
     private static ZoneId getServerTimeZone(ReadableConfig config) {
-        Optional<String> timeZoneOptional = config.getOptional(SERVER_TIME_ZONE);
-        return timeZoneOptional.map(ZoneId::of).orElseGet(ZoneId::systemDefault);
+        final String serverTimeZone = config.get(SERVER_TIME_ZONE);
+        if (serverTimeZone != null) {
+            return ZoneId.of(serverTimeZone);
+        } else {
+            LOGGER.warn(
+                    "{} is not set, which might cause data inconsistencies for time-related fields.",
+                    SERVER_TIME_ZONE.key());
+            final String sessionTimeZone = config.get(TableConfigOptions.LOCAL_TIME_ZONE);
+            final ZoneId zoneId =
+                    TableConfigOptions.LOCAL_TIME_ZONE.defaultValue().equals(sessionTimeZone)
+                            ? ZoneId.systemDefault()
+                            : ZoneId.of(sessionTimeZone);
+
+            return zoneId;
+        }
     }
 }
