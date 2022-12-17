@@ -150,6 +150,11 @@ public class MongoDBSourceConfig implements SourceConfig {
     }
 
     @Override
+    public boolean isScanNewlyAddedTableEnabled() {
+        return false;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;

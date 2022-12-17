@@ -39,6 +39,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
     // --------------------------------------------------------------------------------------------
     protected final Properties dbzProperties;
     protected transient Configuration dbzConfiguration;
+    protected final boolean scanNewlyAddedTableEnabled;
 
     public BaseSourceConfig(
             StartupOptions startupOptions,
@@ -48,7 +49,8 @@ public abstract class BaseSourceConfig implements SourceConfig {
             double distributionFactorLower,
             boolean includeSchemaChanges,
             Properties dbzProperties,
-            Configuration dbzConfiguration) {
+            Configuration dbzConfiguration,
+            boolean scanNewlyAddedTableEnabled) {
         this.startupOptions = startupOptions;
         this.splitSize = splitSize;
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -57,6 +59,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.includeSchemaChanges = includeSchemaChanges;
         this.dbzProperties = dbzProperties;
         this.dbzConfiguration = dbzConfiguration;
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
     }
 
     @Override
@@ -93,5 +96,9 @@ public abstract class BaseSourceConfig implements SourceConfig {
 
     public Configuration getDbzConfiguration() {
         return Configuration.from(dbzProperties);
+    }
+
+    public boolean isScanNewlyAddedTableEnabled() {
+        return scanNewlyAddedTableEnabled;
     }
 }

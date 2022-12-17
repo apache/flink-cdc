@@ -39,6 +39,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isInitialAssigningFinished;
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isNewlyAddedAssigningFinished;
+
 /** Assigner for Hybrid split which contains snapshot splits and stream splits. */
 public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigner {
 
@@ -114,12 +117,16 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             if (isStreamSplitAssigned) {
                 // no more splits for the assigner
                 return Optional.empty();
-            } else if (snapshotSplitAssigner.isFinished()) {
+            } else if (isInitialAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
                 // we need to wait snapshot-assigner to be finished before
                 // assigning the stream split. Otherwise, records emitted from stream split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isStreamSplitAssigned = true;
                 return Optional.of(createStreamSplit());
+            } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
+                // do not need to create binlog, but send event to wake up the binlog reader
+                isStreamSplitAssigned = true;
+                return Optional.empty();
             } else {
                 // stream split is not ready by now
                 return Optional.empty();
@@ -168,6 +175,21 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         snapshotSplitAssigner.notifyCheckpointComplete(checkpointId);
+    }
+
+    @Override
+    public AssignerStatus getAssignerStatus() {
+        return snapshotSplitAssigner.getAssignerStatus();
+    }
+
+    @Override
+    public void suspend() {
+        snapshotSplitAssigner.suspend();
+    }
+
+    @Override
+    public void wakeup() {
+        snapshotSplitAssigner.wakeup();
     }
 
     @Override

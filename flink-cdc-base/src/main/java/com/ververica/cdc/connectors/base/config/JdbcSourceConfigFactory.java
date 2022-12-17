@@ -42,6 +42,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected List<String> tableList;
     protected StartupOptions startupOptions = StartupOptions.initial();
     protected boolean includeSchemaChanges = false;
+    protected boolean scanNewlyAddedTableEnabled = false;
     protected double distributionFactorUpper =
             SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue();
     protected double distributionFactorLower =
@@ -177,6 +178,12 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     /** Whether the {@link SourceConfig} should output the schema changes or not. */
     public JdbcSourceConfigFactory includeSchemaChanges(boolean includeSchemaChanges) {
         this.includeSchemaChanges = includeSchemaChanges;
+        return this;
+    }
+
+    /** Whether the {@link SourceConfig} should scan the newly added tables or not. */
+    public JdbcSourceConfigFactory scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         return this;
     }
 

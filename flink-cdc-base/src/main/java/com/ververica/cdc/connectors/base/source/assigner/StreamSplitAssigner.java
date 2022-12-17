@@ -118,6 +118,21 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
+    public AssignerStatus getAssignerStatus() {
+        return AssignerStatus.INITIAL_ASSIGNING_FINISHED;
+    }
+
+    @Override
+    public void suspend() {
+        // nothing to do
+    }
+
+    @Override
+    public void wakeup() {
+        // nothing to do
+    }
+
+    @Override
     public void close() {}
 
     // ------------------------------------------------------------------------------------------
