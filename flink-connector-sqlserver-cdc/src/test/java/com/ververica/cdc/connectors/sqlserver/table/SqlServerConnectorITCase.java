@@ -16,13 +16,14 @@
 
 package com.ververica.cdc.connectors.sqlserver.table;
 
-import com.ververica.cdc.connectors.sqlserver.SqlServerTestBase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
+
+import com.ververica.cdc.connectors.sqlserver.SqlServerTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -40,9 +41,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
-/**
- * Integration tests for SqlServer Table source.
- */
+/** Integration tests for SqlServer Table source. */
 public class SqlServerConnectorITCase extends SqlServerTestBase {
 
     private final StreamExecutionEnvironment env =
@@ -51,8 +50,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule
-    public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
     @Before
     public void before() {
@@ -148,7 +146,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
          * </pre>
          */
         String[] expected =
-                new String[]{
+                new String[] {
                         "scooter,3.140",
                         "car battery,8.100",
                         "12-pack drill bits,0.800",
@@ -225,12 +223,12 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         + "    val_ntext STRING,\n"
                         + "    val_decimal DECIMAL(6,3),\n"
                         + "    val_numeric NUMERIC,\n"
-                        + "    val_float DOUBLE,\n"
+                        + "    val_float FLOAT,\n"
                         + "    val_real FLOAT,\n"
                         + "    val_smallmoney DECIMAL,\n"
                         + "    val_money DECIMAL,\n"
                         + "    val_bit BOOLEAN,\n"
-                        + "    val_tinyint SMALLINT,\n"
+                        + "    val_tinyint TINYINT,\n"
                         + "    val_smallint SMALLINT,\n"
                         + "    val_int INT,\n"
                         + "    val_bigint BIGINT,\n"
