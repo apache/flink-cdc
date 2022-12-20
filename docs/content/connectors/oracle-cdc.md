@@ -562,14 +562,14 @@ Data Type Mapping
       <td>DECIMAL(p - s, 0)</td>
     </tr>
     <tr>
+      <td>NUMBER(p, s > 0) s < 38,p + s = <38 
+      </td>
+      <td>DECIMAL(p + s, s) </td>
+    </tr>
+    <tr>
       <td>NUMBER(p, s > 0) s >= 38 or (s < 38 , p + s > 38)
       </td>
       <td>STRING</td>
-    </tr>
-    <tr>
-      <td>NUMBER(p, s > 0) s < 38,p + s = <38 
-      </td>
-      <td>DECIMAL(p + s , s) </td>
     </tr>
     <tr>
       <td>NUMBER(p, s <= 0), p - s > 38
