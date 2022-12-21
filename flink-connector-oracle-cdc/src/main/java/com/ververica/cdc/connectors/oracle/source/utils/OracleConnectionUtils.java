@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oracle.source.utils;
 
+import io.debezium.connector.oracle.OracleConnectorConfig;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
@@ -48,11 +49,12 @@ public class OracleConnectionUtils {
     private static final String SHOW_CURRENT_SCN = "SELECT CURRENT_SCN FROM V$DATABASE";
 
     /** Creates a new {@link OracleConnection}, but not open the connection. */
-    public static OracleConnection createOracleConnection(Configuration dbzConfiguration) {
-        Configuration configuration = dbzConfiguration.subset(DATABASE_CONFIG_PREFIX, true);
-        return new OracleConnection(
-                configuration.isEmpty() ? dbzConfiguration : configuration,
-                OracleConnectionUtils.class::getClassLoader);
+    public static OracleConnection createOracleConnection(OracleConnectorConfig connectorConfig) {
+        OracleConnection conn = new OracleConnection(connectorConfig.getJdbcConfig(), OracleConnectionUtils.class::getClassLoader);
+        if(connectorConfig.getPdbName() != null){
+            conn.setSessionToPdb(connectorConfig.getPdbName());
+        }
+        return conn;
     }
 
     /** Fetch current redoLog offsets in Oracle Server. */

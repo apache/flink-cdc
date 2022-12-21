@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oracle.source;
 
+import io.debezium.connector.oracle.OracleConnectorConfig;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -87,8 +88,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
 
     @Override
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        return OracleConnectionUtils.createOracleConnection(
-                sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+        return OracleConnectionUtils.createOracleConnection((OracleConnectorConfig) sourceConfig.getDbzConnectorConfig());
     }
 
     @Override
@@ -116,7 +116,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
-        try (OracleConnection jdbc = createOracleConnection(sourceConfig.getDbzConfiguration())) {
+        try (OracleConnection jdbc = createOracleConnection((OracleConnectorConfig) sourceConfig.getDbzConnectorConfig())) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {
@@ -142,7 +142,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public OracleSourceFetchTaskContext createFetchTaskContext(
             SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         final OracleConnection jdbcConnection =
-                createOracleConnection(taskSourceConfig.getDbzConfiguration());
+                createOracleConnection((OracleConnectorConfig) taskSourceConfig.getDbzConnectorConfig());
         return new OracleSourceFetchTaskContext(taskSourceConfig, this, jdbcConnection);
     }
 

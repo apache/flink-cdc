@@ -265,7 +265,7 @@ public class OracleUtils {
         TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         OracleConnection oracleConnection =
-                OracleConnectionUtils.createOracleConnection(dbzOracleConfig.getJdbcConfig());
+                OracleConnectionUtils.createOracleConnection(dbzOracleConfig);
         //        OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
         OracleValueConverters oracleValueConverters =
                 new OracleValueConverters(dbzOracleConfig, oracleConnection);
@@ -285,7 +285,7 @@ public class OracleUtils {
         TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         OracleConnection oracleConnection =
-                OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
+                OracleConnectionUtils.createOracleConnection(dbzOracleConfig);
         OracleValueConverters oracleValueConverters =
                 new OracleValueConverters(dbzOracleConfig, oracleConnection);
         StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =
