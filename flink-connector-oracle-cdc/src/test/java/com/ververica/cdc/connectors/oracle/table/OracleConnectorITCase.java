@@ -577,10 +577,10 @@ public class OracleConnectorITCase extends AbstractTestBase {
                             + " PRIMARY KEY (ID))");
             statement.execute(
                     "INSERT INTO debezium.test_numeric_table "
-                            + "VALUES (11000000000, 2022-12-06T00:30:52+08:00)");
+                            + "VALUES (11000000000, '2022-12-06T00:30:52+08:00')");
             statement.execute(
                     "INSERT INTO debezium.test_numeric_table "
-                            + "VALUES (11000000001, 2022-12-06T00:30:52Z)");
+                            + "VALUES (11000000001, '2022-12-06T00:30:52Z')");
 
             String sourceDDL =
                     String.format(
