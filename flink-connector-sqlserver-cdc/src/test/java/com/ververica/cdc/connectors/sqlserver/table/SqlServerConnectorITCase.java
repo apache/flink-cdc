@@ -107,7 +107,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         waitForSnapshotStarted("sink");
 
         try (Connection connection = getJdbcConnection();
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
 
             statement.execute(
                     "UPDATE inventory.dbo.products SET description='18oz carpenter hammer' WHERE id=106;");
@@ -147,13 +147,13 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
          */
         String[] expected =
                 new String[] {
-                        "scooter,3.140",
-                        "car battery,8.100",
-                        "12-pack drill bits,0.800",
-                        "hammer,2.625",
-                        "rocks,5.100",
-                        "jacket,0.600",
-                        "spare tire,22.200"
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
@@ -255,7 +255,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         waitForSnapshotStarted("sink");
 
         try (Connection connection = getJdbcConnection();
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
             statement.execute(
                     "UPDATE column_type_test.dbo.full_types SET val_int=8888 WHERE id=0;");
         }
@@ -328,7 +328,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         waitForSnapshotStarted("sink");
 
         try (Connection connection = getJdbcConnection();
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
 
             statement.execute(
                     "UPDATE inventory.dbo.products SET description='18oz carpenter hammer' WHERE id=106;");
