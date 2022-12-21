@@ -16,12 +16,11 @@
 
 package com.ververica.cdc.connectors.oracle.source.utils;
 
-import io.debezium.connector.oracle.OracleConnectorConfig;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
-import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
+import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.Scn;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalTableFilters;
@@ -34,8 +33,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static io.debezium.config.CommonConnectorConfig.DATABASE_CONFIG_PREFIX;
 
 /** Oracle connection Utilities. */
 public class OracleConnectionUtils {
@@ -50,8 +47,11 @@ public class OracleConnectionUtils {
 
     /** Creates a new {@link OracleConnection}, but not open the connection. */
     public static OracleConnection createOracleConnection(OracleConnectorConfig connectorConfig) {
-        OracleConnection conn = new OracleConnection(connectorConfig.getJdbcConfig(), OracleConnectionUtils.class::getClassLoader);
-        if(connectorConfig.getPdbName() != null){
+        OracleConnection conn =
+                new OracleConnection(
+                        connectorConfig.getJdbcConfig(),
+                        OracleConnectionUtils.class::getClassLoader);
+        if (connectorConfig.getPdbName() != null) {
             conn.setSessionToPdb(connectorConfig.getPdbName());
         }
         return conn;

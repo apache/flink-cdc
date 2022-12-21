@@ -20,7 +20,6 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
-import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
