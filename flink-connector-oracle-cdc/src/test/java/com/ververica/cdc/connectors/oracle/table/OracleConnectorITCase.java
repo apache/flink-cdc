@@ -286,7 +286,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                     "+I[12-pack drill bits, 0.800]",
                     "+I[hammer, 2.625]",
                     "+I[rocks, 5.100]",
-                    "+I[jacket, 0.600]",
+                    "+I[jacket, 1.100]",
                     "+I[spare tire, 22.200]"
                 };
 
