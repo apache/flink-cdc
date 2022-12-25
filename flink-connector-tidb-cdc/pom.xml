@@ -146,7 +146,7 @@ under the License.
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dns-cache-manipulator</artifactId>
-            <version>1.7.1</version>
+            <version>1.8.0</version>
             <scope>test</scope>
         </dependency>
 
