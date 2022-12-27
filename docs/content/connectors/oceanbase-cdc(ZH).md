@@ -15,6 +15,16 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 </dependency>
 ```
 
+如果您是要连接企业版的 OceanBase，您可能需要使用 OceanBase 官方的 JDBC 驱动，这时需要引入如下依赖。
+
+```xml
+<dependency>
+   <groupId>com.oceanbase</groupId>
+   <artifactId>oceanbase-client</artifactId>
+   <version>2.4.2</version>
+</dependency>
+```
+
 ## 下载 SQL 客户端 JAR 包
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
@@ -22,6 +32,8 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 下载[flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar)  到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-oceanbase-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+
+对于 JDBC 驱动，上述的 cdc jar 文件中已经包含了我们推荐的 MySQL 驱动版本 5.1.47。由于开源许可证的原因，我们不能在上述 cdc jar 文件中包含 OceanBase 的官方 JDBC 驱动，如果您需要使用它，可以从[这里](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar)下载，然后放到 `<FLINK_HOME>/lib/` 目录下，同时需要将配置项 `jdbc.driver` 设为 `com.oceanbase.jdbc.Driver`。
 
 ### 配置 OceanBase 数据库和 oblogproxy 服务
 
@@ -248,6 +260,20 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>String</td>
                 <td>日志代理中 `libobcdc` 的工作模式 , 可以是 `storage` 或 `memory`。</td>
             </tr>
+            <tr>
+                <td>jdbc.driver</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">com.mysql.jdbc.Driver</td>
+                <td>String</td>
+                <td>全量读取时使用的 jdbc 驱动类名。</td>
+            </tr>
+            <tr>
+                <td>jdbc.properties.*</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
+            </tr>
         </tbody>
     </table>
 </div>
@@ -396,6 +422,7 @@ public class OceanBaseSourceExample {
                       .tableName("^test_table$")
                       .hostname("127.0.0.1")
                       .port(2881)
+                      .jdbcDriver("com.mysql.jdbc.Driver")
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
                       .serverTimeZone(serverTimeZone)
@@ -593,6 +620,103 @@ public class OceanBaseSourceExample {
                 <td>JSON</td>
                 <td>STRING</td>
                 <td>JSON 类型的数据在 Flink 中会转化为 JSON 格式的字符串</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+### Oracle 模式
+
+<div class="wy-table-responsive">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left">OceanBase type</th>
+                <th class="text-left">Flink SQL type</th>
+                <th class="text-left">NOTE</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>NUMBER(1)</td>
+                <td>BOOLEAN</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 3 </td>
+                <td>TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 5 </td>
+                <td>SMALLINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 10 </td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 19 </td>
+                <td>BIGINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), 19 <=p - s <=38</td>
+                <td>DECIMAL(p - s, 0)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s > 0)</td>
+                <td>DECIMAL(p, s)</td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s> 38 </td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    FLOAT<br>
+                    BINARY_FLOAT
+                </td>
+                <td>FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY_DOUBLE</td>
+                <td>DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    DATE<br>
+                    TIMESTAMP [(p)]
+                </td>
+                <td>TIMESTAMP [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    CHAR(n)<br>
+                    NCHAR(n)<br>
+                    VARCHAR(n)<br>
+                    VARCHAR2(n)<br>
+                    NVARCHAR2(n)<br>
+                    CLOB<br>
+                </td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    RAW<br>
+                    BLOB<br>
+                    ROWID
+                </td>
+                <td>BYTES</td>
+                <td></td>
             </tr>
         </tbody>
     </table>

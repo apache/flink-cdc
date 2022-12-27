@@ -26,6 +26,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.connectors.oceanbase.utils.OptionUtils;
+import com.ververica.cdc.debezium.utils.JdbcUrlUtils;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -110,6 +111,13 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Integer port number of OceanBase database server or OceanBase proxy server.");
 
+    public static final ConfigOption<String> JDBC_DRIVER =
+            ConfigOptions.key("jdbc.driver")
+                    .stringType()
+                    .defaultValue("com.mysql.jdbc.Driver")
+                    .withDescription(
+                            "JDBC driver class name, use 'com.mysql.jdbc.Driver' by default.");
+
     public static final ConfigOption<String> LOG_PROXY_HOST =
             ConfigOptions.key("logproxy.host")
                     .stringType()
@@ -161,7 +169,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validate();
+        helper.validateExcept(JdbcUrlUtils.PROPERTIES_PREFIX);
 
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
@@ -181,6 +189,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
         String hostname = config.get(HOSTNAME);
         Integer port = config.get(PORT);
+        String jdbcDriver = config.get(JDBC_DRIVER);
 
         String logProxyHost = config.get(LOG_PROXY_HOST);
         Integer logProxyPort = config.get(LOG_PROXY_PORT);
@@ -205,6 +214,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 connectTimeout,
                 hostname,
                 port,
+                jdbcDriver,
+                JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 logProxyHost,
                 logProxyPort,
                 logProxyClientId,
@@ -240,6 +251,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(TABLE_LIST);
         options.add(HOSTNAME);
         options.add(PORT);
+        options.add(JDBC_DRIVER);
         options.add(CONNECT_TIMEOUT);
         options.add(SERVER_TIME_ZONE);
         options.add(LOG_PROXY_CLIENT_ID);

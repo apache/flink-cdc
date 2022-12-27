@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.table;
+package com.ververica.cdc.debezium.utils;
 
 import java.util.Map;
 import java.util.Properties;

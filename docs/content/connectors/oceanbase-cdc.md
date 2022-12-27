@@ -16,6 +16,16 @@ In order to set up the OceanBase CDC connector, the following table provides dep
 </dependency>
 ```
 
+If you want to use OceanBase JDBC driver to connect to the enterprise edition database, you should also include the following dependency in your class path.
+
+```xml
+<dependency>
+   <groupId>com.oceanbase</groupId>
+   <artifactId>oceanbase-client</artifactId>
+   <version>2.4.2</version>
+</dependency>
+```
+
 ### SQL Client JAR
 
 ```Download link is available only for stable releases.```
@@ -23,6 +33,8 @@ In order to set up the OceanBase CDC connector, the following table provides dep
 Download [flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oceanbase-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc), the released version will be available in the Maven central warehouse.
+
+For JDBC driver, the cdc jar above already contains MySQL JDBC driver 5.1.47, which is our recommended version. Due to the license issue, we can not include the OceanBase JDBC driver in the cdc jar. If you need to use it, you can download it from [here](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar) and put it under `<FLINK_HOME>/lib/`, you also need to set the start option `jdbc.driver` to `com.oceanbase.jdbc.Driver`.
 
 Setup OceanBase and LogProxy Server
 ----------------------
@@ -251,6 +263,20 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td>String</td>
                 <td>Working mode of `obcdc` in LogProxy, can be `storage` or `memory`.</td>
             </tr>
+            <tr>
+                <td>jdbc.driver</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">com.mysql.jdbc.Driver</td>
+                <td>String</td>
+                <td>JDBC driver class for snapshot reading.</td>
+            </tr>
+            <tr>
+                <td>jdbc.properties.*</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
+            </tr>
         </tbody>
     </table>
 </div>
@@ -404,6 +430,7 @@ public class OceanBaseSourceExample {
                       .tableName("^test_table$")
                       .hostname("127.0.0.1")
                       .port(2881)
+                      .jdbcDriver("com.mysql.jdbc.Driver")
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
                       .serverTimeZone(serverTimeZone)
@@ -594,6 +621,103 @@ Data Type Mapping
                 <td>JSON</td>
                 <td>STRING</td>
                 <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+### Oracle Mode
+
+<div class="wy-table-responsive">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left">OceanBase type</th>
+                <th class="text-left">Flink SQL type</th>
+                <th class="text-left">NOTE</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>NUMBER(1)</td>
+                <td>BOOLEAN</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 3 </td>
+                <td>TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 5 </td>
+                <td>SMALLINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 10 </td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s < 19 </td>
+                <td>BIGINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), 19 <=p - s <=38</td>
+                <td>DECIMAL(p - s, 0)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s > 0)</td>
+                <td>DECIMAL(p, s)</td>
+            </tr>
+            <tr>
+                <td>NUMBER(p, s <= 0), p - s> 38 </td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    FLOAT<br>
+                    BINARY_FLOAT
+                </td>
+                <td>FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY_DOUBLE</td>
+                <td>DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    DATE<br>
+                    TIMESTAMP [(p)]
+                </td>
+                <td>TIMESTAMP [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    CHAR(n)<br>
+                    NCHAR(n)<br>
+                    VARCHAR(n)<br>
+                    VARCHAR2(n)<br>
+                    NVARCHAR2(n)<br>
+                    CLOB<br>
+                </td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    RAW<br>
+                    BLOB<br>
+                    ROWID
+                </td>
+                <td>BYTES</td>
+                <td></td>
             </tr>
         </tbody>
     </table>

@@ -45,12 +45,12 @@ import org.slf4j.LoggerFactory;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -82,6 +82,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final Duration connectTimeout;
     private final String hostname;
     private final Integer port;
+    private final String jdbcDriver;
+    private final Properties jdbcProperties;
     private final String logProxyHost;
     private final int logProxyPort;
     private final ClientConf logProxyClientConf;
@@ -110,6 +112,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             Duration connectTimeout,
             String hostname,
             Integer port,
+            String jdbcDriver,
+            Properties jdbcProperties,
             String logProxyHost,
             int logProxyPort,
             ClientConf logProxyClientConf,
@@ -125,6 +129,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.connectTimeout = checkNotNull(connectTimeout);
         this.hostname = hostname;
         this.port = port;
+        this.jdbcDriver = jdbcDriver;
+        this.jdbcProperties = jdbcProperties;
         this.logProxyHost = checkNotNull(logProxyHost);
         this.logProxyPort = checkNotNull(logProxyPort);
         this.logProxyClientConf = checkNotNull(logProxyClientConf);
@@ -172,6 +178,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                             username,
                             password,
                             connectTimeout,
+                            jdbcDriver,
+                            jdbcProperties,
                             getClass().getClassLoader());
         }
         return snapshotConnection;
@@ -205,29 +213,15 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         }
 
         if (StringUtils.isNotBlank(databaseName) && StringUtils.isNotBlank(tableName)) {
+            LOG.info("Connection database mode: {}", getSnapshotConnection().getCompatibleMode());
             try {
-                String sql =
-                        String.format(
-                                "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
-                                        + "WHERE TABLE_TYPE='BASE TABLE' and TABLE_SCHEMA REGEXP '%s' and TABLE_NAME REGEXP '%s'",
-                                databaseName, tableName);
-                final List<String> matchedTables = new ArrayList<>();
-                getSnapshotConnection()
-                        .query(
-                                sql,
-                                rs -> {
-                                    while (rs.next()) {
-                                        matchedTables.add(
-                                                String.format(
-                                                        "%s.%s", rs.getString(1), rs.getString(2)));
-                                    }
-                                });
-                LOG.info("Pattern matched tables: {}", matchedTables);
-                localTableSet.addAll(matchedTables);
+                List<String> tables = getSnapshotConnection().getTables(databaseName, tableName);
+                LOG.info("Pattern matched tables: {}", tables);
+                localTableSet.addAll(tables);
             } catch (SQLException e) {
                 LOG.error(
                         String.format(
-                                "Query table list by 'database-name' %s and 'table-name' %s failed.",
+                                "Query table list by 'databaseName' %s and 'tableName' %s failed.",
                                 databaseName, tableName),
                         e);
                 throw new FlinkRuntimeException(e);
@@ -257,14 +251,18 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         OceanBaseRecord.SourceInfo sourceInfo =
                 new OceanBaseRecord.SourceInfo(
                         tenantName, databaseName, tableName, resolvedTimestamp);
-
-        String fullName = String.format("`%s`.`%s`", databaseName, tableName);
-        String selectSql = "SELECT * FROM " + fullName;
+        String databaseMode = getSnapshotConnection().getCompatibleMode();
+        String fullName;
+        if ("mysql".equalsIgnoreCase(databaseMode)) {
+            fullName = String.format("`%s`.`%s`", databaseName, tableName);
+        } else {
+            fullName = String.format("%s.%s", databaseName, tableName);
+        }
         try {
             LOG.info("Start to read snapshot from {}", fullName);
             getSnapshotConnection()
                     .query(
-                            selectSql,
+                            "SELECT * FROM " + fullName,
                             rs -> {
                                 ResultSetMetaData metaData = rs.getMetaData();
                                 while (rs.next()) {

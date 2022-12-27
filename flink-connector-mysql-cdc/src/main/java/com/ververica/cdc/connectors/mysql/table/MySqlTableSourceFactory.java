@@ -31,6 +31,7 @@ import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
 import com.ververica.cdc.connectors.mysql.utils.OptionUtils;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
+import com.ververica.cdc.debezium.utils.JdbcUrlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
