@@ -357,7 +357,7 @@ Data Type Mapping
         float<br>
         real
       </td>
-      <td>FLOAT</td>
+      <td>DOUBLE</td>
     </tr>
     <tr>
       <td>bit</td>
@@ -369,7 +369,7 @@ Data Type Mapping
     </tr>
     <tr>
       <td>tinyint</td>
-      <td>TINYINT</td>
+      <td>SMALLINT</td>
     </tr>
     <tr>
       <td>smallint</td>
