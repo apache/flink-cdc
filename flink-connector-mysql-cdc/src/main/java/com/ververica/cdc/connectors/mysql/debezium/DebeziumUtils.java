@@ -39,10 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
@@ -119,6 +116,40 @@ public class DebeziumUtils {
                                     .setBinlogFilePosition(binlogFilename, binlogPosition)
                                     .setGtidSet(gtidSet)
                                     .build();
+                        } else {
+                            throw new FlinkRuntimeException(
+                                    "Cannot read the binlog filename and position via '"
+                                            + showMasterStmt
+                                            + "'. Make sure your server is correctly configured");
+                        }
+                    });
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(
+                    "Cannot read the binlog filename and position via '"
+                            + showMasterStmt
+                            + "'. Make sure your server is correctly configured",
+                    e);
+        }
+    }
+
+
+    /** Fetch all binlog files in MySql Server. */
+    public static List<BinlogOffset> allBinlogFilesAndOffset(JdbcConnection jdbc) {
+        final String showMasterStmt = "SHOW MASTER LOGS";
+        List<BinlogOffset> binlogOffsetList = new ArrayList<>();
+        try {
+            return jdbc.queryAndMap(
+                    showMasterStmt,
+                    rs -> {
+                        if (rs.next()) {
+                            do {
+                                final String binlogFilename = rs.getString(1);
+                                final long binlogSize = rs.getLong(2);
+                                 binlogOffsetList.add(BinlogOffset.builder()
+                                         .setBinlogFilePosition(binlogFilename, binlogSize)
+                                         .build());
+                            } while (rs.next());
+                            return binlogOffsetList;
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the binlog filename and position via '"

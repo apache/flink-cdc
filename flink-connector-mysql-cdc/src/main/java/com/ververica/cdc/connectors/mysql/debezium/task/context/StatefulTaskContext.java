@@ -113,9 +113,6 @@ public class StatefulTaskContext {
                 mySqlSplit.getTableSchemas().values());
         this.databaseSchema =
                 DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
-        this.offsetContext =
-                loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
-        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
         this.taskContext =
                 new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
@@ -150,10 +147,6 @@ public class StatefulTaskContext {
 
         this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
 
-        this.signalEventDispatcher =
-                new SignalEventDispatcher(
-                        offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
-
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
                         new MySqlStreamingChangeEventSourceMetrics(
@@ -167,6 +160,12 @@ public class StatefulTaskContext {
         this.errorHandler =
                 new MySqlErrorHandler(
                         connectorConfig.getLogicalName(), queue, taskContext, sourceConfig);
+        this.offsetContext =
+                loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
+        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
+        this.signalEventDispatcher =
+                new SignalEventDispatcher(
+                        offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
     }
 
     private void validateAndLoadDatabaseHistory(
@@ -182,7 +181,7 @@ public class StatefulTaskContext {
                 mySqlSplit.isSnapshotSplit()
                         ? BinlogOffset.ofEarliest()
                         : initializeEffectiveOffset(
-                                mySqlSplit.asBinlogSplit().getStartingOffset(), connection);
+                                mySqlSplit.asBinlogSplit().getStartingOffset(), this);
 
         LOG.info("Starting offset is initialized to {}", offset);
 

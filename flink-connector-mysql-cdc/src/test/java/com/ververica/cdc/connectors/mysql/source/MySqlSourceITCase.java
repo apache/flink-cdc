@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
@@ -462,12 +463,24 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         testStartingOffset(StartupOptions.latest(), Collections.emptyList());
     }
 
+    @Test
+    public void testStartFromTimestamp() throws Exception {
+        List<String> expected = new ArrayList<>();
+        expected.addAll(firstPartBinlogEvents);
+        testStartingOffset(StartupOptions.timestamp(System.currentTimeMillis()), expected);
+    }
+
     private void testStartingOffset(
             StartupOptions startupOptions, List<String> expectedChangelogAfterStart)
             throws Exception {
         // Initialize customer database
         customDatabase.createAndInitialize();
         String tableId = customDatabase.getDatabaseName() + ".customers";
+
+        if (startupOptions.startupMode == StartupMode.TIMESTAMP) {
+            Thread.sleep(2000);
+            startupOptions = StartupOptions.timestamp(System.currentTimeMillis());
+        }
 
         // Make some changes before starting the CDC job
         makeFirstPartBinlogEvents(getConnection(), tableId);
