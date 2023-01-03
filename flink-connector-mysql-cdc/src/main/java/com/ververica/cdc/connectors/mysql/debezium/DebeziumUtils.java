@@ -132,7 +132,6 @@ public class DebeziumUtils {
         }
     }
 
-
     /** Fetch all binlog files in MySql Server. */
     public static List<BinlogOffset> allBinlogFilesAndOffset(JdbcConnection jdbc) {
         final String showMasterStmt = "SHOW MASTER LOGS";
@@ -145,9 +144,10 @@ public class DebeziumUtils {
                             do {
                                 final String binlogFilename = rs.getString(1);
                                 final long binlogSize = rs.getLong(2);
-                                 binlogOffsetList.add(BinlogOffset.builder()
-                                         .setBinlogFilePosition(binlogFilename, binlogSize)
-                                         .build());
+                                binlogOffsetList.add(
+                                        BinlogOffset.builder()
+                                                .setBinlogFilePosition(binlogFilename, binlogSize)
+                                                .build());
                             } while (rs.next());
                             return binlogOffsetList;
                         } else {

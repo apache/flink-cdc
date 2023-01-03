@@ -13,9 +13,7 @@ import io.debezium.util.Clock;
 
 import java.util.Map;
 
-/**
- * Task to read  binlog file for seek binlog/position by specified timestamp
- */
+/** Task to read binlog file for seek binlog/position by specified timestamp */
 public class SimpleBinlogReadTask extends MySqlStreamingChangeEventSource {
 
     private ChangeEventSourceContext context;
@@ -30,15 +28,16 @@ public class SimpleBinlogReadTask extends MySqlStreamingChangeEventSource {
 
     private boolean isFound = false;
 
-    public SimpleBinlogReadTask(MySqlConnectorConfig connectorConfig,
-                                MySqlConnection connection,
-                                EventDispatcher<TableId> dispatcher,
-                                ErrorHandler errorHandler,
-                                Clock clock,
-                                MySqlTaskContext taskContext,
-                                MySqlStreamingChangeEventSourceMetrics metrics,
-                                long timestamp,
-                                Map<String, String> binlogOffset) {
+    public SimpleBinlogReadTask(
+            MySqlConnectorConfig connectorConfig,
+            MySqlConnection connection,
+            EventDispatcher<TableId> dispatcher,
+            ErrorHandler errorHandler,
+            Clock clock,
+            MySqlTaskContext taskContext,
+            MySqlStreamingChangeEventSourceMetrics metrics,
+            long timestamp,
+            Map<String, String> binlogOffset) {
         super(connectorConfig, connection, dispatcher, errorHandler, clock, taskContext, metrics);
         this.binlogOffset = binlogOffset;
         this.timestamp = timestamp;
@@ -54,7 +53,8 @@ public class SimpleBinlogReadTask extends MySqlStreamingChangeEventSource {
 
     @Override
     protected void handleEvent(MySqlOffsetContext offsetContext, Event event) {
-        //if this event is the first event and its timestamp > this.timestamp,then stop and read next binlog file
+        // if this event is the first event and its timestamp > this.timestamp,then stop and read
+        // next binlog file
         if (this.isFirstEvent) {
             if (event.getHeader().getTimestamp() > this.timestamp) {
                 ((SimpleBinlogChangeEventSourceContextImpl) this.context).finished();
@@ -63,7 +63,8 @@ public class SimpleBinlogReadTask extends MySqlStreamingChangeEventSource {
                 this.isFirstEvent = false;
             }
         }
-        if (event.getHeader().getEventType() == EventType.ROTATE || event.getHeader().getEventType() == EventType.STOP) {
+        if (event.getHeader().getEventType() == EventType.ROTATE
+                || event.getHeader().getEventType() == EventType.STOP) {
             ((SimpleBinlogChangeEventSourceContextImpl) this.context).finished();
             return;
         }
@@ -71,15 +72,13 @@ public class SimpleBinlogReadTask extends MySqlStreamingChangeEventSource {
             ((SimpleBinlogChangeEventSourceContextImpl) this.context).finished();
             return;
         }
-        if (event.getHeader().getEventType() == EventType.XID) {
-            if (event.getHeader().getTimestamp() <= this.timestamp) {
-                this.isFound = true;
-                binlogOffset.put(BinlogOffset.BINLOG_FILENAME_OFFSET_KEY, this.currentBinlogFileName);
-                binlogOffset.put(BinlogOffset.BINLOG_POSITION_OFFSET_KEY, String.valueOf(((EventHeaderV4)event.getHeader()).getNextPosition()));
-            } else {
-                return;
-            }
+        if (event.getHeader().getEventType() == EventType.XID
+                && event.getHeader().getTimestamp() <= this.timestamp) {
+            this.isFound = true;
+            binlogOffset.put(BinlogOffset.BINLOG_FILENAME_OFFSET_KEY, this.currentBinlogFileName);
+            binlogOffset.put(
+                    BinlogOffset.BINLOG_POSITION_OFFSET_KEY,
+                    String.valueOf(((EventHeaderV4) event.getHeader()).getNextPosition()));
         }
     }
-
 }

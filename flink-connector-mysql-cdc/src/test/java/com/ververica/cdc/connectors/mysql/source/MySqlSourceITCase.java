@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
-import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
@@ -55,6 +54,7 @@ import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.table.MySqlDeserializationConverterFactory;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
