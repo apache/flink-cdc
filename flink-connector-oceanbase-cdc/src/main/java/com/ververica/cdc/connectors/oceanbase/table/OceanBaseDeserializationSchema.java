@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oceanbase.table;
 
+import com.ververica.cdc.connectors.oceanbase.source.metrics.OceanBaseMetrics;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.util.Collector;
@@ -33,4 +34,6 @@ public interface OceanBaseDeserializationSchema<T> extends Serializable, ResultT
 
     /** Deserialize the OceanBase record, it is represented in {@link OceanBaseRecord}. */
     void deserialize(OceanBaseRecord record, Collector<T> out) throws Exception;
+
+    void deserialize(OceanBaseRecord record, Collector<T> out, OceanBaseMetrics oceanBaseMetrics) throws Exception;
 }
