@@ -75,10 +75,9 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
         }
 
         String stateJson = (String) conf.get(OFFSET_STATE_VALUE);
-        DebeziumOffsetSerializer serializer = new DebeziumOffsetSerializer();
         DebeziumOffset debeziumOffset;
         try {
-            debeziumOffset = serializer.deserialize(stateJson.getBytes(StandardCharsets.UTF_8));
+            debeziumOffset = DebeziumOffsetSerializer.INSTANCE.deserialize(stateJson.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             LOG.error("Can't deserialize debezium offset state from JSON: " + stateJson, e);
             throw new RuntimeException(e);
