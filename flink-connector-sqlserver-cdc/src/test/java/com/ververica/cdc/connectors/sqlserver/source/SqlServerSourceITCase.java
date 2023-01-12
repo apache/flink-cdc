@@ -256,5 +256,4 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
             return format("(%s)", StringUtils.join(captureCustomerTables, ","));
         }
     }
-
 }
