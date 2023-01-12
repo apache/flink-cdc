@@ -1877,6 +1877,70 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testReadingWithMultiMaxValue() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        inventoryDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE multi_max_table ("
+                                + " order_id STRING,"
+                                + " index INTEGER,"
+                                + " desc STRING,"
+                                + " PRIMARY KEY(order_id, index) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        inventoryDatabase.getDatabaseName(),
+                        "multi_max_table",
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM multi_max_table");
+
+        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        do {
+            Thread.sleep(5000L);
+        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+
+        CloseableIterator<Row> iterator = result.collect();
+
+        String[] expected =
+                new String[] {
+                    // snapshot records
+                    "+I[, 0, flink]",
+                    "+I[, 1, flink]",
+                    "+I[, 2, flink]",
+                    "+I[a, 0, flink]",
+                    "+I[b, 0, flink]",
+                    "+I[c, 0, flink]",
+                    "+I[d, 0, flink]",
+                    "+I[E, 0, flink]",
+                    "+I[E, 1, flink]",
+                    "+I[E, 2, flink]",
+                    "+I[E, 3, flink]",
+                    "+I[e, 4, flink]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
     // ------------------------------------------------------------------------------------
 
     private String getServerId() {
