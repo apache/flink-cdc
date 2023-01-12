@@ -106,3 +106,24 @@ VALUES (b'0000010000000100000001000000010000000100000001000000010000000000', '20
        (b'0000010000000100000001000000010000000100000001000000010000000010', '2021-03-08', 20, 200, 'flink'),
        (b'0000010000000100000001000000010000000100000001000000010000000011', '2021-03-08', 30, 300, 'flink'),
        (b'0000010000000100000001000000010000000100000001000000010000000100', '2021-03-08', 40, 400, 'flink');
+
+CREATE TABLE `multi_max_table`
+(
+    `order_id`   varchar(128) NOT NULL,
+    `index`   int(11) NOT NULL,
+    `desc`  varchar(512) NOT NULL,
+    PRIMARY KEY (`order_id`, `index`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO multi_max_table
+VALUES ('', 0, 'flink'),
+       ('', 1, 'flink'),
+       ('', 2, 'flink'),
+       ('a', 0, 'flink'),
+       ('b', 0, 'flink'),
+       ('c', 0, 'flink'),
+       ('d', 0, 'flink'),
+       ('E', 0, 'flink'),
+       ('E', 1, 'flink'),
+       ('E', 2, 'flink'),
+       ('e', 4, 'flink'),
+       ('E', 3, 'flink');

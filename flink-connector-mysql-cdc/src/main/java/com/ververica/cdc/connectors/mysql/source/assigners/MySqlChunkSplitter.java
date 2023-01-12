@@ -315,6 +315,18 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
+
+            // queryMin will return null when the chunkEnd is the max value,
+            // this will happen when the mysql table ignores the capitalization.
+            // see more detail at the test MySqlConnectorITCase#testReadingWithMultiMaxValue.
+            // In the test, the max value of order_id will return 'e' and when we get the chunkEnd =
+            // 'E',
+            // this method will return 'E' and will not return null.
+            // When this method is invoked next time, queryMin will return null here.
+            // So we need return null when we reach the max value here.
+            if (chunkEnd == null) {
+                return null;
+            }
         }
         if (ObjectUtils.compare(chunkEnd, max) >= 0) {
             return null;
