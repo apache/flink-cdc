@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -44,6 +42,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
@@ -68,9 +67,16 @@ public class DebeziumUtils {
     }
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
-    public static MySqlConnection createMySqlConnection(Configuration dbzConfiguration) {
+    public static MySqlConnection createMySqlConnection(MySqlSourceConfig sourceConfig) {
+        return createMySqlConnection(
+                sourceConfig.getDbzConfiguration(), sourceConfig.getJdbcProperties());
+    }
+
+    /** Creates a new {@link MySqlConnection}, but not open the connection. */
+    public static MySqlConnection createMySqlConnection(
+            Configuration dbzConfiguration, Properties jdbcProperties) {
         return new MySqlConnection(
-                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration));
+                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration, jdbcProperties));
     }
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */
@@ -109,8 +115,10 @@ public class DebeziumUtils {
                             final long binlogPosition = rs.getLong(2);
                             final String gtidSet =
                                     rs.getMetaData().getColumnCount() > 4 ? rs.getString(5) : null;
-                            return new BinlogOffset(
-                                    binlogFilename, binlogPosition, 0L, 0, 0, gtidSet, null);
+                            return BinlogOffset.builder()
+                                    .setBinlogFilePosition(binlogFilename, binlogPosition)
+                                    .setGtidSet(gtidSet)
+                                    .build();
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the binlog filename and position via '"

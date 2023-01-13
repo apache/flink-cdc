@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -28,11 +26,11 @@ import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
@@ -62,6 +60,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final String password;
     private final String pluginName;
     private final String slotName;
+    private final DebeziumChangelogMode changelogMode;
     private final Properties dbzProperties;
 
     // --------------------------------------------------------------------------------------------
@@ -85,6 +84,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             String password,
             String pluginName,
             String slotName,
+            DebeziumChangelogMode changelogMode,
             Properties dbzProperties) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -96,6 +96,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.password = checkNotNull(password);
         this.pluginName = checkNotNull(pluginName);
         this.slotName = slotName;
+        this.changelogMode = changelogMode;
         this.dbzProperties = dbzProperties;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -103,12 +104,15 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_BEFORE)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
+        switch (changelogMode) {
+            case UPSERT:
+                return org.apache.flink.table.connector.ChangelogMode.upsert();
+            case ALL:
+                return org.apache.flink.table.connector.ChangelogMode.all();
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported changelog mode: " + changelogMode);
+        }
     }
 
     @Override
@@ -123,7 +127,10 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         .setPhysicalRowType(physicalDataType)
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
+                        .setUserDefinedConverterFactory(
+                                PostgreSQLDeserializationConverterFactory.instance())
                         .setValueValidator(new PostgresValueValidator(schemaName, tableName))
+                        .setChangelogMode(changelogMode)
                         .build();
         DebeziumSourceFunction<RowData> sourceFunction =
                 PostgreSQLSource.<RowData>builder()
@@ -172,6 +179,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         password,
                         pluginName,
                         slotName,
+                        changelogMode,
                         dbzProperties);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
@@ -199,7 +207,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(slotName, that.slotName)
                 && Objects.equals(dbzProperties, that.dbzProperties)
                 && Objects.equals(producedDataType, that.producedDataType)
-                && Objects.equals(metadataKeys, that.metadataKeys);
+                && Objects.equals(metadataKeys, that.metadataKeys)
+                && Objects.equals(changelogMode, that.changelogMode);
     }
 
     @Override
@@ -217,7 +226,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 slotName,
                 dbzProperties,
                 producedDataType,
-                metadataKeys);
+                metadataKeys,
+                changelogMode);
     }
 
     @Override

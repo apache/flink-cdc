@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 ################################################################################
-#  Licensed to the Apache Software Foundation (ASF) under one
-#  or more contributor license agreements.  See the NOTICE file
-#  distributed with this work for additional information
-#  regarding copyright ownership.  The ASF licenses this file
-#  to you under the Apache License, Version 2.0 (the
-#  "License"); you may not use this file except in compliance
-#  with the License.  You may obtain a copy of the License at
+#  Copyright 2022 Ververica Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
 #
 #      http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -49,7 +47,7 @@ if [ ! -d "$DEBUG_FILES_OUTPUT_DIR" ] ; then
 fi
 
 if [ -z "$STAGE" ] ; then
-	echo "ERROR: Environment variable 'STAGE' is not set but expected by test_controller.sh. THe variable refers to the stage being executed."
+	echo "ERROR: Environment variable 'STAGE' is not set but expected by test_controller.sh. The variable refers to the stage being executed."
 	exit 1
 fi
 
@@ -80,7 +78,7 @@ source "${HERE}/watchdog.sh"
 LOG4J_PROPERTIES=${HERE}/log4j.properties
 MVN_LOGGING_OPTIONS="-Dlog.dir=${DEBUG_FILES_OUTPUT_DIR} -Dlog4j.configurationFile=file://$LOG4J_PROPERTIES"
 
-MVN_COMMON_OPTIONS="-Dfast -Pskip-webui-build $MVN_LOGGING_OPTIONS"
+MVN_COMMON_OPTIONS="-Dfast $MVN_LOGGING_OPTIONS"
 MVN_COMPILE_OPTIONS="-DskipTests"
 MVN_COMPILE_MODULES=$(get_compile_modules_for_stage ${STAGE})
 
@@ -100,10 +98,9 @@ fi
 # Step 2: Run tests
 # =============================================================================
 
-MVN_TEST_OPTIONS="-Dflink.tests.with-openssl"
 MVN_TEST_MODULES=$(get_test_modules_for_stage ${STAGE})
 
-run_with_watchdog "run_mvn $MVN_COMMON_OPTIONS $MVN_TEST_OPTIONS $PROFILE $MVN_TEST_MODULES verify" $CALLBACK_ON_TIMEOUT
+run_with_watchdog "run_mvn $MVN_COMMON_OPTIONS $PROFILE $MVN_TEST_MODULES verify" $CALLBACK_ON_TIMEOUT
 EXIT_CODE=$?
 
 # =============================================================================

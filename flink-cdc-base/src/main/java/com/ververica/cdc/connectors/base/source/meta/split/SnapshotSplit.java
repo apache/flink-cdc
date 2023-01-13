@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -31,7 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** The split to describe a split of a MySql table snapshot. */
+/** The split to describe a split of a database table snapshot. */
 public class SnapshotSplit extends SourceSplitBase {
 
     private final TableId tableId;
@@ -40,7 +38,7 @@ public class SnapshotSplit extends SourceSplitBase {
 
     @Nullable private final Object[] splitStart;
     @Nullable private final Object[] splitEnd;
-    /** The high watermark is not bull when the split read finished. */
+    /** The high watermark is not null when the split read finished. */
     @Nullable private final Offset highWatermark;
 
     @Nullable transient byte[] serializedFormCache;
@@ -90,6 +88,12 @@ public class SnapshotSplit extends SourceSplitBase {
         return tableSchemas;
     }
 
+    /** Casts this split into a {@link SchemalessSnapshotSplit}. */
+    public final SchemalessSnapshotSplit toSchemalessSnapshotSplit() {
+        return new SchemalessSnapshotSplit(
+                tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -128,7 +132,7 @@ public class SnapshotSplit extends SourceSplitBase {
                 splitKeyType.getFields().stream()
                         .map(RowType.RowField::asSummaryString)
                         .collect(Collectors.joining(",", "[", "]"));
-        return "MySqlSnapshotSplit{"
+        return "SnapshotSplit{"
                 + "tableId="
                 + tableId
                 + ", splitId='"

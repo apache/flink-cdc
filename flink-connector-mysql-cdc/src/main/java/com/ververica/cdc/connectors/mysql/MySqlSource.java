@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -217,8 +215,8 @@ public class MySqlSource {
                     specificOffset.setSourcePartition(sourcePartition);
 
                     Map<String, Object> sourceOffset = new HashMap<>();
-                    sourceOffset.put("file", startupOptions.specificOffsetFile);
-                    sourceOffset.put("pos", startupOptions.specificOffsetPos);
+                    sourceOffset.put("file", startupOptions.binlogOffset.getFilename());
+                    sourceOffset.put("pos", startupOptions.binlogOffset.getPosition());
                     specificOffset.setSourceOffset(sourceOffset);
                     break;
 
@@ -227,7 +225,8 @@ public class MySqlSource {
                     props.setProperty("snapshot.mode", "never");
                     deserializer =
                             new SeekBinlogToTimestampFilter<>(
-                                    startupOptions.startupTimestampMillis, deserializer);
+                                    startupOptions.binlogOffset.getTimestampSec() * 1000,
+                                    deserializer);
                     break;
 
                 default:

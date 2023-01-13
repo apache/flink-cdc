@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -32,7 +30,7 @@ import java.util.Properties;
 
 /** A {@link Factory} to provide {@link SourceConfig} of JDBC data source. */
 @Internal
-public abstract class JdbcSourceConfigFactory implements Factory {
+public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfig> {
 
     private static final long serialVersionUID = 1L;
 
@@ -56,6 +54,7 @@ public abstract class JdbcSourceConfigFactory implements Factory {
     protected int connectMaxRetries = JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue();
     protected int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     protected Properties dbzProperties;
+    protected String chunkKeyColumn;
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -104,7 +103,7 @@ public abstract class JdbcSourceConfigFactory implements Factory {
 
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
-     * TIMESTAMP type in MYSQL converted to STRING. See more
+     * TIMESTAMP type converted to STRING. See more
      * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
      */
     public JdbcSourceConfigFactory serverTimeZone(String timeZone) {
@@ -122,8 +121,8 @@ public abstract class JdbcSourceConfigFactory implements Factory {
     }
 
     /**
-     * The group size of split meta, if the meta size exceeds the group size, the meta will be will
-     * be divided into multiple groups.
+     * The group size of split meta, if the meta size exceeds the group size, the meta will be
+     * divided into multiple groups.
      */
     public JdbcSourceConfigFactory splitMetaGroupSize(int splitMetaGroupSize) {
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -155,7 +154,7 @@ public abstract class JdbcSourceConfigFactory implements Factory {
     }
 
     /**
-     * The maximum time that the connector should wait after trying to connect to the MySQL database
+     * The maximum time that the connector should wait after trying to connect to the database
      * server before timing out.
      */
     public JdbcSourceConfigFactory connectTimeout(Duration connectTimeout) {
@@ -181,9 +180,18 @@ public abstract class JdbcSourceConfigFactory implements Factory {
         return this;
     }
 
-    /** The Debezium MySQL connector properties. For example, "snapshot.mode". */
+    /** The Debezium connector properties. For example, "snapshot.mode". */
     public JdbcSourceConfigFactory debeziumProperties(Properties properties) {
         this.dbzProperties = properties;
+        return this;
+    }
+
+    /**
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
+     */
+    public JdbcSourceConfigFactory chunkKeyColumn(String chunkKeyColumn) {
+        this.chunkKeyColumn = chunkKeyColumn;
         return this;
     }
 

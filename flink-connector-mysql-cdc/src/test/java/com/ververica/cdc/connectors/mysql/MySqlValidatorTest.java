@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -53,6 +51,7 @@ import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.basicSourceBuilder;
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.setupSource;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqlVersion.V5_5;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqlVersion.V5_7;
 import static org.junit.Assert.assertEquals;
@@ -132,6 +131,19 @@ public class MySqlValidatorTest {
                 message);
     }
 
+    @Test
+    public void testValidateTimezone() {
+        String message =
+                String.format(
+                        "The MySQL server has a timezone offset (%d seconds ahead of UTC) which does not match "
+                                + "the configured timezone %s. Specify the right %s to avoid inconsistencies "
+                                + "for time-related fields.",
+                        45240, // +12:34 is 45240 seconds ahead of UTC
+                        "UTC",
+                        SERVER_TIME_ZONE.key());
+        doValidate(V5_7, buildMySqlConfigFile("[mysqld]\ndefault-time-zone=+12:34"), message);
+    }
+
     private void doValidate(MySqlVersion version, String configPath, String exceptionMessage) {
         MySqlContainer container =
                 new MySqlContainer(version).withConfigurationOverride(configPath);
@@ -164,12 +176,13 @@ public class MySqlValidatorTest {
                             .databaseList(database.getDatabaseName())
                             .tableList(database.getDatabaseName() + ".products")
                             .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
+                            .serverTimeZone("UTC")
                             .build();
 
             mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
         } else {
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder(database, false).build();
+                    basicSourceBuilder(database, "UTC", false).build();
             setupSource(source);
         }
     }

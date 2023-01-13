@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,9 +19,9 @@ package com.ververica.cdc.connectors.base.options;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
 
-/** Configurations for {@link JdbcIncrementalSource}. */
+/** Configurations for {@link IncrementalSource}. */
 public class SourceOptions {
 
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
@@ -58,7 +56,7 @@ public class SourceOptions {
                     .stringType()
                     .defaultValue("initial")
                     .withDescription(
-                            "Optional startup mode for MySQL CDC consumer, valid enumerations are "
+                            "Optional startup mode for CDC consumer, valid enumerations are "
                                     + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
                                     + "or \"specific-offset\"");
 
@@ -88,27 +86,29 @@ public class SourceOptions {
                     .intType()
                     .defaultValue(1000)
                     .withDescription(
-                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be will be divided into multiple groups.");
+                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.");
 
     public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
-            ConfigOptions.key("split-key.even-distribution.factor.upper-bound")
+            ConfigOptions.key("chunk-key.even-distribution.factor.upper-bound")
                     .doubleType()
                     .defaultValue(1000.0d)
+                    .withFallbackKeys("split-key.even-distribution.factor.upper-bound")
                     .withDescription(
-                            "The upper bound of split key distribution factor. The distribution factor is used to determine whether the"
+                            "The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
-                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " and the query for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
     public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
-            ConfigOptions.key("split-key.even-distribution.factor.lower-bound")
+            ConfigOptions.key("chunk-key.even-distribution.factor.lower-bound")
                     .doubleType()
                     .defaultValue(0.05d)
+                    .withFallbackKeys("split-key.even-distribution.factor.lower-bound")
                     .withDescription(
-                            "The lower bound of split key distribution factor. The distribution factor is used to determine whether the"
+                            "The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the"
                                     + " table is evenly distribution or not."
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
-                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " and the query for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 }

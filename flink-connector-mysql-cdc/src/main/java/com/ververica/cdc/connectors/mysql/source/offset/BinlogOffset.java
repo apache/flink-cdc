@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -18,6 +16,10 @@
 
 package com.ververica.cdc.connectors.mysql.source.offset;
 
+import org.apache.flink.annotation.Internal;
+import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.annotation.VisibleForTesting;
+
 import io.debezium.connector.mysql.GtidSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -25,19 +27,24 @@ import org.apache.kafka.connect.errors.ConnectException;
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind.EARLIEST;
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind.LATEST;
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind.NON_STOPPING;
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind.TIMESTAMP;
 
 /**
  * A structure describes a fine grained offset in a binlog event including binlog position and gtid
  * set etc.
  *
  * <p>This structure can also be used to deal the binlog event in transaction, a transaction may
- * contains multiple change events, and each change event may contain multiple rows. When restart
+ * contain multiple change events, and each change event may contain multiple rows. When restart
  * from a specific {@link BinlogOffset}, we need to skip the processed change events and the
  * processed rows.
  */
+@PublicEvolving
 public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -49,42 +56,53 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
     public static final String GTID_SET_KEY = "gtids";
     public static final String TIMESTAMP_KEY = "ts_sec";
     public static final String SERVER_ID_KEY = "server_id";
-
-    public static final BinlogOffset INITIAL_OFFSET = new BinlogOffset("", 0);
-    public static final BinlogOffset NO_STOPPING_OFFSET = new BinlogOffset("", Long.MIN_VALUE);
+    public static final String OFFSET_KIND_KEY = "kind";
 
     private final Map<String, String> offset;
 
+    // ------------------------------- Builders --------------------------------
+
+    /** Create a {@link BinlogOffsetBuilder}. */
+    public static BinlogOffsetBuilder builder() {
+        return new BinlogOffsetBuilder();
+    }
+
+    /** Create offset from binlog filename and position. */
+    public static BinlogOffset ofBinlogFilePosition(String filename, long position) {
+        return builder().setBinlogFilePosition(filename, position).build();
+    }
+
+    /** Create offset from GTID set. */
+    public static BinlogOffset ofGtidSet(String gtidSet) {
+        return builder().setBinlogFilePosition("", 0).setGtidSet(gtidSet).build();
+    }
+
+    /** Create offset which represents the earliest accessible binlog offset. */
+    public static BinlogOffset ofEarliest() {
+        return builder().setOffsetKind(EARLIEST).build();
+    }
+
+    /** Create offset which represents the latest offset at the point of access. */
+    public static BinlogOffset ofLatest() {
+        return builder().setOffsetKind(LATEST).build();
+    }
+
+    /** Create offset specified by a timestamp in second. */
+    public static BinlogOffset ofTimestampSec(long timestampSec) {
+        return builder().setOffsetKind(TIMESTAMP).setTimestampSec(timestampSec).build();
+    }
+
+    @Internal
+    public static BinlogOffset ofNonStopping() {
+        return builder().setOffsetKind(NON_STOPPING).build();
+    }
+
+    @VisibleForTesting
     public BinlogOffset(Map<String, String> offset) {
         this.offset = offset;
     }
 
-    public BinlogOffset(String filename, long position) {
-        this(filename, position, 0L, 0L, 0L, null, null);
-    }
-
-    public BinlogOffset(
-            String filename,
-            long position,
-            long restartSkipEvents,
-            long restartSkipRows,
-            long binlogEpochSecs,
-            @Nullable String restartGtidSet,
-            @Nullable Integer serverId) {
-        Map<String, String> offsetMap = new HashMap<>();
-        offsetMap.put(BINLOG_FILENAME_OFFSET_KEY, filename);
-        offsetMap.put(BINLOG_POSITION_OFFSET_KEY, String.valueOf(position));
-        offsetMap.put(EVENTS_TO_SKIP_OFFSET_KEY, String.valueOf(restartSkipEvents));
-        offsetMap.put(ROWS_TO_SKIP_OFFSET_KEY, String.valueOf(restartSkipRows));
-        offsetMap.put(TIMESTAMP_KEY, String.valueOf(binlogEpochSecs));
-        if (restartGtidSet != null) {
-            offsetMap.put(GTID_SET_KEY, restartGtidSet);
-        }
-        if (serverId != null) {
-            offsetMap.put(SERVER_ID_KEY, String.valueOf(serverId));
-        }
-        this.offset = offsetMap;
-    }
+    // ------------------------------ Field getters -----------------------------
 
     public Map<String, String> getOffset() {
         return offset;
@@ -110,12 +128,20 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         return offset.get(GTID_SET_KEY);
     }
 
-    public long getTimestamp() {
+    public long getTimestampSec() {
         return longOffsetValue(offset, TIMESTAMP_KEY);
     }
 
     public Long getServerId() {
         return longOffsetValue(offset, SERVER_ID_KEY);
+    }
+
+    @Nullable
+    public BinlogOffsetKind getOffsetKind() {
+        if (offset.get(OFFSET_KIND_KEY) == null) {
+            return null;
+        }
+        return BinlogOffsetKind.valueOf(offset.get(OFFSET_KIND_KEY));
     }
 
     private long longOffsetValue(Map<String, ?> values, String key) {
@@ -138,19 +164,21 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         }
     }
 
+    // ---------------------- Comparing BinlogOffset ----------------------
+
     /**
      * This method is inspired by {@link io.debezium.relational.history.HistoryRecordComparator}.
      */
     @Override
     public int compareTo(BinlogOffset that) {
-        // the NO_STOPPING_OFFSET is the max offset
-        if (NO_STOPPING_OFFSET.equals(that) && NO_STOPPING_OFFSET.equals(this)) {
+        // the NON_STOPPING is the max offset
+        if (that.getOffsetKind() == NON_STOPPING && this.getOffsetKind() == NON_STOPPING) {
             return 0;
         }
-        if (NO_STOPPING_OFFSET.equals(this)) {
+        if (this.getOffsetKind() == NON_STOPPING) {
             return 1;
         }
-        if (NO_STOPPING_OFFSET.equals(that)) {
+        if (that.getOffsetKind() == NON_STOPPING) {
             return -1;
         }
 
@@ -202,8 +230,8 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
             // the only thing we can do
             // is compare timestamps, and we have to assume that the server timestamps can be
             // compared ...
-            long timestamp = this.getTimestamp();
-            long targetTimestamp = that.getTimestamp();
+            long timestamp = this.getTimestampSec();
+            long targetTimestamp = that.getTimestampSec();
             return Long.compare(timestamp, targetTimestamp);
         }
 

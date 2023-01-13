@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -50,8 +48,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
-                    env,
-                    EnvironmentSettings.newInstance().useBlinkPlanner().inStreamingMode().build());
+                    env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
@@ -181,12 +178,12 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + "    val_ntext STRING,\n"
                                 + "    val_decimal DECIMAL(6,3),\n"
                                 + "    val_numeric NUMERIC,\n"
-                                + "    val_float FLOAT,\n"
+                                + "    val_float DOUBLE,\n"
                                 + "    val_real FLOAT,\n"
                                 + "    val_smallmoney DECIMAL,\n"
                                 + "    val_money DECIMAL,\n"
                                 + "    val_bit BOOLEAN,\n"
-                                + "    val_tinyint TINYINT,\n"
+                                + "    val_tinyint SMALLINT,\n"
                                 + "    val_smallint SMALLINT,\n"
                                 + "    val_int INT,\n"
                                 + "    val_bigint BIGINT,\n"
@@ -226,12 +223,12 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         + "    val_ntext STRING,\n"
                         + "    val_decimal DECIMAL(6,3),\n"
                         + "    val_numeric NUMERIC,\n"
-                        + "    val_float FLOAT,\n"
+                        + "    val_float DOUBLE,\n"
                         + "    val_real FLOAT,\n"
                         + "    val_smallmoney DECIMAL,\n"
                         + "    val_money DECIMAL,\n"
                         + "    val_bit BOOLEAN,\n"
-                        + "    val_tinyint TINYINT,\n"
+                        + "    val_tinyint SMALLINT,\n"
                         + "    val_smallint SMALLINT,\n"
                         + "    val_int INT,\n"
                         + "    val_bigint BIGINT,\n"
@@ -287,7 +284,8 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'sqlserver-cdc',"
                                 + " 'hostname' = '%s',"
@@ -368,6 +366,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         "-D(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.170)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         Collections.sort(actual);
+        Collections.sort(expected);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
     }

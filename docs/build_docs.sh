@@ -1,12 +1,10 @@
 #!/bin/bash
 ################################################################################
-#  Licensed to the Apache Software Foundation (ASF) under one
-#  or more contributor license agreements.  See the NOTICE file
-#  distributed with this work for additional information
-#  regarding copyright ownership.  The ASF licenses this file
-#  to you under the Apache License, Version 2.0 (the
-#  "License"); you may not use this file except in compliance
-#  with the License.  You may obtain a copy of the License at
+#  Copyright 2022 Ververica Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
 #
 #      http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -24,8 +22,10 @@ apt-get update
 apt-get -y install git rsync python3-pip python3-git python3-stemmer python3-virtualenv python3-setuptools
 python3 -m pip install -U sphinx==4.1.1 myst-parser==0.15.2 pygments==2.10.0 sphinx-rtd-theme==0.5.2
 
-export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
 export REPO_NAME="${GITHUB_REPOSITORY##*/}"
+
+git config --global --add safe.directory /__w/${REPO_NAME}/${REPO_NAME}
+export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
 temp_docs_root=`mktemp -d`
 
 ls

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,12 +22,9 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceTask;
-import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
@@ -52,16 +47,19 @@ import java.util.stream.Collectors;
 import static com.mongodb.client.model.Aggregates.match;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.regex;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.ADD_NS_FIELD;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.ADD_NS_FIELD_NAME;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.bsonListToJson;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.collectionNames;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.collectionsFilter;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.completionPattern;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.databaseFilter;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.databaseNames;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.includeListAsPatterns;
-import static com.ververica.cdc.connectors.mongodb.utils.CollectionDiscoveryUtils.isIncludeListExplicitlySpecified;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.HEARTBEAT_VALUE_SCHEMA;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.ADD_NS_FIELD;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.ADD_NS_FIELD_NAME;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.bsonListToJson;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.collectionNames;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.collectionsFilter;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.completionPattern;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.databaseFilter;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.databaseNames;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.includeListAsPatterns;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.isIncludeListExplicitlySpecified;
+import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.isHeartbeatEvent;
+import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.isSnapshotRecord;
 
 /**
  * Source Task that proxies mongodb kafka connector's {@link MongoSourceTask} to adapt to {@link
@@ -72,13 +70,6 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     public static final String DATABASE_INCLUDE_LIST = "database.include.list";
 
     public static final String COLLECTION_INCLUDE_LIST = "collection.include.list";
-
-    private static final String TRUE = "true";
-
-    private static final Schema HEARTBEAT_VALUE_SCHEMA =
-            SchemaBuilder.struct()
-                    .field(AbstractSourceInfo.TIMESTAMP_KEY, Schema.INT64_SCHEMA)
-                    .build();
 
     private final MongoSourceTask target;
 
@@ -187,7 +178,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     }
 
     private SourceRecord markRecordTimestamp(SourceRecord record) {
-        if (isHeartbeatRecord(record)) {
+        if (isHeartbeatEvent(record)) {
             return markTimestampForHeartbeatRecord(record);
         }
         return markTimestampForDataRecord(record);
@@ -195,6 +186,9 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     private SourceRecord markTimestampForDataRecord(SourceRecord record) {
         final Struct value = (Struct) record.value();
+        // It indicates the time at which the reader processed the event.
+        value.put(MongoDBEnvelope.TIMESTAMP_KEY_FIELD, System.currentTimeMillis());
+
         final Struct source = new Struct(value.schema().field(Envelope.FieldName.SOURCE).schema());
         // It indicates the time that the change was made in the database. If the record is read
         // from snapshot of the table instead of the change stream, the value is always 0.
@@ -205,14 +199,15 @@ public class MongoDBConnectorSourceTask extends SourceTask {
                 timestamp = new JsonReader(clusterTime).readTimestamp().getTime() * 1000L;
             }
         }
-        source.put(AbstractSourceInfo.TIMESTAMP_KEY, timestamp);
+        source.put(MongoDBEnvelope.TIMESTAMP_KEY_FIELD, timestamp);
         value.put(Envelope.FieldName.SOURCE, source);
+
         return record;
     }
 
     private SourceRecord markTimestampForHeartbeatRecord(SourceRecord record) {
         final Struct heartbeatValue = new Struct(HEARTBEAT_VALUE_SCHEMA);
-        heartbeatValue.put(AbstractSourceInfo.TIMESTAMP_KEY, Instant.now().toEpochMilli());
+        heartbeatValue.put(MongoDBEnvelope.TIMESTAMP_KEY_FIELD, Instant.now().toEpochMilli());
 
         return new SourceRecord(
                 record.sourcePartition(),
@@ -238,14 +233,6 @@ public class MongoDBConnectorSourceTask extends SourceTask {
             SnapshotRecord.LAST.toSource(source);
         }
         return record;
-    }
-
-    private boolean isSnapshotRecord(SourceRecord sourceRecord) {
-        return TRUE.equals(sourceRecord.sourceOffset().get(MongoDBEnvelope.COPY_KEY_FIELD));
-    }
-
-    private boolean isHeartbeatRecord(SourceRecord sourceRecord) {
-        return TRUE.equals(sourceRecord.sourceOffset().get(MongoDBEnvelope.HEARTBEAT_KEY_FIELD));
     }
 
     private boolean isCopying() {
@@ -303,12 +290,16 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
                 Bson nsFilter = regex(ADD_NS_FIELD_NAME, namespacesRegex);
                 if (databaseList != null) {
-                    String databaseRegex =
-                            includeListAsPatterns(databaseList).stream()
-                                    .map(Pattern::pattern)
-                                    .collect(Collectors.joining("|"));
-                    Bson dbFilter = regex("ns.db", databaseRegex);
-                    nsFilter = and(dbFilter, nsFilter);
+                    if (isIncludeListExplicitlySpecified(databaseList, discoveredDatabases)) {
+                        props.put(MongoSourceConfig.DATABASE_CONFIG, discoveredDatabases.get(0));
+                    } else {
+                        String databaseRegex =
+                                includeListAsPatterns(databaseList).stream()
+                                        .map(Pattern::pattern)
+                                        .collect(Collectors.joining("|"));
+                        Bson dbFilter = regex("ns.db", databaseRegex);
+                        nsFilter = and(dbFilter, nsFilter);
+                    }
                 }
                 pipeline.add(match(nsFilter));
 

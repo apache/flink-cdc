@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,9 +19,10 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 
-import org.apache.flink.shaded.guava18.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
+import com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -31,12 +30,11 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges.TableChange;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -75,27 +73,21 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
 
         List<TableId> alreadyProcessedTables = Lists.newArrayList(tableId);
-        List<MySqlSnapshotSplit> remainingSplits = new ArrayList<>();
+        List<MySqlSchemalessSnapshotSplit> remainingSplits = new ArrayList<>();
 
-        Map<String, MySqlSnapshotSplit> assignedSplits = new HashMap<>();
+        Map<String, MySqlSchemalessSnapshotSplit> assignedSplits = new HashMap<>();
         Map<String, BinlogOffset> splitFinishedOffsets = new HashMap<>();
 
         for (int i = 0; i < 5; i++) {
             String splitId = customerDatabase.getDatabaseName() + "." + captureTable + ":" + i;
             Object[] splitStart = i == 0 ? null : new Object[] {i * 2};
             Object[] splitEnd = new Object[] {i * 2 + 2};
-            BinlogOffset highWatermark = new BinlogOffset("mysql-bin.00001", i + 1);
-            Map<TableId, TableChange> tableSchemas = new HashMap<>();
-            MySqlSnapshotSplit sqlSnapshotSplit =
-                    new MySqlSnapshotSplit(
-                            tableId,
-                            splitId,
-                            splitKeyType,
-                            splitStart,
-                            splitEnd,
-                            highWatermark,
-                            tableSchemas);
-            assignedSplits.put(splitId, sqlSnapshotSplit);
+            BinlogOffset highWatermark =
+                    BinlogOffset.ofBinlogFilePosition("mysql-bin.00001", i + 1);
+            MySqlSchemalessSnapshotSplit mySqlSchemalessSnapshotSplit =
+                    new MySqlSchemalessSnapshotSplit(
+                            tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
+            assignedSplits.put(splitId, mySqlSchemalessSnapshotSplit);
             splitFinishedOffsets.put(splitId, highWatermark);
         }
 
@@ -104,11 +96,13 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         alreadyProcessedTables,
                         remainingSplits,
                         assignedSplits,
+                        new HashMap<>(),
                         splitFinishedOffsets,
                         AssignerStatus.INITIAL_ASSIGNING_FINISHED,
                         new ArrayList<>(),
                         false,
-                        true);
+                        true,
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
         final MySqlHybridSplitAssigner assigner =
@@ -119,11 +113,11 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         MySqlBinlogSplit mySqlBinlogSplit = binlogSplit.get().asBinlogSplit();
 
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
-        final List<MySqlSnapshotSplit> assignedSnapshotSplit =
+        final List<MySqlSchemalessSnapshotSplit> mySqlSchemalessSnapshotSplits =
                 assignedSplits.values().stream()
                         .sorted(Comparator.comparing(MySqlSplit::splitId))
                         .collect(Collectors.toList());
-        for (MySqlSnapshotSplit split : assignedSnapshotSplit) {
+        for (MySqlSchemalessSnapshotSplit split : mySqlSchemalessSnapshotSplits) {
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),
@@ -136,8 +130,8 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         MySqlBinlogSplit expected =
                 new MySqlBinlogSplit(
                         "binlog-split",
-                        new BinlogOffset("mysql-bin.00001", 1),
-                        BinlogOffset.NO_STOPPING_OFFSET,
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.00001", 1),
+                        BinlogOffset.ofNonStopping(),
                         finishedSnapshotSplitInfos,
                         new HashMap<>(),
                         finishedSnapshotSplitInfos.size());

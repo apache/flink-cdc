@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -39,6 +37,7 @@ import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
@@ -58,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
+import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
 
 /**
  * A stateful task context that contains entries the debezium mysql connector task required.
@@ -68,6 +68,7 @@ import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINL
 public class StatefulTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
+    private static final int DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN = 1024;
     private static final Clock clock = Clock.SYSTEM;
 
     private final MySqlSourceConfig sourceConfig;
@@ -84,6 +85,7 @@ public class StatefulTaskContext {
     private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
+    private EventDispatcher.SnapshotReceiver snapshotReceiver;
     private SignalEventDispatcher signalEventDispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
@@ -120,7 +122,7 @@ public class StatefulTaskContext {
 
         final int queueSize =
                 mySqlSplit.isSnapshotSplit()
-                        ? Integer.MAX_VALUE
+                        ? sourceConfig.getSplitSize() + DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN
                         : connectorConfig.getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
@@ -146,6 +148,8 @@ public class StatefulTaskContext {
                         metadataProvider,
                         schemaNameAdjuster);
 
+        this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
+
         this.signalEventDispatcher =
                 new SignalEventDispatcher(
                         offsetContext.getPartition(), topicSelector.getPrimaryTopic(), queue);
@@ -161,7 +165,8 @@ public class StatefulTaskContext {
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
         this.errorHandler =
-                new MySqlErrorHandler(connectorConfig.getLogicalName(), queue, taskContext);
+                new MySqlErrorHandler(
+                        connectorConfig.getLogicalName(), queue, taskContext, sourceConfig);
     }
 
     private void validateAndLoadDatabaseHistory(
@@ -172,14 +177,16 @@ public class StatefulTaskContext {
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
     private MySqlOffsetContext loadStartingOffsetState(
-            OffsetContext.Loader loader, MySqlSplit mySqlSplit) {
+            OffsetContext.Loader<MySqlOffsetContext> loader, MySqlSplit mySqlSplit) {
         BinlogOffset offset =
                 mySqlSplit.isSnapshotSplit()
-                        ? BinlogOffset.INITIAL_OFFSET
-                        : mySqlSplit.asBinlogSplit().getStartingOffset();
+                        ? BinlogOffset.ofEarliest()
+                        : initializeEffectiveOffset(
+                                mySqlSplit.asBinlogSplit().getStartingOffset(), connection);
 
-        MySqlOffsetContext mySqlOffsetContext =
-                (MySqlOffsetContext) loader.load(offset.getOffset());
+        LOG.info("Starting offset is initialized to {}", offset);
+
+        MySqlOffsetContext mySqlOffsetContext = loader.load(offset.getOffset());
 
         if (!isBinlogAvailable(mySqlOffsetContext)) {
             throw new IllegalStateException(
@@ -350,6 +357,10 @@ public class StatefulTaskContext {
 
     public EventDispatcherImpl<TableId> getDispatcher() {
         return dispatcher;
+    }
+
+    public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
+        return snapshotReceiver;
     }
 
     public SignalEventDispatcher getSignalEventDispatcher() {

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *	 http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -34,7 +32,7 @@ public final class StartupOptions implements Serializable {
 
     /**
      * Performs an initial snapshot on the monitored database tables upon first startup, and
-     * continue to read the latest binlog.
+     * continue to read the latest change log.
      */
     public static StartupOptions initial() {
         return new StartupOptions(StartupMode.INITIAL, null, null, null);
@@ -42,8 +40,8 @@ public final class StartupOptions implements Serializable {
 
     /**
      * Never to perform snapshot on the monitored database tables upon first startup, just read from
-     * the beginning of the binlog. This should be used with care, as it is only valid when the
-     * binlog is guaranteed to contain the entire history of the database.
+     * the beginning of the change log. This should be used with care, as it is only valid when the
+     * change log is guaranteed to contain the entire history of the database.
      */
     public static StartupOptions earliest() {
         return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null);
@@ -51,7 +49,7 @@ public final class StartupOptions implements Serializable {
 
     /**
      * Never to perform snapshot on the monitored database tables upon first startup, just read from
-     * the end of the binlog which means only have the changes since the connector was started.
+     * the end of the change log which means only have the changes since the connector was started.
      */
     public static StartupOptions latest() {
         return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null);
@@ -59,7 +57,7 @@ public final class StartupOptions implements Serializable {
 
     /**
      * Never to perform snapshot on the monitored database tables upon first startup, and directly
-     * read binlog from the specified offset.
+     * read change log from the specified offset.
      */
     public static StartupOptions specificOffset(String specificOffsetFile, int specificOffsetPos) {
         return new StartupOptions(
@@ -68,10 +66,10 @@ public final class StartupOptions implements Serializable {
 
     /**
      * Never to perform snapshot on the monitored database tables upon first startup, and directly
-     * read binlog from the specified timestamp.
+     * read change log from the specified timestamp.
      *
-     * <p>The consumer will traverse the binlog from the beginning and ignore change events whose
-     * timestamp is smaller than the specified timestamp.
+     * <p>The consumer will traverse the change log from the beginning and ignore change events
+     * whose timestamp is smaller than the specified timestamp.
      *
      * @param startupTimestampMillis timestamp for the startup offsets, as milliseconds from epoch.
      */

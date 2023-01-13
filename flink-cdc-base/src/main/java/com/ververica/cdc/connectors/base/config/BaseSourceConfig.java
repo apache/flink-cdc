@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -19,12 +17,12 @@
 package com.ververica.cdc.connectors.base.config;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
 import io.debezium.config.Configuration;
 
 import java.util.Properties;
 
-/** A basic Source configuration which is used by {@link JdbcIncrementalSource}. */
+/** A basic Source configuration which is used by {@link IncrementalSource}. */
 public abstract class BaseSourceConfig implements SourceConfig {
 
     private static final long serialVersionUID = 1L;
@@ -76,12 +74,10 @@ public abstract class BaseSourceConfig implements SourceConfig {
         return splitMetaGroupSize;
     }
 
-    @Override
     public double getDistributionFactorUpper() {
         return distributionFactorUpper;
     }
 
-    @Override
     public double getDistributionFactorLower() {
         return distributionFactorLower;
     }

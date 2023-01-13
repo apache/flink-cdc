@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -25,6 +23,7 @@ import org.apache.flink.util.Collector;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
+import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.document.Array;
@@ -33,6 +32,8 @@ import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Iterator;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getFetchTimestamp;
@@ -52,7 +53,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWate
  * emit records rather than emit the records directly.
  */
 public final class MySqlRecordEmitter<T>
-        implements RecordEmitter<SourceRecord, T, MySqlSplitState> {
+        implements RecordEmitter<SourceRecords, T, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
@@ -74,7 +75,17 @@ public final class MySqlRecordEmitter<T>
     }
 
     @Override
-    public void emitRecord(SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
+    public void emitRecord(
+            SourceRecords sourceRecords, SourceOutput<T> output, MySqlSplitState splitState)
+            throws Exception {
+        final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
+        while (elementIterator.hasNext()) {
+            processElement(elementIterator.next(), output, splitState);
+        }
+    }
+
+    private void processElement(
+            SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
             BinlogOffset watermark = getWatermark(element);

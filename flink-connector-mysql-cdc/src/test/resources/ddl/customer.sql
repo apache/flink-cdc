@@ -1,10 +1,8 @@
--- Licensed to the Apache Software Foundation (ASF) under one
--- or more contributor license agreements.  See the NOTICE file
--- distributed with this work for additional information
--- regarding copyright ownership.  The ASF licenses this file
--- to you under the Apache License, Version 2.0 (the
--- "License"); you may not use this file except in compliance
--- with the License.  You may obtain a copy of the License at
+-- Copyright 2022 Ververica Inc.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
 --   http://www.apache.org/licenses/LICENSE-2.0
 -- Unless required by applicable law or agreed to in writing,
 -- software distributed under the License is distributed on an
@@ -233,6 +231,29 @@ VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
        (404, 'KIND_008', 'user_5', 'leo list'),
        (600, 'KIND_009', 'user_6', 'my shopping cart');
 
+-- table has combined primary key and one of the primary key is evenly
+CREATE TABLE evenly_shopping_cart (
+  product_no INT NOT NULL,
+  product_kind VARCHAR(255),
+  user_id VARCHAR(255) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  PRIMARY KEY(product_kind, product_no, user_id)
+);
+
+insert into evenly_shopping_cart
+VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
+       (102, 'KIND_002', 'user_1', 'my shopping cart'),
+       (103, 'KIND_007', 'user_1', 'my shopping cart'),
+       (104, 'KIND_008', 'user_1', 'my shopping cart'),
+       (105, 'KIND_100', 'user_2', 'my shopping list'),
+       (105, 'KIND_999', 'user_3', 'my shopping list'),
+       (107, 'KIND_010', 'user_4', 'my shopping list'),
+       (108, 'KIND_009', 'user_4', 'my shopping list'),
+       (109, 'KIND_002', 'user_5', 'leo list'),
+       (111, 'KIND_007', 'user_5', 'leo list'),
+       (111, 'KIND_008', 'user_5', 'leo list'),
+       (112, 'KIND_009', 'user_6', 'my shopping cart');
+
 -- table has bigint unsigned auto increment primary key
 CREATE TABLE shopping_cart_big (
   product_no BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
@@ -279,3 +300,13 @@ VALUES (416874195632735147, 'China', 'Beijing', 'West Town address 1'),
        (417272886855938987, 'America', 'New York', 'East Town address 3'),
        (417420106184475563, 'Germany', 'Berlin', 'West Town address 1'),
        (418161258277847979, 'Germany', 'Berlin', 'West Town address 2');
+
+CREATE TABLE default_value_test (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  address VARCHAR(1024),
+  phone_number INTEGER DEFAULT ' 123 '
+);
+INSERT INTO default_value_test
+VALUES (1,'user1','Shanghai',123567),
+       (2,'user2','Shanghai',123567);

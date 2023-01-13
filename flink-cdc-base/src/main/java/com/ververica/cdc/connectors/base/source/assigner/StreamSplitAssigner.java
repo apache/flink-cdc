@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -42,7 +40,7 @@ import java.util.Optional;
 public class StreamSplitAssigner implements SplitAssigner {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreamSplitAssigner.class);
-    private static final String BINLOG_SPLIT_ID = "binlog-split";
+    private static final String STREAM_SPLIT_ID = "stream-split";
 
     private final SourceConfig sourceConfig;
 
@@ -105,7 +103,7 @@ public class StreamSplitAssigner implements SplitAssigner {
 
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
-        // we don't store the split, but will re-create binlog split later
+        // we don't store the split, but will re-create stream split later
         isStreamSplitAssigned = false;
     }
 
@@ -127,9 +125,9 @@ public class StreamSplitAssigner implements SplitAssigner {
     public StreamSplit createStreamSplit() {
 
         return new StreamSplit(
-                BINLOG_SPLIT_ID,
+                STREAM_SPLIT_ID,
                 dialect.displayCurrentOffset(sourceConfig),
-                offsetFactory.createInitialOffset(),
+                offsetFactory.createNoStoppingOffset(),
                 new ArrayList<>(),
                 new HashMap<>(),
                 0);

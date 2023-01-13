@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -23,7 +21,6 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
-import org.apache.flink.table.types.logical.utils.LogicalTypeChecks;
 
 import com.esri.core.geometry.ogc.OGCGeometry;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -117,8 +114,7 @@ public class MySqlDeserializationConverterFactory {
 
     private static Optional<DeserializationRuntimeConverter> createArrayConverter(
             ArrayType arrayType) {
-        if (LogicalTypeChecks.hasFamily(
-                arrayType.getElementType(), LogicalTypeFamily.CHARACTER_STRING)) {
+        if (hasFamily(arrayType.getElementType(), LogicalTypeFamily.CHARACTER_STRING)) {
             // only map MySQL SET type to Flink ARRAY<STRING> type
             return Optional.of(
                     new DeserializationRuntimeConverter() {
@@ -149,5 +145,9 @@ public class MySqlDeserializationConverterFactory {
             // otherwise, fallback to default converter
             return Optional.empty();
         }
+    }
+
+    private static boolean hasFamily(LogicalType logicalType, LogicalTypeFamily family) {
+        return logicalType.getTypeRoot().getFamilies().contains(family);
     }
 }

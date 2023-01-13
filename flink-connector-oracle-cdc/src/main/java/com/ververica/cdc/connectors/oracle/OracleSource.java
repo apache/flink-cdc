@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -18,11 +16,13 @@
 
 package com.ververica.cdc.connectors.oracle;
 
-import com.ververica.cdc.connectors.oracle.table.StartupOptions;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.internal.DebeziumOffset;
 import io.debezium.connector.oracle.OracleConnector;
+
+import javax.annotation.Nullable;
 
 import java.util.Properties;
 
@@ -42,25 +42,32 @@ public class OracleSource {
     /** Builder class of {@link OracleSource}. */
     public static class Builder<T> {
 
-        private int port = 1521; // default 1521 port
+        private Integer port = 1521; // default 1521 port
         private String hostname;
         private String database;
         private String username;
         private String password;
+        private String url;
         private String[] tableList;
         private String[] schemaList;
         private Properties dbzProperties;
         private StartupOptions startupOptions = StartupOptions.initial();
         private DebeziumDeserializationSchema<T> deserializer;
 
-        public Builder<T> hostname(String hostname) {
+        public Builder<T> hostname(@Nullable String hostname) {
             this.hostname = hostname;
             return this;
         }
 
         /** Integer port number of the Oracle database server. */
-        public Builder<T> port(int port) {
+        public Builder<T> port(@Nullable Integer port) {
             this.port = port;
+            return this;
+        }
+
+        /** Url to use when connecting to the Oracle database server. */
+        public Builder<T> url(@Nullable String url) {
+            this.url = url;
             return this;
         }
 
@@ -139,10 +146,18 @@ public class OracleSource {
             // and
             // underscores should be used.
             props.setProperty("database.server.name", DATABASE_SERVER_NAME);
-            props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
-            props.setProperty("database.port", String.valueOf(port));
+
+            if (url != null) {
+                props.setProperty("database.url", url);
+            }
+            if (hostname != null) {
+                props.setProperty("database.hostname", hostname);
+            }
+            if (port != null) {
+                props.setProperty("database.port", String.valueOf(port));
+            }
             props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
             props.setProperty("database.dbname", checkNotNull(database));
             if (schemaList != null) {
@@ -168,6 +183,13 @@ public class OracleSource {
 
             if (dbzProperties != null) {
                 props.putAll(dbzProperties);
+            }
+
+            if (url == null) {
+                checkNotNull(hostname, "hostname is required when url is not configured");
+                props.setProperty("database.hostname", hostname);
+                checkNotNull(port, "port is required when url is not configured");
+                props.setProperty("database.port", String.valueOf(port));
             }
 
             return new DebeziumSourceFunction<>(

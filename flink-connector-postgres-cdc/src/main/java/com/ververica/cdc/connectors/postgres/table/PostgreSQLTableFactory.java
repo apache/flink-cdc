@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -27,12 +25,15 @@ import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
+
 import java.util.HashSet;
 import java.util.Set;
 
 import static com.ververica.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
+import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** Factory for creating configured instance of {@link PostgreSQLTableSource}. */
 public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
@@ -101,6 +102,15 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                                     + "from a particular plug-in for a particular database/schema. The server uses this slot "
                                     + "to stream events to the connector that you are configuring. Default is \"flink\".");
 
+    private static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
+            ConfigOptions.key("changelog-mode")
+                    .enumType(DebeziumChangelogMode.class)
+                    .defaultValue(DebeziumChangelogMode.ALL)
+                    .withDescription(
+                            "The changelog mode used for encoding streaming changes.\n"
+                                    + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
+                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. It can be used for tables with primary keys when replica identity FULL is not an option.");
+
     @Override
     public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -117,8 +127,14 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         int port = config.get(PORT);
         String pluginName = config.get(DECODING_PLUGIN_NAME);
         String slotName = config.get(SLOT_NAME);
+        DebeziumChangelogMode changelogMode = config.get(CHANGELOG_MODE);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
+        if (changelogMode == DebeziumChangelogMode.UPSERT) {
+            checkArgument(
+                    physicalSchema.getPrimaryKey().isPresent(),
+                    "Primary key must be present when upsert mode is selected.");
+        }
 
         return new PostgreSQLTableSource(
                 physicalSchema,
@@ -131,6 +147,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 password,
                 pluginName,
                 slotName,
+                changelogMode,
                 getDebeziumProperties(context.getCatalogTable().getOptions()));
     }
 
@@ -157,6 +174,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(PORT);
         options.add(DECODING_PLUGIN_NAME);
         options.add(SLOT_NAME);
+        options.add(CHANGELOG_MODE);
         return options;
     }
 }

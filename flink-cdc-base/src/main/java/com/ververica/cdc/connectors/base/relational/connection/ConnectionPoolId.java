@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -27,10 +25,12 @@ public class ConnectionPoolId implements Serializable {
     private static final long serialVersionUID = 1L;
     private final String host;
     private final int port;
+    private final String username;
 
-    public ConnectionPoolId(String host, int port) {
+    public ConnectionPoolId(String host, int port, String username) {
         this.host = host;
         this.port = port;
+        this.username = username;
     }
 
     @Override
@@ -42,16 +42,18 @@ public class ConnectionPoolId implements Serializable {
             return false;
         }
         ConnectionPoolId that = (ConnectionPoolId) o;
-        return Objects.equals(host, that.host) && Objects.equals(port, that.port);
+        return Objects.equals(host, that.host)
+                && Objects.equals(port, that.port)
+                && Objects.equals(username, that.username);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(host, port);
+        return Objects.hash(host, port, username);
     }
 
     @Override
     public String toString() {
-        return host + ':' + port;
+        return username + '@' + host + ':' + port;
     }
 }

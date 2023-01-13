@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -22,9 +20,11 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
+import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetSerializer;
 import io.debezium.DebeziumException;
 import io.debezium.util.HexConverter;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -51,7 +51,9 @@ public class SerializerUtils {
             throws IOException {
         switch (offsetVersion) {
             case 1:
-                return in.readBoolean() ? new BinlogOffset(in.readUTF(), in.readLong()) : null;
+                return in.readBoolean()
+                        ? BinlogOffset.ofBinlogFilePosition(in.readUTF(), in.readLong())
+                        : null;
             case 2:
             case 3:
             case 4:
@@ -67,7 +69,23 @@ public class SerializerUtils {
             int binlogOffsetBytesLength = in.readInt();
             byte[] binlogOffsetBytes = new byte[binlogOffsetBytesLength];
             in.readFully(binlogOffsetBytes);
-            return BinlogOffsetSerializer.INSTANCE.deserialize(binlogOffsetBytes);
+            BinlogOffset offset = BinlogOffsetSerializer.INSTANCE.deserialize(binlogOffsetBytes);
+            // Old version of binlog offset without offset kind
+            if (offset.getOffsetKind() == null) {
+                if (StringUtils.isEmpty(offset.getFilename())
+                        && offset.getPosition() == Long.MIN_VALUE) {
+                    return BinlogOffset.ofNonStopping();
+                }
+                if (StringUtils.isEmpty(offset.getFilename()) && offset.getPosition() == 0L) {
+                    return BinlogOffset.ofEarliest();
+                }
+                // For other cases we treat it as a specific offset
+                return BinlogOffset.builder()
+                        .setOffsetKind(BinlogOffsetKind.SPECIFIC)
+                        .setOffsetMap(offset.getOffset())
+                        .build();
+            }
+            return offset;
         } else {
             return null;
         }

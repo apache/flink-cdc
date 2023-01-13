@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -25,75 +23,93 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.ververica.cdc.connectors.mongodb.MongoDBTestBase;
 import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGODB_PORT;
-import static org.junit.Assert.assertNotNull;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_PASSWORD;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_USER;
 
 /** End-to-end tests for mongodb-cdc connector uber jar. */
 public class MongoE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoE2eITCase.class);
-    private static final String MONGO_TEST_USER = "flinkuser";
-    private static final String MONGO_TEST_PASSWORD = "a1?~!@#$%^&*(){}[]<>.,+_-=/|:;";
-    private static final String MONGO_SUPER_USER = "superuser";
-    private static final String MONGO_SUPER_PASSWORD = "superpw";
     private static final String INTER_CONTAINER_MONGO_ALIAS = "mongodb";
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     private static final Path mongoCdcJar = TestUtils.getResource("mongodb-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    private MongoDBContainer mongodb;
+    private MongoDBContainer config;
+
+    private MongoDBContainer shard;
+
+    private MongoDBContainer router;
 
     private MongoClient mongoClient;
+
+    @Parameterized.Parameter(1)
+    public boolean parallelismSnapshot;
+
+    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
+    public static List<Object[]> parameters() {
+        final List<String> flinkVersions = getFlinkVersion();
+        List<Object[]> params = new ArrayList<>();
+        for (String flinkVersion : flinkVersions) {
+            params.add(new Object[] {flinkVersion, true});
+            params.add(new Object[] {flinkVersion, false});
+        }
+        return params;
+    }
 
     @Before
     public void before() {
         super.before();
-        // Tips: If you meet issue like 'errmsg" : "No host described in new configuration 1 for
-        // replica set rs0 maps to this node"' when start the container in you local environment,
-        // please check your '/etc/hosts' file contains the line 'internet_ip(not 127.0.0.1)
-        // hostname' e.g: '30.225.0.87   leonard.machine'
-        mongodb =
-                new MongoDBContainer(NETWORK)
+        config =
+                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.CONFIG)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+        shard =
+                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.SHARD)
+                        .dependsOn(config)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+        router =
+                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.ROUTER)
+                        .dependsOn(shard)
                         .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-        Startables.deepStart(Stream.of(mongodb)).join();
+        Startables.deepStart(Stream.of(config)).join();
+        Startables.deepStart(Stream.of(shard)).join();
+        Startables.deepStart(Stream.of(router)).join();
 
         MongoClientSettings settings =
                 MongoClientSettings.builder()
                         .applyConnectionString(
                                 new ConnectionString(
-                                        mongodb.getConnectionString(
+                                        router.getConnectionString(
                                                 MONGO_SUPER_USER, MONGO_SUPER_PASSWORD)))
                         .build();
         mongoClient = MongoClients.create(settings);
@@ -105,19 +121,26 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         if (mongoClient != null) {
             mongoClient.close();
         }
-        if (mongodb != null) {
-            mongodb.stop();
+        if (router != null) {
+            router.stop();
+        }
+        if (shard != null) {
+            shard.stop();
+        }
+        if (config != null) {
+            config.stop();
         }
     }
 
     @Test
     public void testMongoDbCDC() throws Exception {
         String dbName =
-                executeCommandFileInMongoDB(
+                router.executeCommandFileInDatabase(
                         "mongo_inventory",
                         "inventory" + Integer.toUnsignedString(new Random().nextInt(), 36));
         List<String> sqlLines =
                 Arrays.asList(
+                        "SET 'execution.checkpointing.interval' = '3s';",
                         "CREATE TABLE products_source (",
                         " _id STRING NOT NULL,",
                         " name STRING,",
@@ -129,10 +152,11 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                         " 'connection.options' = 'connectTimeoutMS=12000&socketTimeoutMS=13000',",
                         " 'hosts' = '" + INTER_CONTAINER_MONGO_ALIAS + ":" + MONGODB_PORT + "',",
                         " 'database' = '" + dbName + "',",
-                        " 'username' = '" + MONGO_TEST_USER + "',",
-                        " 'password' = '" + MONGO_TEST_PASSWORD + "',",
+                        " 'username' = '" + FLINK_USER + "',",
+                        " 'password' = '" + FLINK_USER_PASSWORD + "',",
                         " 'collection' = 'products',",
-                        " 'heartbeat.interval.ms' = '1000'",
+                        " 'heartbeat.interval.ms' = '1000',",
+                        " 'scan.incremental.snapshot.enabled' = '" + parallelismSnapshot + "'",
                         ");",
                         "CREATE TABLE mongodb_products_sink (",
                         " `id` STRING NOT NULL,",
@@ -209,35 +233,6 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                 "mongodb_products_sink",
                 new String[] {"id", "name", "description", "weight"},
                 60000L);
-    }
-
-    /** Executes a mongo command file, specify a database name. */
-    private String executeCommandFileInMongoDB(String fileNameIgnoreSuffix, String databaseName) {
-        final String dbName = databaseName != null ? databaseName : fileNameIgnoreSuffix;
-        final String ddlFile = String.format("ddl/%s.js", fileNameIgnoreSuffix);
-        final URL ddlTestFile = MongoDBTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-
-        try {
-            // use database;
-            String command0 = String.format("db = db.getSiblingDB('%s');\n", dbName);
-            String command1 =
-                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                            .map(String::trim)
-                            .filter(x -> StringUtils.isNotBlank(x) && !x.trim().startsWith("//"))
-                            .map(
-                                    x -> {
-                                        final Matcher m = COMMENT_PATTERN.matcher(x);
-                                        return m.matches() ? m.group(1) : x;
-                                    })
-                            .collect(Collectors.joining("\n"));
-
-            mongodb.executeCommand(command0 + command1);
-
-            return dbName;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private Document productDocOf(String id, String name, String description, Double weight) {

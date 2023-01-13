@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -19,11 +17,13 @@
 package com.ververica.cdc.connectors.mysql.source.assigners.state;
 
 import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
+import com.ververica.cdc.connectors.mysql.source.assigners.ChunkSplitter;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
-import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.util.List;
 import java.util.Map;
@@ -42,13 +42,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final List<TableId> alreadyProcessedTables;
 
     /** The splits in the checkpoint. */
-    private final List<MySqlSnapshotSplit> remainingSplits;
+    private final List<MySqlSchemalessSnapshotSplit> remainingSplits;
 
     /**
      * The snapshot splits that the {@link MySqlSourceEnumerator} has assigned to {@link
      * MySqlSplitReader}s.
      */
-    private final Map<String, MySqlSnapshotSplit> assignedSplits;
+    private final Map<String, MySqlSchemalessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received
@@ -65,15 +65,22 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     /** Whether the remaining tables are keep when snapshot state. */
     private final boolean isRemainingTablesCheckpointed;
 
+    private final Map<TableId, TableChange> tableSchemas;
+
+    /** The data structure to record the state of a {@link ChunkSplitter}. */
+    private final ChunkSplitterState chunkSplitterState;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
-            List<MySqlSnapshotSplit> remainingSplits,
-            Map<String, MySqlSnapshotSplit> assignedSplits,
+            List<MySqlSchemalessSnapshotSplit> remainingSplits,
+            Map<String, MySqlSchemalessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChange> tableSchemas,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            boolean isRemainingTablesCheckpointed) {
+            boolean isRemainingTablesCheckpointed,
+            ChunkSplitterState chunkSplitterState) {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
@@ -82,18 +89,24 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.remainingTables = remainingTables;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
+        this.tableSchemas = tableSchemas;
+        this.chunkSplitterState = chunkSplitterState;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
         return alreadyProcessedTables;
     }
 
-    public List<MySqlSnapshotSplit> getRemainingSplits() {
+    public List<MySqlSchemalessSnapshotSplit> getRemainingSplits() {
         return remainingSplits;
     }
 
-    public Map<String, MySqlSnapshotSplit> getAssignedSplits() {
+    public Map<String, MySqlSchemalessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
+    }
+
+    public Map<TableId, TableChange> getTableSchemas() {
+        return tableSchemas;
     }
 
     public Map<String, BinlogOffset> getSplitFinishedOffsets() {
@@ -116,6 +129,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return isRemainingTablesCheckpointed;
     }
 
+    public ChunkSplitterState getChunkSplitterState() {
+        return chunkSplitterState;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -132,7 +149,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
-                && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets);
+                && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets)
+                && Objects.equals(chunkSplitterState, that.chunkSplitterState);
     }
 
     @Override
@@ -145,7 +163,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 splitFinishedOffsets,
                 assignerStatus,
                 isTableIdCaseSensitive,
-                isRemainingTablesCheckpointed);
+                isRemainingTablesCheckpointed,
+                chunkSplitterState);
     }
 
     @Override
@@ -167,6 +186,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + isTableIdCaseSensitive
                 + ", isRemainingTablesCheckpointed="
                 + isRemainingTablesCheckpointed
+                + ", chunkSplitterState="
+                + chunkSplitterState
                 + '}';
     }
 }

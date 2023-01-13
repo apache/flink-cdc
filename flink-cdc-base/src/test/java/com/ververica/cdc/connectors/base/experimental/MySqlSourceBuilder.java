@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -23,7 +21,8 @@ import org.apache.flink.annotation.Experimental;
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffsetFactory;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 
 import java.time.Duration;
@@ -135,8 +134,8 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
-     * The group size of split meta, if the meta size exceeds the group size, the meta will be will
-     * be divided into multiple groups.
+     * The group size of split meta, if the meta size exceeds the group size, the meta will be
+     * divided into multiple groups.
      */
     public MySqlSourceBuilder<T> splitMetaGroupSize(int splitMetaGroupSize) {
         this.configFactory.splitMetaGroupSize(splitMetaGroupSize);
@@ -227,7 +226,7 @@ public class MySqlSourceBuilder<T> {
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }
 
-    /** The {@link JdbcIncrementalSource} implementation for MySQL. */
+    /** The {@link IncrementalSource} implementation for MySQL. */
     public static class MySqlIncrementalSource<T> extends JdbcIncrementalSource<T> {
 
         public MySqlIncrementalSource(

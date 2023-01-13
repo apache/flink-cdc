@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -26,6 +24,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.jayway.jsonpath.JsonPath;
 import com.ververica.cdc.connectors.mysql.MySqlTestUtils.TestingListState;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -594,7 +593,8 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         }
 
         Tuple2<String, Integer> offset =
-                currentMySqlLatestOffset(database, "products", 10, useLegacyImplementation);
+                currentMySqlLatestOffset(
+                        MYSQL_CONTAINER, database, "products", 10, useLegacyImplementation);
         final String offsetFile = offset.f0;
         final int offsetPos = offset.f1;
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -684,7 +684,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder(database, useLegacyImplementation)
+                    basicSourceBuilder(database, "UTC", useLegacyImplementation)
                             .tableList(database.getDatabaseName() + "." + "category")
                             .build();
             // we use blocking context to block the source to emit before last snapshot record
@@ -917,6 +917,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
     /** Gets the latest offset of current MySQL server. */
     public static Tuple2<String, Integer> currentMySqlLatestOffset(
+            MySqlContainer container,
             UniqueDatabase database,
             String table,
             int expectedRecordCount,
@@ -924,12 +925,12 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             throws Exception {
         DebeziumSourceFunction<SourceRecord> source =
                 MySqlSource.<SourceRecord>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .hostname(container.getHost())
+                        .port(container.getDatabasePort())
                         .databaseList(database.getDatabaseName())
                         .tableList(database.getDatabaseName() + "." + table)
-                        .username(MYSQL_CONTAINER.getUsername())
-                        .password(MYSQL_CONTAINER.getPassword())
+                        .username(container.getUsername())
+                        .password(container.getPassword())
                         .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
                         .debeziumProperties(createDebeziumProperties(useLegacyImplementation))
                         .build();
@@ -1040,13 +1041,13 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource(
             String offsetFile, int offsetPos) {
-        return basicSourceBuilder(database, useLegacyImplementation)
+        return basicSourceBuilder(database, "UTC", useLegacyImplementation)
                 .startupOptions(StartupOptions.specificOffset(offsetFile, offsetPos))
                 .build();
     }
 
     private DebeziumSourceFunction<SourceRecord> createMySqlBinlogSource() {
-        return basicSourceBuilder(database, useLegacyImplementation).build();
+        return basicSourceBuilder(database, "UTC", useLegacyImplementation).build();
     }
 
     private boolean waitForCheckpointLock(Object checkpointLock, Duration timeout)

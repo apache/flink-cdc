@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -51,7 +49,7 @@ public abstract class SourceSplitSerializer
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
     private static final int SNAPSHOT_SPLIT_FLAG = 1;
-    private static final int BINLOG_SPLIT_FLAG = 2;
+    private static final int STREAM_SPLIT_FLAG = 2;
 
     @Override
     public int getVersion() {
@@ -87,25 +85,25 @@ public abstract class SourceSplitSerializer
             snapshotSplit.serializedFormCache = result;
             return result;
         } else {
-            final StreamSplit binlogSplit = split.asStreamSplit();
+            final StreamSplit streamSplit = split.asStreamSplit();
             // optimization: the splits lazily cache their own serialized form
-            if (binlogSplit.serializedFormCache != null) {
-                return binlogSplit.serializedFormCache;
+            if (streamSplit.serializedFormCache != null) {
+                return streamSplit.serializedFormCache;
             }
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
-            out.writeInt(BINLOG_SPLIT_FLAG);
-            out.writeUTF(binlogSplit.splitId());
+            out.writeInt(STREAM_SPLIT_FLAG);
+            out.writeUTF(streamSplit.splitId());
             out.writeUTF("");
-            writeOffsetPosition(binlogSplit.getStartingOffset(), out);
-            writeOffsetPosition(binlogSplit.getEndingOffset(), out);
-            writeFinishedSplitsInfo(binlogSplit.getFinishedSnapshotSplitInfos(), out);
-            writeTableSchemas(binlogSplit.getTableSchemas(), out);
-            out.writeInt(binlogSplit.getTotalFinishedSplitSize());
+            writeOffsetPosition(streamSplit.getStartingOffset(), out);
+            writeOffsetPosition(streamSplit.getEndingOffset(), out);
+            writeFinishedSplitsInfo(streamSplit.getFinishedSnapshotSplitInfos(), out);
+            writeTableSchemas(streamSplit.getTableSchemas(), out);
+            out.writeInt(streamSplit.getTotalFinishedSplitSize());
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
             // serialization
-            binlogSplit.serializedFormCache = result;
+            streamSplit.serializedFormCache = result;
             return result;
         }
     }
@@ -143,7 +141,7 @@ public abstract class SourceSplitSerializer
                     splitBoundaryEnd,
                     highWatermark,
                     tableSchemas);
-        } else if (splitKind == BINLOG_SPLIT_FLAG) {
+        } else if (splitKind == STREAM_SPLIT_FLAG) {
             String splitId = in.readUTF();
             // skip split Key Type
             in.readUTF();
@@ -169,7 +167,7 @@ public abstract class SourceSplitSerializer
         }
     }
 
-    private static void writeTableSchemas(
+    public static void writeTableSchemas(
             Map<TableId, TableChange> tableSchemas, DataOutputSerializer out) throws IOException {
         FlinkJsonTableChangeSerializer jsonSerializer = new FlinkJsonTableChangeSerializer();
         DocumentWriter documentWriter = DocumentWriter.defaultWriter();
@@ -185,7 +183,7 @@ public abstract class SourceSplitSerializer
         }
     }
 
-    private static Map<TableId, TableChange> readTableSchemas(int version, DataInputDeserializer in)
+    public static Map<TableId, TableChange> readTableSchemas(int version, DataInputDeserializer in)
             throws IOException {
         DocumentReader documentReader = DocumentReader.defaultReader();
         Map<TableId, TableChange> tableSchemas = new HashMap<>();

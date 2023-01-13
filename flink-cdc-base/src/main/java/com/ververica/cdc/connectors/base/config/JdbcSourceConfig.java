@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2022 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -19,7 +17,7 @@
 package com.ververica.cdc.connectors.base.config;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import com.ververica.cdc.connectors.base.source.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.IncrementalSource;
 import io.debezium.config.Configuration;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 
@@ -28,8 +26,7 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * A Source configuration which is used by {@link JdbcIncrementalSource} which used JDBC data
- * source.
+ * A Source configuration which is used by {@link IncrementalSource} which used JDBC data source.
  */
 public abstract class JdbcSourceConfig extends BaseSourceConfig {
 
@@ -45,6 +42,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final Duration connectTimeout;
     protected final int connectMaxRetries;
     protected final int connectionPoolSize;
+    protected final String chunkKeyColumn;
 
     public JdbcSourceConfig(
             StartupOptions startupOptions,
@@ -66,7 +64,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             String serverTimeZone,
             Duration connectTimeout,
             int connectMaxRetries,
-            int connectionPoolSize) {
+            int connectionPoolSize,
+            String chunkKeyColumn) {
         super(
                 startupOptions,
                 splitSize,
@@ -88,6 +87,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         this.connectTimeout = connectTimeout;
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
+        this.chunkKeyColumn = chunkKeyColumn;
     }
 
     public abstract RelationalDatabaseConnectorConfig getDbzConnectorConfig();
@@ -138,5 +138,9 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
 
     public int getConnectionPoolSize() {
         return connectionPoolSize;
+    }
+
+    public String getChunkKeyColumn() {
+        return chunkKeyColumn;
     }
 }
