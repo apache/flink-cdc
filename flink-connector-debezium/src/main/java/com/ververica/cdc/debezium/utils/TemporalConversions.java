@@ -24,6 +24,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.concurrent.TimeUnit;
 
 /** Temporal conversion constants. */
@@ -123,6 +124,9 @@ public final class TemporalConversions {
                         "Time values must use number of milliseconds greater than 0 and less than 86400000000000");
             }
         }
+        if (obj instanceof String) {
+            return LocalTime.parse((String) obj);
+        }
         throw new IllegalArgumentException(
                 "Unable to convert to LocalTime from unexpected value '"
                         + obj
@@ -150,6 +154,10 @@ public final class TemporalConversions {
         if (obj instanceof LocalTime) {
             LocalTime time = (LocalTime) obj;
             return LocalDateTime.of(EPOCH, time);
+        }
+        if (obj instanceof ZonedDateTime) {
+            ZonedDateTime zonedDateTime = (ZonedDateTime) obj;
+            return zonedDateTime.withZoneSameInstant(serverTimeZone).toLocalDateTime();
         }
         if (obj instanceof java.sql.Date) {
             java.sql.Date sqlDate = (java.sql.Date) obj;

@@ -613,6 +613,16 @@ import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlSourceExample {
   public static void main(String[] args) throws Exception {
+      Properties properties = new Properties();
+      properties.put("converters", "flinkcdc-converter"); // custom a debezium mysql data type converter
+      properties.put(
+              "mysql-converter.type",
+              "com.ververica.cdc.debezium.converter.FlinkCDCFormatConverter");
+      properties.put("flinkcdc-converter.format.date", "yyyy-MM-dd");
+      properties.put("flinkcdc-converter.format.time", "HH:mm:ss");
+      properties.put("flinkcdc-converter.format.datetime", "yyyy-MM-dd HH:mm:ss");
+      properties.put("flinkcdc-converter.format.timestamp", "yyyy-MM-dd HH:mm:ss");
+      properties.put("flinkcdc-converter.format.timestamp.zone", "Asia/Shanghai");
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
@@ -621,6 +631,7 @@ public class MySqlSourceExample {
         .username("yourUsername")
         .password("yourPassword")
         .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .debeziumProperties(properties)
         .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

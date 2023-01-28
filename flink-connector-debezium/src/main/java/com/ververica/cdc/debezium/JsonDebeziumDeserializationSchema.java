@@ -20,6 +20,7 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.util.Collector;
 
+import org.apache.kafka.connect.json.DecimalFormat;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -78,6 +79,7 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
         final HashMap<String, Object> configs = new HashMap<>(2);
         configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
         configs.put(JsonConverterConfig.SCHEMAS_ENABLE_CONFIG, includeSchema);
+        configs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, DecimalFormat.NUMERIC.name());
         if (customConverterConfigs != null) {
             configs.putAll(customConverterConfigs);
         }
