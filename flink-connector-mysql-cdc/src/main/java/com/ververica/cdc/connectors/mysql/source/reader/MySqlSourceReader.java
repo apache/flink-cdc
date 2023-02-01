@@ -209,21 +209,14 @@ public class MySqlSourceReader<T>
 
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(MySqlBinlogSplit split) {
         final String splitId = split.splitId();
-        if (split.getTableSchemas().isEmpty()) {
-            try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
-                Map<TableId, TableChanges.TableChange> tableSchemas =
-                        TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
-                LOG.info("The table schema discovery for binlog split {} success", splitId);
-                return MySqlBinlogSplit.fillTableSchemas(split, tableSchemas);
-            } catch (SQLException e) {
-                LOG.error("Failed to obtains table schemas due to {}", e.getMessage());
-                throw new FlinkRuntimeException(e);
-            }
-        } else {
-            LOG.warn(
-                    "The binlog split {} has table schemas yet, skip the table schema discovery",
-                    split);
-            return split;
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
+            LOG.info("The table schema discovery for binlog split {} success", splitId);
+            return MySqlBinlogSplit.fillTableSchemas(split, tableSchemas);
+        } catch (SQLException e) {
+            LOG.error("Failed to obtains table schemas due to {}", e.getMessage());
+            throw new FlinkRuntimeException(e);
         }
     }
 

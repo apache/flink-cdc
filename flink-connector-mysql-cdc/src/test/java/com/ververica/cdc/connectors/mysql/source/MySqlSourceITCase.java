@@ -103,6 +103,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
+    private static final String LATEST_SCAN_STARTUP_MODE = "latest-offset";
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -247,6 +248,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                DEFAULT_SCAN_STARTUP_MODE,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -258,6 +260,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                DEFAULT_SCAN_STARTUP_MODE,
                 true,
                 "address_hangzhou",
                 "address_beijing");
@@ -269,6 +272,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                DEFAULT_SCAN_STARTUP_MODE,
                 false,
                 "address_hangzhou",
                 "address_beijing",
@@ -281,7 +285,21 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                DEFAULT_SCAN_STARTUP_MODE,
                 true,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai");
+    }
+
+    @Test
+    public void testLatestModeNewlyAddedTableForExistsPipelineTwice() throws Exception {
+        testNewlyAddedTableOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                LATEST_SCAN_STARTUP_MODE,
+                false,
                 "address_hangzhou",
                 "address_beijing",
                 "address_shanghai");
@@ -293,6 +311,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                DEFAULT_SCAN_STARTUP_MODE,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -305,6 +324,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                DEFAULT_SCAN_STARTUP_MODE,
                 true,
                 "address_hangzhou",
                 "address_beijing");
@@ -316,6 +336,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
+                DEFAULT_SCAN_STARTUP_MODE,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -327,6 +348,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
+                DEFAULT_SCAN_STARTUP_MODE,
                 true,
                 "address_hangzhou",
                 "address_beijing");
@@ -338,6 +360,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
+                DEFAULT_SCAN_STARTUP_MODE,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -349,6 +372,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
+                DEFAULT_SCAN_STARTUP_MODE,
                 false,
                 "address_hangzhou",
                 "address_beijing");
@@ -760,6 +784,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             int parallelism,
             FailoverType failoverType,
             FailoverPhase failoverPhase,
+            String startupMode,
             boolean makeBinlogBeforeCapture,
             String... captureAddressTables)
             throws Exception {
@@ -772,7 +797,6 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         final TemporaryFolder temporaryFolder = new TemporaryFolder();
         temporaryFolder.create();
         final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
-
         // test newly added table one by one
         String finishedSavePointPath = null;
         List<String> fetchedDataList = new ArrayList<>();
@@ -789,7 +813,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
             StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-            String createTableStatement = getCreateTableStatement(captureTablesThisRound);
+            String createTableStatement =
+                    getCreateTableStatement(startupMode, captureTablesThisRound);
             tEnv.executeSql(createTableStatement);
             tEnv.executeSql(
                     "CREATE TABLE sink ("
@@ -806,21 +831,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             TableResult tableResult = tEnv.executeSql("insert into sink select * from address");
             JobClient jobClient = tableResult.getJobClient().get();
 
-            // step 2: assert fetched snapshot data in this round
             String cityName = newlyAddedTable.split("_")[1];
-            List<String> expectedSnapshotDataThisRound =
-                    Arrays.asList(
-                            format(
-                                    "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
-                                    newlyAddedTable, cityName, cityName),
-                            format(
-                                    "+I[%s, 416927583791428523, China, %s, %s West Town address 2]",
-                                    newlyAddedTable, cityName, cityName),
-                            format(
-                                    "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
-                                    newlyAddedTable, cityName, cityName));
-            if (makeBinlogBeforeCapture) {
-                expectedSnapshotDataThisRound =
+            // step 2: assert fetched snapshot data in this round
+            if (DEFAULT_SCAN_STARTUP_MODE.equals(startupMode)) {
+                List<String> expectedSnapshotDataThisRound =
                         Arrays.asList(
                                 format(
                                         "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
@@ -830,24 +844,39 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                         newlyAddedTable, cityName, cityName),
                                 format(
                                         "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
-                                        newlyAddedTable, cityName, cityName),
-                                format(
-                                        "+I[%s, 417022095255614381, China, %s, %s West Town address 5]",
                                         newlyAddedTable, cityName, cityName));
+                if (makeBinlogBeforeCapture) {
+                    expectedSnapshotDataThisRound =
+                            Arrays.asList(
+                                    format(
+                                            "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
+                                            newlyAddedTable, cityName, cityName),
+                                    format(
+                                            "+I[%s, 416927583791428523, China, %s, %s West Town address 2]",
+                                            newlyAddedTable, cityName, cityName),
+                                    format(
+                                            "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
+                                            newlyAddedTable, cityName, cityName),
+                                    format(
+                                            "+I[%s, 417022095255614381, China, %s, %s West Town address 5]",
+                                            newlyAddedTable, cityName, cityName));
+                    // trigger failover after some snapshot data read finished
+                    if (failoverPhase == FailoverPhase.SNAPSHOT) {
+                        triggerFailover(
+                                failoverType,
+                                jobClient.getJobID(),
+                                miniClusterResource.getMiniCluster(),
+                                () -> sleepMs(100));
+                    }
+                    fetchedDataList.addAll(expectedSnapshotDataThisRound);
+                    waitForSinkSize("sink", fetchedDataList.size());
+                    assertEqualsInAnyOrder(
+                            fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+                }
+            } else {
+                // wait for binaryLogClient connect
+                Thread.sleep(30 * 1000L);
             }
-
-            // trigger failover after some snapshot data read finished
-            if (failoverPhase == FailoverPhase.SNAPSHOT) {
-                triggerFailover(
-                        failoverType,
-                        jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
-                        () -> sleepMs(100));
-            }
-            fetchedDataList.addAll(expectedSnapshotDataThisRound);
-            waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
-
             // step 3: make some binlog data for this round
             makeFirstPartBinlogForAddressTable(getConnection(), newlyAddedTable);
             if (failoverPhase == FailoverPhase.BINLOG) {
@@ -882,7 +911,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
     }
 
-    private String getCreateTableStatement(String... captureTableNames) {
+    private String getCreateTableStatement(String startupMode, String... captureTableNames) {
         return format(
                 "CREATE TABLE address ("
                         + " table_name STRING METADATA VIRTUAL,"
@@ -894,6 +923,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         + ") WITH ("
                         + " 'connector' = 'mysql-cdc',"
                         + " 'scan.incremental.snapshot.enabled' = 'true',"
+                        + " 'scan.startup.mode' = '%s',"
                         + " 'hostname' = '%s',"
                         + " 'port' = '%s',"
                         + " 'username' = '%s',"
@@ -905,6 +935,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         + " 'server-id' = '%s',"
                         + " 'scan.newly-added-table.enabled' = 'true'"
                         + ")",
+                startupMode,
                 MYSQL_CONTAINER.getHost(),
                 MYSQL_CONTAINER.getDatabasePort(),
                 customDatabase.getUsername(),
