@@ -216,6 +216,7 @@ public class RowV2 {
         this.offsets32 = new int[this.numNotNullCols];
     }
 
+    /** Copied from https://github.com/tikv/client-java project to fix. */
     public static class ColIDSearchResult {
         int idx;
         boolean isNull;
