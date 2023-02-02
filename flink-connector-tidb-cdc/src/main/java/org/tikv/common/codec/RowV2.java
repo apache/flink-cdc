@@ -20,9 +20,7 @@ import org.tikv.common.exception.InvalidCodecFormatException;
 
 import java.util.Arrays;
 
-/**
- * Copied from https://github.com/tikv/client-java project to fix
- */
+/** Copied from https://github.com/tikv/client-java project to fix */
 public class RowV2 {
     // CodecVer is the constant number that represent the new row format.
     public static int CODEC_VER = 0x80;
@@ -118,10 +116,9 @@ public class RowV2 {
     }
 
     /**
-     * Fill int array starting from 2.
-     * Why start with 2 ?
-     * Because the binarySearch method only looks for non-primary key fields, and ID values for non-primary key fields start at 2.
-     * Primary key fields are handled separately, the ID value of the primary key field is 1.
+     * Fill int array starting from 2. Why start with 2 ? Because the binarySearch method only looks
+     * for non-primary key fields, and ID values for non-primary key fields start at 2. Primary key
+     * fields are handled separately, the ID value of the primary key field is 1.
      */
     private void readFullyForInt(int[] colIdsInt, int i, int numCols) {
         int val = 2;

@@ -23,9 +23,7 @@ import org.tikv.common.row.Row;
 
 import java.util.List;
 
-/**
- * Copied from https://github.com/tikv/client-java project to fix
- */
+/** Copied from https://github.com/tikv/client-java project to fix */
 public class TableCodec {
     public static byte[] encodeRow(
             List<TiColumnInfo> columnInfos,

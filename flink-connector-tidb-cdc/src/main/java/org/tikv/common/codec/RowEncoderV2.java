@@ -33,9 +33,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Copied from https://github.com/tikv/client-java project to fix
- */
+/** Copied from https://github.com/tikv/client-java project to fix */
 public class RowEncoderV2 {
     private static final long SIGN_MASK = 0x8000000000000000L;
     private int numCols;
@@ -205,7 +203,8 @@ public class RowEncoderV2 {
                 } else if (value instanceof Float) {
                     encodeFloat(cdo, value);
                 } else {
-                    throw new TypeException("type does not match in encoding, should be float/double");
+                    throw new TypeException(
+                            "type does not match in encoding, should be float/double");
                 }
                 break;
             case TypeString:
@@ -308,7 +307,8 @@ public class RowEncoderV2 {
             Timestamp timestamp = (Timestamp) value;
             DateTime dateTime = new DateTime(timestamp.getTime());
             int nanos = timestamp.getNanos();
-            ExtendedDateTime extendedDateTime = new ExtendedDateTime(dateTime, (nanos / 1000) % 1000);
+            ExtendedDateTime extendedDateTime =
+                    new ExtendedDateTime(dateTime, (nanos / 1000) % 1000);
             long t = Codec.DateTimeCodec.toPackedLong(extendedDateTime, tz);
             encodeInt(cdo, t);
         } else if (value instanceof Date) {
@@ -368,4 +368,3 @@ public class RowEncoderV2 {
         throw new CodecException("JSON encoding is not yet supported.");
     }
 }
-
