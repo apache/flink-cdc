@@ -23,7 +23,7 @@ import org.tikv.common.row.Row;
 
 import java.util.List;
 
-/** Copied from https://github.com/tikv/client-java project to fix */
+/** Copied from https://github.com/tikv/client-java project to fix. */
 public class TableCodec {
     public static byte[] encodeRow(
             List<TiColumnInfo> columnInfos,
@@ -47,7 +47,7 @@ public class TableCodec {
         if (value.length == 0) {
             throw new CodecException("Decode fails: value length is zero");
         }
-        if ((value[0] & 0xff) == RowV2.CODEC_VER) {
+        if ((value[0] & 0xff) == RowV2.CODER_VER) {
             return TableCodecV2.decodeObjects(value, handle, tableInfo);
         }
         return TableCodecV1.decodeObjects(value, handle, tableInfo);
@@ -57,7 +57,7 @@ public class TableCodec {
         if (value.length == 0) {
             throw new CodecException("Decode fails: value length is zero");
         }
-        if ((value[0] & 0xff) == RowV2.CODEC_VER) {
+        if ((value[0] & 0xff) == RowV2.CODER_VER) {
             return TableCodecV2.decodeRow(value, handle, tableInfo);
         }
         return TableCodecV1.decodeRow(value, handle, tableInfo);

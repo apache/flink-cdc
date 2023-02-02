@@ -33,7 +33,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-/** Copied from https://github.com/tikv/client-java project to fix */
+/** Copied from https://github.com/tikv/client-java project to fix. */
 public class RowEncoderV2 {
     private static final long SIGN_MASK = 0x8000000000000000L;
     private int numCols;

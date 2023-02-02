@@ -25,14 +25,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-/** Copied from https://github.com/tikv/client-java project to fix */
+/** Copied from https://github.com/tikv/client-java project to fix. */
 public class TableCodecV2 {
     /**
-     * New Row Format: Reference
-     * https://github.com/pingcap/tidb/blob/952d1d7541a8e86be0af58f5b7e3d5e982bab34e/docs/design/2018-07-19-row-format.md
+     * New Row Format: Reference.
+     * https://github.com/pingcap/tidb/blob/952d1d7541a8e86be0af58f5b7e3d5e982bab34e/docs/design/2018-07-19-row-format.md.
      *
      * <p>- version, flag, numOfNotNullCols, numOfNullCols, notNullCols, nullCols, notNullOffsets,
-     * notNullValues
+     * notNullValues.
      */
     protected static byte[] encodeRow(
             List<TiColumnInfo> columnInfos, Object[] values, boolean isPkHandle) {
