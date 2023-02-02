@@ -47,7 +47,7 @@ public class TableCodec {
         if (value.length == 0) {
             throw new CodecException("Decode fails: value length is zero");
         }
-        if ((value[0] & 0xff) == RowV2.CODER_VER) {
+        if ((value[0] & 0xff) == RowV2.coderVer) {
             return TableCodecV2.decodeObjects(value, handle, tableInfo);
         }
         return TableCodecV1.decodeObjects(value, handle, tableInfo);
@@ -57,7 +57,7 @@ public class TableCodec {
         if (value.length == 0) {
             throw new CodecException("Decode fails: value length is zero");
         }
-        if ((value[0] & 0xff) == RowV2.CODER_VER) {
+        if ((value[0] & 0xff) == RowV2.coderVer) {
             return TableCodecV2.decodeRow(value, handle, tableInfo);
         }
         return TableCodecV1.decodeRow(value, handle, tableInfo);
