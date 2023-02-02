@@ -23,7 +23,7 @@ import java.util.Arrays;
 /** Copied from https://github.com/tikv/client-java project to fix. */
 public class RowV2 {
     // CodecVer is the constant number that represent the new row format.
-    public static int CODER_VER = 0x80;
+    public static int coderVer = 0x80;
     // small:  colID byte[], offsets int[], optimized for most cases.
     // large:  colID long[], offsets long[].
     boolean large;
@@ -74,7 +74,7 @@ public class RowV2 {
 
     private void fromBytes(byte[] rowData) {
         CodecDataInputLittleEndian cdi = new CodecDataInputLittleEndian(rowData);
-        if (cdi.readUnsignedByte() != CODER_VER) {
+        if (cdi.readUnsignedByte() != coderVer) {
             throw new InvalidCodecFormatException("invalid codec version");
         }
         this.large = (cdi.readUnsignedByte() & 1) > 0;
@@ -141,7 +141,7 @@ public class RowV2 {
 
     public byte[] toBytes() {
         CodecDataOutputLittleEndian cdo = new CodecDataOutputLittleEndian();
-        cdo.write(CODER_VER);
+        cdo.write(coderVer);
         cdo.write(this.large ? 1 : 0);
         cdo.writeShort(this.numNotNullCols);
         cdo.writeShort(this.numNullCols);
