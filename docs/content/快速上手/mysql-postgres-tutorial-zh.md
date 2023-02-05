@@ -26,6 +26,8 @@ services:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai
   mysql:
     image: debezium/example-mysql:1.1
     ports:
@@ -34,6 +36,8 @@ services:
       - MYSQL_ROOT_PASSWORD=123456
       - MYSQL_USER=mysqluser
       - MYSQL_PASSWORD=mysqlpw
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai      
   elasticsearch:
     image: elastic/elasticsearch:7.6.0
     environment:
@@ -41,6 +45,8 @@ services:
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - discovery.type=single-node
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai      
     ports:
       - "9200:9200"
       - "9300:9300"
@@ -53,6 +59,9 @@ services:
         hard: 65536
   kibana:
     image: elastic/kibana:7.6.0
+    environment:
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai   
     ports:
       - "5601:5601"
 ```
