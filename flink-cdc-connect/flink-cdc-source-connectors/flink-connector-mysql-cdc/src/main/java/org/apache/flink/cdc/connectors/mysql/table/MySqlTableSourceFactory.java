@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.cdc.debezium.table.DebeziumOptions;
 import org.apache.flink.cdc.debezium.utils.JdbcUrlUtils;
 import org.apache.flink.configuration.ConfigOption;
@@ -47,6 +48,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
+import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHANGELOG_MODE;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -116,7 +119,12 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         }
 
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
-
+        DebeziumChangelogMode changelogMode = config.get(CHANGELOG_MODE);
+        if (changelogMode == DebeziumChangelogMode.UPSERT) {
+            checkArgument(
+                    physicalSchema.getPrimaryKey().isPresent(),
+                    "Primary key must be present when upsert mode is selected.");
+        }
         return new MySqlTableSource(
                 physicalSchema,
                 port,
@@ -143,7 +151,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
                 chunkKeyColumn,
-                skipSnapshotBackFill);
+                skipSnapshotBackFill,
+                changelogMode);
     }
 
     @Override
@@ -189,6 +198,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.HEARTBEAT_INTERVAL);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        options.add(MySqlSourceOptions.CHANGELOG_MODE);
         return options;
     }
 

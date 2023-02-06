@@ -354,6 +354,15 @@ Flink SQL> SELECT * FROM orders;
           <td>Duration</td>
           <td>用于跟踪最新可用 binlog 偏移的发送心跳事件的间隔。</td>
     </tr>
+    </tr> 
+    <tr>
+          <td>changelog-mode</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">all</td>
+          <td>String</td>
+          <td>用于设置变更流的编码模式。支持的值有<code>all</code> (将变更流编码为带有所有RowKinds类型的retract流) 和 <code>upsert</code> (将变更流编码为可以根据主键进行幂等更新的upsert流)。
+          <br/>使用"upsert"模式必须声明主键。</td>
+    </tr> 
     <tr>
       <td>debezium.*</td>
       <td>optional</td>

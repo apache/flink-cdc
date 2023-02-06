@@ -68,6 +68,8 @@ import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.assertContainsErrorMsg;
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -2256,6 +2258,128 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[2, 127, 255, 255, 32767, 65535, 65535, 2024]"
                 };
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testUpsertMode() throws Exception {
+        if (incrementalSnapshot) {
+            env.setParallelism(1);
+            // check the checkpoint is optional when parallelism is 1
+            env.getCheckpointConfig().disableCheckpointing();
+        } else {
+            return;
+        }
+        inventoryDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " `id` INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s',"
+                                + " 'changelog-mode' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        inventoryDatabase.getDatabaseName(),
+                        "products",
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize(),
+                        "upsert");
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " weightSum DECIMAL(10,3),"
+                        + " PRIMARY KEY (name) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT name, SUM(weight) FROM debezium_source GROUP BY name");
+        waitForSnapshotStarted("sink");
+
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM products WHERE id=111;");
+        }
+
+        waitForSinkSize("sink", 20);
+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | id  | name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
+
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertThat(actual, containsInAnyOrder(expected));
+
         result.getJobClient().get().cancel().get();
     }
 

@@ -21,6 +21,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.table.catalog.ObjectPath;
@@ -83,6 +84,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
     final boolean skipSnapshotBackFill;
+    private DebeziumChangelogMode changelogMode;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -120,7 +122,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             Properties jdbcProperties,
             Duration heartbeatInterval,
             @Nullable String chunkKeyColumn,
-            boolean skipSnapshotBackFill) {
+            boolean skipSnapshotBackFill,
+            DebeziumChangelogMode changelogMode) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -150,11 +153,20 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
         this.skipSnapshotBackFill = skipSnapshotBackFill;
+        this.changelogMode = changelogMode;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.all();
+        switch (changelogMode) {
+            case UPSERT:
+                return org.apache.flink.table.connector.ChangelogMode.upsert();
+            case ALL:
+                return org.apache.flink.table.connector.ChangelogMode.all();
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported changelog mode: " + changelogMode);
+        }
     }
 
     @Override
@@ -173,6 +185,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setServerTimeZone(serverTimeZone)
                         .setUserDefinedConverterFactory(
                                 MySqlDeserializationConverterFactory.instance())
+                        .setChangelogMode(changelogMode)
                         .build();
         if (enableParallelRead) {
             MySqlSource<RowData> parallelSource =
@@ -290,7 +303,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         jdbcProperties,
                         heartbeatInterval,
                         chunkKeyColumn,
-                        skipSnapshotBackFill);
+                        skipSnapshotBackFill,
+                        changelogMode);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -332,7 +346,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(jdbcProperties, that.jdbcProperties)
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
-                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill);
+                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill)
+                && Objects.equals(changelogMode, that.changelogMode);
     }
 
     @Override
@@ -365,7 +380,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 jdbcProperties,
                 heartbeatInterval,
                 chunkKeyColumn,
-                skipSnapshotBackFill);
+                skipSnapshotBackFill,
+                changelogMode);
     }
 
     @Override
