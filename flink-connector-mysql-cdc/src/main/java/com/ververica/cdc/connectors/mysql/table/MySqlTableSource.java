@@ -31,6 +31,7 @@ import org.apache.flink.table.types.logical.RowType;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
@@ -79,6 +80,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
+    private DebeziumChangelogMode changelogMode;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -114,7 +116,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean scanNewlyAddedTableEnabled,
             Properties jdbcProperties,
             Duration heartbeatInterval,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            DebeziumChangelogMode changelogMode) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -142,11 +145,20 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.changelogMode = changelogMode;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.all();
+        switch (changelogMode) {
+            case UPSERT:
+                return org.apache.flink.table.connector.ChangelogMode.upsert();
+            case ALL:
+                return org.apache.flink.table.connector.ChangelogMode.all();
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported changelog mode: " + changelogMode);
+        }
     }
 
     @Override
@@ -165,6 +177,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setServerTimeZone(serverTimeZone)
                         .setUserDefinedConverterFactory(
                                 MySqlDeserializationConverterFactory.instance())
+                        .setChangelogMode(changelogMode)
                         .build();
         if (enableParallelRead) {
             MySqlSource<RowData> parallelSource =
@@ -271,7 +284,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         scanNewlyAddedTableEnabled,
                         jdbcProperties,
                         heartbeatInterval,
-                        chunkKeyColumn);
+                        chunkKeyColumn,
+                        changelogMode);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -311,7 +325,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(jdbcProperties, that.jdbcProperties)
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
-                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(changelogMode, that.changelogMode);
     }
 
     @Override
@@ -342,7 +357,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 scanNewlyAddedTableEnabled,
                 jdbcProperties,
                 heartbeatInterval,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                changelogMode);
     }
 
     @Override

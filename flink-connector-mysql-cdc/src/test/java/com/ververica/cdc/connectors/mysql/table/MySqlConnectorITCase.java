@@ -1773,6 +1773,98 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testUpsertMode() throws Exception {
+        if (incrementalSnapshot) {
+            env.setParallelism(1);
+            // check the checkpoint is optional when parallelism is 1
+            env.getCheckpointConfig().disableCheckpointing();
+        } else {
+            return;
+        }
+        inventoryDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " `id` INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s',"
+                                + " 'changelog-mode' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        inventoryDatabase.getDatabaseName(),
+                        "products",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize(),
+                        "upsert");
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM debezium_source");
+        CloseableIterator<Row> iterator = result.collect();
+        String[] expectedSnapshot =
+                new String[] {
+                    "+I[101, scooter, Small 2-wheel scooter, 3.140]",
+                    "+I[102, car battery, 12V car battery, 8.100]",
+                    "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.800]",
+                    "+I[104, hammer, 12oz carpenter's hammer, 0.750]",
+                    "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
+                    "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
+                    "+I[107, rocks, box of assorted rocks, 5.300]",
+                    "+I[108, jacket, water resistent black wind breaker, 0.100]",
+                    "+I[109, spare tire, 24 inch spare tire, 22.200]"
+                };
+        assertEqualsInAnyOrder(
+                Arrays.asList(expectedSnapshot), fetchRows(iterator, expectedSnapshot.length));
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM products WHERE id=111;");
+        }
+
+        String[] expectedBinlog =
+                new String[] {
+                    "+I[110, jacket, water resistent white wind breaker, 0.200]",
+                    "+I[111, scooter, Big 2-wheel scooter , 5.180]",
+                    "-U[110, jacket, water resistent white wind breaker, 0.200]",
+                    "+U[110, jacket, new water resistent white wind breaker, 0.500]",
+                    "-U[111, scooter, Big 2-wheel scooter , 5.180]",
+                    "+U[111, scooter, Big 2-wheel scooter , 5.170]",
+                    "-D[111, scooter, Big 2-wheel scooter , 5.170]"
+                };
+        assertEqualsInOrder(
+                Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
+        result.getJobClient().get().cancel().get();
+    }
+
     // ------------------------------------------------------------------------------------
 
     private String getDezImplementation() {

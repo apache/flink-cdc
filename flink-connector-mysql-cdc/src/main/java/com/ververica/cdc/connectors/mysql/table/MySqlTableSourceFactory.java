@@ -28,6 +28,7 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
+import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHANGELOG_MODE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -69,6 +71,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
+import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
@@ -121,7 +124,12 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
         }
-
+        DebeziumChangelogMode changelogMode = config.get(CHANGELOG_MODE);
+        if (changelogMode == DebeziumChangelogMode.UPSERT) {
+            checkArgument(
+                    physicalSchema.getPrimaryKey().isPresent(),
+                    "Primary key must be present when upsert mode is selected.");
+        }
         return new MySqlTableSource(
                 physicalSchema,
                 port,
@@ -146,7 +154,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 scanNewlyAddedTableEnabled,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
-                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null),
+                changelogMode);
     }
 
     @Override
@@ -190,6 +199,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(CHANGELOG_MODE);
         return options;
     }
 
