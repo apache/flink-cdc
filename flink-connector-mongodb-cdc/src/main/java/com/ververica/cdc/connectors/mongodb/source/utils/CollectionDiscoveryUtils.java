@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mongodb.source.utils;
 import com.mongodb.MongoNamespace;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoDatabase;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
@@ -88,22 +89,21 @@ public class CollectionDiscoveryUtils {
         return collectionNames;
     }
 
-    public static Predicate<String> databaseFilter(List<String> databaseList) {
-        Predicate<String> databaseFilter = CollectionDiscoveryUtils::isNotBuiltInDatabase;
-        if (databaseList != null && !databaseList.isEmpty()) {
-            List<Pattern> databasePatterns = includeListAsPatterns(databaseList);
-            databaseFilter = databaseFilter.and(anyMatch(databasePatterns));
+    private static Predicate<String> stringListFilter(
+            Predicate<String> filter, List<String> stringList) {
+        if (CollectionUtils.isNotEmpty(stringList)) {
+            List<Pattern> databasePatterns = includeListAsPatterns(stringList);
+            filter = filter.and(anyMatch(databasePatterns));
         }
-        return databaseFilter;
+        return filter;
+    }
+
+    public static Predicate<String> databaseFilter(List<String> databaseList) {
+        return stringListFilter(CollectionDiscoveryUtils::isNotBuiltInDatabase, databaseList);
     }
 
     public static Predicate<String> collectionsFilter(List<String> collectionList) {
-        Predicate<String> collectionFilter = CollectionDiscoveryUtils::isNotBuiltInCollections;
-        if (collectionList != null && !collectionList.isEmpty()) {
-            List<Pattern> collectionPatterns = includeListAsPatterns(collectionList);
-            collectionFilter = collectionFilter.and(anyMatch(collectionPatterns));
-        }
-        return collectionFilter;
+        return stringListFilter(CollectionDiscoveryUtils::isNotBuiltInCollections, collectionList);
     }
 
     public static Predicate<String> anyMatch(List<Pattern> patterns) {
