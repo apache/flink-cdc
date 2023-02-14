@@ -124,6 +124,7 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
             SourceRecord lowWatermark = null;
             SourceRecord highWatermark = null;
             Map<Struct, SourceRecord> outputBuffer = new HashMap<>();
+            List<SourceRecord> snapshotRecordsWithoutKey = new ArrayList<>();
             while (!reachChangeLogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
@@ -149,7 +150,11 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
                     }
 
                     if (!reachChangeLogStart) {
-                        outputBuffer.put((Struct) record.key(), record);
+                        if (record.key() == null) {
+                            snapshotRecordsWithoutKey.add(record);
+                        } else {
+                            outputBuffer.put((Struct) record.key(), record);
+                        }
                     } else {
                         if (isChangeRecordInChunkRange(record)) {
                             // rewrite overlapping snapshot records through the record key
@@ -163,7 +168,11 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
 
             final List<SourceRecord> normalizedRecords = new ArrayList<>();
             normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(taskContext.formatMessageTimestamp(outputBuffer.values()));
+            if (snapshotRecordsWithoutKey.isEmpty()) {
+                normalizedRecords.addAll(taskContext.formatMessageTimestamp(outputBuffer.values()));
+            } else {
+                normalizedRecords.addAll(taskContext.formatMessageTimestamp(snapshotRecordsWithoutKey));
+            }
             normalizedRecords.add(highWatermark);
 
             final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
