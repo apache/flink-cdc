@@ -28,7 +28,6 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.oracle.source.assigner.splitter.OracleChunkSplitter;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
-import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleScanFetchTask;
 import com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleSourceFetchTaskContext;
 import com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask;
@@ -52,14 +51,7 @@ import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionU
 public class OracleDialect implements JdbcDataSourceDialect {
 
     private static final long serialVersionUID = 1L;
-    private final OracleSourceConfigFactory configFactory;
-    private final OracleSourceConfig sourceConfig;
     private transient OracleSchema oracleSchema;
-
-    public OracleDialect(OracleSourceConfigFactory configFactory) {
-        this.configFactory = configFactory;
-        this.sourceConfig = configFactory.create(0);
-    }
 
     @Override
     public String getName() {
@@ -87,8 +79,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
 
     @Override
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        return OracleConnectionUtils.createOracleConnection(
-                sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+        return OracleConnectionUtils.createOracleConnection(sourceConfig);
     }
 
     @Override
@@ -116,7 +107,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
-        try (OracleConnection jdbc = createOracleConnection(sourceConfig.getDbzConfiguration())) {
+        try (OracleConnection jdbc = createOracleConnection(sourceConfig)) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {
@@ -141,8 +132,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     @Override
     public OracleSourceFetchTaskContext createFetchTaskContext(
             SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
-        final OracleConnection jdbcConnection =
-                createOracleConnection(taskSourceConfig.getDbzConfiguration());
+        final OracleConnection jdbcConnection = createOracleConnection(taskSourceConfig);
         return new OracleSourceFetchTaskContext(taskSourceConfig, this, jdbcConnection);
     }
 
