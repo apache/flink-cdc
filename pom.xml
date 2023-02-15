@@ -27,7 +27,7 @@ under the License.
 
     <groupId>com.ververica</groupId>
     <artifactId>flink-cdc-connectors</artifactId>
-    <version>2.3-SNAPSHOT</version>
+    <version>2.4-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -264,6 +264,7 @@ under the License.
                         <exclude>docs/make.bat</exclude>
                         <exclude>docs/_templates/version.html</exclude>
                         <exclude>docs/_static/button.js</exclude>
+                        <exclude>docs/_build/**</exclude>
                         <!-- Site -->
                         <exclude>docs/site/**</exclude>
                         <!-- Tests -->

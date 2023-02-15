@@ -56,7 +56,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mysql.debezium.task.context.ChangeEventCreatorFactory.createChangeEventCreator;
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
 
@@ -145,7 +144,7 @@ public class StatefulTaskContext {
                         databaseSchema,
                         queue,
                         connectorConfig.getTableFilters().dataCollectionFilter(),
-                        createChangeEventCreator(mySqlSplit),
+                        DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster);
 
@@ -166,7 +165,8 @@ public class StatefulTaskContext {
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
         this.errorHandler =
-                new MySqlErrorHandler(connectorConfig.getLogicalName(), queue, taskContext);
+                new MySqlErrorHandler(
+                        connectorConfig.getLogicalName(), queue, taskContext, sourceConfig);
     }
 
     private void validateAndLoadDatabaseHistory(

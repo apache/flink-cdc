@@ -85,9 +85,15 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
+import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertTrue;
 
@@ -96,6 +102,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
+    private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -189,6 +196,17 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testTaskManagerFailoverFromLatestOffset() throws Exception {
+        testMySqlParallelSource(
+                DEFAULT_PARALLELISM,
+                "latest-offset",
+                FailoverType.TM,
+                FailoverPhase.BINLOG,
+                new String[] {"customers", "customers_1"},
+                RestartStrategies.fixedDelayRestart(1, 0));
+    }
+
+    @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
         testMySqlParallelSource(
                 FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
@@ -198,6 +216,17 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     public void testJobManagerFailoverInBinlogPhase() throws Exception {
         testMySqlParallelSource(
                 FailoverType.JM, FailoverPhase.BINLOG, new String[] {"customers", "customers_1"});
+    }
+
+    @Test
+    public void testJobManagerFailoverFromLatestOffset() throws Exception {
+        testMySqlParallelSource(
+                DEFAULT_PARALLELISM,
+                "latest-offset",
+                FailoverType.JM,
+                FailoverPhase.BINLOG,
+                new String[] {"customers", "customers_1"},
+                RestartStrategies.fixedDelayRestart(1, 0));
     }
 
     @Test
@@ -330,6 +359,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         try {
             testMySqlParallelSource(
                     1,
+                    DEFAULT_SCAN_STARTUP_MODE,
                     FailoverType.NONE,
                     FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
@@ -415,6 +445,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(
                 Arrays.asList(expectedSnapshotData),
                 fetchRowData(iterator, expectedSnapshotData.length));
+        assertTrue(!hasNextData(iterator));
         jobClient.cancel().get();
     }
 
@@ -550,6 +581,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             throws Exception {
         testMySqlParallelSource(
                 parallelism,
+                DEFAULT_SCAN_STARTUP_MODE,
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
@@ -558,6 +590,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     private void testMySqlParallelSource(
             int parallelism,
+            String scanStartupMode,
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
@@ -587,6 +620,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
@@ -597,8 +631,28 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         customDatabase.getPassword(),
                         customDatabase.getDatabaseName(),
                         getTableNameRegex(captureCustomerTables),
+                        scanStartupMode,
                         getServerId());
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
+
         // first step: check the snapshot data
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
+        }
+
+        // second step: check the binlog data
+        checkBinlogData(tableResult, failoverType, failoverPhase, captureCustomerTables);
+
+        tableResult.getJobClient().get().cancel().get();
+    }
+
+    private void checkSnapshotData(
+            TableResult tableResult,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
         String[] snapshotForSingleTable =
                 new String[] {
                     "+I[101, user_1, Shanghai, 123567891234]",
@@ -623,14 +677,14 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     "+I[1019, user_20, Shanghai, 123567891234]",
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
-        tEnv.executeSql(sourceDDL);
-        TableResult tableResult = tEnv.executeSql("select * from customers");
-        CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+
         List<String> expectedSnapshotData = new ArrayList<>();
         for (int i = 0; i < captureCustomerTables.length; i++) {
             expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
         }
+
+        CloseableIterator<Row> iterator = tableResult.collect();
+        JobID jobId = tableResult.getJobClient().get().getJobID();
 
         // trigger failover after some snapshot splits read finished
         if (failoverPhase == FailoverPhase.SNAPSHOT && iterator.hasNext()) {
@@ -640,15 +694,30 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
         assertEqualsInAnyOrder(
                 expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+    }
 
-        // second step: check the binlog data
+    private void checkBinlogData(
+            TableResult tableResult,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        waitUntilJobRunning(tableResult);
+        CloseableIterator<Row> iterator = tableResult.collect();
+        JobID jobId = tableResult.getJobClient().get().getJobID();
+
         for (String tableId : captureCustomerTables) {
             makeFirstPartBinlogEvents(
                     getConnection(), customDatabase.getDatabaseName() + '.' + tableId);
         }
+
+        // wait for the binlog reading
+        Thread.sleep(2000L);
+
         if (failoverPhase == FailoverPhase.BINLOG) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+            waitUntilJobRunning(tableResult);
         }
         for (String tableId : captureCustomerTables) {
             makeSecondPartBinlogEvents(
@@ -660,8 +729,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             expectedBinlogData.addAll(firstPartBinlogEvents);
             expectedBinlogData.addAll(secondPartBinlogEvents);
         }
+
         assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
-        tableResult.getJobClient().get().cancel().get();
+        assertTrue(!hasNextData(iterator));
     }
 
     private static List<String> convertRowDataToRowString(List<RowData> rows) {
@@ -1137,6 +1207,27 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 // job is not started yet
                 return 0;
             }
+        }
+    }
+
+    private void waitUntilJobRunning(TableResult tableResult)
+            throws InterruptedException, ExecutionException {
+        do {
+            Thread.sleep(5000L);
+        } while (tableResult.getJobClient().get().getJobStatus().get() != RUNNING);
+    }
+
+    private boolean hasNextData(final CloseableIterator<?> iterator)
+            throws InterruptedException, ExecutionException {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            FutureTask<Boolean> future = new FutureTask(iterator::hasNext);
+            executor.execute(future);
+            return future.get(3, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            return false;
+        } finally {
+            executor.shutdown();
         }
     }
 

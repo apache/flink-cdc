@@ -27,7 +27,6 @@ import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
@@ -40,6 +39,7 @@ import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
 import javax.annotation.Nullable;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -69,9 +69,13 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final StartupOptions startupOptions;
     private final boolean enableParallelRead;
     private final int splitSize;
+    private final int splitMetaGroupSize;
     private final int fetchSize;
+    private final Duration connectTimeout;
     private final int connectionPoolSize;
     private final int connectMaxRetries;
+    private final double distributionFactorUpper;
+    private final double distributionFactorLower;
     private final String chunkKeyColumn;
 
     // --------------------------------------------------------------------------------------------
@@ -98,9 +102,13 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             StartupOptions startupOptions,
             boolean enableParallelRead,
             int splitSize,
+            int splitMetaGroupSize,
             int fetchSize,
+            Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
             @Nullable String chunkKeyColumn) {
         this.physicalSchema = physicalSchema;
         this.url = url;
@@ -117,20 +125,19 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.metadataKeys = Collections.emptyList();
         this.enableParallelRead = enableParallelRead;
         this.splitSize = splitSize;
+        this.splitMetaGroupSize = splitMetaGroupSize;
         this.fetchSize = fetchSize;
+        this.connectTimeout = connectTimeout;
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
+        this.distributionFactorUpper = distributionFactorUpper;
+        this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_BEFORE)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
+        return ChangelogMode.all();
     }
 
     @Override
@@ -164,9 +171,13 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .deserializer(deserializer)
                             .debeziumProperties(dbzProperties)
                             .splitSize(splitSize)
+                            .splitMetaGroupSize(splitMetaGroupSize)
                             .fetchSize(fetchSize)
+                            .connectTimeout(connectTimeout)
                             .connectionPoolSize(connectionPoolSize)
                             .connectMaxRetries(connectMaxRetries)
+                            .distributionFactorUpper(distributionFactorUpper)
+                            .distributionFactorLower(distributionFactorLower)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -223,9 +234,13 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         startupOptions,
                         enableParallelRead,
                         splitSize,
+                        splitMetaGroupSize,
                         fetchSize,
+                        connectTimeout,
                         connectMaxRetries,
                         connectionPoolSize,
+                        distributionFactorUpper,
+                        distributionFactorLower,
                         chunkKeyColumn);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
@@ -256,9 +271,13 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(enableParallelRead, that.enableParallelRead)
                 && Objects.equals(splitSize, that.splitSize)
+                && Objects.equals(splitMetaGroupSize, that.splitMetaGroupSize)
                 && Objects.equals(fetchSize, that.fetchSize)
+                && Objects.equals(connectTimeout, that.connectTimeout)
                 && Objects.equals(connectMaxRetries, that.connectMaxRetries)
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
+                && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
+                && Objects.equals(distributionFactorLower, that.distributionFactorLower)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
     }
 
@@ -280,9 +299,13 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 metadataKeys,
                 enableParallelRead,
                 splitSize,
+                splitMetaGroupSize,
                 fetchSize,
+                connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
                 chunkKeyColumn);
     }
 

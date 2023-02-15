@@ -35,6 +35,8 @@ import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.function.Predicate;
+
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.isNonStoppingOffset;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 
@@ -49,6 +51,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     private final EventDispatcherImpl<TableId> eventDispatcher;
     private final SignalEventDispatcher signalEventDispatcher;
     private final ErrorHandler errorHandler;
+    private final Predicate<Event> eventFilter;
     private ChangeEventSourceContext context;
 
     public MySqlBinlogSplitReadTask(
@@ -60,12 +63,14 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
             Clock clock,
             MySqlTaskContext taskContext,
             MySqlStreamingChangeEventSourceMetrics metrics,
-            MySqlBinlogSplit binlogSplit) {
+            MySqlBinlogSplit binlogSplit,
+            Predicate<Event> eventFilter) {
         super(connectorConfig, connection, dispatcher, errorHandler, clock, taskContext, metrics);
         this.binlogSplit = binlogSplit;
         this.eventDispatcher = dispatcher;
         this.errorHandler = errorHandler;
         this.signalEventDispatcher = signalEventDispatcher;
+        this.eventFilter = eventFilter;
     }
 
     @Override
@@ -77,6 +82,9 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
     @Override
     protected void handleEvent(MySqlOffsetContext offsetContext, Event event) {
+        if (!eventFilter.test(event)) {
+            return;
+        }
         super.handleEvent(offsetContext, event);
         // check do we need to stop for read binlog for snapshot split.
         if (isBoundedRead()) {

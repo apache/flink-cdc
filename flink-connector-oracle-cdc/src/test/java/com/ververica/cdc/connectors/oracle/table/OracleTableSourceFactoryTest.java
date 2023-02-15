@@ -36,6 +36,7 @@ import com.ververica.cdc.connectors.base.options.SourceOptions;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import org.junit.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -108,9 +109,15 @@ public class OracleTableSourceFactoryTest {
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
                         JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
                         null);
         assertEquals(expectedSource, actualSource);
     }
@@ -136,9 +143,15 @@ public class OracleTableSourceFactoryTest {
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
                         JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
                         null);
         assertEquals(expectedSource, actualSource);
     }
@@ -168,9 +181,15 @@ public class OracleTableSourceFactoryTest {
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
                         JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
                         null);
         assertEquals(expectedSource, actualSource);
     }
@@ -179,9 +198,13 @@ public class OracleTableSourceFactoryTest {
     public void testScanIncrementalProperties() {
         Map<String, String> options = getAllRequiredOptions();
         int chunkSize = 4096;
+        int splitMetaGroupSize = 2048;
         int fetchSize = 1024;
+        Duration connectTimeout = Duration.ofSeconds(60);
         int connectMaxRetry = 5;
         int connectPoolSize = 10;
+        double distributionFactorUpper = 40.5;
+        double distributionFactorLower = 0.01;
         options.put("port", "1521");
         options.put("hostname", MY_LOCALHOST);
         options.put("debezium.snapshot.mode", "initial");
@@ -189,9 +212,19 @@ public class OracleTableSourceFactoryTest {
         options.put(
                 SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(),
                 String.valueOf(chunkSize));
+        options.put(SourceOptions.CHUNK_META_GROUP_SIZE.key(), String.valueOf(splitMetaGroupSize));
         options.put(SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
+        options.put(
+                JdbcSourceOptions.CONNECT_TIMEOUT.key(),
+                String.format("%ds", connectTimeout.getSeconds()));
         options.put(JdbcSourceOptions.CONNECT_MAX_RETRIES.key(), String.valueOf(connectMaxRetry));
         options.put(JdbcSourceOptions.CONNECTION_POOL_SIZE.key(), String.valueOf(connectPoolSize));
+        options.put(
+                JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                String.valueOf(distributionFactorUpper));
+        options.put(
+                JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                String.valueOf(distributionFactorLower));
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -211,9 +244,13 @@ public class OracleTableSourceFactoryTest {
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         chunkSize,
+                        splitMetaGroupSize,
                         fetchSize,
+                        connectTimeout,
                         connectMaxRetry,
                         connectPoolSize,
+                        distributionFactorUpper,
+                        distributionFactorLower,
                         null);
         assertEquals(expectedSource, actualSource);
     }
@@ -240,9 +277,15 @@ public class OracleTableSourceFactoryTest {
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
                         JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
                         null);
         assertEquals(expectedSource, actualSource);
     }
@@ -269,9 +312,15 @@ public class OracleTableSourceFactoryTest {
                         StartupOptions.latest(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
                         JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
                         null);
         assertEquals(expectedSource, actualSource);
     }
@@ -302,9 +351,15 @@ public class OracleTableSourceFactoryTest {
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
                         JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
                         null);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
