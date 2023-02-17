@@ -164,7 +164,8 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         if (taskContext.isDataChangeRecord(sourceRecord)) {
             TableId tableId = taskContext.getTableId(sourceRecord);
             Offset position = taskContext.getStreamOffset(sourceRecord);
-            if (hasEnterPureStreamPhase(tableId, position)) {
+            // source record has no primary need no comparing for binlog position
+            if (hasEnterPureStreamPhase(tableId, position) || sourceRecord.key() == null) {
                 return true;
             }
             // only the table who captured snapshot splits need to filter
