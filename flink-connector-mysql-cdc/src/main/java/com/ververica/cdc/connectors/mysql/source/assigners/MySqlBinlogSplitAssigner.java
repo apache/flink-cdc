@@ -37,7 +37,7 @@ import java.util.Optional;
 /** A {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
-    private static final String BINLOG_SPLIT_ID = "binlog-split";
+    public static final String BINLOG_SPLIT_ID = "binlog-split";
 
     private final MySqlSourceConfig sourceConfig;
 
@@ -110,10 +110,10 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public void suspend() {}
+    public void startAssignNewlyAddedTables() {}
 
     @Override
-    public void wakeup() {}
+    public void onBinlogSplitUpdated() {}
 
     @Override
     public void close() {}

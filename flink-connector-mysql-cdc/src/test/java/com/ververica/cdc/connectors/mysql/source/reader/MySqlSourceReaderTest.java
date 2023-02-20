@@ -115,7 +115,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         MySqlSplit binlogSplit;
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
-                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(sourceConfig, jdbc);
             binlogSplit =
                     MySqlBinlogSplit.fillTableSchemas(
                             createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
