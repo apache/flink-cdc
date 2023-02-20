@@ -243,7 +243,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                         streamSplit.splitId(),
                         StreamSplit.appendFinishedSplitInfos(streamSplit, metaDataGroup));
 
-                LOG.info("Fill meta data of group {} to stream split", metaDataGroup.size());
+                LOG.info("Fill metadata of group {} to stream split", metaDataGroup.size());
             } else {
                 LOG.warn(
                         "Received out of oder metadata event for split {}, the received meta group id is {}, but expected is {}, ignore it",
