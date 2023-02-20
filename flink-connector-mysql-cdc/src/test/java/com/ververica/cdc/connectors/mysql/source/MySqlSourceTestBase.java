@@ -16,8 +16,12 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
+import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
+import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
@@ -82,6 +86,9 @@ public abstract class MySqlSourceTestBase extends TestLogger {
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 
+    // ------------------------------------------------------------------------
+    //  test utilities
+    // ------------------------------------------------------------------------
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
         assertTrue(expected != null && actual != null);
         assertEqualsInOrder(
@@ -93,5 +100,69 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         assertTrue(expected != null && actual != null);
         assertEquals(expected.size(), actual.size());
         assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+    }
+
+    /** The type of failover. */
+    protected enum FailoverType {
+        TM,
+        JM,
+        NONE
+    }
+
+    /** The phase of failover. */
+    protected enum FailoverPhase {
+        SNAPSHOT,
+        BINLOG,
+        NEVER
+    }
+
+    protected static void triggerFailover(
+            FailoverType type, JobID jobId, MiniCluster miniCluster, Runnable afterFailAction)
+            throws Exception {
+        switch (type) {
+            case TM:
+                restartTaskManager(miniCluster, afterFailAction);
+                break;
+            case JM:
+                triggerJobManagerFailover(jobId, miniCluster, afterFailAction);
+                break;
+            case NONE:
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + type);
+        }
+    }
+
+    protected static void triggerJobManagerFailover(
+            JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
+        final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
+        haLeadershipControl.revokeJobMasterLeadership(jobId).get();
+        afterFailAction.run();
+        haLeadershipControl.grantJobMasterLeadership(jobId).get();
+    }
+
+    protected static void restartTaskManager(MiniCluster miniCluster, Runnable afterFailAction)
+            throws Exception {
+        miniCluster.terminateTaskManager(0).get();
+        afterFailAction.run();
+        miniCluster.startTaskManager();
+    }
+
+    protected static void waitForUpsertSinkSize(String sinkName, int expectedSize)
+            throws InterruptedException {
+        while (upsertSinkSize(sinkName) < expectedSize) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected static int upsertSinkSize(String sinkName) {
+        synchronized (TestValuesTableFactory.class) {
+            try {
+                return TestValuesTableFactory.getResults(sinkName).size();
+            } catch (IllegalArgumentException e) {
+                // job is not started yet
+                return 0;
+            }
+        }
     }
 }
