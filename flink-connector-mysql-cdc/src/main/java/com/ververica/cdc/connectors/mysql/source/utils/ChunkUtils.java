@@ -81,8 +81,6 @@ public class ChunkUtils {
     /** Returns next meta group id according to received meta number and meta group size. */
     public static int getNextMetaGroupId(int receivedMetaNum, int metaGroupSize) {
         Preconditions.checkState(metaGroupSize > 0);
-        return receivedMetaNum % metaGroupSize == 0
-                ? (receivedMetaNum / metaGroupSize)
-                : (receivedMetaNum / metaGroupSize) + 1;
+        return receivedMetaNum / metaGroupSize;
     }
 }
