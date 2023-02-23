@@ -120,8 +120,13 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
     @Override
     public ChangeStreamOffset displayCurrentOffset(MongoDBSourceConfig sourceConfig) {
         MongoClient mongoClient = clientFor(sourceConfig);
-        BsonDocument startupResumeToken =
-                getLatestResumeToken(mongoClient, ChangeStreamDescriptor.deployment());
+        CollectionDiscoveryInfo discoveryInfo = discoverAndCacheDataCollections(sourceConfig);
+        ChangeStreamDescriptor changeStreamDescriptor =
+                getChangeStreamDescriptor(
+                        sourceConfig,
+                        discoveryInfo.getDiscoveredDatabases(),
+                        discoveryInfo.getDiscoveredCollections());
+        BsonDocument startupResumeToken = getLatestResumeToken(mongoClient, changeStreamDescriptor);
 
         ChangeStreamOffset changeStreamOffset;
         if (startupResumeToken != null) {
