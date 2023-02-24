@@ -285,7 +285,9 @@ public class LogMinerStreamingChangeEventSource
                                 } else {
 
                                     final Scn lastProcessedScn = processor.getLastProcessedScn();
+                                    // only after processed data, use lastProcessedScn as endScn
                                     if (!lastProcessedScn.isNull()
+                                            && lastProcessedScn.compareTo(startScn) > 0
                                             && lastProcessedScn.compareTo(endScn) < 0) {
                                         // If the last processed SCN is before the endScn we need to
                                         // use the last processed SCN as the
