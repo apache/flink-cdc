@@ -184,7 +184,9 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         DocumentWriter documentWriter = DocumentWriter.defaultWriter();
         final int size = tableSchemas.size();
         out.writeInt(size);
-        for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
+        List<Map.Entry<TableId, TableChange>> entries = new ArrayList<>();
+        entries.addAll(tableSchemas.entrySet());
+        for (Map.Entry<TableId, TableChange> entry : entries) {
             out.writeUTF(entry.getKey().toString());
             final String tableChangeStr =
                     documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
