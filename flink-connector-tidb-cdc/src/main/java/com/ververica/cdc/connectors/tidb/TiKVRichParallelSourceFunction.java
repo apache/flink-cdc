@@ -149,7 +149,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                                         + getRuntimeContext().getIndexOfThisSubtask())
                         .build();
         executorService = Executors.newSingleThreadExecutor(threadFactory);
-        final MetricGroup metricGroup = (MetricGroup) getRuntimeContext().getMetricGroup();
+        final MetricGroup metricGroup = getRuntimeContext().getMetricGroup();
         sourceMetrics = new TiDBSourceMetrics(metricGroup);
         sourceMetrics.registerMetrics();
     }
