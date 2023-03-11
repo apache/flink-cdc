@@ -294,13 +294,13 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         @Override
         protected SnapshotContext prepare(ChangeEventSourceContext changeEventSourceContext)
                 throws Exception {
-            return new MySqlSnapshotContext();
+            return new OracleSnapshotContext();
         }
 
-        private static class MySqlSnapshotContext
+        private static class OracleSnapshotContext
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext {
 
-            public MySqlSnapshotContext() throws SQLException {
+            public OracleSnapshotContext() throws SQLException {
                 super("");
             }
         }

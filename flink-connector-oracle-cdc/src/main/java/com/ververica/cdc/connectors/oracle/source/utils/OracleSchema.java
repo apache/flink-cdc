@@ -42,7 +42,7 @@ public class OracleSchema {
     }
 
     /**
-     * Gets table schema for the given table path. It will request to MySQL server by running `SHOW
+     * Gets table schema for the given table path. It will request to Oracle server by running `SHOW
      * CREATE TABLE` if cache missed.
      */
     public TableChange getTableSchema(JdbcConnection jdbc, TableId tableId) {

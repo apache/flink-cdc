@@ -252,7 +252,7 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         while (chunkEnd != null && isChunkEndLeMax(chunkEnd, max)) {
             // we start from [null, min + chunk_size) and avoid [null, min)
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
-            // may sleep a while to avoid DDOS on MySQL server
+            // may sleep a while to avoid DDOS on Oracle server
             maySleep(count++, tableId);
             chunkStart = chunkEnd;
             chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
