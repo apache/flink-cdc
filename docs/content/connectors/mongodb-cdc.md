@@ -254,6 +254,13 @@ Connector Options
       <td>Integer</td>
       <td>The chunk size mb of incremental snapshot.</td>
     </tr>
+    <tr>
+      <td>chunk-meta.group.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">100</td>
+      <td>Integer</td>
+      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
+    </tr>
     </tbody>
 </table>
 </div>
