@@ -117,6 +117,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                 SourceRecord changeRecord = null;
                 if (!next.isPresent()) {
                     long untilNext = nextUpdate - time.milliseconds();
+                    nextUpdate += sourceConfig.getPollAwaitTimeMillis();
                     if (untilNext > 0) {
                         LOG.debug("Waiting {} ms to poll change records", untilNext);
                         time.sleep(untilNext);
