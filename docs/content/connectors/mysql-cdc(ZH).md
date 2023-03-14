@@ -6,7 +6,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 | Connector                                                | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
 |-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| [mysql-cdc](mysql-cdc(ZH).md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27     |
+| [mysql-cdc](mysql-cdc(ZH).md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.21     |
 
 依赖
 ------------
@@ -20,7 +20,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- 请使用已发布的版本依赖，snapshot版本的依赖需要本地自行编译。 -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.3.0</version>
 </dependency>
 ```
 
@@ -28,9 +28,9 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载 [flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.4-SNAPSHOT/flink-sql-connector-mysql-cdc-2.4-SNAPSHOT.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-mysql-cdc-2.3.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.3.0/flink-sql-connector-mysql-cdc-2.3.0.jar) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-mysql-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-mysql-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 配置 MySQL 服务器
 ----------------
@@ -236,21 +236,21 @@ Flink SQL> SELECT * FROM orders;
       <td>scan.startup.specific-offset.gtid-set</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
+      <td>Long</td>
       <td>在 "specific-offset" 启动模式下，启动位点的 GTID 集合。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-events</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
+      <td>String</td>
       <td>在指定的启动位点后需要跳过的事件数量。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-rows</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
+      <td>String</td>
       <td>在指定的启动位点后需要跳过的数据行数量。</td>
     </tr>
     <tr>
@@ -589,10 +589,8 @@ CREATE TABLE mysql_source (...) WITH (
 )
 ```
 
-**注意**：
-1. MySQL source 会在 checkpoint 时将当前位点以 INFO 级别打印到日志中，日志前缀为 "Binlog offset on checkpoint {checkpoint-id}"。
+**注意**：MySQL source 会在 checkpoint 时将当前位点以 INFO 级别打印到日志中，日志前缀为 "Binlog offset on checkpoint {checkpoint-id}"。
 该日志可以帮助将作业从某个 checkpoint 的位点开始启动的场景。
-2. 如果捕获变更的表曾经发生过表结构变化，从最早位点、特定位点或时间戳启动可能会发生错误，因为 Debezium 读取器会在内部保存当前的最新表结构，结构不匹配的早期数据无法被正确解析。
 
 
 ### DataStream Source
@@ -697,7 +695,7 @@ $ ./bin/flink run \
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left" style="width:30%;"><a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html">MySQL type</a></th>
         <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
