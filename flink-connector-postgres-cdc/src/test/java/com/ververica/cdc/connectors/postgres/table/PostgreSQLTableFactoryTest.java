@@ -97,6 +97,7 @@ public class PostgreSQLTableFactoryTest {
     private static final String MY_DATABASE = "myDB";
     private static final String MY_TABLE = "myTable";
     private static final String MY_SCHEMA = "public";
+    private static final String MY_SLOT_NAME = "flinktest";
     private static final Properties PROPERTIES = new Properties();
 
     @Test
@@ -116,7 +117,7 @@ public class PostgreSQLTableFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         "decoderbufs",
-                        "flink",
+                        MY_SLOT_NAME,
                         DebeziumChangelogMode.ALL,
                         PROPERTIES);
         assertEquals(expectedSource, actualSource);
@@ -128,7 +129,6 @@ public class PostgreSQLTableFactoryTest {
         options.put("port", "5444");
         options.put("decoding.plugin.name", "wal2json");
         options.put("debezium.snapshot.mode", "never");
-        options.put("slot.name", "flink");
         options.put("changelog-mode", "upsert");
 
         DynamicTableSource actualSource = createTableSource(options);
@@ -145,7 +145,7 @@ public class PostgreSQLTableFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         "wal2json",
-                        "flink",
+                        MY_SLOT_NAME,
                         DebeziumChangelogMode.UPSERT,
                         dbzProperties);
         assertEquals(expectedSource, actualSource);
@@ -173,7 +173,7 @@ public class PostgreSQLTableFactoryTest {
                         MY_USERNAME,
                         MY_PASSWORD,
                         "decoderbufs",
-                        "flink",
+                        MY_SLOT_NAME,
                         DebeziumChangelogMode.ALL,
                         new Properties());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
@@ -263,6 +263,7 @@ public class PostgreSQLTableFactoryTest {
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);
+        options.put("slot.name", MY_SLOT_NAME);
         return options;
     }
 
