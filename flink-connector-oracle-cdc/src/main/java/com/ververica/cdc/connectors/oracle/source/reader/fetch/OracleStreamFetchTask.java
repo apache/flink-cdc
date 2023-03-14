@@ -16,10 +16,13 @@
 
 package com.ververica.cdc.connectors.oracle.source.reader.fetch;
 
+import org.apache.flink.metrics.Gauge;
+
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.DebeziumException;
@@ -43,13 +46,21 @@ import static com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffs
 
 /** The task to work for fetching data of Oracle table stream split. */
 public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
+    private static final Logger LOG = LoggerFactory.getLogger(OracleStreamFetchTask.class);
 
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
     private RedoLogSplitReadTask redoLogSplitReadTask;
 
+    private SourceReaderMetrics sourceReaderMetrics;
+
     public OracleStreamFetchTask(StreamSplit split) {
         this.split = split;
+    }
+
+    public OracleStreamFetchTask(StreamSplit split, SourceReaderMetrics sourceReaderMetrics) {
+        this.split = split;
+        this.sourceReaderMetrics = sourceReaderMetrics;
     }
 
     @Override
@@ -66,6 +77,17 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getSourceConfig().getOriginDbzConnectorConfig(),
                         sourceFetchContext.getStreamingChangeEventSourceMetrics(),
                         split);
+        LOG.info("regist StreamingChangeEventSourceMetrics");
+        sourceFetchContext.getStreamingChangeEventSourceMetrics().register(LOG);
+
+        LOG.info("regist currentScn");
+        sourceReaderMetrics
+                .getMetricGroup()
+                .gauge(
+                        "currentScn",
+                        (Gauge<String>)
+                                sourceFetchContext.getStreamingChangeEventSourceMetrics()
+                                        ::getCurrentScn);
         RedoLogSplitChangeEventSourceContext changeEventSourceContext =
                 new RedoLogSplitChangeEventSourceContext();
         redoLogSplitReadTask.execute(

@@ -28,6 +28,7 @@ import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.Fetcher;
 import com.ververica.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
@@ -56,6 +57,19 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
     @Nullable private String currentSplitId;
     private final DataSourceDialect<C> dataSourceDialect;
     private final C sourceConfig;
+    private SourceReaderMetrics sourceReaderMetrics;
+
+    public IncrementalSourceSplitReader(
+            SourceReaderMetrics sourceReaderMetrics,
+            int subtaskId,
+            DataSourceDialect<C> dataSourceDialect,
+            C sourceConfig) {
+        this.sourceReaderMetrics = sourceReaderMetrics;
+        this.subtaskId = subtaskId;
+        this.splits = new ArrayDeque<>();
+        this.dataSourceDialect = dataSourceDialect;
+        this.sourceConfig = sourceConfig;
+    }
 
     public IncrementalSourceSplitReader(
             int subtaskId, DataSourceDialect<C> dataSourceDialect, C sourceConfig) {
@@ -122,6 +136,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                 if (currentFetcher == null) {
                     final FetchTask.Context taskContext =
                             dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
+                    dataSourceDialect.setSourceReaderMetrics(sourceReaderMetrics);
                     currentFetcher = new IncrementalSourceScanFetcher(taskContext, subtaskId);
                 }
             } else {
@@ -132,6 +147,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                 }
                 final FetchTask.Context taskContext =
                         dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
+                dataSourceDialect.setSourceReaderMetrics(sourceReaderMetrics);
                 currentFetcher = new IncrementalSourceStreamFetcher(taskContext, subtaskId);
                 LOG.info("Stream fetcher is created.");
             }

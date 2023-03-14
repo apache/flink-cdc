@@ -21,6 +21,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.DebeziumException;
@@ -71,14 +72,22 @@ import static com.ververica.cdc.connectors.oracle.source.utils.OracleUtils.readT
 
 /** The task to work for fetching data of Oracle table snapshot split. */
 public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
+    private static final Logger LOG = LoggerFactory.getLogger(OracleScanFetchTask.class);
 
     private final SnapshotSplit split;
     private volatile boolean taskRunning = false;
 
     private OracleSnapshotSplitReadTask snapshotSplitReadTask;
 
+    private SourceReaderMetrics sourceReaderMetrics;
+
     public OracleScanFetchTask(SnapshotSplit split) {
         this.split = split;
+    }
+
+    public OracleScanFetchTask(SnapshotSplit split, SourceReaderMetrics sourceReaderMetrics) {
+        this.split = split;
+        this.sourceReaderMetrics = sourceReaderMetrics;
     }
 
     @Override
@@ -104,6 +113,8 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getDispatcher(),
                         split);
+        LOG.info("regist SnapshotChangeEventSourceMetrics");
+        sourceFetchContext.getSnapshotChangeEventSourceMetrics().register(LOG);
         SnapshotSplitChangeEventSourceContext changeEventSourceContext =
                 new SnapshotSplitChangeEventSourceContext();
         SnapshotResult snapshotResult =

@@ -22,6 +22,7 @@ import com.mongodb.client.MongoClient;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.mongodb.source.assigners.splitters.MongoDBChunkSplitter;
 import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
@@ -167,5 +168,10 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
                         discoveryInfo.getDiscoveredDatabases(),
                         discoveryInfo.getDiscoveredCollections());
         return new MongoDBFetchTaskContext(this, sourceConfig, changeStreamDescriptor);
+    }
+
+    @Override
+    public void setSourceReaderMetrics(SourceReaderMetrics sourceReaderMetrics) {
+        // TODO
     }
 }

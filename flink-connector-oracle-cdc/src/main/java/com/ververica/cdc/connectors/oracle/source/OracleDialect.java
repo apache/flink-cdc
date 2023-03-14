@@ -25,6 +25,7 @@ import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoo
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.oracle.source.assigner.splitter.OracleChunkSplitter;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
@@ -52,6 +53,8 @@ public class OracleDialect implements JdbcDataSourceDialect {
 
     private static final long serialVersionUID = 1L;
     private transient OracleSchema oracleSchema;
+
+    private SourceReaderMetrics sourceReaderMetrics;
 
     @Override
     public String getName() {
@@ -137,11 +140,18 @@ public class OracleDialect implements JdbcDataSourceDialect {
     }
 
     @Override
+    public void setSourceReaderMetrics(SourceReaderMetrics sourceReaderMetrics) {
+        this.sourceReaderMetrics = sourceReaderMetrics;
+    }
+
+    @Override
     public FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase) {
         if (sourceSplitBase.isSnapshotSplit()) {
-            return new OracleScanFetchTask(sourceSplitBase.asSnapshotSplit());
+            return new OracleScanFetchTask(
+                    sourceSplitBase.asSnapshotSplit(), this.sourceReaderMetrics);
         } else {
-            return new OracleStreamFetchTask(sourceSplitBase.asStreamSplit());
+            return new OracleStreamFetchTask(
+                    sourceSplitBase.asStreamSplit(), this.sourceReaderMetrics);
         }
     }
 }

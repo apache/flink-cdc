@@ -49,6 +49,10 @@ public class SourceReaderMetrics {
         this.metricGroup = metricGroup;
     }
 
+    public MetricGroup getMetricGroup() {
+        return metricGroup;
+    }
+
     public void registerMetrics() {
         metricGroup.gauge(
                 SourceReaderMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
