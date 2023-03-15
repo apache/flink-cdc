@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.oracle.source.utils;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.StringJoiner;
 
 import static io.debezium.config.CommonConnectorConfig.DATABASE_CONFIG_PREFIX;
 
@@ -81,17 +83,28 @@ public class OracleConnectionUtils {
     }
 
     public static List<TableId> listTables(
-            JdbcConnection jdbcConnection, RelationalTableFilters tableFilters)
+            JdbcConnection jdbcConnection, OracleSourceConfig oracleSourceConfig)
             throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
-
+        List<String> tableList = oracleSourceConfig.getTableList();
         Set<TableId> tableIdSet = new HashSet<>();
-        String queryTablesSql =
-                "SELECT OWNER ,TABLE_NAME,TABLESPACE_NAME FROM ALL_TABLES \n"
-                        + "WHERE TABLESPACE_NAME IS NOT NULL AND TABLESPACE_NAME NOT IN ('SYSTEM','SYSAUX')";
+        StringBuilder queryTablesSql =
+                new StringBuilder(
+                        "SELECT OWNER ,TABLE_NAME,TABLESPACE_NAME FROM ALL_TABLES \n"
+                                + "WHERE TABLESPACE_NAME IS NOT NULL AND TABLESPACE_NAME NOT IN ('SYSTEM','SYSAUX')");
+        if (tableList != null && !tableList.isEmpty()) {
+            StringJoiner stringJoiner = new StringJoiner(",");
+            for (String tableId : tableList) {
+                stringJoiner.add("'" + tableId + "'");
+            }
+            queryTablesSql
+                    .append(" AND TABLE_NAME IN (")
+                    .append(stringJoiner.toString())
+                    .append(")");
+        }
         try {
             jdbcConnection.query(
-                    queryTablesSql,
+                    queryTablesSql.toString(),
                     rs -> {
                         while (rs.next()) {
                             String schemaName = rs.getString(1);
@@ -104,7 +117,7 @@ public class OracleConnectionUtils {
         } catch (SQLException e) {
             LOG.warn(" SQL execute error, sql:{}", queryTablesSql, e);
         }
-
+        RelationalTableFilters tableFilters = oracleSourceConfig.getTableFilters();
         for (TableId tableId : tableIdSet) {
             if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
                 capturedTableIds.add(tableId);
