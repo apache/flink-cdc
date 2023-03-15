@@ -122,6 +122,9 @@ public class VitessSourceTest extends VitessTestBase {
             // ...
             statement.execute(
                     "ALTER TABLE test.products ADD COLUMN volume FLOAT, ADD COLUMN alias VARCHAR(30) NULL");
+
+            // Vitess schema change has eventual consistency, wait few seconds.
+            Thread.sleep(5000);
             statement.execute("UPDATE test.products SET volume=13.5 WHERE id=2001");
             records = drain(sourceContext, 1);
             assertUpdate(records.get(0), "id", 2001);
