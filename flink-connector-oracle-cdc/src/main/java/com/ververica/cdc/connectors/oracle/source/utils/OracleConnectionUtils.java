@@ -95,7 +95,8 @@ public class OracleConnectionUtils {
         if (tableList != null && !tableList.isEmpty()) {
             StringJoiner stringJoiner = new StringJoiner(",");
             for (String tableId : tableList) {
-                stringJoiner.add("'" + tableId + "'");
+
+                stringJoiner.add("'" + tableId.split("\\.")[1] + "'");
             }
             queryTablesSql
                     .append(" AND TABLE_NAME IN (")
