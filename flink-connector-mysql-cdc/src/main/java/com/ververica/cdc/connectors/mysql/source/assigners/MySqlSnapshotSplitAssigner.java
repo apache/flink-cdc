@@ -491,28 +491,31 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private void splitChunksForRemainingTables() {
-        try {
-            // restore from a checkpoint and start to split the table from the previous checkpoint
-            if (chunkSplitter.hasNextChunk()) {
-                LOG.info(
-                        "Start splitting remaining chunks for table {}",
-                        chunkSplitter.getCurrentSplittingTableId());
-                splitTable(chunkSplitter.getCurrentSplittingTableId());
-            }
+        synchronized (lock) {
+            try {
+                // restore from a checkpoint and start to split the table from the previous
+                // checkpoint
+                if (chunkSplitter.hasNextChunk()) {
+                    LOG.info(
+                            "Start splitting remaining chunks for table {}",
+                            chunkSplitter.getCurrentSplittingTableId());
+                    splitTable(chunkSplitter.getCurrentSplittingTableId());
+                }
 
-            // split the remaining tables
-            for (TableId nextTable : remainingTables) {
-                splitTable(nextTable);
-            }
-        } catch (Throwable e) {
-            if (uncaughtSplitterException == null) {
-                uncaughtSplitterException = e;
-            } else {
-                uncaughtSplitterException.addSuppressed(e);
-            }
-            // Release the potential waiting getNext() call
-            synchronized (lock) {
-                lock.notify();
+                // split the remaining tables
+                for (TableId nextTable : remainingTables) {
+                    splitTable(nextTable);
+                }
+            } catch (Throwable e) {
+                if (uncaughtSplitterException == null) {
+                    uncaughtSplitterException = e;
+                } else {
+                    uncaughtSplitterException.addSuppressed(e);
+                }
+                // Release the potential waiting getNext() call
+                synchronized (lock) {
+                    lock.notify();
+                }
             }
         }
     }
