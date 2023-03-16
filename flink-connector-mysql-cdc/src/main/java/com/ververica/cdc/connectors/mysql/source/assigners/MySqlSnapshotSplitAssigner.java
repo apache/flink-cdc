@@ -491,31 +491,29 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private void splitChunksForRemainingTables() {
-        synchronized (lock) {
-            try {
-                // restore from a checkpoint and start to split the table from the previous
-                // checkpoint
-                if (chunkSplitter.hasNextChunk()) {
-                    LOG.info(
-                            "Start splitting remaining chunks for table {}",
-                            chunkSplitter.getCurrentSplittingTableId());
-                    splitTable(chunkSplitter.getCurrentSplittingTableId());
-                }
+        try {
+            // restore from a checkpoint and start to split the table from the previous
+            // checkpoint
+            if (chunkSplitter.hasNextChunk()) {
+                LOG.info(
+                        "Start splitting remaining chunks for table {}",
+                        chunkSplitter.getCurrentSplittingTableId());
+                splitTable(chunkSplitter.getCurrentSplittingTableId());
+            }
 
-                // split the remaining tables
-                for (TableId nextTable : remainingTables) {
-                    splitTable(nextTable);
-                }
-            } catch (Throwable e) {
+            // split the remaining tables
+            for (TableId nextTable : remainingTables) {
+                splitTable(nextTable);
+            }
+        } catch (Throwable e) {
+            synchronized (lock) {
                 if (uncaughtSplitterException == null) {
                     uncaughtSplitterException = e;
                 } else {
                     uncaughtSplitterException.addSuppressed(e);
                 }
                 // Release the potential waiting getNext() call
-                synchronized (lock) {
-                    lock.notify();
-                }
+                lock.notify();
             }
         }
     }
