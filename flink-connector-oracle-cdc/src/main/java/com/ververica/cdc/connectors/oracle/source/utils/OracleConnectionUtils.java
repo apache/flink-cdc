@@ -92,8 +92,8 @@ public class OracleConnectionUtils {
                 new StringBuilder(
                         "SELECT OWNER ,TABLE_NAME,TABLESPACE_NAME FROM ALL_TABLES \n"
                                 + "WHERE TABLESPACE_NAME IS NOT NULL AND TABLESPACE_NAME NOT IN ('SYSTEM','SYSAUX')");
-        String schema = jdbcConnection.connection().getSchema();
         if (tableList != null && !tableList.isEmpty()) {
+            String schema = jdbcConnection.connection().getSchema();
             StringJoiner stringJoiner = new StringJoiner(",");
             for (String tableId : tableList) {
                 String tableName = tableId.replaceFirst(schema + "\\.", "");
