@@ -367,7 +367,7 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
     }
 
     private static void maySleep(int count, TableId tableId) {
-        // every 100 queries to sleep 1s
+        // every 10 queries to sleep 0.1s
         if (count % 10 == 0) {
             try {
                 Thread.sleep(100);

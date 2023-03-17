@@ -147,7 +147,7 @@ docker-compose up -d
 
 1. 使用下面的命令跳转至 Flink 目录下
     ```
-    cd flink-15.2
+    cd flink-1.16.0
     ```
    
 2. 使用下面的命令启动 Flink 集群
