@@ -117,7 +117,6 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                 SourceRecord changeRecord = null;
                 if (!next.isPresent()) {
                     long untilNext = nextUpdate - time.milliseconds();
-                    nextUpdate += sourceConfig.getPollAwaitTimeMillis();
                     if (untilNext > 0) {
                         LOG.debug("Waiting {} ms to poll change records", untilNext);
                         time.sleep(untilNext);
@@ -131,6 +130,8 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                                         .map(this::normalizeHeartbeatRecord)
                                         .orElse(null);
                     }
+                    // update nextUpdateTime
+                    nextUpdate += sourceConfig.getPollAwaitTimeMillis();
                 } else {
                     BsonDocument changeStreamDocument = next.get();
                     MongoNamespace namespace = getMongoNamespace(changeStreamDocument);
