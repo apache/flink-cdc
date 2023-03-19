@@ -129,7 +129,9 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '4'"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
                         MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
