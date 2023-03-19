@@ -36,7 +36,7 @@ body:
     attributes:
       label: Database and its version
       description: >
-        Please provide the database you connecto to and its version.
+        Please provide the database you connect to and its version.
     validations:
       required: true
   - type: textarea
