@@ -188,7 +188,8 @@ Flink SQL> CREATE TABLE products (
     'username' = 'root',
     'password' = '123456',
     'database-name' = 'mydb',
-    'table-name' = 'products'
+    'table-name' = 'products',
+    'server-time-zone' = 'UTC'
   );
 
 Flink SQL> CREATE TABLE orders (
@@ -206,7 +207,8 @@ Flink SQL> CREATE TABLE orders (
    'username' = 'root',
    'password' = '123456',
    'database-name' = 'mydb',
-   'table-name' = 'orders'
+   'table-name' = 'orders',
+   'server-time-zone' = 'UTC'
  );
 
 Flink SQL> CREATE TABLE shipments (
