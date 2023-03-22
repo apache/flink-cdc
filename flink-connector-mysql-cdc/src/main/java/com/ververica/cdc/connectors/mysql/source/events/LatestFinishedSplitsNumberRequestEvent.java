@@ -22,25 +22,12 @@ import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerato
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * wake up source reader to consume split again.
+ * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
+ * ask the latest finished snapshot splits number.
  */
-public class WakeupReaderEvent implements SourceEvent {
+public class LatestFinishedSplitsNumberRequestEvent implements SourceEvent {
+
     private static final long serialVersionUID = 1L;
 
-    /** Wake up target. */
-    public enum WakeUpTarget {
-        SNAPSHOT_READER,
-        BINLOG_READER
-    }
-
-    private WakeUpTarget target;
-
-    public WakeupReaderEvent(WakeUpTarget target) {
-        this.target = target;
-    }
-
-    public WakeUpTarget getTarget() {
-        return target;
-    }
+    public LatestFinishedSplitsNumberRequestEvent() {}
 }

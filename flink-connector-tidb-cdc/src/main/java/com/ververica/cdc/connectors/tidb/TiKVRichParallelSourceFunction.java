@@ -272,7 +272,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             }
             if (executorService != null) {
                 executorService.shutdown();
-                if (executorService.awaitTermination(CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                     LOG.warn(
                             "Failed to close the tidb source function in {} seconds.",
                             CLOSE_TIMEOUT);

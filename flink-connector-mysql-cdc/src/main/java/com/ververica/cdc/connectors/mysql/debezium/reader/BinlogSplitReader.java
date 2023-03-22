@@ -91,7 +91,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
+                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subTaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
@@ -193,7 +193,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             currentTaskRunning = false;
             if (executorService != null) {
                 executorService.shutdown();
-                if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                     LOG.warn(
                             "Failed to close the binlog split reader in {} seconds.",
                             READER_CLOSE_TIMEOUT);

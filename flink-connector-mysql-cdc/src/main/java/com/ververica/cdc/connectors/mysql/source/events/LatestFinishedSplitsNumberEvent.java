@@ -22,12 +22,27 @@ import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerato
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
- * The {@link SourceEvent} that {@link MySqlSourceEnumerator} broadcasts to {@link
- * MySqlSourceReader} to tell the source reader to suspend the binlog reader.
+ * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
+ * pass the latest finished snapshot splits number.
  */
-public class SuspendBinlogReaderEvent implements SourceEvent {
+public class LatestFinishedSplitsNumberEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
+    private final int latestFinishedSplitsNumber;
 
-    public SuspendBinlogReaderEvent() {}
+    public LatestFinishedSplitsNumberEvent(int latestFinishedSplitsNumber) {
+        this.latestFinishedSplitsNumber = latestFinishedSplitsNumber;
+    }
+
+    public int getLatestFinishedSplitsNumber() {
+        return latestFinishedSplitsNumber;
+    }
+
+    @Override
+    public String toString() {
+        return "LatestFinishedSplitsNumberEvent{"
+                + "latestFinishedSplitsNumber="
+                + latestFinishedSplitsNumber
+                + '}';
+    }
 }

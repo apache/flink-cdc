@@ -731,7 +731,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         binlogSplitAssigner.open();
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
-                    TableDiscoveryUtils.discoverCapturedTableSchemas(sourceConfig, jdbc);
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(sourceConfig, jdbc);
             return MySqlBinlogSplit.fillTableSchemas(
                     binlogSplitAssigner.getNext().get().asBinlogSplit(), tableSchemas);
         }

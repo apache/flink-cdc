@@ -28,7 +28,9 @@ import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlRecords;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -39,56 +41,159 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Queue;
+import java.util.Set;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+import static com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner.BINLOG_SPLIT_ID;
 
 /** The {@link SplitReader} implementation for the {@link MySqlSource}. */
 public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSplitReader.class);
-    private final Queue<MySqlSplit> splits;
+    private final ArrayDeque<MySqlSnapshotSplit> snapshotSplits;
+    private final ArrayDeque<MySqlBinlogSplit> binlogSplits;
     private final MySqlSourceConfig sourceConfig;
     private final int subtaskId;
     private final MySqlSourceReaderContext context;
 
-    @Nullable private DebeziumReader<SourceRecords, MySqlSplit> currentReader;
     @Nullable private String currentSplitId;
+    @Nullable private DebeziumReader<SourceRecords, MySqlSplit> currentReader;
+    @Nullable private SnapshotSplitReader reusedSnapshotReader;
+    @Nullable private BinlogSplitReader reusedBinlogReader;
 
     public MySqlSplitReader(
             MySqlSourceConfig sourceConfig, int subtaskId, MySqlSourceReaderContext context) {
         this.sourceConfig = sourceConfig;
         this.subtaskId = subtaskId;
-        this.splits = new ArrayDeque<>();
+        this.snapshotSplits = new ArrayDeque<>();
+        this.binlogSplits = new ArrayDeque<>(1);
         this.context = context;
     }
 
     @Override
     public RecordsWithSplitIds<SourceRecords> fetch() throws IOException {
-
-        checkSplitOrStartNext();
-        checkNeedStopBinlogReader();
-
-        Iterator<SourceRecords> dataIt;
         try {
-            dataIt = currentReader.pollSplitRecords();
+            suspendBinlogReaderIfNeed();
+            return pollSplitRecords();
         } catch (InterruptedException e) {
             LOG.warn("fetch data failed.", e);
             throw new IOException(e);
         }
-        return dataIt == null
-                ? finishedSnapshotSplit()
-                : MySqlRecords.forRecords(currentSplitId, dataIt);
     }
 
-    private void checkNeedStopBinlogReader() {
-        if (currentReader instanceof BinlogSplitReader
-                && context.needStopBinlogSplitReader()
+    /** Suspends binlog reader until updated binlog split join again. */
+    private void suspendBinlogReaderIfNeed() {
+        if (currentReader != null
+                && currentReader instanceof BinlogSplitReader
+                && context.isBinlogSplitReaderSuspended()
                 && !currentReader.isFinished()) {
             ((BinlogSplitReader) currentReader).stopBinlogReadTask();
+            LOG.info("Suspend binlog reader to wait the binlog split update.");
         }
+    }
+
+    private MySqlRecords pollSplitRecords() throws InterruptedException {
+        Iterator<SourceRecords> dataIt;
+        if (currentReader == null) {
+            // (1) Reads binlog split firstly and then read snapshot split
+            if (binlogSplits.size() > 0) {
+                // the binlog split may come from:
+                // (a) the initial binlog split
+                // (b) added back binlog-split in newly added table process
+                MySqlSplit nextSplit = binlogSplits.poll();
+                currentSplitId = nextSplit.splitId();
+                currentReader = getBinlogSplitReader();
+                currentReader.submitSplit(nextSplit);
+            } else if (snapshotSplits.size() > 0) {
+                MySqlSplit nextSplit = snapshotSplits.poll();
+                currentSplitId = nextSplit.splitId();
+                currentReader = getSnapshotSplitReader();
+                currentReader.submitSplit(nextSplit);
+            } else {
+                LOG.info("No available split to read.");
+            }
+            dataIt = currentReader.pollSplitRecords();
+            return dataIt == null ? finishedSplit() : forRecords(dataIt);
+        } else if (currentReader instanceof SnapshotSplitReader) {
+            // (2) try to switch to binlog split reading util current snapshot split finished
+            dataIt = currentReader.pollSplitRecords();
+            if (dataIt != null) {
+                // first fetch data of snapshot split, return and emit the records of snapshot split
+                MySqlRecords records;
+                if (context.isHasAssignedBinlogSplit()) {
+                    records = forNewAddedTableFinishedSplit(currentSplitId, dataIt);
+                    closeSnapshotReader();
+                    closeBinlogReader();
+                } else {
+                    records = forRecords(dataIt);
+                    MySqlSplit nextSplit = snapshotSplits.poll();
+                    if (nextSplit != null) {
+                        currentSplitId = nextSplit.splitId();
+                        currentReader.submitSplit(nextSplit);
+                    } else {
+                        closeSnapshotReader();
+                    }
+                }
+                return records;
+            } else {
+                return finishedSplit();
+            }
+        } else if (currentReader instanceof BinlogSplitReader) {
+            // (3) switch to snapshot split reading if there are newly added snapshot splits
+            dataIt = currentReader.pollSplitRecords();
+            if (dataIt != null) {
+                // try to switch to read snapshot split if there are new added snapshot
+                MySqlSplit nextSplit = snapshotSplits.poll();
+                if (nextSplit != null) {
+                    closeBinlogReader();
+                    LOG.info("It's turn to switch next fetch reader to snapshot split reader");
+                    currentSplitId = nextSplit.splitId();
+                    currentReader = getSnapshotSplitReader();
+                    currentReader.submitSplit(nextSplit);
+                }
+                return MySqlRecords.forBinlogRecords(BINLOG_SPLIT_ID, dataIt);
+            } else {
+                // null will be returned after receiving suspend binlog event
+                // finish current binlog split reading
+                closeBinlogReader();
+                return finishedSplit();
+            }
+        } else {
+            throw new IllegalStateException("Unsupported reader type.");
+        }
+    }
+
+    private MySqlRecords finishedSplit() {
+        final MySqlRecords finishedRecords = MySqlRecords.forFinishedSplit(currentSplitId);
+        currentSplitId = null;
+        return finishedRecords;
+    }
+
+    private MySqlRecords forRecords(Iterator<SourceRecords> dataIt) {
+        if (currentReader instanceof SnapshotSplitReader) {
+            final MySqlRecords finishedRecords =
+                    MySqlRecords.forSnapshotRecords(currentSplitId, dataIt);
+            closeSnapshotReader();
+            return finishedRecords;
+        } else {
+            return MySqlRecords.forBinlogRecords(currentSplitId, dataIt);
+        }
+    }
+
+    /**
+     * Finishes new added snapshot split, mark the binlog split as finished too, we will add the
+     * binlog split back in {@code MySqlSourceReader}.
+     */
+    private MySqlRecords forNewAddedTableFinishedSplit(
+            final String splitId, final Iterator<SourceRecords> recordsForSplit) {
+        final Set<String> finishedSplits = new HashSet<>();
+        finishedSplits.add(splitId);
+        finishedSplits.add(BINLOG_SPLIT_ID);
+        currentSplitId = null;
+        return new MySqlRecords(splitId, recordsForSplit, finishedSplits);
     }
 
     @Override
@@ -100,8 +205,14 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
                             splitsChanges.getClass()));
         }
 
-        LOG.debug("Handling split change {}", splitsChanges);
-        splits.addAll(splitsChanges.splits());
+        LOG.info("Handling split change {}", splitsChanges);
+        for (MySqlSplit mySqlSplit : splitsChanges.splits()) {
+            if (mySqlSplit.isSnapshotSplit()) {
+                snapshotSplits.add(mySqlSplit.asSnapshotSplit());
+            } else {
+                binlogSplits.add(mySqlSplit.asBinlogSplit());
+            }
+        }
     }
 
     @Override
@@ -109,64 +220,54 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
 
     @Override
     public void close() throws Exception {
-        if (currentReader != null) {
-            LOG.info(
-                    "Close current debezium reader {}",
-                    currentReader.getClass().getCanonicalName());
-            currentReader.close();
-            currentSplitId = null;
+        closeSnapshotReader();
+        closeBinlogReader();
+    }
+
+    private SnapshotSplitReader getSnapshotSplitReader() {
+        if (reusedSnapshotReader == null) {
+            final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
+            final BinaryLogClient binaryLogClient =
+                    createBinaryClient(sourceConfig.getDbzConfiguration());
+            final StatefulTaskContext statefulTaskContext =
+                    new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
+            reusedSnapshotReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
+        }
+        return reusedSnapshotReader;
+    }
+
+    private BinlogSplitReader getBinlogSplitReader() {
+        if (reusedBinlogReader == null) {
+            final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
+            final BinaryLogClient binaryLogClient =
+                    createBinaryClient(sourceConfig.getDbzConfiguration());
+            final StatefulTaskContext statefulTaskContext =
+                    new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
+            reusedBinlogReader = new BinlogSplitReader(statefulTaskContext, subtaskId);
+        }
+        return reusedBinlogReader;
+    }
+
+    private void closeSnapshotReader() {
+        if (reusedSnapshotReader != null) {
+            LOG.debug(
+                    "Close snapshot reader {}", reusedSnapshotReader.getClass().getCanonicalName());
+            reusedSnapshotReader.close();
+            if (reusedSnapshotReader == currentReader) {
+                currentReader = null;
+            }
+            reusedSnapshotReader = null;
         }
     }
 
-    private void checkSplitOrStartNext() throws IOException {
-        if (canAssignNextSplit()) {
-            MySqlSplit nextSplit = splits.poll();
-            if (nextSplit == null) {
-                return;
+    private void closeBinlogReader() {
+        if (reusedBinlogReader != null) {
+            LOG.debug("Close binlog reader {}", reusedBinlogReader.getClass().getCanonicalName());
+            reusedBinlogReader.close();
+            if (reusedBinlogReader == currentReader) {
+                currentReader = null;
             }
-
-            currentSplitId = nextSplit.splitId();
-
-            if (nextSplit.isSnapshotSplit()) {
-                if (currentReader instanceof BinlogSplitReader) {
-                    LOG.info(
-                            "This is the point from binlog split reading change to snapshot split reading");
-                    currentReader.close();
-                    currentReader = null;
-                }
-                if (currentReader == null) {
-                    final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
-                    final BinaryLogClient binaryLogClient =
-                            createBinaryClient(sourceConfig.getDbzConfiguration());
-                    final StatefulTaskContext statefulTaskContext =
-                            new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
-                    currentReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
-                }
-            } else {
-                // point from snapshot split to binlog split
-                if (currentReader != null) {
-                    LOG.info("It's turn to read binlog split, close current snapshot reader");
-                    currentReader.close();
-                }
-                final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
-                final BinaryLogClient binaryLogClient =
-                        createBinaryClient(sourceConfig.getDbzConfiguration());
-                final StatefulTaskContext statefulTaskContext =
-                        new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
-                currentReader = new BinlogSplitReader(statefulTaskContext, subtaskId);
-                LOG.info("BinlogSplitReader is created.");
-            }
-            currentReader.submitSplit(nextSplit);
+            reusedBinlogReader = null;
         }
-    }
-
-    private boolean canAssignNextSplit() {
-        return currentReader == null || currentReader.isFinished();
-    }
-
-    private MySqlRecords finishedSnapshotSplit() {
-        final MySqlRecords finishedRecords = MySqlRecords.forFinishedSplit(currentSplitId);
-        currentSplitId = null;
-        return finishedRecords;
     }
 }
