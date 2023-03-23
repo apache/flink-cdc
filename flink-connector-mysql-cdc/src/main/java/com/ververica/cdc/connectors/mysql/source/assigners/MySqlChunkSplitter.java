@@ -148,7 +148,12 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                     ChunkUtils.getChunkKeyColumn(
                             currentSplittingTable, sourceConfig.getChunkKeyColumn());
             splitType = ChunkUtils.getChunkKeyColumnType(splitColumn);
-            minMaxOfSplitColumn = queryMinMax(jdbcConnection, tableId, splitColumn.name());
+            // split column would be null if table has no primary key.
+            if (splitColumn != null) {
+                minMaxOfSplitColumn = queryMinMax(jdbcConnection, tableId, splitColumn.name());
+            } else {
+                minMaxOfSplitColumn = new Object[2];
+            }
             approximateRowCnt = queryApproximateRowCnt(jdbcConnection, tableId);
         } catch (Exception e) {
             throw new RuntimeException("Fail to analyze table in chunk splitter.", e);

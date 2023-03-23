@@ -42,20 +42,20 @@ public class ChunkUtils {
         return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumn));
     }
 
-    public static RowType getChunkKeyColumnType(Column chunkKeyColumn) {
+    public static RowType getChunkKeyColumnType(@Nullable Column chunkKeyColumn) {
+        if (chunkKeyColumn == null) {
+            return (RowType) ROW().getLogicalType();
+        }
         return (RowType)
                 ROW(FIELD(chunkKeyColumn.name(), MySqlTypeUtils.fromDbzColumn(chunkKeyColumn)))
                         .getLogicalType();
     }
 
+    @Nullable
     public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
+            return null;
         }
 
         if (chunkKeyColumn != null) {

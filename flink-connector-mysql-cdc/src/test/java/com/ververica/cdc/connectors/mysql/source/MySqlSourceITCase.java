@@ -44,7 +44,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.table.MySqlDeserializationConverterFactory;
@@ -57,15 +56,19 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -89,11 +92,14 @@ import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MySqlSource}. */
+@RunWith(Parameterized.class)
 public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
+    private static final String TABLE_WITH_PRIMARY_KEY = "customers";
+    private static final String TABLE_WITHOUT_PRIMARY_KEY = "customers_no_pk";
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -143,119 +149,122 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]",
                     "+U[1010, user_11, Hangzhou, 123567891234]");
 
+    @Parameterized.Parameter public String tableName;
+
+    @Parameterized.Parameters(name = "tableName: {0}")
+    public static Collection<String> parameters() {
+        return Arrays.asList(TABLE_WITH_PRIMARY_KEY, TABLE_WITHOUT_PRIMARY_KEY);
+    }
+
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
         testMySqlParallelSource(
-                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {tableName});
     }
 
     @Test
     public void testReadSingleTableWithMultipleParallelism() throws Exception {
         testMySqlParallelSource(
-                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {tableName});
     }
 
     @Test
     public void testReadMultipleTableWithSingleParallelism() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_no_pk"});
     }
 
     @Test
     public void testReadMultipleTableWithMultipleParallelism() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
                 4,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_no_pk"});
     }
 
     // Failover tests
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
-                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                FailoverType.TM,
+                FailoverPhase.SNAPSHOT,
+                new String[] {"customers", "customers_no_pk"});
     }
 
     @Test
     public void testTaskManagerFailoverInBinlogPhase() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
-                FailoverType.TM, FailoverPhase.BINLOG, new String[] {"customers", "customers_1"});
+                FailoverType.TM,
+                FailoverPhase.BINLOG,
+                new String[] {"customers", "customers_no_pk"});
     }
 
     @Test
     public void testTaskManagerFailoverFromLatestOffset() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
-                new String[] {"customers", "customers_1"},
+                new String[] {"customers", "customers_no_pk"},
                 RestartStrategies.fixedDelayRestart(1, 0));
     }
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
-                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                FailoverType.JM,
+                FailoverPhase.SNAPSHOT,
+                new String[] {"customers", "customers_no_pk"});
     }
 
     @Test
     public void testJobManagerFailoverInBinlogPhase() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
-                FailoverType.JM, FailoverPhase.BINLOG, new String[] {"customers", "customers_1"});
+                FailoverType.JM,
+                FailoverPhase.BINLOG,
+                new String[] {"customers", "customers_no_pk"});
     }
 
     @Test
     public void testJobManagerFailoverFromLatestOffset() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
                 FailoverType.JM,
                 FailoverPhase.BINLOG,
-                new String[] {"customers", "customers_1"},
+                new String[] {"customers", "customers_no_pk"},
                 RestartStrategies.fixedDelayRestart(1, 0));
     }
 
     @Test
     public void testTaskManagerFailoverSingleParallelism() throws Exception {
         testMySqlParallelSource(
-                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
+                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {tableName});
     }
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
         testMySqlParallelSource(
-                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
-    }
-
-    @Test
-    public void testConsumingTableWithoutPrimaryKey() {
-        try {
-            testMySqlParallelSource(
-                    1,
-                    DEFAULT_SCAN_STARTUP_MODE,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
-                    new String[] {"customers_no_pk"},
-                    RestartStrategies.noRestart());
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
-                                            customDatabase.getDatabaseName() + ".customers_no_pk"))
-                            .isPresent());
-        }
+                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {tableName});
     }
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
     public void testSnapshotSplitReadingFailCrossCheckpoints() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
@@ -329,6 +338,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Test
     public void testStartFromEarliestOffset() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         List<String> expected = new ArrayList<>();
         expected.addAll(initialChanges);
         expected.addAll(firstPartBinlogEvents);
@@ -337,6 +347,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Test
     public void testStartFromLatestOffset() throws Exception {
+        Assume.assumeTrue(TABLE_WITH_PRIMARY_KEY.equals(tableName));
         testStartingOffset(StartupOptions.latest(), Collections.emptyList());
     }
 

@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -49,8 +50,10 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -248,7 +251,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             boolean reachBinlogEnd = false;
             SourceRecord lowWatermark = null;
             SourceRecord highWatermark = null;
-            Map<Struct, SourceRecord> snapshotRecords = new LinkedHashMap<>();
+
+            SnapshotRecords snapshotRecords =
+                    containsPrimaryKey()
+                            ? new PrimaryKeySnapshotRecords()
+                            : new NoPrimaryKeySnapshotRecords();
             while (!reachBinlogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
@@ -273,14 +280,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         break;
                     }
 
-                    if (!reachBinlogStart) {
-                        snapshotRecords.put((Struct) record.key(), record);
-                    } else {
-                        if (isRequiredBinlogRecord(record)) {
-                            // upsert binlog events through the record key
-                            upsertBinlog(snapshotRecords, record);
-                        }
-                    }
+                    snapshotRecords.collect(record, reachBinlogStart);
                 }
             }
             // snapshot split return its data once
@@ -288,7 +288,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
             final List<SourceRecord> normalizedRecords = new ArrayList<>();
             normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
+            normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.getRecords()));
             normalizedRecords.add(highWatermark);
 
             final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
@@ -401,6 +401,60 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         @Override
         public boolean isRunning() {
             return currentTaskRunning;
+        }
+    }
+
+    private boolean containsPrimaryKey() {
+        return !CollectionUtil.isNullOrEmpty(currentSnapshotSplit.getSplitKeyType().getFields());
+    }
+
+    /** Collect records need to be sent, except low/high watermark. */
+    interface SnapshotRecords {
+        void collect(SourceRecord record, boolean reachBinlogStart);
+
+        Collection<SourceRecord> getRecords();
+    }
+
+    /** Collect records with primary key. May upsert binlog events. */
+    class PrimaryKeySnapshotRecords implements SnapshotRecords {
+        private final Map<Struct, SourceRecord> snapshotRecords = new LinkedHashMap<>();
+
+        @Override
+        public void collect(SourceRecord record, boolean reachBinlogStart) {
+            if (!reachBinlogStart) {
+                snapshotRecords.put((Struct) record.key(), record);
+            } else {
+                if (isRequiredBinlogRecord(record)) {
+                    // upsert binlog events through the record key
+                    upsertBinlog(snapshotRecords, record);
+                }
+            }
+        }
+
+        @Override
+        public Collection<SourceRecord> getRecords() {
+            return snapshotRecords.values();
+        }
+    }
+
+    /** Collect records without primary key. There are no binlog events. */
+    static class NoPrimaryKeySnapshotRecords implements SnapshotRecords {
+        private final List<SourceRecord> snapshotRecords = new LinkedList<>();
+
+        @Override
+        public void collect(SourceRecord record, boolean reachBinlogStart) {
+            if (!reachBinlogStart) {
+                snapshotRecords.add(record);
+            } else {
+                throw new IllegalStateException(
+                        "a table without primary key can not have binlog splits"
+                                + " in initialization stage");
+            }
+        }
+
+        @Override
+        public Collection<SourceRecord> getRecords() {
+            return snapshotRecords;
         }
     }
 }
