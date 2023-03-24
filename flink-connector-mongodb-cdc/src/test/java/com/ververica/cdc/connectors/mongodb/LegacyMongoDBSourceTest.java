@@ -352,28 +352,30 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
 
     @Test
     public void testConnectionUri() {
-        String hosts = MONGODB_CONTAINER.getHostAndPort();
+        String hostAndPort = MONGODB_CONTAINER.getHostAndPort();
 
-        ConnectionString case0 = buildConnectionString(null, null, false, hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case0.toString());
+        ConnectionString case0 = buildConnectionString(null, null, false, hostAndPort, null);
+        assertEquals(String.format("mongodb://%s", hostAndPort), case0.toString());
 
-        ConnectionString case1 = buildConnectionString("", null, false, hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case1.toString());
+        ConnectionString case1 = buildConnectionString("", null, false, hostAndPort, null);
+        assertEquals(String.format("mongodb://%s", hostAndPort), case1.toString());
 
-        ConnectionString case2 = buildConnectionString(null, "", false, hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case2.toString());
+        ConnectionString case2 = buildConnectionString(null, "", false, hostAndPort, null);
+        assertEquals(String.format("mongodb://%s", hostAndPort), case2.toString());
 
-        ConnectionString case3 = buildConnectionString(null, null, true, hosts, null);
-        assertEquals(String.format("mongodb+srv://%s", hosts), case3.toString());
+        String host = MONGODB_CONTAINER.getHost();
 
-        ConnectionString case4 = buildConnectionString("", null, true, hosts, null);
-        assertEquals(String.format("mongodb+srv://%s", hosts), case4.toString());
+        ConnectionString case3 = buildConnectionString(null, null, true, host, null);
+        assertEquals(String.format("mongodb+srv://%s", host), case3.toString());
 
-        ConnectionString case5 = buildConnectionString(null, "", true, hosts, null);
-        assertEquals(String.format("mongodb+srv://%s", hosts), case5.toString());
+        ConnectionString case4 = buildConnectionString("", null, true, host, null);
+        assertEquals(String.format("mongodb+srv://%s", host), case4.toString());
+
+        ConnectionString case5 = buildConnectionString(null, "", true, host, null);
+        assertEquals(String.format("mongodb+srv://%s", host), case5.toString());
 
         ConnectionString case6 =
-                buildConnectionString(FLINK_USER, FLINK_USER_PASSWORD, false, hosts, null);
+                buildConnectionString(FLINK_USER, FLINK_USER_PASSWORD, false, hostAndPort, null);
         assertEquals(FLINK_USER, case6.getUsername());
         assertEquals(FLINK_USER_PASSWORD, new String(case6.getPassword()));
     }
