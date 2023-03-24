@@ -38,6 +38,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.DATABASE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HOSTS;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.IS_SRV_PROTOCOL;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
@@ -62,6 +63,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         final ReadableConfig config = helper.getOptions();
 
+        Boolean isSrvProtocol = config.get(IS_SRV_PROTOCOL);
         String hosts = config.get(HOSTS);
         String connectionOptions = config.getOptional(CONNECTION_OPTIONS).orElse(null);
 
@@ -98,6 +100,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         return new MongoDBTableSource(
                 physicalSchema,
+                isSrvProtocol,
                 hosts,
                 username,
                 password,
@@ -137,6 +140,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(IS_SRV_PROTOCOL);
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(CONNECTION_OPTIONS);

@@ -52,6 +52,12 @@ public class MongoDBSourceBuilder<T> {
     private final MongoDBSourceConfigFactory configFactory = new MongoDBSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
 
+    /** Is srv Protocol. Defaults to false. */
+    public MongoDBSourceBuilder<T> isSrvProtocol(boolean isSrvProtocol) {
+        this.configFactory.isSrvProtocol(isSrvProtocol);
+        return this;
+    }
+
     /** The comma-separated list of hostname and port pairs of mongodb servers. */
     public MongoDBSourceBuilder<T> hosts(String hosts) {
         this.configFactory.hosts(hosts);

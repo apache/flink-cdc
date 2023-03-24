@@ -39,6 +39,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
 
     private static final long serialVersionUID = 1L;
 
+    private boolean isSrvProtocol;
     private String hosts;
     private String username;
     private String password;
@@ -53,6 +54,12 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
     private Integer splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private Integer splitSizeMB = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
+
+    /** Is srv Protocol. Defaults to false. */
+    public MongoDBSourceConfigFactory isSrvProtocol(boolean isSrvProtocol) {
+        this.isSrvProtocol = isSrvProtocol;
+        return this;
+    }
 
     /** The comma-separated list of hostname and port pairs of mongodb servers. */
     public MongoDBSourceConfigFactory hosts(String hosts) {
@@ -196,6 +203,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
         return new MongoDBSourceConfig(
+                isSrvProtocol,
                 hosts,
                 username,
                 password,

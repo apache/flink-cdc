@@ -83,7 +83,7 @@ public class MongoDBTableFactoryTest {
                                     "_database_name", DataTypes.STRING(), "database_name", true)),
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("_id")));
-
+    private static final Boolean IS_SRV_PROTOCOL = false;
     private static final String MY_HOSTS = "localhost:27017,localhost:27018";
     private static final String USER = "flinkuser";
     private static final String PASSWORD = "flinkpw";
@@ -111,6 +111,7 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         SCHEMA,
+                        IS_SRV_PROTOCOL,
                         MY_HOSTS,
                         USER,
                         PASSWORD,
@@ -148,6 +149,7 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         SCHEMA,
+                        false,
                         MY_HOSTS,
                         USER,
                         PASSWORD,
@@ -182,6 +184,7 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
+                        false,
                         MY_HOSTS,
                         USER,
                         PASSWORD,

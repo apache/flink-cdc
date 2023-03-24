@@ -64,6 +64,7 @@ public class MongoDBSource {
     /** Builder class of {@link MongoDBSource}. */
     public static class Builder<T> {
 
+        private boolean isSrvProtocol;
         private String hosts;
         private String username;
         private String password;
@@ -80,6 +81,11 @@ public class MongoDBSource {
         private String copyExistingPipeline;
         private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
         private DebeziumDeserializationSchema<T> deserializer;
+
+        public Builder<T> isSrvProtocol(boolean isSrvProtocol) {
+            this.isSrvProtocol = isSrvProtocol;
+            return this;
+        }
 
         /** The comma-separated list of hostname and port pairs of mongodb servers. */
         public Builder<T> hosts(String hosts) {
@@ -261,7 +267,8 @@ public class MongoDBSource {
             props.setProperty(
                     MongoSourceConfig.CONNECTION_URI_CONFIG,
                     String.valueOf(
-                            buildConnectionString(username, password, hosts, connectionOptions)));
+                            buildConnectionString(
+                                    username, password, isSrvProtocol, hosts, connectionOptions)));
 
             if (databaseList != null) {
                 props.setProperty(DATABASE_INCLUDE_LIST, String.join(",", databaseList));

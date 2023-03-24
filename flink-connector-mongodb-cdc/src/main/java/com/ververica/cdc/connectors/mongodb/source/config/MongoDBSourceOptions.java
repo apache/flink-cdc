@@ -23,6 +23,12 @@ import org.apache.flink.configuration.ConfigOptions;
 /** Configurations for {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}. */
 public class MongoDBSourceOptions {
 
+    public static final ConfigOption<Boolean> IS_SRV_PROTOCOL =
+            ConfigOptions.key("is-srv-protocol")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Is srv Protocol. Defaults to false.");
+
     public static final ConfigOption<String> HOSTS =
             ConfigOptions.key("hosts")
                     .stringType()

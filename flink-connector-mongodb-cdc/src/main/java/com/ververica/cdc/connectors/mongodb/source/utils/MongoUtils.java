@@ -57,6 +57,7 @@ import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.DROP
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.ID_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.KEY_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.NAMESPACE_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.UUID_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.encodeValue;
@@ -348,9 +349,11 @@ public class MongoUtils {
     public static ConnectionString buildConnectionString(
             @Nullable String username,
             @Nullable String password,
+            boolean isSrvProtocol,
             String hosts,
             @Nullable String connectionOptions) {
-        StringBuilder sb = new StringBuilder(MONGODB_SCHEME).append("://");
+        String schema = isSrvProtocol ? MONGODB_SRV_SCHEME : MONGODB_SCHEME;
+        StringBuilder sb = new StringBuilder(schema).append("://");
 
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             sb.append(encodeValue(username)).append(":").append(encodeValue(password)).append("@");

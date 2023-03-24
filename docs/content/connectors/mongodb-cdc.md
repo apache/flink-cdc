@@ -147,6 +147,14 @@ Connector Options
       <td>Specify what connector to use, here should be <code>mongodb-cdc</code>.</td>
     </tr>
     <tr>
+      <td>is-srv-protocol</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to use the srv protocol. Enable the srv protocol, the schema connected to the mongo server is <code>mongodb+srv://</code>, otherwise it is <code>mongodb://</code>.
+      </td>
+    </tr>
+    <tr>
       <td>hosts</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>

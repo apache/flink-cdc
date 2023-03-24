@@ -33,6 +33,7 @@ public class MongoDBSourceConfig implements SourceConfig {
 
     private static final long serialVersionUID = 1L;
 
+    private final boolean isSrvProtocol;
     private final String hosts;
     @Nullable private final String username;
     @Nullable private final String password;
@@ -49,6 +50,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final int splitSizeMB;
 
     MongoDBSourceConfig(
+            boolean isSrvProtocol,
             String hosts,
             @Nullable String username,
             @Nullable String password,
@@ -63,13 +65,14 @@ public class MongoDBSourceConfig implements SourceConfig {
             int heartbeatIntervalMillis,
             int splitMetaGroupSize,
             int splitSizeMB) {
+        this.isSrvProtocol = isSrvProtocol;
         this.hosts = checkNotNull(hosts);
         this.username = username;
         this.password = password;
         this.databaseList = databaseList;
         this.collectionList = collectionList;
         this.connectionString =
-                buildConnectionString(username, password, hosts, connectionOptions)
+                buildConnectionString(username, password, isSrvProtocol, hosts, connectionOptions)
                         .getConnectionString();
         this.batchSize = batchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
@@ -166,6 +169,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && heartbeatIntervalMillis == that.heartbeatIntervalMillis
                 && splitMetaGroupSize == that.splitMetaGroupSize
                 && splitSizeMB == that.splitSizeMB
+                && isSrvProtocol == that.isSrvProtocol
                 && Objects.equals(hosts, that.hosts)
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
@@ -177,6 +181,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     @Override
     public int hashCode() {
         return Objects.hash(
+                isSrvProtocol,
                 hosts,
                 username,
                 password,

@@ -62,6 +62,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBTableSource.class);
 
     private final ResolvedSchema physicalSchema;
+    private final Boolean isSrvProtocol;
     private final String hosts;
     private final String connectionOptions;
     private final String username;
@@ -91,6 +92,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
 
     public MongoDBTableSource(
             ResolvedSchema physicalSchema,
+            Boolean isSrvProtocol,
             String hosts,
             @Nullable String username,
             @Nullable String password,
@@ -108,6 +110,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable Integer splitMetaGroupSize,
             @Nullable Integer splitSizeMB) {
         this.physicalSchema = physicalSchema;
+        this.isSrvProtocol = isSrvProtocol;
         this.hosts = checkNotNull(hosts);
         this.username = username;
         this.password = password;
@@ -172,7 +175,10 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
 
         if (enableParallelRead) {
             MongoDBSourceBuilder<RowData> builder =
-                    MongoDBSource.<RowData>builder().hosts(hosts).deserializer(deserializer);
+                    MongoDBSource.<RowData>builder()
+                            .isSrvProtocol(isSrvProtocol)
+                            .hosts(hosts)
+                            .deserializer(deserializer);
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
@@ -192,6 +198,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         } else {
             com.ververica.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
                     com.ververica.cdc.connectors.mongodb.MongoDBSource.<RowData>builder()
+                            .isSrvProtocol(isSrvProtocol)
                             .hosts(hosts)
                             .deserializer(deserializer);
 
@@ -248,6 +255,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         MongoDBTableSource source =
                 new MongoDBTableSource(
                         physicalSchema,
+                        isSrvProtocol,
                         hosts,
                         username,
                         password,
