@@ -131,7 +131,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                                         .orElse(null);
                     }
                     // update nextUpdateTime
-                    nextUpdate += sourceConfig.getPollAwaitTimeMillis();
+                    nextUpdate = time.milliseconds() + sourceConfig.getPollAwaitTimeMillis();
                 } else {
                     BsonDocument changeStreamDocument = next.get();
                     MongoNamespace namespace = getMongoNamespace(changeStreamDocument);
