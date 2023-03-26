@@ -177,7 +177,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
             long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
             double distributionFactor =
                     calculateDistributionFactor(tableId, min, max, approximateRowCnt);
-
+	    // if the difference between the current ID and the minimum ID is large, but the amount of data in the table is relatively small(for example, 10W), it will trigger the reverse optimization of the Flink cdc
             boolean dataIsEvenlyDistributed =
                     doubleCompare(distributionFactor, distributionFactorLower) >= 0
                             && doubleCompare(distributionFactor, distributionFactorUpper) <= 0;
