@@ -160,6 +160,10 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         } else {
             LOG.info("Skip snapshot read");
             resolvedTs = session.getTimestamp().getVersion();
+            // get the resolvedTs from checkpoints in LATEST_OFFSET mode
+            if (checkpointsResolvedTs != SNAPSHOT_VERSION_EPOCH) {
+                resolvedTs = checkpointsResolvedTs;
+            }
         }
 
         LOG.info("start read change events");
