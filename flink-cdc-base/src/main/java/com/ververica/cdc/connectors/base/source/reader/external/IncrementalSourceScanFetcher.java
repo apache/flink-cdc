@@ -190,7 +190,7 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         try {
             if (executorService != null) {
                 executorService.shutdown();
-                if (executorService.awaitTermination(
+                if (!executorService.awaitTermination(
                         READER_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     LOG.warn(
                             "Failed to close the scan fetcher in {} seconds.",

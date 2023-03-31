@@ -23,7 +23,7 @@ import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
- * pull binlog meta data, i.e. sending {@link BinlogSplitMetaEvent}.
+ * pull binlog metadata, i.e. sending {@link BinlogSplitMetaEvent}.
  */
 public class BinlogSplitMetaRequestEvent implements SourceEvent {
 

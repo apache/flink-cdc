@@ -56,7 +56,7 @@ public interface SplitAssigner {
     boolean waitingForFinishedSplits();
 
     /**
-     * Gets the finished splits information. This is useful meta data to generate a stream split
+     * Gets the finished splits' information. This is useful metadata to generate a stream split
      * that considering finished snapshot splits.
      */
     List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();

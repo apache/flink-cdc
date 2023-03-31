@@ -94,7 +94,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subtaskId).build();
+                new ThreadFactoryBuilder().setNameFormat("snapshot-reader-" + subtaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
@@ -339,7 +339,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             }
             if (executorService != null) {
                 executorService.shutdown();
-                if (executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                     LOG.warn(
                             "Failed to close the snapshot split reader in {} seconds.",
                             READER_CLOSE_TIMEOUT);

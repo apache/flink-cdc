@@ -1,0 +1,70 @@
+name: Bug report
+description: Problems with the software
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you very much for your feedback!
+
+        For suggestions or help, please consider using [Github Discussion](https://github.com/ververica/flink-cdc-connectors/discussions) instead.
+  - type: checkboxes
+    attributes:
+      label: Search before asking
+      description: >
+        Please search [issues](https://github.com/ververica/flink-cdc-connectors/issues) to check if your issue has already been reported.
+      options:
+        - label: >
+            I searched in the [issues](https://github.com/ververica/flink-cdc-connectors/issues) and found nothing similar.
+          required: true
+  - type: textarea
+    attributes:
+      label: Flink version
+      description: >
+        Please provide the version of Flink you are using. If you are using the master branch, please provide the commit id.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Flink CDC version
+      description: >
+        Please provide the version of Flink CDC you are using. If you are using the master branch, please provide the commit id.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Database and its version
+      description: >
+        Please provide the database you connect to and its version.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Minimal reproduce step
+      description: Please try to give reproducing steps to facilitate quick location of the problem.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: What did you expect to see?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: What did you see instead?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Anything else?
+  - type: checkboxes
+    attributes:
+      label: Are you willing to submit a PR?
+      description: >
+        We look forward to the community of developers or users helping solve Flink CDC problems together. If you are willing to submit a PR to fix this problem, please check the box.
+      options:
+        - label: I'm willing to submit a PR!
+  - type: markdown
+    attributes:
+      value: "Thanks for completing our form!"
