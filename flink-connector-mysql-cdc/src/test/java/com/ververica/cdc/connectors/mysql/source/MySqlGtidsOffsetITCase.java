@@ -88,7 +88,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsInitialTest() throws Exception {
+    public void testSingleGtidsInitial() throws Exception {
         // Set parameters and expected data for test cases
         StartupOptions startupOptions = StartupOptions.initial();
         int actuallyAddDataCount = 5;
@@ -114,7 +114,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsInitialTest() throws Exception {
+    public void testMultipleGtidsInitial() throws Exception {
         // Set parameters and expected data for test cases.
         StartupOptions startupOptions = StartupOptions.initial();
         int actuallyAddDataCount = 5;
@@ -141,7 +141,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsLatestTest() throws Exception {
+    public void testSingleGtidsLatest() throws Exception {
         // Set parameters and expected data for test cases
         StartupOptions startupOptions = StartupOptions.latest();
         int actuallyAddDataCount = 5;
@@ -167,7 +167,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsLatestTest() throws Exception {
+    public void testMultipleGtidsLatest() throws Exception {
         // Set parameters and expected data for test cases.
         StartupOptions startupOptions = StartupOptions.latest();
         int actuallyAddDataCount = 5;
@@ -194,7 +194,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsEarliestTest() throws Exception {
+    public void testSingleGtidsEarliest() throws Exception {
         // Set parameters and expected data for test cases.
         StartupOptions startupOptions = StartupOptions.earliest();
         int actuallyAddDataCount = 5;
@@ -220,7 +220,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsEarliestTest() throws Exception {
+    public void testMultipleGtidsEarliest() throws Exception {
         // Set parameters and expected data for test cases.
         StartupOptions startupOptions = StartupOptions.earliest();
         int actuallyAddDataCount = 5;
@@ -247,7 +247,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsOffsetGtidByBeginningTest() throws Exception {
+    public void testSingleGtidsOffsetGtidByBeginning() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -273,7 +273,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsOffsetGtidByMiddleTest() throws Exception {
+    public void testSingleGtidsOffsetGtidByMiddle() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -299,7 +299,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsOffsetGtidByBeginningIncorrectSettingTest() throws Exception {
+    public void testMultipleGtidsOffsetGtidByBeginningIncorrectSetting() throws Exception {
         try {
             // Set parameters and expected data for test cases.
             Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
@@ -330,7 +330,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsOffsetGtidByBeginningCorrectSettingTest() throws Exception {
+    public void testMultipleGtidsOffsetGtidByBeginningCorrectSetting() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -358,7 +358,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsOffsetGtidByMiddleIncorrectSettingTest() {
+    public void testMultipleGtidsOffsetGtidByMiddleIncorrectSetting() {
         try {
             // Set parameters and expected data for test cases.
             Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
@@ -390,7 +390,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsOffsetGtidByMiddleCorrectSettingTest() throws Exception {
+    public void testMultipleGtidsOffsetGtidByMiddleCorrectSetting() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -418,7 +418,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsOffsetBinlogFileByBeginningTest() throws Exception {
+    public void testSingleGtidsOffsetBinlogFileByBeginning() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -446,7 +446,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsOffsetBinlogFileByMiddleTest() throws Exception {
+    public void testSingleGtidsOffsetBinlogFileByMiddle() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -475,7 +475,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsOffsetBinlogFileByBeginningTest() throws Exception {
+    public void testMultipleGtidsOffsetBinlogFileByBeginning() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -504,7 +504,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsOffsetBinlogFileByMiddleTest() throws Exception {
+    public void testMultipleGtidsOffsetBinlogFileByMiddle() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -534,7 +534,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doSingleGtidsTimestampTest() throws Exception {
+    public void testSingleGtidsTimestamp() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
@@ -562,7 +562,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void doMultipleGtidsTimestampTest() throws Exception {
+    public void testMultipleGtidsTimestamp() throws Exception {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
