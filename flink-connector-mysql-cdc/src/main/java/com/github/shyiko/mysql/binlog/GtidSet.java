@@ -16,27 +16,34 @@
 
 package com.github.shyiko.mysql.binlog;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Copied from https://github.com/osheroff/mysql-binlog-connector-java project to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1944
  *
- * <p>Line 106 ~ 120: A new method called "overwriteThenAdd" has been added to address the incomplete Gtid storage
- * issue in MySQL-CDC when storing checkpoints. In the MySQL-CDC scenario, consuming from a certain GTID should be
- * ordered, and GTIDs before this should not be consumed again. Therefore, it is assumed that when recording a
- * checkpoint, the historical offset should also be recorded as processed.
+ * <p>Line 106 ~ 120: A new method called "overwriteThenAdd" has been added to address the
+ * incomplete Gtid storage issue in MySQL-CDC when storing checkpoints. In the MySQL-CDC scenario,
+ * consuming from a certain GTID should be ordered, and GTIDs before this should not be consumed
+ * again. Therefore, it is assumed that when recording a checkpoint, the historical offset should
+ * also be recorded as processed.
  */
 public class GtidSet {
 
     private final Map<String, UUIDSet> map = new LinkedHashMap<String, UUIDSet>();
 
-    /**
-     * @param gtidSet gtid set comprised of closed intervals (like MySQL's executed_gtid_set).
-     */
+    /** @param gtidSet gtid set comprised of closed intervals (like MySQL's executed_gtid_set). */
     public GtidSet(String gtidSet) {
-        String[] uuidSets = (gtidSet == null || gtidSet.isEmpty()) ? new String[0] :
-                gtidSet.replace("\n", "").split(",");
+        String[] uuidSets =
+                (gtidSet == null || gtidSet.isEmpty())
+                        ? new String[0]
+                        : gtidSet.replace("\n", "").split(",");
         for (String uuidSet : uuidSets) {
             int uuidSeparatorIndex = uuidSet.indexOf(":");
             String sourceId = uuidSet.substring(0, uuidSeparatorIndex);
@@ -59,6 +66,7 @@ public class GtidSet {
 
     /**
      * Get an immutable collection of the {@link UUIDSet range of GTIDs for a single server}.
+     *
      * @return the {@link UUIDSet GTID ranges for each server}; never null
      */
     public Collection<UUIDSet> getUUIDSets() {
@@ -67,18 +75,21 @@ public class GtidSet {
 
     /**
      * Find the {@link UUIDSet} for the server with the specified UUID.
+     *
      * @param uuid the UUID of the server
-     * @return the {@link UUIDSet} for the identified server, or {@code null} if there are no GTIDs from that server.
+     * @return the {@link UUIDSet} for the identified server, or {@code null} if there are no GTIDs
+     *     from that server.
      */
     public UUIDSet getUUIDSet(String uuid) {
         return map.get(uuid);
     }
 
     /**
-     * Add or replace the UUIDSet
+     * Add or replace the UUIDSet.
+     *
      * @param uuidSet UUIDSet to be added
-     * @return the old {@link UUIDSet} for the server given in uuidSet param,
-     *         or {@code null} if there are no UUIDSet for the given server.
+     * @return the old {@link UUIDSet} for the server given in uuidSet param, or {@code null} if
+     *     there are no UUIDSet for the given server.
      */
     public UUIDSet putUUIDSet(UUIDSet uuidSet) {
         return map.put(uuidSet.getUUID(), uuidSet);
@@ -100,10 +111,11 @@ public class GtidSet {
     }
 
     /**
-     * Add a Gtid string to the current GtidSet. If the corresponding sourceId is being added for the first time,
-     * overwrite it; otherwise, add it.
-     * Overwrite: For example, if the current GtidSet is A:1-100, and a Gtid A:150 is added with overwrite, then the
-     * current GtidSet will become A:1-150.
+     * Add a Gtid string to the current GtidSet. If the corresponding sourceId is being added for
+     * the first time, overwrite it; otherwise, add it. Overwrite: For example, if the current
+     * GtidSet is A:1-100, and a Gtid A:150 is added with overwrite, then the current GtidSet will
+     * become A:1-150.
+     *
      * @param gtid GTID ("source_id:transaction_id")
      * @return whether or not gtid was added to the set (false if it was already there)
      */
@@ -124,11 +136,13 @@ public class GtidSet {
     }
 
     /**
-     * Determine if the GTIDs represented by this object are contained completely within the supplied set of GTIDs.
-     * Note that if two {@link GtidSet}s are equal, then they both are subsets of the other.
+     * Determine if the GTIDs represented by this object are contained completely within the
+     * supplied set of GTIDs. Note that if two {@link GtidSet}s are equal, then they both are
+     * subsets of the other.
+     *
      * @param other the other set of GTIDs; may be null
-     * @return {@code true} if all of the GTIDs in this set are equal to or completely contained within the supplied
-     * set of GTIDs, or {@code false} otherwise
+     * @return {@code true} if all of the GTIDs in this set are equal to or completely contained
+     *     within the supplied set of GTIDs, or {@code false} otherwise
      */
     public boolean isContainedWithin(GtidSet other) {
         if (other == null) {
@@ -188,6 +202,7 @@ public class GtidSet {
 
     /**
      * A range of GTIDs for a single server with a specific UUID.
+     *
      * @see GtidSet
      */
     public static final class UUIDSet {
@@ -217,12 +232,10 @@ public class GtidSet {
                 if (interval.start == transactionId + 1) {
                     interval.start = transactionId;
                     addedToExisting = true;
-                } else
-                if (interval.end + 1 == transactionId) {
+                } else if (interval.end + 1 == transactionId) {
                     interval.end = transactionId;
                     addedToExisting = true;
-                } else
-                if (interval.start <= transactionId && transactionId <= interval.end) {
+                } else if (interval.start <= transactionId && transactionId <= interval.end) {
                     return false;
                 }
             }
@@ -235,11 +248,11 @@ public class GtidSet {
             return true;
         }
 
-        /**
-         * Collapses intervals like a-(b-1):b-c into a-c (only in index+-1 range).
-         */
+        /** Collapses intervals like a-(b-1):b-c into a-c (only in index+-1 range). */
         private void joinAdjacentIntervals(int index) {
-            for (int i = Math.min(index + 1, intervals.size() - 1), e = Math.max(index - 1, 0); i > e; i--) {
+            for (int i = Math.min(index + 1, intervals.size() - 1), e = Math.max(index - 1, 0);
+                    i > e;
+                    i--) {
                 Interval a = intervals.get(i - 1), b = intervals.get(i);
                 if (a.end + 1 == b.start) {
                     a.end = b.end;
@@ -249,7 +262,8 @@ public class GtidSet {
         }
 
         /**
-         * @return index which is either a pointer to the interval containing v or a position at which v can be added
+         * @return index which is either a pointer to the interval containing v or a position at
+         *     which v can be added
          */
         private int findInterval(long v) {
             int l = 0, p = 0, r = intervals.size();
@@ -258,8 +272,7 @@ public class GtidSet {
                 Interval i = intervals.get(p);
                 if (i.end < v) {
                     l = p + 1;
-                } else
-                if (v < i.start) {
+                } else if (v < i.start) {
                     r = p;
                 } else {
                     return p;
@@ -273,6 +286,7 @@ public class GtidSet {
 
         /**
          * Get the UUID for the server that generated the GTIDs.
+         *
          * @return the server's UUID; never null
          */
         public String getUUID() {
@@ -281,6 +295,7 @@ public class GtidSet {
 
         /**
          * Get the intervals of transaction numbers.
+         *
          * @return the immutable transaction intervals; never null
          */
         public List<Interval> getIntervals() {
@@ -288,11 +303,12 @@ public class GtidSet {
         }
 
         /**
-         * Determine if the set of transaction numbers from this server is completely within the set of transaction
-         * numbers from the set of transaction numbers in the supplied set.
+         * Determine if the set of transaction numbers from this server is completely within the set
+         * of transaction numbers from the set of transaction numbers in the supplied set.
+         *
          * @param other the set to compare with this set
-         * @return {@code true} if this server's transaction numbers are equal to or a subset of the transaction
-         * numbers of the supplied set, or false otherwise
+         * @return {@code true} if this server's transaction numbers are equal to or a subset of the
+         *     transaction numbers of the supplied set, or false otherwise
          */
         public boolean isContainedWithin(UUIDSet other) {
             if (other == null) {
@@ -336,8 +352,8 @@ public class GtidSet {
             }
             if (obj instanceof UUIDSet) {
                 UUIDSet that = (UUIDSet) obj;
-                return this.getUUID().equalsIgnoreCase(that.getUUID()) &&
-                        this.getIntervals().equals(that.getIntervals());
+                return this.getUUID().equalsIgnoreCase(that.getUUID())
+                        && this.getIntervals().equals(that.getIntervals());
             }
             return super.equals(obj);
         }
@@ -363,6 +379,7 @@ public class GtidSet {
 
     /**
      * An interval of contiguous transaction identifiers.
+     *
      * @see GtidSet
      */
     public static final class Interval implements Comparable<Interval> {
@@ -377,6 +394,7 @@ public class GtidSet {
 
         /**
          * Get the starting transaction number in this interval.
+         *
          * @return this interval's first transaction number
          */
         public long getStart() {
@@ -385,6 +403,7 @@ public class GtidSet {
 
         /**
          * Get the ending transaction number in this interval.
+         *
          * @return this interval's last transaction number
          */
         public long getEnd() {
@@ -393,10 +412,12 @@ public class GtidSet {
 
         /**
          * Determine if this interval is completely within the supplied interval.
+         *
          * @param other the interval to compare with
-         * @return {@code true} if the {@link #getStart() start} is greater than or equal to the supplied interval's
-         * {@link #getStart() start} and the {@link #getEnd() end} is less than or equal to the supplied
-         * interval's {@link #getEnd() end}, or {@code false} otherwise
+         * @return {@code true} if the {@link #getStart() start} is greater than or equal to the
+         *     supplied interval's {@link #getStart() start} and the {@link #getEnd() end} is less
+         *     than or equal to the supplied interval's {@link #getEnd() end}, or {@code false}
+         *     otherwise
          */
         public boolean isContainedWithin(Interval other) {
             if (other == this) {
@@ -445,5 +466,4 @@ public class GtidSet {
             return (int) value;
         }
     }
-
 }

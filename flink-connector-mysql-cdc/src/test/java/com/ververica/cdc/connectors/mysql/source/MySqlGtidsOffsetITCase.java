@@ -16,11 +16,6 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
-import com.github.shyiko.mysql.binlog.GtidSet;
-import com.ververica.cdc.connectors.mysql.table.StartupOptions;
-import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
-import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
-import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -36,6 +31,12 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
+
+import com.github.shyiko.mysql.binlog.GtidSet;
+import com.ververica.cdc.connectors.mysql.table.StartupOptions;
+import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,9 +51,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
-/**
- * IT cases for {@link MySqlSource} to test the gtids offset is correctly stored and restored.
- */
+/** IT cases for {@link MySqlSource} to test the gtids offset is correctly stored and restored. */
 public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
 
     protected static final Logger LOG = LoggerFactory.getLogger(MySqlGtidsOffsetITCase.class);
@@ -62,11 +61,12 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
 
     private final String tableId = gtidsDatabase.getDatabaseName() + ".products";
 
-    private final String historyPurgedGtids = "6f7b6d88-6a12-11e9-bd82-0242ac110002:1-39816543," +
-            "85ebef13-1e2d-11e7-a18e-080027d89544:1-27336452";
+    private final String historyPurgedGtids =
+            "6f7b6d88-6a12-11e9-bd82-0242ac110002:1-39816543,"
+                    + "85ebef13-1e2d-11e7-a18e-080027d89544:1-27336452";
 
     private static boolean isDatabaseInitialized = false;
-    
+
     private static final long waitFlinkBootTime = 5000;
 
     @Before
@@ -76,7 +76,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
             gtidsDatabase.createAndInitialize();
             isDatabaseInitialized = true;
         } else {
-            // For non-initial database initialization, it is necessary to reset the GTID to avoid interference from
+            // For non-initial database initialization, it is necessary to reset the GTID to avoid
+            // interference from
             // previous tests and create some events to generate new GTIDs for obtaining source IDs.
             gtidsDatabase.createAndInitialize();
             Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
@@ -109,8 +110,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -137,8 +137,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -164,8 +163,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -192,8 +190,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -219,8 +216,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -247,8 +243,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -274,8 +269,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -301,8 +295,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -330,8 +323,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                     actuallyFetchDataCount,
                     initSourceId,
                     historyPurgedGtids,
-                    expectedTransactionId
-            );
+                    expectedTransactionId);
         } catch (Exception e) {
             assertEquals("Failed to fetch next result", e.getMessage());
         }
@@ -342,7 +334,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
-        StartupOptions startupOptions = StartupOptions.specificOffset(historyPurgedGtids + "," + initSourceId + ":1-3");
+        StartupOptions startupOptions =
+                StartupOptions.specificOffset(historyPurgedGtids + "," + initSourceId + ":1-3");
         int actuallyAddDataCount = 5;
         int actuallyFetchDataCount = 7;
         String expectedTransactionId = "1-9";
@@ -361,8 +354,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -390,8 +382,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                     actuallyFetchDataCount,
                     initSourceId,
                     historyPurgedGtids,
-                    expectedTransactionId
-            );
+                    expectedTransactionId);
         } catch (Exception e) {
             // The exception is expected, because the offset is not in the history gtid set
             assertEquals("Failed to fetch next result", e.getMessage());
@@ -403,7 +394,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         // Set parameters and expected data for test cases.
         Connection jdbcConnection = gtidsDatabase.getJdbcConnection();
         String initSourceId = getSourceId(getExecutedGtids(jdbcConnection));
-        StartupOptions startupOptions = StartupOptions.specificOffset(historyPurgedGtids + "," + initSourceId + ":3-4");
+        StartupOptions startupOptions =
+                StartupOptions.specificOffset(historyPurgedGtids + "," + initSourceId + ":3-4");
         int actuallyAddDataCount = 5;
         int actuallyFetchDataCount = 8;
         String expectedTransactionId = "1-2:5-9";
@@ -422,8 +414,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -438,7 +429,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         // Predefined Gtids for the database
         resetMaster(gtidsDatabase.getJdbcConnection());
         Tuple2<String, Long> binlogFileAndPos = getBinlogFileAndPos(jdbcConnection);
-        StartupOptions startupOptions = StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
+        StartupOptions startupOptions =
+                StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
         addData(jdbcConnection, 5);
         MySqlSource<String> mySqlSource = getSource(startupOptions);
 
@@ -450,8 +442,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -467,7 +458,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         resetMaster(gtidsDatabase.getJdbcConnection());
         addData(jdbcConnection, 3);
         Tuple2<String, Long> binlogFileAndPos = getBinlogFileAndPos(jdbcConnection);
-        StartupOptions startupOptions = StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
+        StartupOptions startupOptions =
+                StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
         addData(jdbcConnection, 2);
         MySqlSource<String> mySqlSource = getSource(startupOptions);
 
@@ -479,8 +471,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -496,7 +487,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         resetMaster(gtidsDatabase.getJdbcConnection());
         setPurgedGitds(jdbcConnection, historyPurgedGtids);
         Tuple2<String, Long> binlogFileAndPos = getBinlogFileAndPos(jdbcConnection);
-        StartupOptions startupOptions = StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
+        StartupOptions startupOptions =
+                StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
         addData(jdbcConnection, 5);
         MySqlSource<String> mySqlSource = getSource(startupOptions);
 
@@ -508,8 +500,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -526,7 +517,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         setPurgedGitds(jdbcConnection, historyPurgedGtids);
         addData(jdbcConnection, 3);
         Tuple2<String, Long> binlogFileAndPos = getBinlogFileAndPos(jdbcConnection);
-        StartupOptions startupOptions = StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
+        StartupOptions startupOptions =
+                StartupOptions.specificOffset(binlogFileAndPos.f0, binlogFileAndPos.f1);
         addData(jdbcConnection, 2);
         MySqlSource<String> mySqlSource = getSource(startupOptions);
 
@@ -538,8 +530,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -567,8 +558,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 null,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     @Test
@@ -597,8 +587,7 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                 actuallyFetchDataCount,
                 initSourceId,
                 historyPurgedGtids,
-                expectedTransactionId
-        );
+                expectedTransactionId);
     }
 
     private String getSourceId(String gtids) {
@@ -611,7 +600,9 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     }
 
     private void setPurgedGitds(Connection jdbcConnection, String gtids) throws Exception {
-        jdbcConnection.createStatement().execute(String.format("SET @@GLOBAL.gtid_purged='%s'", gtids));
+        jdbcConnection
+                .createStatement()
+                .execute(String.format("SET @@GLOBAL.gtid_purged='%s'", gtids));
     }
 
     private String getExecutedGtids(Connection jdbcConnection) throws Exception {
@@ -625,16 +616,17 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
     private Tuple2<String, Long> getBinlogFileAndPos(Connection jdbcConnection) throws Exception {
         ResultSet resultSet = jdbcConnection.createStatement().executeQuery("SHOW MASTER STATUS");
         if (resultSet.next()) {
-            Tuple2<String, Long> BinlogFilePos = new Tuple2<>();
-            BinlogFilePos.f0 = (resultSet.getString("File"));
-            BinlogFilePos.f1 = (resultSet.getLong("Position"));
-            return BinlogFilePos;
+            Tuple2<String, Long> binlogFilePos = new Tuple2<>();
+            binlogFilePos.f0 = (resultSet.getString("File"));
+            binlogFilePos.f1 = (resultSet.getLong("Position"));
+            return binlogFilePos;
         }
         throw new Exception("Can not got ExecutedGtids");
     }
 
     private String getPurgedGtids(Connection jdbcConnection) throws Exception {
-        ResultSet resultSet = jdbcConnection.createStatement().executeQuery("SELECT @@global.gtid_purged");
+        ResultSet resultSet =
+                jdbcConnection.createStatement().executeQuery("SELECT @@global.gtid_purged");
         if (resultSet.next()) {
             return resultSet.getString("@@global.gtid_purged");
         }
@@ -643,7 +635,10 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
 
     private void addData(Connection jdbcConnection, int dataCnt) throws Exception {
         for (int i = 0; i < dataCnt; i++) {
-            jdbcConnection.createStatement().execute("INSERT INTO products VALUES (default,\"scooter\",\"Small 2-wheel scooter\", 3.14);");
+            jdbcConnection
+                    .createStatement()
+                    .execute(
+                            "INSERT INTO products VALUES (default,\"scooter\",\"Small 2-wheel scooter\", 3.14);");
         }
     }
 
@@ -666,26 +661,27 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("description", DataTypes.STRING()),
                         DataTypes.FIELD("weight", DataTypes.FLOAT()));
-        InternalTypeInfo<RowData> typeInfo = InternalTypeInfo.of(TypeConversions.fromDataToLogicalType(dataType));
+        InternalTypeInfo<RowData> typeInfo =
+                InternalTypeInfo.of(TypeConversions.fromDataToLogicalType(dataType));
         return RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType((RowType) dataType.getLogicalType())
-                        .setResultTypeInfo(typeInfo)
-                        .build();
+                .setPhysicalRowType((RowType) dataType.getLogicalType())
+                .setResultTypeInfo(typeInfo)
+                .build();
     }
 
     private MySqlSource<String> getSource(StartupOptions startupOptions) {
         return MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        .databaseList(gtidsDatabase.getDatabaseName())
-                        .serverTimeZone("UTC")
-                        .tableList(tableId)
-                        .username(gtidsDatabase.getUsername())
-                        .password(gtidsDatabase.getPassword())
-                        .serverId("5401-5404")
-                        .deserializer(new GtidsDebeziumDeserializationSchema())
-                        .startupOptions(startupOptions)
-                        .build();
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .databaseList(gtidsDatabase.getDatabaseName())
+                .serverTimeZone("UTC")
+                .tableList(tableId)
+                .username(gtidsDatabase.getUsername())
+                .password(gtidsDatabase.getPassword())
+                .serverId("5401-5404")
+                .deserializer(new GtidsDebeziumDeserializationSchema())
+                .startupOptions(startupOptions)
+                .build();
     }
 
     private static List<String> fetchRowData(Iterator<String> iter, int size) {
@@ -698,7 +694,15 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         return (rows);
     }
 
-    private void executeCdcAndAssert(Connection jdbcConnection, MySqlSource<String> mySqlSource, int addSize, int fetchSize, String initSourceId, String historyGtids, String expectedTransactionId) throws Exception {
+    private void executeCdcAndAssert(
+            Connection jdbcConnection,
+            MySqlSource<String> mySqlSource,
+            int addSize,
+            int fetchSize,
+            String initSourceId,
+            String historyGtids,
+            String expectedTransactionId)
+            throws Exception {
         StreamExecutionEnvironment env = getEnv();
         DataStreamSource<String> sourceStream =
                 env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "selfSource");
@@ -709,15 +713,17 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
             LOG.info("expectedFetchSize is {}, actualFetchSize is {}", fetchSize, rows.size());
             assertEquals(fetchSize, rows.size());
 
-            String lastGtids = (rows.size() > 0) ? rows.get(rows.size()-1) : "";
+            String lastGtids = (rows.size() > 0) ? rows.get(rows.size() - 1) : "";
             GtidSet lastGtidSet = new GtidSet(lastGtids);
-            GtidSet expectedGtidSet = getExpectedGtidSet(initSourceId, historyGtids, expectedTransactionId);
+            GtidSet expectedGtidSet =
+                    getExpectedGtidSet(initSourceId, historyGtids, expectedTransactionId);
             LOG.info("expectedGtidSet is {}, lastGtidSet is {}", expectedGtidSet, lastGtidSet);
             assertEquals(expectedGtidSet, lastGtidSet);
         }
     }
 
-    private GtidSet getExpectedGtidSet(String initSourceId, String historyGtids, String expectedTransactionId) {
+    private GtidSet getExpectedGtidSet(
+            String initSourceId, String historyGtids, String expectedTransactionId) {
         String expectedGtids = "";
         if (historyGtids != null) {
             expectedGtids = expectedGtids + historyGtids + ",";
@@ -726,7 +732,8 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         return new GtidSet(expectedGtids);
     }
 
-    static class GtidsDebeziumDeserializationSchema implements DebeziumDeserializationSchema<String> {
+    static class GtidsDebeziumDeserializationSchema
+            implements DebeziumDeserializationSchema<String> {
 
         private static final long serialVersionUID = 1L;
 
@@ -742,6 +749,5 @@ public class MySqlGtidsOffsetITCase extends MySqlSourceTestBase {
         public TypeInformation<String> getProducedType() {
             return BasicTypeInfo.of(String.class);
         }
-
     }
 }
