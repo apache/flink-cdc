@@ -88,6 +88,9 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * <p>Line 268 ~ 270: Clean cache on rotate event to prevent it from growing indefinitely. We should
  * remove this class after we bumped a higher debezium version where the
  * https://issues.redhat.com/browse/DBZ-5126 has been fixed.
+ *
+ * <p> Line 555, 1071 ~ 1090: To fix https://github.com/ververica/flink-cdc-connectors/issues/1944, attempt to obtain
+ * the complete GTID when initializing the GtidSet (MySQL may have multiple sources).
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlOffsetContext> {
@@ -546,7 +549,12 @@ public class MySqlStreamingChangeEventSource
         LOGGER.debug("GTID transaction: {}", event);
         GtidEventData gtidEvent = unwrapData(event);
         String gtid = gtidEvent.getGtid();
-        gtidSet.add(gtid);
+
+        // When gtidSet need merged, the received GTIDs will be merged into purgedServerGtidSet
+        // to generate a new gtidSet. This ensures the integrity of gtidSet and avoids failure
+        // during recovery from checkpoint due to incomplete gtidSet.
+        gtidSet.overwriteThenAdd(gtid);
+
         offsetContext.startGtid(gtid, gtidSet.toString()); // rather than use the client's GTID set
         ignoreDmlEventByGtidSource = false;
         if (gtidDmlSourceFilter != null && gtid != null) {
@@ -1060,11 +1068,26 @@ public class MySqlStreamingChangeEventSource
                 effectiveOffsetContext.setCompletedGtidSet(filteredGtidSetStr);
                 gtidSet = new com.github.shyiko.mysql.binlog.GtidSet(filteredGtidSetStr);
             } else {
-                // We've not yet seen any GTIDs, so that means we have to start reading the binlog
-                // from the beginning ...
-                client.setBinlogFilename(effectiveOffsetContext.getSource().binlogFilename());
-                client.setBinlogPosition(effectiveOffsetContext.getSource().binlogPosition());
-                gtidSet = new com.github.shyiko.mysql.binlog.GtidSet("");
+                String purgedServerGtidSetStr = purgedServerGtidSet.toString();
+                if ("".equals(effectiveOffsetContext.getSource().binlogFilename())
+                        && effectiveOffsetContext.getSource().binlogPosition() == 0) {
+                    // When starting with the "earliest", "offset-binlogfile", or "timestamp" mode, GTIDs will be null,
+                    // binlogfile will be '', and binlogpos will be 0. In this case, it is expected to consume from the
+                    // beginning. However, in reality, some binlogs may be cleaned up, so consumption should start from
+                    // the position of the purged GTIDs.
+                    client.setGtidSet(purgedServerGtidSetStr);
+                    gtidSet = new com.github.shyiko.mysql.binlog.GtidSet(purgedServerGtidSetStr);
+                } else {
+                    // When GTID is enabled and starting from the offset-binlogfile, the client will start from the
+                    // binlogFile + binlogPos. However, at this point, it is difficult to obtain the precise GTIDs at
+                    // a low cost, so the availableServerGtid can only be used as the initial value. Then,
+                    // the overwriteThenAppend method is used for correction. This approach is effective when MySQL is
+                    // in both single-master and multi-master configurations, as it ensures that the client starts
+                    // reading the binlog from the correct position and properly handles new GTIDs afterward.
+                    client.setBinlogFilename(effectiveOffsetContext.getSource().binlogFilename());
+                    client.setBinlogPosition(effectiveOffsetContext.getSource().binlogPosition());
+                    gtidSet = new com.github.shyiko.mysql.binlog.GtidSet(availableServerGtidStr);
+                }
             }
         } else {
             // The server is not using GTIDs, so start reading the binlog based upon where we last
@@ -1194,10 +1217,10 @@ public class MySqlStreamingChangeEventSource
 
                     keyManagers = kmf.getKeyManagers();
                 } catch (KeyStoreException
-                        | IOException
-                        | CertificateException
-                        | NoSuchAlgorithmException
-                        | UnrecoverableKeyException e) {
+                         | IOException
+                         | CertificateException
+                         | NoSuchAlgorithmException
+                         | UnrecoverableKeyException e) {
                     throw new DebeziumException("Could not load keystore", e);
                 }
             }
@@ -1213,23 +1236,23 @@ public class MySqlStreamingChangeEventSource
                         sc.init(
                                 finalKMS,
                                 new TrustManager[] {
-                                    new X509TrustManager() {
+                                        new X509TrustManager() {
 
-                                        @Override
-                                        public void checkClientTrusted(
-                                                X509Certificate[] x509Certificates, String s)
-                                                throws CertificateException {}
+                                            @Override
+                                            public void checkClientTrusted(
+                                                    X509Certificate[] x509Certificates, String s)
+                                                    throws CertificateException {}
 
-                                        @Override
-                                        public void checkServerTrusted(
-                                                X509Certificate[] x509Certificates, String s)
-                                                throws CertificateException {}
+                                            @Override
+                                            public void checkServerTrusted(
+                                                    X509Certificate[] x509Certificates, String s)
+                                                    throws CertificateException {}
 
-                                        @Override
-                                        public X509Certificate[] getAcceptedIssuers() {
-                                            return new X509Certificate[0];
+                                            @Override
+                                            public X509Certificate[] getAcceptedIssuers() {
+                                                return new X509Certificate[0];
+                                            }
                                         }
-                                    }
                                 },
                                 null);
                     }
