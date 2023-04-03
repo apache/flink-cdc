@@ -310,3 +310,22 @@ CREATE TABLE default_value_test (
 INSERT INTO default_value_test
 VALUES (1,'user1','Shanghai',123567),
        (2,'user2','Shanghai',123567);
+
+
+CREATE TABLE customer_general_ci (
+  id VARCHAR(255) COLLATE utf8_general_ci NOT NULL,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  address VARCHAR(1024),
+  phone_number VARCHAR(512),
+  PRIMARY KEY (id)
+);
+
+INSERT INTO customer_general_ci
+VALUES ("a1","user_a","Shanghai","123567891234"),
+       ("A2","user_A","Shanghai","123567891234"),
+       ("b1","user_b","Shanghai","123567891234"),
+       ("B2","user_B","Shanghai","123567891234"),
+       ("c1","user_c","Shanghai","123567891234"),
+       ("C2","user_C","Shanghai","123567891234"),
+       ("d1","user_d","Shanghai","123567891234"),
+       ("D2","user_D","Shanghai","123567891234");

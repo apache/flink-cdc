@@ -54,7 +54,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.ObjectUtils.double
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryApproximateRowCnt;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMin;
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryMinMax;
-import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryNextChunkMax;
+import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.queryNextChunkMaxAndCount;
 import static java.math.BigDecimal.ROUND_CEILING;
 
 /** The {@link ChunkSplitter} implementation for MySQL. */
@@ -179,7 +179,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                         chunkSize);
         // may sleep a while to avoid DDOS on MySQL server
         maySleep(nextChunkId, tableId);
-        if (chunkEnd != null && ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) <= 0) {
+        if (chunkEnd != null) {
             nextChunkStart = ChunkSplitterState.ChunkBound.middleOf(chunkEnd);
             return createSnapshotSplit(
                     jdbcConnection, tableId, nextChunkId++, splitType, chunkStartVal, chunkEnd);
@@ -309,8 +309,11 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             int chunkSize)
             throws SQLException {
         // chunk end might be null when max values are removed
-        Object chunkEnd =
-                queryNextChunkMax(jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
+        Object[] chunkEndAndCount =
+                queryNextChunkMaxAndCount(
+                        jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
+        Object chunkEnd = chunkEndAndCount[0];
+        Integer chunkCount = Integer.valueOf(chunkEndAndCount[1].toString());
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
@@ -328,7 +331,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 return null;
             }
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
+        if (Objects.equals(chunkEnd, max) || chunkSize > chunkCount) {
             return null;
         } else {
             return chunkEnd;

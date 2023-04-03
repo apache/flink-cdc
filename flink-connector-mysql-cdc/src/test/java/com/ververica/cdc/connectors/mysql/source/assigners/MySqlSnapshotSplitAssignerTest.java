@@ -428,6 +428,26 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         assertFalse(assigner.needToDiscoveryTables());
     }
 
+    @Test
+    public void testPrimaryKeyIgnoreCase() {
+        List<String> expected =
+                Arrays.asList(
+                        "customer_general_ci null [A2]",
+                        "customer_general_ci [A2] [b1]",
+                        "customer_general_ci [b1] [B2]",
+                        "customer_general_ci [B2] [c1]",
+                        "customer_general_ci [c1] [C2]",
+                        "customer_general_ci [C2] [d1]",
+                        "customer_general_ci [d1] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        2,
+                        2000.0d,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {customerDatabase.getDatabaseName() + ".customer_general_ci"});
+        assertEquals(expected, splits);
+    }
+
     private List<String> getTestAssignSnapshotSplits(
             int splitSize,
             double distributionFactorUpper,
