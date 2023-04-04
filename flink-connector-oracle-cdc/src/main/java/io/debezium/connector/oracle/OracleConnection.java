@@ -6,6 +6,7 @@
 
 package io.debezium.connector.oracle;
 
+import com.zaxxer.hikari.pool.HikariProxyConnection;
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.config.Field;
@@ -23,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Clob;
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -469,5 +471,14 @@ public class OracleConnection extends JdbcConnection {
 
     private static ConnectionFactory resolveConnectionFactory(Configuration config) {
         return JdbcConnection.patternBasedFactory(connectionString(config));
+    }
+
+    @Override
+    public synchronized Connection connection() throws SQLException {
+        Connection connection = super.connection();
+        if (connection instanceof HikariProxyConnection) {
+            connection = connection.unwrap(oracle.jdbc.OracleConnection.class);
+        }
+        return connection;
     }
 }
