@@ -65,13 +65,21 @@ public class CdcJsonSourceTable implements ScanTableSource {
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
 
-    /**
-     * Data type that describes the final output of the source.
-     */
+    /** Data type that describes the final output of the source. */
     protected DataType producedDataType;
 
-    public CdcJsonSourceTable(ResolvedSchema physicalSchema, int port, String hostname, List<String> databaseList, List<String> schemaList, List<String> tableList, String username, String password,
-                              String sourceType, Map<String, String> extraProperties, Properties debeziumProperties) {
+    public CdcJsonSourceTable(
+            ResolvedSchema physicalSchema,
+            int port,
+            String hostname,
+            List<String> databaseList,
+            List<String> schemaList,
+            List<String> tableList,
+            String username,
+            String password,
+            String sourceType,
+            Map<String, String> extraProperties,
+            Properties debeziumProperties) {
 
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -83,20 +91,21 @@ public class CdcJsonSourceTable implements ScanTableSource {
         this.password = checkNotNull(password);
         this.sourceType = checkNotNull(sourceType);
         this.extraProperties = new HashMap<>(extraProperties);
-        extraProperties.keySet().forEach(key -> {
-            if (key.startsWith("debezium.")) {
-                this.extraProperties.remove(key);
-            }
-        });
+        extraProperties
+                .keySet()
+                .forEach(
+                        key -> {
+                            if (key.startsWith("debezium.")) {
+                                this.extraProperties.remove(key);
+                            }
+                        });
         this.dbzProperties = debeziumProperties;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .build();
+        return ChangelogMode.newBuilder().addContainedKind(RowKind.INSERT).build();
     }
 
     @Override
@@ -114,17 +123,24 @@ public class CdcJsonSourceTable implements ScanTableSource {
     }
 
     private ScanRuntimeProvider getPostgreCdc() {
-        SourceFunction<RowData> sourceFunction = PostgreSQLSource.<RowData>builder()
-                .hostname(hostname)
-                .port(port)
-                .database(databaseList.get(0)) // monitor postgres database
-                .schemaList(schemaList.toArray(new String[schemaList.size()]))  // monitor inventory schema
-                .tableList(tableList.toArray(new String[tableList.size()])) // monitor products table
-                .username(username)
-                .password(password)
-                .deserializer(new CdcJsonRowDataDebeziumDeserializationSchema(false)) // converts SourceRecord to JSON String
-                .debeziumProperties(dbzProperties)
-                .build();
+        SourceFunction<RowData> sourceFunction =
+                PostgreSQLSource.<RowData>builder()
+                        .hostname(hostname)
+                        .port(port)
+                        .database(databaseList.get(0)) // monitor postgres database
+                        .schemaList(
+                                schemaList.toArray(
+                                        new String[schemaList.size()])) // monitor inventory schema
+                        .tableList(
+                                tableList.toArray(
+                                        new String[tableList.size()])) // monitor products table
+                        .username(username)
+                        .password(password)
+                        .deserializer(
+                                new CdcJsonRowDataDebeziumDeserializationSchema(
+                                        false)) // converts SourceRecord to JSON String
+                        .debeziumProperties(dbzProperties)
+                        .build();
 
         return SourceFunctionProvider.of(sourceFunction, false);
     }
@@ -136,50 +152,75 @@ public class CdcJsonSourceTable implements ScanTableSource {
             scanStartOptions = StartupOptions.latest();
         }
 
-        MySqlSource<RowData> sourceFunction = MySqlSource.<RowData>builder()
-                .hostname(hostname)
-                .port(port)
-                .databaseList(databaseList.toArray(new String[databaseList.size()])) // monitor postgres database
-                .tableList(tableList.toArray(new String[tableList.size()])) // monitor products table
-                .username(username)
-                .password(password)
-                .serverTimeZone(this.extraProperties.getOrDefault("server-time-zone", "Asia/Shanghai"))
-                .includeSchemaChanges(Boolean.valueOf(extraProperties.getOrDefault("include-schema-changes", "false")))
-                .scanNewlyAddedTableEnabled(Boolean.valueOf(extraProperties.getOrDefault("scan-new-table", "false")))
-                .deserializer(new CdcJsonRowDataDebeziumDeserializationSchema(false)) // converts SourceRecord to JSON String
-                .startupOptions(scanStartOptions)
-                .debeziumProperties(dbzProperties)
-                .build();
+        MySqlSource<RowData> sourceFunction =
+                MySqlSource.<RowData>builder()
+                        .hostname(hostname)
+                        .port(port)
+                        .databaseList(
+                                databaseList.toArray(
+                                        new String
+                                                [databaseList.size()])) // monitor postgres database
+                        .tableList(
+                                tableList.toArray(
+                                        new String[tableList.size()])) // monitor products table
+                        .username(username)
+                        .password(password)
+                        .serverTimeZone(
+                                this.extraProperties.getOrDefault(
+                                        "server-time-zone", "Asia/Shanghai"))
+                        .includeSchemaChanges(
+                                Boolean.valueOf(
+                                        extraProperties.getOrDefault(
+                                                "include-schema-changes", "false")))
+                        .scanNewlyAddedTableEnabled(
+                                Boolean.valueOf(
+                                        extraProperties.getOrDefault("scan-new-table", "false")))
+                        .deserializer(
+                                new CdcJsonRowDataDebeziumDeserializationSchema(
+                                        false)) // converts SourceRecord to JSON String
+                        .startupOptions(scanStartOptions)
+                        .debeziumProperties(dbzProperties)
+                        .build();
 
         return SourceProvider.of(sourceFunction);
     }
 
     private ScanRuntimeProvider getOracleCdc() {
-        DebeziumSourceFunction<RowData> sourceFunction = OracleSource.<RowData>builder()
-                .hostname(hostname)
-                .port(port)
-                .database(databaseList.get(0)) // monitor postgres database
-                .tableList(tableList.toArray(new String[tableList.size()])) // monitor products table
-                .username(username)
-                .password(password)
-                .deserializer(new CdcJsonRowDataDebeziumDeserializationSchema(false)) // converts SourceRecord to JSON String
-                .debeziumProperties(dbzProperties)
-                .build();
+        DebeziumSourceFunction<RowData> sourceFunction =
+                OracleSource.<RowData>builder()
+                        .hostname(hostname)
+                        .port(port)
+                        .database(databaseList.get(0)) // monitor postgres database
+                        .tableList(
+                                tableList.toArray(
+                                        new String[tableList.size()])) // monitor products table
+                        .username(username)
+                        .password(password)
+                        .deserializer(
+                                new CdcJsonRowDataDebeziumDeserializationSchema(
+                                        false)) // converts SourceRecord to JSON String
+                        .debeziumProperties(dbzProperties)
+                        .build();
 
         return SourceFunctionProvider.of(sourceFunction, false);
     }
 
     private ScanRuntimeProvider getSqlserverCdc() {
-        DebeziumSourceFunction<RowData> sourceFunction = SqlServerSource.<RowData>builder()
-                .hostname(hostname)
-                .port(port)
-                .database(databaseList.get(0)) // monitor postgres database
-                .tableList(tableList.toArray(new String[tableList.size()])) // monitor products table
-                .username(username)
-                .password(password)
-                .deserializer(new CdcJsonRowDataDebeziumDeserializationSchema(false)) // converts SourceRecord to JSON String
-                .debeziumProperties(dbzProperties)
-                .build();
+        DebeziumSourceFunction<RowData> sourceFunction =
+                SqlServerSource.<RowData>builder()
+                        .hostname(hostname)
+                        .port(port)
+                        .database(databaseList.get(0)) // monitor postgres database
+                        .tableList(
+                                tableList.toArray(
+                                        new String[tableList.size()])) // monitor products table
+                        .username(username)
+                        .password(password)
+                        .deserializer(
+                                new CdcJsonRowDataDebeziumDeserializationSchema(
+                                        false)) // converts SourceRecord to JSON String
+                        .debeziumProperties(dbzProperties)
+                        .build();
 
         return SourceFunctionProvider.of(sourceFunction, false);
     }
@@ -242,5 +283,4 @@ public class CdcJsonSourceTable implements ScanTableSource {
     public String asSummaryString() {
         return "PostgreSQL-CDC";
     }
-
 }
