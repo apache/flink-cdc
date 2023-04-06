@@ -234,7 +234,8 @@ public class LogMinerStreamingChangeEventSource
                                 // With one mining session, it grows and maybe there is another way
                                 // to flush PGA.
                                 // At this point we use a new mining session
-                                LOGGER.trace(
+                                LOGGER.info("!!! log switch occurred !!!");
+                                LOGGER.info(
                                         "Ending log mining startScn={}, endScn={}, offsetContext.getScn={}, strategy={}, continuous={}",
                                         startScn,
                                         endScn,
@@ -243,18 +244,26 @@ public class LogMinerStreamingChangeEventSource
                                         isContinuousMining);
                                 endMining(jdbcConnection);
 
+                                LOGGER.info(
+                                        "log mining already end, try to initialize redo logs for mining");
                                 initializeRedoLogsForMining(jdbcConnection, true, startScn);
 
                                 abandonOldTransactionsIfExist(
                                         jdbcConnection, offsetContext, transactionalBuffer);
 
+                                LOGGER.info("try to get current redo sequences... ");
                                 // This needs to be re-calculated because building the data
                                 // dictionary will force the
                                 // current redo log sequence to be advanced due to a complete log
                                 // switch of all logs.
                                 currentRedoLogSequences = getCurrentRedoLogSequences();
+                                LOGGER.info("<<< log switched success !");
                             }
 
+                            LOGGER.info(
+                                    "try to sys.dbms_logmnr.start_logmnr {} to {} ... ",
+                                    startScn,
+                                    endScn);
                             startLogMining(
                                     jdbcConnection,
                                     startScn,
@@ -263,7 +272,7 @@ public class LogMinerStreamingChangeEventSource
                                     isContinuousMining,
                                     streamingMetrics);
 
-                            LOGGER.trace(
+                            LOGGER.info(
                                     "Fetching LogMiner view results SCN {} to {}",
                                     startScn,
                                     endScn);
@@ -277,6 +286,8 @@ public class LogMinerStreamingChangeEventSource
                                         stopwatch.stop().durations().statistics().getTotal();
                                 streamingMetrics.setLastDurationOfBatchCapturing(
                                         lastDurationOfBatchCapturing);
+                                LOGGER.info(
+                                        "Fetched LogMiner view results, start process results...");
                                 processor.processResult(rs);
                                 if (connectorConfig.isLobEnabled()) {
                                     startScn =
