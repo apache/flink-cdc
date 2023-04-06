@@ -42,7 +42,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final Duration connectTimeout;
     protected final int connectMaxRetries;
     protected final int connectionPoolSize;
-    protected final String chunkKeyColumn;
+    protected final List<String> chunkKeyColumn;
 
     public JdbcSourceConfig(
             StartupOptions startupOptions,
@@ -65,7 +65,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn) {
+            List<String> chunkKeyColumn) {
         super(
                 startupOptions,
                 splitSize,
@@ -140,7 +140,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         return connectionPoolSize;
     }
 
-    public String getChunkKeyColumn() {
+    public List<String> getChunkKeyColumn() {
         return chunkKeyColumn;
     }
 }

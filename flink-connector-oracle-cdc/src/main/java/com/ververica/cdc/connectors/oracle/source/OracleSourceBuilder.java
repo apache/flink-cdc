@@ -192,7 +192,7 @@ public class OracleSourceBuilder<T> {
      * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
      * key column when read the snapshot of table.
      */
-    public OracleSourceBuilder<T> chunkKeyColumn(String chunkKeyColumn) {
+    public OracleSourceBuilder<T> chunkKeyColumn(String... chunkKeyColumn) {
         this.configFactory.chunkKeyColumn(chunkKeyColumn);
         return this;
     }
