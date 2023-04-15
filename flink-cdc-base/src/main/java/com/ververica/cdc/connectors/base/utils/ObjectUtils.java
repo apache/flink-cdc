@@ -22,6 +22,9 @@ import java.math.BigInteger;
 /** Utilities for operation on {@link Object}. */
 public class ObjectUtils {
 
+    /** Utility class can not be instantiated */
+    private ObjectUtils() {}
+
     /**
      * Returns a number {@code Object} whose value is {@code (number + augend)}, Note: This method
      * will throw {@link ArithmeticException} if number overflows.
