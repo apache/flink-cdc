@@ -22,7 +22,7 @@ import java.math.BigInteger;
 /** Utilities for operation on {@link Object}. */
 public class ObjectUtils {
 
-    /** Utility class can not be instantiated */
+    /** Utility class can not be instantiated. */
     private ObjectUtils() {}
 
     /**
