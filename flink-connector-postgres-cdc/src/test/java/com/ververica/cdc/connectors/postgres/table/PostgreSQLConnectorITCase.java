@@ -45,6 +45,7 @@ import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
 public class PostgreSQLConnectorITCase extends PostgresTestBase {
+    private static final String SLOT_NAME = "flinktest";
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -79,7 +80,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
                         POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -87,7 +89,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getPassword(),
                         POSTGERS_CONTAINER.getDatabaseName(),
                         "inventory",
-                        "products");
+                        "products",
+                        SLOT_NAME);
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -184,7 +187,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.slot.name' = '%s'"
+                                + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
                         POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -277,7 +280,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
                         POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -285,7 +289,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getPassword(),
                         POSTGERS_CONTAINER.getDatabaseName(),
                         "inventory",
-                        "full_types");
+                        "full_types",
+                        SLOT_NAME);
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + "    id INTEGER NOT NULL,"
@@ -362,7 +367,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.slot.name' = '%s'"
+                                + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
                         POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
@@ -459,7 +464,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.slot.name' = '%s',"
+                                + " 'slot.name' = '%s',"
                                 + " 'changelog-mode' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),

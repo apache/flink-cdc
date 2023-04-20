@@ -126,6 +126,15 @@ Connector Options
       <td>Integer port number of the PostgreSQL database server.</td>
     </tr>
     <tr>
+      <td>slot.name</td>
+      <td>required</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in
+          for a particular database/schema. The server uses this slot to stream events to the connector that you are configuring.
+          <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
+    </tr> 
+    <tr>
       <td>decoding.plugin.name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">decoderbufs</td>
@@ -133,15 +142,6 @@ Connector Options
       <td>The name of the Postgres logical decoding plug-in installed on the server. 
           Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and pgoutput.</td>
     </tr>    
-    <tr>
-      <td>slot.name</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">flink</td>
-      <td>String</td>
-      <td>The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in
-          for a particular database/schema. The server uses this slot to stream events to the connector that you are configuring.
-          <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
-    </tr> 
     <tr>
       <td>changelog-mode</td>
       <td>optional</td>

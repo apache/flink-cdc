@@ -96,11 +96,11 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
     private static final ConfigOption<String> SLOT_NAME =
             ConfigOptions.key("slot.name")
                     .stringType()
-                    .defaultValue("flink")
+                    .noDefaultValue()
                     .withDescription(
                             "The name of the PostgreSQL logical decoding slot that was created for streaming changes "
                                     + "from a particular plug-in for a particular database/schema. The server uses this slot "
-                                    + "to stream events to the connector that you are configuring. Default is \"flink\".");
+                                    + "to stream events to the connector that you are configuring.");
 
     private static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
             ConfigOptions.key("changelog-mode")
@@ -165,6 +165,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(DATABASE_NAME);
         options.add(SCHEMA_NAME);
         options.add(TABLE_NAME);
+        options.add(SLOT_NAME);
         return options;
     }
 
@@ -173,7 +174,6 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
         options.add(DECODING_PLUGIN_NAME);
-        options.add(SLOT_NAME);
         options.add(CHANGELOG_MODE);
         return options;
     }

@@ -620,6 +620,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 .schemaList("inventory")
                 .tableList("inventory.products")
                 .deserializer(new ForwardDeserializeSchema())
+                .slotName(SLOT_NAME)
                 .debeziumProperties(properties)
                 .build();
     }

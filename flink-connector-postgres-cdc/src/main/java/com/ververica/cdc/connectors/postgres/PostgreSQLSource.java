@@ -118,7 +118,7 @@ public class PostgreSQLSource {
         /**
          * The name of the PostgreSQL logical decoding slot that was created for streaming changes
          * from a particular plug-in for a particular database/schema. The server uses this slot to
-         * stream events to the connector that you are configuring. Default is "flink".
+         * stream events to the connector that you are configuring.
          *
          * <p>Slot names must conform to <a
          * href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL
