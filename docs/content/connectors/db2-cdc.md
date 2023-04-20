@@ -314,7 +314,7 @@ Data Type Mapping
     </tr>
     <tr>
       <td>
-        CHAR(n)
+        CHARACTER(n)
       </td>
       <td>CHAR(n)</td>
       <td></td>
