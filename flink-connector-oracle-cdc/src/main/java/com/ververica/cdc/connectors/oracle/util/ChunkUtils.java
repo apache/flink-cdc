@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oracle.util;
 
+import oracle.sql.NUMBER;
 import org.apache.flink.table.api.ValidationException;
 
 import io.debezium.relational.Column;
@@ -53,7 +54,16 @@ public class ChunkUtils {
                             table.id()));
         }
 
-        // Use the ROWID column as the chunk key column by default for oracle cdc connector
-        return Column.editor().jdbcType(Types.VARCHAR).name(ROWID.class.getSimpleName()).create();
+        if (primaryKeys.isEmpty()) {
+            // Use the ROWID column as the chunk key column by default for oracle cdc connector
+            return Column.editor().jdbcType(Types.VARCHAR).name(ROWID.class.getSimpleName()).create();
+        } else {
+            // Use the first column of primary key columns as the chunk key column by default
+            Column column = primaryKeys.get(0);
+            if (NUMBER.class.getSimpleName().equalsIgnoreCase(column.typeName()) && column.length() == 0) {
+                return Column.editor().jdbcType(column.jdbcType()).length(38).name(column.name()).create();
+            }
+            return column;
+        }
     }
 }
