@@ -134,7 +134,7 @@ CDC Connectors for Apache Flink<sup>®</sup> welcomes anyone that wants to help 
   You can search the group number [**33121212**] or scan the following QR code to join in the group.
   
   <div align=center>
-     <img src="https://user-images.githubusercontent.com/9601882/158350201-a1de35e6-0399-4a91-b5b0-e2fd5d33e33c.png" width=400 />
+     <img src="https://user-images.githubusercontent.com/5163645/233297896-0195d0ae-eb1c-4604-977b-1d08e424c7e7.png" width=400 />
    </div>
 
 ## Documents
