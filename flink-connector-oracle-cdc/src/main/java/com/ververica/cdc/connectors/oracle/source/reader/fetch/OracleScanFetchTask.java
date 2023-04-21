@@ -259,31 +259,35 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                 SnapshotContext snapshotContext,
                 SnapshottingTask snapshottingTask)
                 throws Exception {
-            final RelationalSnapshotChangeEventSource.RelationalSnapshotContext ctx =
-                    (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
-            ctx.offset = offsetContext;
+            try{
+                final RelationalSnapshotChangeEventSource.RelationalSnapshotContext ctx =
+                        (RelationalSnapshotChangeEventSource.RelationalSnapshotContext) snapshotContext;
+                ctx.offset = offsetContext;
 
-            final RedoLogOffset lowWatermark = currentRedoLogOffset(jdbcConnection);
-            LOG.info(
-                    "Snapshot step 1 - Determining low watermark {} for split {}",
-                    lowWatermark,
-                    snapshotSplit);
-            ((SnapshotSplitChangeEventSourceContext) (context)).setLowWatermark(lowWatermark);
-            dispatcher.dispatchWatermarkEvent(
-                    offsetContext.getPartition(), snapshotSplit, lowWatermark, WatermarkKind.LOW);
+                final RedoLogOffset lowWatermark = currentRedoLogOffset(jdbcConnection);
+                LOG.info(
+                        "Snapshot step 1 - Determining low watermark {} for split {}",
+                        lowWatermark,
+                        snapshotSplit);
+                ((SnapshotSplitChangeEventSourceContext) (context)).setLowWatermark(lowWatermark);
+                dispatcher.dispatchWatermarkEvent(
+                        offsetContext.getPartition(), snapshotSplit, lowWatermark, WatermarkKind.LOW);
 
-            LOG.info("Snapshot step 2 - Snapshotting data");
-            createDataEvents(ctx, snapshotSplit.getTableId());
+                LOG.info("Snapshot step 2 - Snapshotting data");
+                createDataEvents(ctx, snapshotSplit.getTableId());
 
-            final RedoLogOffset highWatermark = currentRedoLogOffset(jdbcConnection);
-            LOG.info(
-                    "Snapshot step 3 - Determining high watermark {} for split {}",
-                    highWatermark,
-                    snapshotSplit);
-            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(lowWatermark);
-            dispatcher.dispatchWatermarkEvent(
-                    offsetContext.getPartition(), snapshotSplit, highWatermark, WatermarkKind.HIGH);
-            return SnapshotResult.completed(ctx.offset);
+                final RedoLogOffset highWatermark = currentRedoLogOffset(jdbcConnection);
+                LOG.info(
+                        "Snapshot step 3 - Determining high watermark {} for split {}",
+                        highWatermark,
+                        snapshotSplit);
+                ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(lowWatermark);
+                dispatcher.dispatchWatermarkEvent(
+                        offsetContext.getPartition(), snapshotSplit, highWatermark, WatermarkKind.HIGH);
+                return SnapshotResult.completed(ctx.offset);
+            } finally {
+                jdbcConnection.close();
+            }
         }
 
         @Override
