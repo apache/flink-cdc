@@ -278,6 +278,28 @@ public class OracleUtils {
                 topicSelector,
                 tableNameCaseSensitivity);
     }
+    
+    //Share existing OracleConnection, it will be closed when doExecute
+    public static OracleDatabaseSchema createOracleDatabaseSchema(
+            OracleConnectorConfig dbzOracleConfig, OracleConnection oracleConnection) {
+        TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
+        SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
+        if (oracleConnection == null){
+            oracleConnection =
+                OracleConnectionUtils.createOracleConnection(dbzOracleConfig.getJdbcConfig());
+        }
+        //        OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
+        OracleValueConverters oracleValueConverters =
+                new OracleValueConverters(dbzOracleConfig, oracleConnection);
+        StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =
+                dbzOracleConfig.getAdapter().getTableNameCaseSensitivity(oracleConnection);
+        return new OracleDatabaseSchema(
+                dbzOracleConfig,
+                oracleValueConverters,
+                schemaNameAdjuster,
+                topicSelector,
+                tableNameCaseSensitivity);
+    }
 
     /** Creates a new {@link OracleDatabaseSchema} to monitor the latest oracle database schemas. */
     public static OracleDatabaseSchema createOracleDatabaseSchema(
