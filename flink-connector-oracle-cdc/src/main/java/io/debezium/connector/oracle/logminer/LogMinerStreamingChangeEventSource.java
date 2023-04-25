@@ -183,8 +183,7 @@ public class LogMinerStreamingChangeEventSource
                                     historyRecorder);
 
                     final String query =
-                            LogMinerQueryBuilder.build(
-                                    connectorConfig, schema, jdbcConnection.username());
+                            LogMinerQueryBuilder.build(connectorConfig, schema);
                     try (PreparedStatement miningView =
                             jdbcConnection
                                     .connection()
