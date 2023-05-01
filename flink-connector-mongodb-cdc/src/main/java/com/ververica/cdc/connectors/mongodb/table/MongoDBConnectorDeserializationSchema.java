@@ -72,6 +72,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.mongodb.source.utils.MongoRecordUtils.isDMLOperation;
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -124,12 +125,17 @@ public class MongoDBConnectorDeserializationSchema
         Schema valueSchema = record.valueSchema();
 
         OperationType op = operationTypeFor(record);
-        BsonDocument documentKey =
-                checkNotNull(
-                        extractBsonDocument(
-                                value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD));
-        BsonDocument fullDocument =
-                extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_FIELD);
+        BsonDocument documentKey = new BsonDocument();
+        BsonDocument fullDocument = new BsonDocument();
+
+        if (isDMLOperation(op)) {
+            documentKey =
+                    checkNotNull(
+                            extractBsonDocument(
+                                    value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD));
+            fullDocument =
+                    extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_FIELD);
+        }
 
         switch (op) {
             case INSERT:

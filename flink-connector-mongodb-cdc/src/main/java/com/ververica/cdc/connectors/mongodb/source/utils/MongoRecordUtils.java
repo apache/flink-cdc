@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mongodb.source.utils;
 
+import com.mongodb.client.model.changestream.OperationType;
 import com.mongodb.kafka.connect.source.schema.BsonValueToSchemaAndValue;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
 import io.debezium.data.Envelope;
@@ -202,4 +203,16 @@ public class MongoRecordUtils {
     public static Map<String, String> createWatermarkPartitionMap(String partition) {
         return singletonMap(NAMESPACE_FIELD, partition);
     }
+
+    /**
+     * Whether the MongoDB event's operation is a dml operation.
+     */
+    public static boolean isDMLOperation(OperationType op) {
+        if (OperationType.INSERT.equals(op) || OperationType.DELETE.equals(op)
+                || OperationType.UPDATE.equals(op) || OperationType.REPLACE.equals(op)) {
+            return true;
+        }
+        return false;
+    }
+
 }
