@@ -48,29 +48,40 @@ import static java.util.Collections.singletonMap;
 /** Utility class to deal record. */
 public class MongoRecordUtils {
 
-    private MongoRecordUtils() {}
+    private MongoRecordUtils() {
+    }
 
-    /** Check the sourceRecord is snapshot record. */
+    /**
+     * Check the sourceRecord is snapshot record.
+     */
     public static boolean isSnapshotRecord(SourceRecord sourceRecord) {
         return "true".equals(getOffsetValue(sourceRecord, COPY_KEY_FIELD));
     }
 
-    /** Check the sourceRecord is heartbeat event. */
+    /**
+     * Check the sourceRecord is heartbeat event.
+     */
     public static boolean isHeartbeatEvent(SourceRecord sourceRecord) {
         return "true".equals(getOffsetValue(sourceRecord, MongoDBEnvelope.HEARTBEAT_KEY_FIELD));
     }
 
-    /** Check the sourceRecord is data change record. */
+    /**
+     * Check the sourceRecord is data change record.
+     */
     public static boolean isDataChangeRecord(SourceRecord sourceRecord) {
         return !isWatermarkEvent(sourceRecord) && !isHeartbeatEvent(sourceRecord);
     }
 
-    /** Return the resumeToken from heartbeat event or change stream event. */
+    /**
+     * Return the resumeToken from heartbeat event or change stream event.
+     */
     public static BsonDocument getResumeToken(SourceRecord sourceRecord) {
         return BsonDocument.parse(getOffsetValue(sourceRecord, MongoDBEnvelope.ID_FIELD));
     }
 
-    /** Return the documentKey from change stream event. */
+    /**
+     * Return the documentKey from change stream event.
+     */
     public static BsonDocument getDocumentKey(SourceRecord sourceRecord) {
         Struct value = (Struct) sourceRecord.value();
         return BsonDocument.parse(value.getString(MongoDBEnvelope.DOCUMENT_KEY_FIELD));
@@ -80,7 +91,9 @@ public class MongoRecordUtils {
         return (String) sourceRecord.sourceOffset().get(key);
     }
 
-    /** Return the timestamp when the change event is produced in MongoDB. */
+    /**
+     * Return the timestamp when the change event is produced in MongoDB.
+     */
     public static Long getMessageTimestamp(SourceRecord sourceRecord) {
         if (isHeartbeatEvent(sourceRecord)) {
             return getMessageTimestampFromHeartbeatEvent(sourceRecord);
@@ -91,13 +104,17 @@ public class MongoRecordUtils {
         return source.getInt64(Envelope.FieldName.TIMESTAMP);
     }
 
-    /** Return the timestamp from heartbeat record in MongoDB. */
+    /**
+     * Return the timestamp from heartbeat record in MongoDB.
+     */
     public static Long getMessageTimestampFromHeartbeatEvent(SourceRecord sourceRecord) {
         Struct value = (Struct) sourceRecord.value();
         return value.getInt64(TIMESTAMP_KEY_FIELD);
     }
 
-    /** Return the timestamp when the change event is fetched. */
+    /**
+     * Return the timestamp when the change event is fetched.
+     */
     public static Long getFetchTimestamp(SourceRecord record) {
         Schema schema = record.valueSchema();
         Struct value = (Struct) record.value();
@@ -107,7 +124,9 @@ public class MongoRecordUtils {
         return value.getInt64(Envelope.FieldName.TIMESTAMP);
     }
 
-    /** Return the TableId for snapshot record or change record. */
+    /**
+     * Return the TableId for snapshot record or change record.
+     */
     public static TableId getTableId(SourceRecord dataRecord) {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(MongoDBEnvelope.NAMESPACE_FIELD);
@@ -214,5 +233,4 @@ public class MongoRecordUtils {
         }
         return false;
     }
-
 }
