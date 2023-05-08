@@ -26,6 +26,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.storage.ConverterConfig;
 import org.apache.kafka.connect.storage.ConverterType;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -69,7 +70,7 @@ public class JsonDebeziumDeserializationSchema implements DebeziumDeserializatio
         }
         byte[] bytes =
                 jsonConverter.fromConnectData(record.topic(), record.valueSchema(), record.value());
-        out.collect(new String(bytes));
+        out.collect(new String(bytes, StandardCharsets.UTF_8));
     }
 
     /** Initialize {@link JsonConverter} with given configs. */
