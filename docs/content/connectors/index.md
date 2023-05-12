@@ -4,6 +4,7 @@
 :maxdepth: 2
 
 mongodb-cdc
+mongodb-cdc(ZH)
 mysql-cdc
 mysql-cdc(ZH)
 oceanbase-cdc
