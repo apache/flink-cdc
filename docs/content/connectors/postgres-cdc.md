@@ -14,7 +14,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.3.0</version>
 </dependency>
 ```
 
@@ -22,9 +22,9 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.4-SNAPSHOT/flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-2.3.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.3.0/flink-sql-connector-postgres-cdc-2.3.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
 
 How to create a Postgres CDC table
 ----------------
@@ -315,7 +315,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left"><a href="https://www.postgresql.org/docs/12/datatype.html">PostgreSQL type</a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>

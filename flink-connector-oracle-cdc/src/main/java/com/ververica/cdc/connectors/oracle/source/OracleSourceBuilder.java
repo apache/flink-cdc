@@ -219,7 +219,7 @@ public class OracleSourceBuilder<T> {
      */
     public OracleIncrementalSource<T> build() {
         this.offsetFactory = new RedoLogOffsetFactory();
-        this.dialect = new OracleDialect(configFactory);
+        this.dialect = new OracleDialect();
         return new OracleIncrementalSource<T>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }

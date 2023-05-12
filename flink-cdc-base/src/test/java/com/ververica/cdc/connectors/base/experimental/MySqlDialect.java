@@ -33,6 +33,7 @@ import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoo
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
@@ -153,5 +154,10 @@ public class MySqlDialect implements JdbcDataSourceDialect {
         } else {
             return new MySqlStreamFetchTask(sourceSplitBase.asStreamSplit());
         }
+    }
+
+    @Override
+    public void setSourceReaderMetrics(SourceReaderMetrics sourceReaderMetrics) {
+        // TODO
     }
 }

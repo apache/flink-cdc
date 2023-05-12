@@ -23,7 +23,7 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-db2-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.3.0</version>
 </dependency>
 ```
 
@@ -31,7 +31,7 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-db2-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-db2-cdc/2.4-SNAPSHOT/flink-sql-connector-db2-cdc-2.4-SNAPSHOT.jar) and 
+Download [flink-sql-connector-db2-cdc-2.3.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-db2-cdc/2.3.0/flink-sql-connector-db2-cdc-2.3.0.jar) and 
 put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-db2-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users 
@@ -50,8 +50,8 @@ Notes
 
 ###  Not support BOOLEAN type in SQL Replication on Db2
 
-Only snapshots can be taken from tables with BOOLEAN type columns. Currently, SQL Replication on Db2 does not support BOOLEAN, so Debezium can not perform CDC on those tables.
-Consider using another type to replace BOOLEAN type.
+Only snapshots can be taken from tables with BOOLEAN type columns. Currently SQL Replication on Db2 does not support BOOLEAN, so Debezium can not perform CDC on those tables.
+Consider using a different type.
 
 
 How to create a Db2 CDC table
@@ -203,36 +203,36 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 ### DataStream Source
 
 ```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
-
+import org.apache.kafka.connect.source.SourceRecord;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.db2.Db2Source;
 
 public class Db2SourceExample {
   public static void main(String[] args) throws Exception {
-    SourceFunction<String> db2Source =
-            Db2Source.<String>builder()
-                    .hostname("yourHostname")
-                    .port(50000)
-                    .database("yourDatabaseName") // set captured database
-                    .tableList("yourSchemaName.yourTableName") // set captured table
-                    .username("yourUsername")
-                    .password("yourPassword")
-                    .deserializer(
-                            new JsonDebeziumDeserializationSchema()) // converts SourceRecord to
-                    // JSON String
-                    .build();
+    Db2Source<SourceRecord> db2Source = Db2Source.<SourceRecord>builder()
+        .hostname("yourHostname")
+        .port(yourPort)
+        .database("yourDatabaseName") // set captured database
+        .tableList("yourSchemaName.yourTableName") // set captured table
+        .username("yourUsername")
+        .password("yourPassword")
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
     // enable checkpoint
     env.enableCheckpointing(3000);
 
-    env.addSource(db2Source)
-            .print()
-            .setParallelism(1); // use parallelism 1 for sink to keep message ordering
+    env
+      .fromSource(db2Source, WatermarkStrategy.noWatermarks(), "Db2 Source")
+      // set 4 parallel source tasks
+      .setParallelism(1)
+      .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
 
-    env.execute("Print Db2 Snapshot + Change Stream");
+    env.execute("Print Db2 Snapshot + Binlog");
   }
 }
 ```

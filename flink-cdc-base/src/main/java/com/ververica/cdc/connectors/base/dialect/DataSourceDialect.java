@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -68,4 +69,6 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable 
 
     /** The task context used for fetch task to fetch data from external systems. */
     FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase, C sourceConfig);
+
+    void setSourceReaderMetrics(SourceReaderMetrics sourceReaderMetrics);
 }

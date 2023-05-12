@@ -14,7 +14,7 @@ In order to setup the SQLServer CDC connector, the following table provides depe
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-sqlserver-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.3.0</version>
 </dependency>
 ```
 
@@ -22,9 +22,9 @@ In order to setup the SQLServer CDC connector, the following table provides depe
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-sqlserver-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.4-SNAPSHOT/flink-sql-connector-sqlserver-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-sqlserver-cdc-2.3.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.3.0/flink-sql-connector-sqlserver-cdc-2.3.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-sqlserver-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-sqlserver-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-sqlserver-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-sqlserver-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-sqlserver-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-sqlserver-cdc), the released version will be available in the Maven central warehouse.
 
 Setup SQLServer Database
 ----------------
@@ -315,7 +315,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">SQLServer type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
+        <th class="text-left"><a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql">SQLServer type</a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>
@@ -357,7 +357,7 @@ Data Type Mapping
         float<br>
         real
       </td>
-      <td>DOUBLE</td>
+      <td>FLOAT</td>
     </tr>
     <tr>
       <td>bit</td>
@@ -369,7 +369,7 @@ Data Type Mapping
     </tr>
     <tr>
       <td>tinyint</td>
-      <td>SMALLINT</td>
+      <td>TINYINT</td>
     </tr>
     <tr>
       <td>smallint</td>

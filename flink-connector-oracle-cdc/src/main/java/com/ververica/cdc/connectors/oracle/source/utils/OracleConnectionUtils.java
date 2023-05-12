@@ -18,6 +18,9 @@ package com.ververica.cdc.connectors.oracle.source.utils;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
+import com.ververica.cdc.connectors.oracle.source.OraclePooledDataSourceFactory;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
@@ -34,8 +37,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static io.debezium.config.CommonConnectorConfig.DATABASE_CONFIG_PREFIX;
-
 /** Oracle connection Utilities. */
 public class OracleConnectionUtils {
 
@@ -44,15 +45,17 @@ public class OracleConnectionUtils {
     /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
 
+    private static final OraclePooledDataSourceFactory FACTORY =
+            new OraclePooledDataSourceFactory();
+
     /** show current scn sql in oracle. */
     private static final String SHOW_CURRENT_SCN = "SELECT CURRENT_SCN FROM V$DATABASE";
 
-    /** Creates a new {@link OracleConnection}, but not open the connection. */
-    public static OracleConnection createOracleConnection(Configuration dbzConfiguration) {
-        Configuration configuration = dbzConfiguration.subset(DATABASE_CONFIG_PREFIX, true);
-        return new OracleConnection(
-                configuration.isEmpty() ? dbzConfiguration : configuration,
-                OracleConnectionUtils.class::getClassLoader);
+    public static OracleConnection createOracleConnection(JdbcSourceConfig sourceConfig) {
+        Configuration dbzConfig = sourceConfig.getDbzConnectorConfig().getJdbcConfig();
+        JdbcConnectionFactory jdbcConnectionFactory =
+                new JdbcConnectionFactory(sourceConfig, FACTORY);
+        return new OracleConnection(dbzConfig, jdbcConnectionFactory);
     }
 
     /** Fetch current redoLog offsets in Oracle Server. */
