@@ -56,7 +56,8 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
             String serverTimeZone,
             Duration connectTimeout,
             int connectMaxRetries,
-            int connectionPoolSize) {
+            int connectionPoolSize,
+            boolean scanNewlyAddedTableEnabled) {
         super(
                 startupOptions,
                 databaseList,
@@ -78,7 +79,8 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                null);
+                null,
+                scanNewlyAddedTableEnabled);
     }
 
     @Override

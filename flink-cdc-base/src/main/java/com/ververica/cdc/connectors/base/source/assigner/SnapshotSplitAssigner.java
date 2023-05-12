@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.source.assigner;
 
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
@@ -46,6 +47,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isAssigningFinished;
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isSuspended;
+
 /** Assigner for snapshot split. */
 public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssigner {
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitAssigner.class);
@@ -56,6 +60,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, Offset> splitFinishedOffsets;
     private boolean assignerFinished;
+    private AssignerStatus assignerStatus;
 
     private final C sourceConfig;
     private final int currentParallelism;
@@ -84,7 +89,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 new HashMap<>(),
                 new HashMap<>(),
                 new HashMap<>(),
-                false,
+                AssignerStatus.INITIAL_ASSIGNING,
                 remainingTables,
                 isTableIdCaseSensitive,
                 true,
@@ -106,7 +111,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 checkpoint.getAssignedSplits(),
                 checkpoint.getTableSchemas(),
                 checkpoint.getSplitFinishedOffsets(),
-                checkpoint.isAssignerFinished(),
+                checkpoint.getSnapshotAssignerStatus(),
                 checkpoint.getRemainingTables(),
                 checkpoint.isTableIdCaseSensitive(),
                 checkpoint.isRemainingTablesCheckpointed(),
@@ -122,7 +127,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             Map<String, SchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
-            boolean assignerFinished,
+            AssignerStatus assignerStatus,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
@@ -135,7 +140,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.assignedSplits = assignedSplits;
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
-        this.assignerFinished = assignerFinished;
+        this.assignerStatus = assignerStatus;
         this.remainingTables = new LinkedList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
@@ -148,7 +153,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         chunkSplitter = dialect.createChunkSplitter(sourceConfig);
 
         // the legacy state didn't snapshot remaining tables, discovery remaining table here
-        if (!isRemainingTablesCheckpointed && !assignerFinished) {
+        if (!isRemainingTablesCheckpointed && !isAssigningFinished(assignerStatus)) {
             try {
                 final List<TableId> discoverTables = dialect.discoverDataCollections(sourceConfig);
                 discoverTables.removeAll(alreadyProcessedTables);
@@ -159,6 +164,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         "Failed to discover remaining tables to capture", e);
             }
         }
+
+        captureNewlyAddedTables();
     }
 
     @Override
@@ -265,7 +272,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         assignedSplits,
                         tableSchemas,
                         splitFinishedOffsets,
-                        assignerFinished,
+                        assignerStatus,
                         remainingTables,
                         isTableIdCaseSensitive,
                         true);
@@ -287,20 +294,56 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         }
     }
 
+    private void captureNewlyAddedTables() {
+        if (sourceConfig.isScanNewlyAddedTableEnabled()) {
+            // check whether we got newly added tables
+            try {
+                final List<TableId> newlyAddedTables =
+                        dialect.discoverDataCollections(sourceConfig);
+                newlyAddedTables.removeAll(alreadyProcessedTables);
+                newlyAddedTables.removeAll(remainingTables);
+                if (!newlyAddedTables.isEmpty()) {
+                    // if job is still in snapshot reading phase, directly add all newly added
+                    // tables
+                    LOG.info("Found newly added tables, start capture newly added tables process");
+                    remainingTables.addAll(newlyAddedTables);
+                    if (isAssigningFinished(assignerStatus)) {
+                        // start the newly added tables process under stream reading phase
+                        LOG.info(
+                                "Found newly added tables, start capture newly added tables process under stream reading phase");
+                        this.suspend();
+                    }
+                }
+            } catch (Exception e) {
+                throw new FlinkRuntimeException("Failed to capture newly added tables", e);
+            }
+        }
+    }
+
+    public AssignerStatus getAssignerStatus() {
+        return assignerStatus;
+    }
+
+    @Override
+    public void suspend() {
+        Preconditions.checkState(
+                isAssigningFinished(assignerStatus), "Invalid assigner status {}", assignerStatus);
+        assignerStatus = assignerStatus.suspend();
+    }
+
+    @Override
+    public void wakeup() {
+        Preconditions.checkState(
+                isSuspended(assignerStatus), "Invalid assigner status {}", assignerStatus);
+        assignerStatus = assignerStatus.wakeup();
+    }
+
     @Override
     public void close() {}
 
     /** Indicates there is no more splits available in this assigner. */
     public boolean noMoreSplits() {
         return remainingTables.isEmpty() && remainingSplits.isEmpty();
-    }
-
-    /**
-     * Returns whether the snapshot split assigner is finished, which indicates there is no more
-     * splits and all records of splits have been completely processed in the pipeline.
-     */
-    public boolean isFinished() {
-        return assignerFinished;
     }
 
     public Map<String, SchemalessSnapshotSplit> getAssignedSplits() {

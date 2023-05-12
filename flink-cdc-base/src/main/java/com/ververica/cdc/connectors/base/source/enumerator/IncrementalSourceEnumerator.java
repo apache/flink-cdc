@@ -25,13 +25,19 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
+import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.LatestFinishedSplitsSizeEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.LatestFinishedSplitsSizeRequestEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitMetaEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitMetaRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.SuspendStreamReaderAckEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.SuspendStreamReaderEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.WakeupReaderEvent;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -47,6 +53,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isAssigning;
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isAssigningFinished;
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isSuspended;
 
 /**
  * Incremental source enumerator that enumerates receive the split request and assign the split to
@@ -65,6 +75,7 @@ public class IncrementalSourceEnumerator
     // using TreeSet to prefer assigning stream split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> finishedSnapshotSplitMeta;
+    private boolean streamReaderIsSuspended = false;
 
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
@@ -74,6 +85,14 @@ public class IncrementalSourceEnumerator
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
+
+        // when restored from state, if the split assigner is assigning snapshot
+        // splits or has already assigned all splits, send wakeup event to
+        // SourceReader, SourceReader can omit the event based on its own status.
+        if (isAssigning(splitAssigner.getAssignerStatus())
+                || isAssigningFinished(splitAssigner.getAssignerStatus())) {
+            streamReaderIsSuspended = true;
+        }
     }
 
     @Override
@@ -105,7 +124,9 @@ public class IncrementalSourceEnumerator
 
     @Override
     public void addReader(int subtaskId) {
-        // do nothing
+        if (isSuspended(splitAssigner.getAssignerStatus())) {
+            context.sendEventToSourceReader(subtaskId, new SuspendStreamReaderEvent());
+        }
     }
 
     @Override
@@ -119,6 +140,7 @@ public class IncrementalSourceEnumerator
                     (FinishedSnapshotSplitsReportEvent) sourceEvent;
             Map<String, Offset> finishedOffsets = reportEvent.getFinishedOffsets();
             splitAssigner.onFinishedSplits(finishedOffsets);
+            wakeupStreamReaderIfNeed();
             // send acknowledge event
             FinishedSnapshotSplitsAckEvent ackEvent =
                     new FinishedSnapshotSplitsAckEvent(new ArrayList<>(finishedOffsets.keySet()));
@@ -128,6 +150,13 @@ public class IncrementalSourceEnumerator
                     "The enumerator receives request for stream split meta from subtask {}.",
                     subtaskId);
             sendStreamMetaRequestEvent(subtaskId, (StreamSplitMetaRequestEvent) sourceEvent);
+        } else if (sourceEvent instanceof SuspendStreamReaderAckEvent) {
+            LOG.info(
+                    "The enumerator receives event that the stream split reader has been suspended from subtask {}. ",
+                    subtaskId);
+            handleSuspendStreamReaderAckEvent(subtaskId);
+        } else if (sourceEvent instanceof LatestFinishedSplitsSizeRequestEvent) {
+            handleLatestFinishedSplitSizeRequest(subtaskId);
         }
     }
 
@@ -171,6 +200,7 @@ public class IncrementalSourceEnumerator
                 LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
+                wakeupStreamReaderIfNeed();
                 break;
             }
         }
@@ -196,6 +226,52 @@ public class IncrementalSourceEnumerator
                 context.sendEventToSourceReader(
                         subtaskId, new FinishedSnapshotSplitsRequestEvent());
             }
+        }
+
+        suspendStreamReaderIfNeed();
+        wakeupStreamReaderIfNeed();
+    }
+
+    private void suspendStreamReaderIfNeed() {
+        if (isSuspended(splitAssigner.getAssignerStatus())) {
+            for (int subtaskId : getRegisteredReader()) {
+                context.sendEventToSourceReader(subtaskId, new SuspendStreamReaderEvent());
+            }
+            streamReaderIsSuspended = true;
+        }
+    }
+
+    private void wakeupStreamReaderIfNeed() {
+        if (isAssigningFinished(splitAssigner.getAssignerStatus()) && streamReaderIsSuspended) {
+            for (int subtaskId : getRegisteredReader()) {
+                context.sendEventToSourceReader(
+                        subtaskId,
+                        new WakeupReaderEvent(WakeupReaderEvent.WakeUpTarget.STREAM_READER));
+            }
+            streamReaderIsSuspended = false;
+        }
+    }
+
+    private void handleSuspendStreamReaderAckEvent(int subTask) {
+        LOG.info(
+                "Received event that the stream split reader has been suspended from subtask {}. ",
+                subTask);
+        splitAssigner.wakeup();
+        if (splitAssigner instanceof HybridSplitAssigner) {
+            for (int subtaskId : this.getRegisteredReader()) {
+                context.sendEventToSourceReader(
+                        subtaskId,
+                        new WakeupReaderEvent(WakeupReaderEvent.WakeUpTarget.SNAPSHOT_READER));
+            }
+        }
+    }
+
+    private void handleLatestFinishedSplitSizeRequest(int subTask) {
+        if (splitAssigner instanceof HybridSplitAssigner) {
+            context.sendEventToSourceReader(
+                    subTask,
+                    new LatestFinishedSplitsSizeEvent(
+                            splitAssigner.getFinishedSplitInfos().size()));
         }
     }
 

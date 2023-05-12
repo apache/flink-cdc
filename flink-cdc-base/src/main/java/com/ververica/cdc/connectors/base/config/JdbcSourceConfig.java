@@ -65,7 +65,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn) {
+            String chunkKeyColumn,
+            boolean scanNewlyAddedTableEnabled) {
         super(
                 startupOptions,
                 splitSize,
@@ -74,7 +75,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 distributionFactorLower,
                 includeSchemaChanges,
                 dbzProperties,
-                dbzConfiguration);
+                dbzConfiguration,
+                scanNewlyAddedTableEnabled);
         this.driverClassName = driverClassName;
         this.hostname = hostname;
         this.port = port;
