@@ -19,6 +19,7 @@ import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.RowsQueryEventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
+import com.github.shyiko.mysql.binlog.event.TransactionPayloadEventData;
 import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
@@ -267,6 +268,27 @@ public class MySqlStreamingChangeEventSource
                             // indefinitely.
                             if (event.getHeader().getEventType() == EventType.ROTATE) {
                                 tableMapEventByTableId.clear();
+                            }
+                            // Handle for transaction payload and capture the table map event and
+                            // add it to the map
+                            if (event.getHeader().getEventType() == EventType.TRANSACTION_PAYLOAD) {
+                                TransactionPayloadEventData transactionPayloadEventData =
+                                        (TransactionPayloadEventData) event.getData();
+                                /**
+                                 * Loop over the uncompressed events in the transaction payload
+                                 * event and add the table map event in the map of table events
+                                 */
+                                for (Event uncompressedEvent :
+                                        transactionPayloadEventData.getUncompressedEvents()) {
+                                    if (uncompressedEvent.getHeader().getEventType()
+                                            == EventType.TABLE_MAP
+                                            && uncompressedEvent.getData() != null) {
+                                        TableMapEventData tableMapEvent =
+                                                uncompressedEvent.getData();
+                                        tableMapEventByTableId.put(
+                                                tableMapEvent.getTableId(), tableMapEvent);
+                                    }
+                                }
                             }
                             return event;
                         }
@@ -686,6 +708,21 @@ public class MySqlStreamingChangeEventSource
         ignoreDmlEventByGtidSource = false;
     }
 
+    protected void handleTransactionPayload(Event event) throws InterruptedException {
+        TransactionPayloadEventData transactionPayloadEventData = event.getData();
+        /**
+         * Loop over the uncompressed events in the transaction payload event and add the table map
+         * event in the map of table events
+         */
+        EventType eventType = null;
+        for (Event uncompressedEvent : transactionPayloadEventData.getUncompressedEvents()) {
+            eventType = uncompressedEvent.getHeader().getEventType();
+            eventHandlers
+                    .getOrDefault(eventType, (e) -> ignoreEvent(null, uncompressedEvent))
+                    .accept(uncompressedEvent);
+        }
+    }
+
     /**
      * Handle a change in the table metadata.
      *
@@ -1011,6 +1048,8 @@ public class MySqlStreamingChangeEventSource
                     EventType.ROWS_QUERY,
                     (event) -> handleRowsQuery(effectiveOffsetContext, event));
         }
+
+        eventHandlers.put(EventType.TRANSACTION_PAYLOAD, (this::handleTransactionPayload));
 
         BinaryLogClient.EventListener listener;
         if (connectorConfig.bufferSizeForStreamingChangeEventSource() == 0) {

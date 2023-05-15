@@ -75,6 +75,7 @@ under the License.
     <properties>
         <flink.version>1.16.0</flink.version>
         <debezium.version>1.6.4.Final</debezium.version>
+        <mysql.binlog.version>0.26.1</mysql.binlog.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
         <!-- OracleE2eITCase will report "container cannot be accessed" error when running in Azure Pipeline with 1.16.1 testconainters.
