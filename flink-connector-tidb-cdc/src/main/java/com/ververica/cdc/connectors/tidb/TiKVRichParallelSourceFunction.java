@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.cdc.CDCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.key.Key;
 import org.tikv.common.key.RowKey;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.kvproto.Cdcpb;
@@ -193,22 +194,31 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     }
 
     protected void readSnapshotEvents() throws Exception {
-        LOG.info("read snapshot events");
+        LOG.info("read snapshot events {} {} with range: {}", database, tableName, keyRange);
         try (KVClient scanClient = session.createKVClient()) {
             long startTs = session.getTimestamp().getVersion();
             ByteString start = keyRange.getStart();
+            Key end = Key.toRawKey(keyRange.getEnd());
             while (true) {
                 final List<Kvrpcpb.KvPair> segment =
-                        scanClient.scan(start, keyRange.getEnd(), startTs);
+                        scanClient.scan(start, startTs, tiConf.getScanBatchSize());
 
                 if (segment.isEmpty()) {
                     resolvedTs = startTs;
                     break;
                 }
-
                 for (final Kvrpcpb.KvPair pair : segment) {
+                    if (Key.toRawKey(pair.getKey()).compareTo(end) >= 0) {
+                        resolvedTs = startTs;
+                        return;
+                    }
+
                     if (TableKeyRangeUtils.isRecordKey(pair.getKey().toByteArray())) {
-                        snapshotEventDeserializationSchema.deserialize(pair, outputCollector);
+                        try {
+                            snapshotEventDeserializationSchema.deserialize(pair, outputCollector);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
 
