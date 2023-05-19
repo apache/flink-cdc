@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
@@ -499,7 +500,11 @@ public class RowDataOceanBaseDeserializationSchema
 
             @Override
             public Object convertChangeEvent(String string) {
-                return TimestampData.fromLocalDateTime(Timestamp.valueOf(string).toLocalDateTime());
+                try {
+                    return TimestampData.fromTimestamp(Timestamp.valueOf(string));
+                } catch (IllegalArgumentException e) {
+                    return TimestampData.fromInstant(Instant.parse(string));
+                }
             }
         };
     }
@@ -532,11 +537,15 @@ public class RowDataOceanBaseDeserializationSchema
 
             @Override
             public Object convertChangeEvent(String string) {
-                return TimestampData.fromInstant(
-                        Timestamp.valueOf(string)
-                                .toLocalDateTime()
-                                .atZone(serverTimeZone)
-                                .toInstant());
+                try {
+                    return TimestampData.fromInstant(
+                            Timestamp.valueOf(string)
+                                    .toLocalDateTime()
+                                    .atZone(serverTimeZone)
+                                    .toInstant());
+                } catch (IllegalArgumentException e) {
+                    return TimestampData.fromInstant(Instant.parse(string));
+                }
             }
         };
     }

@@ -406,7 +406,7 @@ public class OceanBaseSourceExample {
                       .port(2881)
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
-                      .serverTimeZone(serverTimezone)
+                      .serverTimeZone(serverTimeZone)
                       .deserializer(deserializer)
                       .build();
 
