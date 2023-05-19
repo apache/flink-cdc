@@ -430,9 +430,9 @@ public class MongoDBIncrementalSourceExample {
 
 Data Type Mapping
 ----------------
-[BSON](https://docs.mongodb.com/manual/reference/bson-types/) short for **Binary JSON** is a bin­ary-en­coded seri­al­iz­a­tion of JSON-like format used to store documents and make remote procedure calls in MongoDB.
+[BSON](https://docs.mongodb.com/manual/reference/bson-types/) short for **Binary JSON** is a binary-encoded serialization of JSON-like format used to store documents and make remote procedure calls in MongoDB.
 
-[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
+[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
 
 In order to enable Flink SQL to process data from heterogeneous data sources, the data types of heterogeneous data sources need to be uniformly converted to Flink SQL data types.
 
@@ -552,7 +552,7 @@ Reference
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
-- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/)
+- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/)
 
 FAQ
 --------

@@ -1,7 +1,7 @@
 # Changelog JSON Format
 
 **WARNING:** The CDC format `changelog-json` is deprecated since Flink CDC version 2.2.
-The CDC format `changelog-json` was introduced at the point that Flink didn't offer any CDC format. Currently, Flink offers several well-maintained CDC formats i.e.[Debezium CDC, MAXWELL CDC, CANAL CDC](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/connectors/table/formats/overview/), we recommend user to use above CDC formats.
+The CDC format `changelog-json` was introduced at the point that Flink didn't offer any CDC format. Currently, Flink offers several well-maintained CDC formats i.e.[Debezium CDC, MAXWELL CDC, CANAL CDC](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/connectors/table/formats/overview/), we recommend user to use above CDC formats.
 
 ### Compatibility Note
 

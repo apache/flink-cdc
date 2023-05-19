@@ -21,17 +21,18 @@ The CDC Connectors for Apache Flink<sup>®</sup> integrate Debezium as the engin
 ## Supported Flink Versions 
 The following table shows the version mapping between Flink<sup>®</sup> CDC Connectors and Flink<sup>®</sup>:
 
-| Flink<sup>®</sup> CDC Version | Flink<sup>®</sup> Version |
-|:---:|:---:|
-| <font color="DarkCyan">1.0.0</font> | <font color="MediumVioletRed">1.11.*</font> |
-| <font color="DarkCyan">1.1.0</font> | <font color="MediumVioletRed">1.11.*</font> |
-| <font color="DarkCyan">1.2.0</font> | <font color="MediumVioletRed">1.12.*</font> |
-| <font color="DarkCyan">1.3.0</font> | <font color="MediumVioletRed">1.12.*</font> |
-| <font color="DarkCyan">1.4.0</font> | <font color="MediumVioletRed">1.13.*</font> |
-| <font color="DarkCyan">2.0.*</font> | <font color="MediumVioletRed">1.13.*</font> |
-| <font color="DarkCyan">2.1.*</font> | <font color="MediumVioletRed">1.13.*</font> |
-| <font color="DarkCyan">2.2.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font> |
-| <font color="DarkCyan">2.3.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.0</font> |
+|    Flink<sup>®</sup> CDC Version    |                                                                                                      Flink<sup>®</sup> Version                                                                                                      |
+|:-----------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+| <font color="DarkCyan">1.0.0</font> |                                                                                             <font color="MediumVioletRed">1.11.*</font>                                                                                             |
+| <font color="DarkCyan">1.1.0</font> |                                                                                             <font color="MediumVioletRed">1.11.*</font>                                                                                             |
+| <font color="DarkCyan">1.2.0</font> |                                                                                             <font color="MediumVioletRed">1.12.*</font>                                                                                             |
+| <font color="DarkCyan">1.3.0</font> |                                                                                             <font color="MediumVioletRed">1.12.*</font>                                                                                             |
+| <font color="DarkCyan">1.4.0</font> |                                                                                             <font color="MediumVioletRed">1.13.*</font>                                                                                             |
+| <font color="DarkCyan">2.0.*</font> |                                                                                             <font color="MediumVioletRed">1.13.*</font>                                                                                             |
+| <font color="DarkCyan">2.1.*</font> |                                                                                             <font color="MediumVioletRed">1.13.*</font>                                                                                             |
+| <font color="DarkCyan">2.2.*</font> |                                                                     <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>                                                                      |
+| <font color="DarkCyan">2.3.*</font> |                        <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.0</font>                        |
+| <font color="DarkCyan">2.4.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.\*</font>, <font color="MediumVioletRed">1.17.0</font> |
 
 ## Features
 
