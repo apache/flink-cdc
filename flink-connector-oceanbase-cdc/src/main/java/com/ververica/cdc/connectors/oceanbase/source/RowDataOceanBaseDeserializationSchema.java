@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Map;
@@ -484,7 +485,10 @@ public class RowDataOceanBaseDeserializationSchema
             @Override
             public Object convertSnapshotEvent(Object object) {
                 if (object instanceof Timestamp) {
-                    return TimestampData.fromLocalDateTime(((Timestamp) object).toLocalDateTime());
+                    return TimestampData.fromTimestamp((Timestamp) object);
+                }
+                if (object instanceof LocalDateTime) {
+                    return TimestampData.fromLocalDateTime((LocalDateTime) object);
                 }
                 throw new IllegalArgumentException(
                         "Unable to convert to TimestampData from unexpected value '"
@@ -514,6 +518,10 @@ public class RowDataOceanBaseDeserializationSchema
                                     .toLocalDateTime()
                                     .atZone(serverTimeZone)
                                     .toInstant());
+                }
+                if (object instanceof LocalDateTime) {
+                    return TimestampData.fromInstant(
+                            ((LocalDateTime) object).atZone(serverTimeZone).toInstant());
                 }
                 throw new IllegalArgumentException(
                         "Unable to convert to TimestampData from unexpected value '"
