@@ -262,6 +262,143 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testNoPKTableWithChunkKey() throws Exception {
+        runConsumingForNoPKTableTest(", 'scan.incremental.snapshot.chunk.key-column'='type'");
+    }
+
+    @Test
+    public void testNoPKTableWithoutChunkKey() throws Exception {
+        // We use one parallelism here to make sure all records sent to the same sink task
+        if (incrementalSnapshot) {
+            return;
+        }
+        runConsumingForNoPKTableTest("");
+    }
+
+    // This test always enable the incrementalSnapshot
+    private void runConsumingForNoPKTableTest(String otherTableOptions) throws Exception {
+        inventoryDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " `type` INT,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = 'products_no_pk',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2'"
+                                + " %s"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        inventoryDatabase.getDatabaseName(),
+                        getServerId(),
+                        otherTableOptions);
+        // If there is multi parallelism, the sink must have primary keys
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " `type` INT,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(10,3)"
+                        + (incrementalSnapshot ? ", PRIMARY KEY (`type`) NOT ENFORCED" : "")
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+        // wait until the snapshot phase finished
+        waitForSinkSize("sink", 11);
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "UPDATE products_no_pk SET description='18oz carpenter hammer' WHERE type=103;");
+            statement.execute("UPDATE products_no_pk SET weight='5.1' WHERE type=106;");
+            statement.execute(
+                    "INSERT INTO products_no_pk VALUES (110,'jacket','water resistent white wind breaker',0.2);");
+            statement.execute("DELETE FROM products_no_pk WHERE type=102;");
+            statement.execute(
+                    "INSERT INTO products_no_pk VALUES (111,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products_no_pk SET description='new water resistent white wind breaker', weight='0.5' WHERE type=110;");
+            statement.execute("UPDATE products_no_pk SET weight='5.17' WHERE type=111;");
+            statement.execute("DELETE FROM products_no_pk WHERE type=111;");
+        }
+
+        waitForSinkSize("sink", incrementalSnapshot ? 25 : 29);
+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products_no_pk;
+         * +------+--------------------+---------------------------------------------------------+--------+
+         * | type | name               | description                                             | weight |
+         * +------+--------------------+---------------------------------------------------------+--------+
+         * | 100  | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 101  | car battery        | 12V car battery                                         |    8.1 |
+         * | 103  | hammer             | 18oz carpenter hammer                                   |   0.75 |
+         * | 103  | hammer             | 18oz carpenter hammer                                   |  0.875 |
+         * | 103  | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 104  | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 104  | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 104  | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 105  | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 106  | spare tire         | 24 inch spare tire                                      |    5.1 |
+         * | 110  | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
+
+        String[] expected =
+                incrementalSnapshot
+                        ? new String[] {
+                            "+I[100, scooter, Small 2-wheel scooter, 3.140]",
+                            "+I[101, car battery, 12V car battery, 8.100]",
+                            "+I[103, hammer, 18oz carpenter hammer, 1.000]",
+                            "+I[104, rocks, box of assorted rocks, 5.300]",
+                            "+I[105, jacket, water resistent black wind breaker, 0.100]",
+                            "+I[106, spare tire, 24 inch spare tire, 5.100]",
+                            "+I[110, jacket, new water resistent white wind breaker, 0.500]"
+                        }
+                        : new String[] {
+                            "+I[100, scooter, Small 2-wheel scooter, 3.140]",
+                            "+I[101, car battery, 12V car battery, 8.100]",
+                            "+I[103, hammer, 18oz carpenter hammer, 0.750]",
+                            "+I[103, hammer, 18oz carpenter hammer, 0.875]",
+                            "+I[103, hammer, 18oz carpenter hammer, 1.000]",
+                            "+I[104, rocks, box of assorted rocks, 5.300]",
+                            "+I[104, rocks, box of assorted rocks, 5.300]",
+                            "+I[104, rocks, box of assorted rocks, 5.300]",
+                            "+I[105, jacket, water resistent black wind breaker, 0.100]",
+                            "+I[106, spare tire, 24 inch spare tire, 5.100]",
+                            "+I[110, jacket, new water resistent white wind breaker, 0.500]"
+                        };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
     public void testCheckpointIsOptionalUnderSingleParallelism() throws Exception {
         if (incrementalSnapshot) {
             env.setParallelism(1);

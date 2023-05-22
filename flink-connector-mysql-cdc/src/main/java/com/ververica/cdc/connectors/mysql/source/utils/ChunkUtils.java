@@ -42,35 +42,41 @@ public class ChunkUtils {
         return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumn));
     }
 
-    public static RowType getChunkKeyColumnType(Column chunkKeyColumn) {
+    public static RowType getChunkKeyColumnType(@Nullable Column chunkKeyColumn) {
         return (RowType)
                 ROW(FIELD(chunkKeyColumn.name(), MySqlTypeUtils.fromDbzColumn(chunkKeyColumn)))
                         .getLogicalType();
     }
 
+    /**
+     * Get the chunk key column. This column could be set by `chunkKeyColumn`. If the table doesn't
+     * have primary keys, `chunkKeyColumn` must be set. If the table has primary keys,
+     * `chunkKeyColumn` must be a column of them or else null. When the parameter `chunkKeyColumn`
+     * is not set and the table has primary keys, return the first column of primary keys.
+     */
     public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
+        if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
             throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
+                    "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         }
-
+        List<Column> searchColumns = primaryKeys.isEmpty() ? table.columns() : primaryKeys;
         if (chunkKeyColumn != null) {
-            Optional<Column> targetPkColumn =
-                    primaryKeys.stream()
+            Optional<Column> targetColumn =
+                    searchColumns.stream()
                             .filter(col -> chunkKeyColumn.equals(col.name()))
                             .findFirst();
-            if (targetPkColumn.isPresent()) {
-                return targetPkColumn.get();
+            if (targetColumn.isPresent()) {
+                return targetColumn.get();
             }
             throw new ValidationException(
                     String.format(
-                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            "Chunk key column '%s' doesn't exist in the %s [%s] of the table %s.",
                             chunkKeyColumn,
-                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
+                            primaryKeys.isEmpty() ? "columns" : "primary keys",
+                            searchColumns.stream()
+                                    .map(Column::name)
+                                    .collect(Collectors.joining(",")),
                             table.id()));
         }
 

@@ -36,10 +36,12 @@ import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
+import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -226,20 +228,21 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             if (hasEnterPureBinlogPhase(tableId, position)) {
                 return true;
             }
+
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
                 RowType splitKeyType =
                         ChunkUtils.getChunkKeyColumnType(
                                 statefulTaskContext.getDatabaseSchema().tableFor(tableId),
                                 statefulTaskContext.getSourceConfig().getChunkKeyColumn());
-                Object[] key =
+
+                Struct target = getStructContainsChunkKey(sourceRecord);
+                Object[] chunkKey =
                         getSplitKey(
-                                splitKeyType,
-                                sourceRecord,
-                                statefulTaskContext.getSchemaNameAdjuster());
+                                splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
-                                    key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
+                                    chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
                             && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }
@@ -251,6 +254,20 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         // always send the schema change event and signal event
         // we need record them to state of Flink
         return true;
+    }
+
+    private Struct getStructContainsChunkKey(SourceRecord record) {
+        if (record.key() != null) {
+            return (Struct) record.key();
+        }
+
+        Envelope.Operation op = Envelope.operationFor(record);
+        Struct value = (Struct) record.value();
+        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+            return value.getStruct(Envelope.FieldName.AFTER);
+        } else {
+            return value.getStruct(Envelope.FieldName.BEFORE);
+        }
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {

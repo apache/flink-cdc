@@ -72,7 +72,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
 
     private JdbcConnection jdbcConnection;
     private Table currentSplittingTable;
-    private Column splitColumn;
+    @Nullable private Column splitColumn;
     private RowType splitType;
     private Object[] minMaxOfSplitColumn;
     private long approximateRowCnt;

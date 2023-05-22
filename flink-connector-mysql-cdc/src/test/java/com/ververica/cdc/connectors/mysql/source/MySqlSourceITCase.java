@@ -44,7 +44,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.table.MySqlDeserializationConverterFactory;
@@ -60,12 +59,15 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -89,6 +91,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MySqlSource}. */
+@RunWith(Parameterized.class)
 public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
@@ -143,47 +146,56 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]",
                     "+U[1010, user_11, Hangzhou, 123567891234]");
 
+    @Parameterized.Parameter public String tableName;
+
+    @Parameterized.Parameter(1)
+    public String chunkColumnName;
+
+    @Parameterized.Parameters(name = "table: {0}, chunkColumn: {1}")
+    public static Collection<Object[]> parameters() {
+        return Arrays.asList(
+                new Object[][] {
+                    {"customers", null},
+                    {"customers_no_pk", null},
+                    {"customers_no_pk", "id"}
+                });
+    }
+
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
         testMySqlParallelSource(
-                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {tableName});
     }
 
     @Test
     public void testReadSingleTableWithMultipleParallelism() throws Exception {
         testMySqlParallelSource(
-                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {tableName});
     }
 
     @Test
     public void testReadMultipleTableWithSingleParallelism() throws Exception {
         testMySqlParallelSource(
-                1,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {tableName, "customers_1"});
     }
 
     @Test
     public void testReadMultipleTableWithMultipleParallelism() throws Exception {
         testMySqlParallelSource(
-                4,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {tableName, "customers_1"});
     }
 
     // Failover tests
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
         testMySqlParallelSource(
-                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {tableName, "customers_1"});
     }
 
     @Test
     public void testTaskManagerFailoverInBinlogPhase() throws Exception {
         testMySqlParallelSource(
-                FailoverType.TM, FailoverPhase.BINLOG, new String[] {"customers", "customers_1"});
+                FailoverType.TM, FailoverPhase.BINLOG, new String[] {tableName, "customers_1"});
     }
 
     @Test
@@ -193,20 +205,20 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 "latest-offset",
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
-                new String[] {"customers", "customers_1"},
+                new String[] {tableName, "customers_1"},
                 RestartStrategies.fixedDelayRestart(1, 0));
     }
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
         testMySqlParallelSource(
-                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {tableName, "customers_1"});
     }
 
     @Test
     public void testJobManagerFailoverInBinlogPhase() throws Exception {
         testMySqlParallelSource(
-                FailoverType.JM, FailoverPhase.BINLOG, new String[] {"customers", "customers_1"});
+                FailoverType.JM, FailoverPhase.BINLOG, new String[] {tableName, "customers_1"});
     }
 
     @Test
@@ -216,41 +228,20 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 "latest-offset",
                 FailoverType.JM,
                 FailoverPhase.BINLOG,
-                new String[] {"customers", "customers_1"},
+                new String[] {tableName, "customers_1"},
                 RestartStrategies.fixedDelayRestart(1, 0));
     }
 
     @Test
     public void testTaskManagerFailoverSingleParallelism() throws Exception {
         testMySqlParallelSource(
-                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
+                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {tableName});
     }
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
         testMySqlParallelSource(
-                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
-    }
-
-    @Test
-    public void testConsumingTableWithoutPrimaryKey() {
-        try {
-            testMySqlParallelSource(
-                    1,
-                    DEFAULT_SCAN_STARTUP_MODE,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
-                    new String[] {"customers_no_pk"},
-                    RestartStrategies.noRestart());
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
-                                            customDatabase.getDatabaseName() + ".customers_no_pk"))
-                            .isPresent());
-        }
+                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {tableName});
     }
 
     @Test
@@ -345,7 +336,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             throws Exception {
         // Initialize customer database
         customDatabase.createAndInitialize();
-        String tableId = customDatabase.getDatabaseName() + ".customers";
+        String tableId = getTableId();
 
         // Make some changes before starting the CDC job
         makeFirstPartBinlogEvents(getConnection(), tableId);
@@ -381,6 +372,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         .serverId("5401-5404")
                         .deserializer(deserializer)
                         .startupOptions(startupOptions)
+                        .chunkKeyColumn(chunkColumnName)
                         .build();
 
         // Build and execute the job
@@ -422,7 +414,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .databaseList(customDatabase.getDatabaseName())
-                .tableList(customDatabase.getDatabaseName() + ".customers")
+                .tableList(getTableId())
                 .username(customDatabase.getUsername())
                 .password(customDatabase.getPassword())
                 .serverTimeZone("UTC")
@@ -441,6 +433,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 .scanNewlyAddedTableEnabled(false)
                 .jdbcProperties(new Properties())
                 .heartbeatInterval(Duration.ofSeconds(30))
+                .chunkKeyColumn(chunkColumnName)
                 .build();
     }
 
@@ -487,8 +480,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " id BIGINT NOT NULL,"
                                 + " name STRING,"
                                 + " address STRING,"
-                                + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " phone_number STRING"
+                                + ("customers_no_pk".equals(tableName)
+                                        ? ""
+                                        : ", primary key (id) not enforced")
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -502,6 +497,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
+                                + " %s"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -510,7 +506,12 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         customDatabase.getDatabaseName(),
                         getTableNameRegex(captureCustomerTables),
                         scanStartupMode,
-                        getServerId());
+                        getServerId(),
+                        chunkColumnName == null
+                                ? ""
+                                : String.format(
+                                        ", 'scan.incremental.snapshot.chunk.key-column' = '%s'",
+                                        chunkColumnName));
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
@@ -734,6 +735,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
         return DebeziumUtils.createMySqlConnection(configuration, new Properties());
+    }
+
+    private String getTableId() {
+        return customDatabase.getDatabaseName() + "." + tableName;
     }
 
     private void waitUntilJobRunning(TableResult tableResult)

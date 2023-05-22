@@ -136,8 +136,8 @@ VALUES (1,'user_1','Shanghai','123567891234'),
        (3,'user_10','Shanghai','123567891234');
 
 CREATE TABLE customers_no_pk (
-   id INTEGER NOT NULL,
-   name VARCHAR(255) NOT NULL DEFAULT 'flink',
+   id INTEGER,
+   name VARCHAR(255) DEFAULT 'flink',
    address VARCHAR(1024),
    phone_number VARCHAR(512)
 );
