@@ -30,6 +30,7 @@ import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OracleValueConverters;
+import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
@@ -152,6 +153,12 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
 
     private RedoLogSplitReadTask createBackfillRedoLogReadTask(
             StreamSplit backfillBinlogSplit, OracleSourceFetchTaskContext context) {
+        OracleConnectorConfig oracleConnectorConfig =
+                context.getSourceConfig().getDbzConnectorConfig();
+        final OffsetContext.Loader<OracleOffsetContext> loader =
+                new LogMinerOracleOffsetContextLoader(oracleConnectorConfig);
+        final OracleOffsetContext oracleOffsetContext =
+                loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
         // we should only capture events for the current table,
         // otherwise, we may can't find corresponding schema
         Configuration dezConf =
@@ -287,13 +294,13 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         @Override
         protected SnapshotContext prepare(ChangeEventSourceContext changeEventSourceContext)
                 throws Exception {
-            return new OracleSnapshotContext();
+            return new MySqlSnapshotContext();
         }
 
-        private static class OracleSnapshotContext
+        private static class MySqlSnapshotContext
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext {
 
-            public OracleSnapshotContext() throws SQLException {
+            public MySqlSnapshotContext() throws SQLException {
                 super("");
             }
         }

@@ -65,6 +65,9 @@ public class SqlServerTypeUtils {
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
             case Types.TIMESTAMP_WITH_TIMEZONE:
+                return column.length() >= 0
+                        ? DataTypes.TIMESTAMP(column.length())
+                        : DataTypes.TIMESTAMP();
             case Types.BOOLEAN:
                 return DataTypes.BOOLEAN();
             default:

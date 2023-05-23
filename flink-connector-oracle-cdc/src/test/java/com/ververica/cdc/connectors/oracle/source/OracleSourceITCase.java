@@ -129,7 +129,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
 
         String sourceDDL =
                 format(
-                        "CREATE TABLE customers ("
+                        "CREATE TABLE products ("
                                 + " ID INT NOT NULL,"
                                 + " NAME STRING,"
                                 + " ADDRESS STRING,"
@@ -183,7 +183,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
         tEnv.executeSql(sourceDDL);
-        TableResult tableResult = tEnv.executeSql("select * from customers");
+        TableResult tableResult = tEnv.executeSql("select * from products");
         CloseableIterator<Row> iterator = tableResult.collect();
         JobID jobId = tableResult.getJobClient().get().getJobID();
         List<String> expectedSnapshotData = new ArrayList<>();

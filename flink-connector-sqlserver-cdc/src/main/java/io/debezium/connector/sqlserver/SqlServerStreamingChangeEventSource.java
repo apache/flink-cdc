@@ -46,8 +46,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * A {@link StreamingChangeEventSource} based on SQL Server change data capture functionality. A
- * main loop polls database DDL change and change data tables and turns them into change events.
+ * Copied from Debezium project(1.6.4.final) to add method {@link
+ * SqlServerStreamingChangeEventSource#afterHandleLsn(SqlServerOffsetContext)}. A {@link
+ * StreamingChangeEventSource} based on SQL Server change data capture functionality. A main loop
+ * polls database DDL change and change data tables and turns them into change events.
  *
  * <p>The connector uses CDC functionality of SQL Server that is implemented as as a process that
  * monitors source table and write changes from the table into the change table.

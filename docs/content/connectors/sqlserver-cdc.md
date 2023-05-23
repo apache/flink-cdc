@@ -139,18 +139,11 @@ Connector Options
       <td>Database name of the SQLServer database to monitor.</td>
     </tr> 
     <tr>
-      <td>schema-name</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Schema name of the SQLServer database to monitor.</td>
-    </tr> 
-    <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the SQLServer database to monitor.</td>
+      <td>Table name of the SQLServer database to monitor, e.g.: "db1.table1"</td>
     </tr>
     <tr>
       <td>port</td>
