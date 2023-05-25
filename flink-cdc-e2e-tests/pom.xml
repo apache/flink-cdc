@@ -32,7 +32,8 @@ under the License.
         <flink-1.14>1.14.4</flink-1.14>
         <flink-1.15>1.15.2</flink-1.15>
         <flink-1.16>1.16.0</flink-1.16>
-        <flink-1.17>3.1.0-1.17</flink-1.17>
+        <flink-1.17>1.17.0</flink-1.17>
+        <jdbc.version-1.17>3.1.0-1.17</jdbc.version-1.17>
         <mysql.driver.version>8.0.27</mysql.driver.version>
     </properties>
 
@@ -253,7 +254,7 @@ under the License.
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
                             <artifactId>flink-connector-jdbc</artifactId>
-                            <version>${flink-1.17}</version>
+                            <version>${jdbc.version-1.17}</version>
                             <destFileName>jdbc-connector_${flink-1.17}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies

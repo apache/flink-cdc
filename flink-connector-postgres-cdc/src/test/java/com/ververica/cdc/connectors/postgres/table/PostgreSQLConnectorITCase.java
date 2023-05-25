@@ -446,10 +446,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
-                                + " id INT NOT NULL PRIMARY KEY,"
+                                + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
-                                + " weight DECIMAL(10,3)"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'hostname' = '%s',"
