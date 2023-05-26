@@ -43,6 +43,7 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
     public void testMySqlCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
+                        "SET 'execution.checkpointing.interval' = '3s';",
                         "CREATE TABLE products_source (",
                         " `id` INT NOT NULL,",
                         " name STRING,",
