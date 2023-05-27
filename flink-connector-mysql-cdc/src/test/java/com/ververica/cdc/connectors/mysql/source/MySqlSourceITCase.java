@@ -48,6 +48,7 @@ import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.table.MySqlDeserializationConverterFactory;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -340,12 +341,24 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         testStartingOffset(StartupOptions.latest(), Collections.emptyList());
     }
 
+    @Test
+    public void testStartFromTimestamp() throws Exception {
+        List<String> expected = new ArrayList<>();
+        expected.addAll(firstPartBinlogEvents);
+        testStartingOffset(StartupOptions.timestamp(System.currentTimeMillis()), expected);
+    }
+
     private void testStartingOffset(
             StartupOptions startupOptions, List<String> expectedChangelogAfterStart)
             throws Exception {
         // Initialize customer database
         customDatabase.createAndInitialize();
         String tableId = customDatabase.getDatabaseName() + ".customers";
+
+        if (startupOptions.startupMode == StartupMode.TIMESTAMP) {
+            Thread.sleep(2000);
+            startupOptions = StartupOptions.timestamp(System.currentTimeMillis());
+        }
 
         // Make some changes before starting the CDC job
         makeFirstPartBinlogEvents(getConnection(), tableId);
