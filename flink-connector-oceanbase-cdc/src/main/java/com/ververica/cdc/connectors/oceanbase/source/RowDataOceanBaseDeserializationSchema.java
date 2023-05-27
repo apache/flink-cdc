@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oceanbase.source;
 
+import com.ververica.cdc.connectors.oceanbase.source.metrics.OceanBaseMetrics;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericArrayData;
@@ -133,6 +134,12 @@ public class RowDataOceanBaseDeserializationSchema
         }
     }
 
+    @Override
+    public void deserialize(OceanBaseRecord record, Collector<RowData> out, OceanBaseMetrics oceanBaseMetrics) throws Exception {
+            reportMetrics(record, oceanBaseMetrics);
+            deserialize(record, out);
+    }
+
     private void emit(OceanBaseRecord row, RowData physicalRow, Collector<RowData> collector) {
         if (!hasMetadata) {
             collector.collect(physicalRow);
@@ -143,6 +150,34 @@ public class RowDataOceanBaseDeserializationSchema
         appendMetadataCollector.outputCollector = collector;
         appendMetadataCollector.collect(physicalRow);
     }
+
+
+
+    private void reportMetrics(OceanBaseRecord element, OceanBaseMetrics oceanBaseMetrics) {
+        long now = System.currentTimeMillis();
+        // record the latest process time
+        oceanBaseMetrics.recordProcessTime(now);
+        Long messageTimestamp = getMessageTimestamp(element);
+
+        if (messageTimestamp != null && messageTimestamp > 0L) {
+            // report fetch delay
+            Long fetchTimestamp = getFetchTimestamp(element);
+            if (fetchTimestamp != null && fetchTimestamp >= messageTimestamp) {
+                oceanBaseMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
+            }
+            // report emit delay
+            oceanBaseMetrics.recordEmitDelay(now - messageTimestamp);
+        }
+    }
+
+    public static Long getMessageTimestamp(OceanBaseRecord record){
+        return record.getSourceInfo().getTimestampS();
+    }
+
+    public static Long getFetchTimestamp(OceanBaseRecord record){
+        return Long.valueOf(record.getLogMessageTimeStamp());
+    }
+
 
     @Override
     public TypeInformation<RowData> getProducedType() {

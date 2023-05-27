@@ -34,22 +34,26 @@ public class OceanBaseRecord implements Serializable {
     private DataMessage.Record.Type opt;
     private Map<String, ByteString> logMessageFieldsBefore;
     private Map<String, ByteString> logMessageFieldsAfter;
+    private final String logMessageTimeStamp;
 
-    public OceanBaseRecord(SourceInfo sourceInfo, Map<String, Object> jdbcFields) {
+    public OceanBaseRecord(SourceInfo sourceInfo, Map<String, Object> jdbcFields, String logMessageTimeStamp) {
         this.sourceInfo = sourceInfo;
         this.isSnapshotRecord = true;
         this.jdbcFields = jdbcFields;
+        this.logMessageTimeStamp = logMessageTimeStamp;
     }
 
     public OceanBaseRecord(
             SourceInfo sourceInfo,
             DataMessage.Record.Type opt,
-            List<DataMessage.Record.Field> logMessageFieldList) {
+            List<DataMessage.Record.Field> logMessageFieldList,
+            String logMessageTimeStamp) {
         this.sourceInfo = sourceInfo;
         this.isSnapshotRecord = false;
         this.opt = opt;
         this.logMessageFieldsBefore = new HashMap<>();
         this.logMessageFieldsAfter = new HashMap<>();
+        this.logMessageTimeStamp = logMessageTimeStamp;
         for (DataMessage.Record.Field field : logMessageFieldList) {
             if (field.isPrev()) {
                 logMessageFieldsBefore.put(field.getFieldname(), field.getValue());
@@ -82,6 +86,8 @@ public class OceanBaseRecord implements Serializable {
     public Map<String, ByteString> getLogMessageFieldsAfter() {
         return logMessageFieldsAfter;
     }
+
+    public String getLogMessageTimeStamp(){ return logMessageTimeStamp;}
 
     /** Information about the source of record. */
     public static class SourceInfo implements Serializable {

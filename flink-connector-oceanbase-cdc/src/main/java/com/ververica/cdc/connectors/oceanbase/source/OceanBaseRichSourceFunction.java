@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oceanbase.source;
 
+import com.ververica.cdc.connectors.oceanbase.source.metrics.OceanBaseMetrics;
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -23,6 +24,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.base.LongSerializer;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -43,6 +45,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Method;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -98,6 +101,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private transient LogProxyClient logProxyClient;
     private transient ListState<Long> offsetState;
     private transient OutputCollector<T> outputCollector;
+    private transient OceanBaseMetrics oceanBaseMetrics;
 
     public OceanBaseRichSourceFunction(
             boolean snapshot,
@@ -135,6 +139,15 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     @Override
     public void open(final Configuration config) throws Exception {
         super.open(config);
+        // initialize metrics
+        // make RuntimeContext#getMetricGroup compatible between Flink 1.13 and Flink 1.14
+        final Method getMetricGroupMethod =
+            getRuntimeContext().getClass().getMethod("getMetricGroup");
+        getMetricGroupMethod.setAccessible(true);
+        final MetricGroup metricGroup =
+            (MetricGroup) getMetricGroupMethod.invoke(getRuntimeContext());
+        this.oceanBaseMetrics = new OceanBaseMetrics(metricGroup);
+        this.oceanBaseMetrics.registerMetrics();
         this.outputCollector = new OutputCollector<>();
         this.resolvedTimestamp = -1;
     }
@@ -276,9 +289,9 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                                 metaData.getColumnName(i + 1), rs.getObject(i + 1));
                                     }
                                     OceanBaseRecord record =
-                                            new OceanBaseRecord(sourceInfo, fieldMap);
+                                            new OceanBaseRecord(sourceInfo, fieldMap, Long.toString(resolvedTimestamp));
                                     try {
-                                        deserializer.deserialize(record, outputCollector);
+                                        deserializer.deserialize(record, outputCollector, oceanBaseMetrics);
                                     } catch (Exception e) {
                                         LOG.error("Deserialize snapshot record failed ", e);
                                         throw new FlinkRuntimeException(e);
@@ -333,7 +346,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                             msg -> {
                                                 try {
                                                     deserializer.deserialize(
-                                                            getChangeRecord(msg), outputCollector);
+                                                            getChangeRecord(msg), outputCollector, oceanBaseMetrics);
                                                 } catch (Exception e) {
                                                     throw new FlinkRuntimeException(e);
                                                 }
@@ -380,7 +393,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                         databaseName,
                         message.getTableName(),
                         getCheckpointTimestamp(message));
-        return new OceanBaseRecord(sourceInfo, message.getOpt(), message.getFieldList());
+        return new OceanBaseRecord(sourceInfo, message.getOpt(), message.getFieldList(), message.getTimestamp());
     }
 
     /**
