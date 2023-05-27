@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHANGELOG_MODE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -72,6 +73,17 @@ public class MySqlTableSourceFactoryTest {
                             Column.physical("eee", DataTypes.TIMESTAMP(3))),
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
+
+    private static final ResolvedSchema SCHEMA_WITHOUT_PRIMARY_KEY =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("aaa", DataTypes.INT().notNull()),
+                            Column.physical("bbb", DataTypes.STRING().notNull()),
+                            Column.physical("ccc", DataTypes.DOUBLE()),
+                            Column.physical("ddd", DataTypes.DECIMAL(31, 18)),
+                            Column.physical("eee", DataTypes.TIMESTAMP(3))),
+                    new ArrayList<>(),
+                    null);
 
     private static final ResolvedSchema SCHEMA_WITH_METADATA =
             new ResolvedSchema(
@@ -123,7 +135,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -167,7 +180,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        "testCol");
+                        "testCol",
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -207,7 +221,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -245,7 +260,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -291,7 +307,8 @@ public class MySqlTableSourceFactoryTest {
                         true,
                         jdbcProperties,
                         Duration.ofMillis(15213),
-                        "testCol");
+                        "testCol",
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -335,7 +352,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -371,7 +389,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -408,7 +427,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -446,7 +466,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -482,7 +503,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -523,11 +545,28 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        CHANGELOG_MODE.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
         assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testUpsertModeWithoutPrimaryKeyError() {
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("changelog-mode", "upsert");
+
+            createTableSource(SCHEMA_WITHOUT_PRIMARY_KEY, properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "Primary key must be present when upsert mode is selected.")
+                            .isPresent());
+        }
     }
 
     @Test
