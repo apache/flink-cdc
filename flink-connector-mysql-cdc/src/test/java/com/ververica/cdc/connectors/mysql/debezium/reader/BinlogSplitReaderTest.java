@@ -721,6 +721,61 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 "Timeout waiting for heartbeat event");
     }
 
+    @Test
+    public void testReuseBinaryLogClient() throws Exception {
+        customerDatabase.createAndInitialize();
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        List<MySqlSnapshotSplit> splits =
+                getMySqlSplits(new String[] {"customers_even_dist"}, sourceConfig);
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-D[102, user_2, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]",
+                    "+I[104, user_4, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]"
+                };
+
+        int eventListenersCount = 0;
+        int lifecycleListenersCount = 0;
+        for (int i = 0; i < 2; i++) {
+            List<String> actual =
+                    readBinlogSplitsFromSnapshotSplits(
+                            splits,
+                            dataType,
+                            sourceConfig,
+                            1,
+                            expected.length,
+                            splits.get(splits.size() - 1).getTableId());
+            assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+
+            if (eventListenersCount == 0) {
+                eventListenersCount = binaryLogClient.getEventListeners().size();
+            } else {
+                assertEquals(eventListenersCount, binaryLogClient.getEventListeners().size());
+            }
+            if (lifecycleListenersCount == 0) {
+                lifecycleListenersCount = binaryLogClient.getLifecycleListeners().size();
+            } else {
+                assertEquals(
+                        lifecycleListenersCount, binaryLogClient.getLifecycleListeners().size());
+            }
+        }
+    }
+
     private BinlogSplitReader createBinlogReader(MySqlSourceConfig sourceConfig) {
         return new BinlogSplitReader(
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection), 0);

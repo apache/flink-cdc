@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.task;
 
+import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
@@ -35,6 +36,7 @@ import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.isNonStoppingOffset;
@@ -52,6 +54,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     private final SignalEventDispatcher signalEventDispatcher;
     private final ErrorHandler errorHandler;
     private final Predicate<Event> eventFilter;
+    private final MySqlTaskContext taskContext;
     private ChangeEventSourceContext context;
 
     public MySqlBinlogSplitReadTask(
@@ -71,12 +74,38 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
         this.errorHandler = errorHandler;
         this.signalEventDispatcher = signalEventDispatcher;
         this.eventFilter = eventFilter;
+        this.taskContext = taskContext;
     }
 
     @Override
     public void execute(ChangeEventSourceContext context, MySqlOffsetContext offsetContext)
             throws InterruptedException {
         this.context = context;
+
+        /**
+         * Clear reusedBinaryLogClient's eventListeners and lifecycleListeners of the last run to
+         * fix hung up of snapshot phase. Keep the last
+         * Listener(com.github.shyiko.mysql.binlog.jmx.BinaryLogClientStatistics) for the current
+         * run.
+         */
+        final BinaryLogClient client = taskContext.getBinaryLogClient();
+        final List<BinaryLogClient.EventListener> eventListeners = client.getEventListeners();
+        final List<BinaryLogClient.LifecycleListener> lifecycleListeners =
+                client.getLifecycleListeners();
+
+        eventListeners.forEach(
+                listener -> {
+                    if (eventListeners.indexOf(listener) != eventListeners.size() - 1) {
+                        client.unregisterEventListener(listener);
+                    }
+                });
+        lifecycleListeners.forEach(
+                listener -> {
+                    if (lifecycleListeners.indexOf(listener) != lifecycleListeners.size() - 1) {
+                        client.unregisterLifecycleListener(listener);
+                    }
+                });
+
         super.execute(context, offsetContext);
     }
 
