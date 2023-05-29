@@ -114,6 +114,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 props,
                 dbzConfiguration,
                 DRIVER_ClASS_NAME,

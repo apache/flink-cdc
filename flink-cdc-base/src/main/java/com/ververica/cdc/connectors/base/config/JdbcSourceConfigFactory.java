@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.config;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.configuration.Configuration;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig.Factory;
 import com.ververica.cdc.connectors.base.options.JdbcSourceOptions;
@@ -27,6 +28,8 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.requireCheckpointsAfterTasksFinished;
 
 /** A {@link Factory} to provide {@link SourceConfig} of JDBC data source. */
 @Internal
@@ -42,6 +45,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected List<String> tableList;
     protected StartupOptions startupOptions = StartupOptions.initial();
     protected boolean includeSchemaChanges = false;
+    protected boolean closeIdleReaders = false;
     protected double distributionFactorUpper =
             SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue();
     protected double distributionFactorLower =
@@ -207,6 +211,29 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
         }
         this.startupOptions = startupOptions;
         return this;
+    }
+
+    /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public JdbcSourceConfigFactory closeIdleReaders(boolean closeIdleReaders) {
+        this.closeIdleReaders = closeIdleReaders;
+        return this;
+    }
+
+    @Override
+    public JdbcSourceConfig create(int subtask, Configuration configuration) {
+        if (closeIdleReaders) {
+            requireCheckpointsAfterTasksFinished(configuration);
+        }
+        return create(subtask);
     }
 
     @Override

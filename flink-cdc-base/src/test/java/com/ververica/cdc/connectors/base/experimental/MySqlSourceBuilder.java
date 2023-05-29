@@ -206,6 +206,21 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public MySqlSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
+        this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
+    /**
      * The deserializer used to convert from consumed {@link
      * org.apache.kafka.connect.source.SourceRecord}.
      */

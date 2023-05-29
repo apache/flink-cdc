@@ -47,6 +47,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final int heartbeatIntervalMillis;
     private final int splitMetaGroupSize;
     private final int splitSizeMB;
+    private final boolean closeIdleReaders;
 
     MongoDBSourceConfig(
             String hosts,
@@ -62,7 +63,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             StartupOptions startupOptions,
             int heartbeatIntervalMillis,
             int splitMetaGroupSize,
-            int splitSizeMB) {
+            int splitSizeMB,
+            boolean closeIdleReaders) {
         this.hosts = checkNotNull(hosts);
         this.username = username;
         this.password = password;
@@ -79,6 +81,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
+        this.closeIdleReaders = closeIdleReaders;
     }
 
     public String getHosts() {
@@ -150,6 +153,11 @@ public class MongoDBSourceConfig implements SourceConfig {
     }
 
     @Override
+    public boolean isCloseIdleReaders() {
+        return closeIdleReaders;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -166,6 +174,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && heartbeatIntervalMillis == that.heartbeatIntervalMillis
                 && splitMetaGroupSize == that.splitMetaGroupSize
                 && splitSizeMB == that.splitSizeMB
+                && closeIdleReaders == that.closeIdleReaders
                 && Objects.equals(hosts, that.hosts)
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
@@ -190,6 +199,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 startupOptions,
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
-                splitSizeMB);
+                splitSizeMB,
+                closeIdleReaders);
     }
 }

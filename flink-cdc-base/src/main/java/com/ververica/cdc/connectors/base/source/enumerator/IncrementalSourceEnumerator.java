@@ -169,6 +169,11 @@ public class IncrementalSourceEnumerator
                 context.assignSplit(sourceSplit, nextAwaiting);
                 awaitingReader.remove();
                 LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
+            } else if (sourceConfig.isCloseIdleReaders()) {
+                // close idle readers when snapshot phase finished.
+                context.signalNoMoreSplits(nextAwaiting);
+                awaitingReader.remove();
+                LOG.info("Close idle reader of subtask {}", nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
                 break;

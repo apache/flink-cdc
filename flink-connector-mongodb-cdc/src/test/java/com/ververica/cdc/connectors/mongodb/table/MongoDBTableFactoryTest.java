@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
@@ -101,6 +102,8 @@ public class MongoDBTableFactoryTest {
     private static final int SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT =
             SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
     private static final int CHUNK_META_GROUP_SIZE_DEFAULT = CHUNK_META_GROUP_SIZE.defaultValue();
+    private static final boolean SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT =
+            SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue();
 
     @Test
     public void testCommonProperties() {
@@ -126,7 +129,8 @@ public class MongoDBTableFactoryTest {
                         LOCAL_TIME_ZONE,
                         SCAN_INCREMENTAL_SNAPSHOT_ENABLED_DEFAULT,
                         CHUNK_META_GROUP_SIZE_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT);
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -143,6 +147,7 @@ public class MongoDBTableFactoryTest {
         options.put("scan.incremental.snapshot.enabled", "true");
         options.put("chunk-meta.group.size", "1001");
         options.put("scan.incremental.snapshot.chunk.size.mb", "10");
+        options.put("scan.incremental.close-idle-reader.enabled", "true");
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =
@@ -163,7 +168,8 @@ public class MongoDBTableFactoryTest {
                         LOCAL_TIME_ZONE,
                         true,
                         1001,
-                        10);
+                        10,
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -197,7 +203,8 @@ public class MongoDBTableFactoryTest {
                         LOCAL_TIME_ZONE,
                         SCAN_INCREMENTAL_SNAPSHOT_ENABLED_DEFAULT,
                         CHUNK_META_GROUP_SIZE_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT);
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");

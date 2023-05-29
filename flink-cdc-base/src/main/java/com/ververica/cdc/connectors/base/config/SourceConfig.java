@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.config;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.configuration.Configuration;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 
@@ -34,9 +35,12 @@ public interface SourceConfig extends Serializable {
 
     boolean isIncludeSchemaChanges();
 
+    boolean isCloseIdleReaders();
+
     /** Factory for the {@code SourceConfig}. */
-    @FunctionalInterface
     interface Factory<C extends SourceConfig> extends Serializable {
+
+        C create(int subtask, Configuration configuration);
 
         C create(int subtask);
     }

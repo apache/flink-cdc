@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mongodb.source.config;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.configuration.Configuration;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig.Factory;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
@@ -25,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.requireCheckpointsAfterTasksFinished;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
@@ -48,11 +50,12 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private Integer batchSize = BATCH_SIZE.defaultValue();
     private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS.defaultValue();
     private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE.defaultValue();
-    private Boolean updateLookup = true;
+    private boolean updateLookup = true;
     private StartupOptions startupOptions = StartupOptions.initial();
     private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
     private Integer splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private Integer splitSizeMB = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
+    private boolean closeIdleReaders = false;
 
     /** The comma-separated list of hostname and port pairs of mongodb servers. */
     public MongoDBSourceConfigFactory hosts(String hosts) {
@@ -187,16 +190,34 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
-    /** Validate required options. */
-    public void validate() {
-        checkNotNull(hosts, "hosts must be provided");
+    /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public MongoDBSourceConfigFactory closeIdleReaders(boolean closeIdleReaders) {
+        this.closeIdleReaders = closeIdleReaders;
+        return this;
+    }
+
+    @Override
+    public MongoDBSourceConfig create(int subtaskId, Configuration configuration) {
+        if (closeIdleReaders) {
+            requireCheckpointsAfterTasksFinished(configuration);
+        }
+        return create(subtaskId);
     }
 
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
         return new MongoDBSourceConfig(
-                hosts,
+                checkNotNull(hosts),
                 username,
                 password,
                 databaseList,
@@ -209,6 +230,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 startupOptions,
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
-                splitSizeMB);
+                splitSizeMB,
+                closeIdleReaders);
     }
 }
