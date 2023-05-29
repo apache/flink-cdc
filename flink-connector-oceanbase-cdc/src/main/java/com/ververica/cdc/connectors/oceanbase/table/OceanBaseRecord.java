@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.oceanbase.table;
 
-import com.oceanbase.oms.logmessage.ByteString;
 import com.oceanbase.oms.logmessage.DataMessage;
 
 import java.io.Serializable;
@@ -32,8 +31,8 @@ public class OceanBaseRecord implements Serializable {
     private final boolean isSnapshotRecord;
     private Map<String, Object> jdbcFields;
     private DataMessage.Record.Type opt;
-    private Map<String, ByteString> logMessageFieldsBefore;
-    private Map<String, ByteString> logMessageFieldsAfter;
+    private Map<String, Object> logMessageFieldsBefore;
+    private Map<String, Object> logMessageFieldsAfter;
 
     public OceanBaseRecord(SourceInfo sourceInfo, Map<String, Object> jdbcFields) {
         this.sourceInfo = sourceInfo;
@@ -52,11 +51,18 @@ public class OceanBaseRecord implements Serializable {
         this.logMessageFieldsAfter = new HashMap<>();
         for (DataMessage.Record.Field field : logMessageFieldList) {
             if (field.isPrev()) {
-                logMessageFieldsBefore.put(field.getFieldname(), field.getValue());
+                logMessageFieldsBefore.put(field.getFieldname(), getFieldStringValue(field));
             } else {
-                logMessageFieldsAfter.put(field.getFieldname(), field.getValue());
+                logMessageFieldsAfter.put(field.getFieldname(), getFieldStringValue(field));
             }
         }
+    }
+
+    private String getFieldStringValue(DataMessage.Record.Field field) {
+        if (field.getValue() == null) {
+            return null;
+        }
+        return field.getValue().toString(field.getEncoding());
     }
 
     public SourceInfo getSourceInfo() {
@@ -75,11 +81,11 @@ public class OceanBaseRecord implements Serializable {
         return opt;
     }
 
-    public Map<String, ByteString> getLogMessageFieldsBefore() {
+    public Map<String, Object> getLogMessageFieldsBefore() {
         return logMessageFieldsBefore;
     }
 
-    public Map<String, ByteString> getLogMessageFieldsAfter() {
+    public Map<String, Object> getLogMessageFieldsAfter() {
         return logMessageFieldsAfter;
     }
 
