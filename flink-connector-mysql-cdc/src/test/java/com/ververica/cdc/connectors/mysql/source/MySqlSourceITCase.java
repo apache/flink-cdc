@@ -32,6 +32,7 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
@@ -372,7 +373,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         .serverId("5401-5404")
                         .deserializer(deserializer)
                         .startupOptions(startupOptions)
-                        .chunkKeyColumn(chunkColumnName)
+                        .chunkKeyColumn(
+                                new ObjectPath(customDatabase.getDatabaseName(), tableName),
+                                chunkColumnName)
                         .build();
 
         // Build and execute the job
@@ -433,7 +436,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 .scanNewlyAddedTableEnabled(false)
                 .jdbcProperties(new Properties())
                 .heartbeatInterval(Duration.ofSeconds(30))
-                .chunkKeyColumn(chunkColumnName)
+                .chunkKeyColumn(
+                        new ObjectPath(customDatabase.getDatabaseName(), tableName),
+                        chunkColumnName)
                 .build();
     }
 

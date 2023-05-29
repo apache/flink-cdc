@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
@@ -26,7 +27,9 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -71,7 +74,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
-    private String chunkKeyColumn;
+    private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -145,8 +148,17 @@ public class MySqlSourceConfigFactory implements Serializable {
      * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
      * key column when read the snapshot of table.
      */
-    public MySqlSourceConfigFactory chunkKeyColumn(String chunkKeyColumn) {
-        this.chunkKeyColumn = chunkKeyColumn;
+    public MySqlSourceConfigFactory chunkKeyColumn(ObjectPath objectPath, String chunkKeyColumn) {
+        this.chunkKeyColumns.put(objectPath, chunkKeyColumn);
+        return this;
+    }
+
+    /**
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
+     */
+    public MySqlSourceConfigFactory chunkKeyColumn(Map<ObjectPath, String> chunkKeyColumns) {
+        this.chunkKeyColumns.putAll(chunkKeyColumns);
         return this;
     }
 
@@ -332,6 +344,6 @@ public class MySqlSourceConfigFactory implements Serializable {
                 scanNewlyAddedTableEnabled,
                 props,
                 jdbcProperties,
-                chunkKeyColumn);
+                chunkKeyColumns);
     }
 }

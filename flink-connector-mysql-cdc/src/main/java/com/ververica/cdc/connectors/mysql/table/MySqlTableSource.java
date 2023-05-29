@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -191,7 +192,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
-                            .chunkKeyColumn(chunkKeyColumn)
+                            .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

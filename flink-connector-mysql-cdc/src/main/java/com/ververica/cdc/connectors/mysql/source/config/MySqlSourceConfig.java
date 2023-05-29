@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.mysql.source.config;
 
+import org.apache.flink.table.catalog.ObjectPath;
+
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import io.debezium.config.Configuration;
@@ -27,6 +29,7 @@ import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -55,7 +58,7 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
     private final Properties jdbcProperties;
-    @Nullable private final String chunkKeyColumn;
+    private final Map<ObjectPath, String> chunkKeyColumns;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -86,7 +89,7 @@ public class MySqlSourceConfig implements Serializable {
             boolean scanNewlyAddedTableEnabled,
             Properties dbzProperties,
             Properties jdbcProperties,
-            @Nullable String chunkKeyColumn) {
+            Map<ObjectPath, String> chunkKeyColumns) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -110,7 +113,7 @@ public class MySqlSourceConfig implements Serializable {
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
         this.jdbcProperties = jdbcProperties;
-        this.chunkKeyColumn = chunkKeyColumn;
+        this.chunkKeyColumns = chunkKeyColumns;
     }
 
     public String getHostname() {
@@ -210,8 +213,7 @@ public class MySqlSourceConfig implements Serializable {
         return jdbcProperties;
     }
 
-    @Nullable
-    public String getChunkKeyColumn() {
-        return chunkKeyColumn;
+    public Map<ObjectPath, String> getChunkKeyColumns() {
+        return chunkKeyColumns;
     }
 }
