@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -52,8 +51,8 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -62,15 +61,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.formatMessageTimestamp;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isLowWatermarkEvent;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.splitKeyRangeContains;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.upsertBinlog;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.upsertBinlogForNoPKTable;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
@@ -254,7 +250,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             SourceRecord lowWatermark = null;
             SourceRecord highWatermark = null;
 
-            SnapshotRecordCollector snapshotRecords = new EmptyCollector();
+            Map<Struct, List<SourceRecord>> snapshotRecords = new HashMap<>();
             while (!reachBinlogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
@@ -279,13 +275,25 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         break;
                     }
 
-                    if (snapshotRecords instanceof EmptyCollector) {
-                        snapshotRecords =
-                                record.key() == null
-                                        ? new SnapshotRecordNoPrimaryKeyCollector()
-                                        : new SnapshotRecordWithPrimaryKeyCollector();
+                    if (!reachBinlogStart) {
+                        if (record.key() != null) {
+                            snapshotRecords.put(
+                                    (Struct) record.key(), Collections.singletonList(record));
+                        } else {
+                            List<SourceRecord> records =
+                                    snapshotRecords.computeIfAbsent(
+                                            (Struct) record.value(), key -> new LinkedList<>());
+                            records.add(record);
+                        }
+                    } else {
+                        upsertBinlog(
+                                snapshotRecords,
+                                record,
+                                currentSnapshotSplit.getSplitKeyType(),
+                                nameAdjuster,
+                                currentSnapshotSplit.getSplitStart(),
+                                currentSnapshotSplit.getSplitEnd());
                     }
-                    snapshotRecords.collect(record, reachBinlogStart);
                 }
             }
             // snapshot split return its data once
@@ -293,7 +301,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
             final List<SourceRecord> normalizedRecords = new ArrayList<>();
             normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.getRecords()));
+            normalizedRecords.addAll(
+                    formatMessageTimestamp(
+                            snapshotRecords.values().stream()
+                                    .flatMap(Collection::stream)
+                                    .collect(Collectors.toList())));
             normalizedRecords.add(highWatermark);
 
             final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
@@ -396,92 +408,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         @Override
         public boolean isRunning() {
             return currentTaskRunning;
-        }
-    }
-
-    /** Collect records need to be sent, except low/high watermark. */
-    interface SnapshotRecordCollector {
-        void collect(SourceRecord record, boolean reachBinlogStart);
-
-        Collection<SourceRecord> getRecords();
-    }
-
-    /** Collect no data. */
-    class EmptyCollector implements SnapshotRecordCollector {
-        @Override
-        public void collect(SourceRecord record, boolean reachBinlogStart) {
-            throw new IllegalStateException("EmptyCollector must not receive data.");
-        }
-
-        @Override
-        public Collection<SourceRecord> getRecords() {
-            return Collections.emptyList();
-        }
-    }
-
-    /** Collect records with primary key. May upsert binlog events. */
-    class SnapshotRecordWithPrimaryKeyCollector implements SnapshotRecordCollector {
-        private final Map<Struct, SourceRecord> snapshotRecords = new LinkedHashMap<>();
-
-        @Override
-        public void collect(SourceRecord record, boolean reachBinlogStart) {
-            if (!reachBinlogStart) {
-                snapshotRecords.put((Struct) record.key(), record);
-            } else {
-                if (isRequiredBinlogRecord(record)) {
-                    // upsert binlog events through the record key
-                    upsertBinlog(snapshotRecords, record);
-                }
-            }
-        }
-
-        @Override
-        public Collection<SourceRecord> getRecords() {
-            return snapshotRecords.values();
-        }
-
-        private boolean isRequiredBinlogRecord(SourceRecord record) {
-            if (isDataChangeRecord(record)) {
-                Object[] key =
-                        getSplitKey(currentSnapshotSplit.getSplitKeyType(), record, nameAdjuster);
-                return splitKeyRangeContains(
-                        key,
-                        currentSnapshotSplit.getSplitStart(),
-                        currentSnapshotSplit.getSplitEnd());
-            }
-            return false;
-        }
-    }
-
-    /** Collect records without primary key. */
-    class SnapshotRecordNoPrimaryKeyCollector implements SnapshotRecordCollector {
-        private final List<SourceRecord> snapshotRecords = new LinkedList<>();
-
-        @Override
-        public void collect(SourceRecord record, boolean reachBinlogStart) {
-            if (!reachBinlogStart) {
-                snapshotRecords.add(record);
-            } else {
-                RowType splitKeyType = currentSnapshotSplit.getSplitKeyType();
-                if (splitKeyType.getFields().isEmpty()) {
-                    throw new IllegalStateException(
-                            "The table without primary key can not have binlog splits"
-                                    + " in initialization stage when not set 'scan.incremental.snapshot.chunk.key-column'.");
-                } else {
-                    upsertBinlogForNoPKTable(
-                            snapshotRecords,
-                            record,
-                            splitKeyType,
-                            nameAdjuster,
-                            currentSnapshotSplit.getSplitStart(),
-                            currentSnapshotSplit.getSplitEnd());
-                }
-            }
-        }
-
-        @Override
-        public Collection<SourceRecord> getRecords() {
-            return snapshotRecords;
         }
     }
 }

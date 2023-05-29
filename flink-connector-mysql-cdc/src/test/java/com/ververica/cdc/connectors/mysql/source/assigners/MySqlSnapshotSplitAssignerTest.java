@@ -157,7 +157,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    "Chunk key column 'errorCol' doesn't exist in the primary key [card_no,level] of the table")
+                                    "Chunk key column 'errorCol' doesn't exist in the primary keys [card_no,level] of the table")
                             .isPresent());
         }
     }
@@ -402,11 +402,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    String.format(
-                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
-                                            customerDatabase.getDatabaseName()
-                                                    + "."
-                                                    + tableWithoutPrimaryKey))
+                                    "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.")
                             .isPresent());
         }
     }
@@ -509,10 +505,14 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         for (String table : captureTables) {
             chunkKeys.put(new ObjectPath(database.getDatabaseName(), table), chunkKeyColumn);
         }
+        String[] fullNames = new String[captureTables.length];
+        for (int i = 0; i < captureTables.length; i++) {
+            fullNames[i] = database.getDatabaseName() + "." + captureTables[i];
+        }
         return new MySqlSourceConfigFactory()
                 .startupOptions(StartupOptions.initial())
                 .databaseList(database.getDatabaseName())
-                .tableList(captureTables)
+                .tableList(fullNames)
                 .hostname(MYSQL_CONTAINER.getHost())
                 .port(MYSQL_CONTAINER.getDatabasePort())
                 .splitSize(splitSize)

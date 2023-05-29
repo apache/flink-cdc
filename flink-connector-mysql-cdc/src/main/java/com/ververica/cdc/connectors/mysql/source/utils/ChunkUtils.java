@@ -80,7 +80,7 @@ public class ChunkUtils {
                     String.format(
                             "Chunk key column '%s' doesn't exist in the %s [%s] of the table %s.",
                             chunkKeyColumn,
-                            primaryKeys.isEmpty() ? "columns" : "primary keys",
+                            primaryKeys.isEmpty() ? "user specified columns" : "primary keys",
                             searchColumns.stream()
                                     .map(Column::name)
                                     .collect(Collectors.joining(",")),

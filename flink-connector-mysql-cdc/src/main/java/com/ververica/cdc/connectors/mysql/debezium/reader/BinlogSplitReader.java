@@ -36,7 +36,6 @@ import com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
-import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
@@ -63,6 +62,7 @@ import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStructContainsChunkKey;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 
@@ -254,20 +254,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         // always send the schema change event and signal event
         // we need record them to state of Flink
         return true;
-    }
-
-    private Struct getStructContainsChunkKey(SourceRecord record) {
-        if (record.key() != null) {
-            return (Struct) record.key();
-        }
-
-        Envelope.Operation op = Envelope.operationFor(record);
-        Struct value = (Struct) record.value();
-        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
-            return value.getStruct(Envelope.FieldName.AFTER);
-        } else {
-            return value.getStruct(Envelope.FieldName.BEFORE);
-        }
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {

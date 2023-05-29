@@ -276,9 +276,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         if (chunkKeyColumn == null && !physicalSchema.getPrimaryKey().isPresent()) {
             throw new ValidationException(
                     String.format(
-                            "The primary key is necessary when enable '%s' to 'true'. If the table doesn't have primary keys, '%s' must be set.",
-                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED,
-                            SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN));
+                            "'%s' is required for table without primary key when '%s' enabled.",
+                            SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key(),
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
         }
     }
 

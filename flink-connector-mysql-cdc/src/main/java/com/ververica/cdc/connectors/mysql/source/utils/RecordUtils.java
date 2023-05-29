@@ -31,6 +31,8 @@ import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -40,8 +42,9 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,6 +59,8 @@ import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 
 /** Utility class to deal record. */
 public class RecordUtils {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RecordUtils.class);
 
     private RecordUtils() {}
 
@@ -74,49 +79,26 @@ public class RecordUtils {
         return row;
     }
 
-    /** upsert binlog events to snapshot events collection. */
-    public static void upsertBinlog(
-            Map<Struct, SourceRecord> snapshotRecords, SourceRecord binlogRecord) {
-        Struct key = (Struct) binlogRecord.key();
-        Struct value = (Struct) binlogRecord.value();
-        if (value != null) {
-            Envelope.Operation operation =
-                    Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
-            switch (operation) {
-                case CREATE:
-                case UPDATE:
-                    Envelope envelope = Envelope.fromSchema(binlogRecord.valueSchema());
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    Struct after = value.getStruct(Envelope.FieldName.AFTER);
-                    Instant fetchTs =
-                            Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
-                    SourceRecord record =
-                            new SourceRecord(
-                                    binlogRecord.sourcePartition(),
-                                    binlogRecord.sourceOffset(),
-                                    binlogRecord.topic(),
-                                    binlogRecord.kafkaPartition(),
-                                    binlogRecord.keySchema(),
-                                    binlogRecord.key(),
-                                    binlogRecord.valueSchema(),
-                                    envelope.read(after, source, fetchTs));
-                    snapshotRecords.put(key, record);
-                    break;
-                case DELETE:
-                    snapshotRecords.remove(key);
-                    break;
-                case READ:
-                    throw new IllegalStateException(
-                            String.format(
-                                    "Binlog record shouldn't use READ operation, the the record is %s.",
-                                    binlogRecord));
-            }
+    public static Struct getStructContainsChunkKey(SourceRecord record) {
+        // If the table has primary keys, chunk key is in the record key struct
+        if (record.key() != null) {
+            return (Struct) record.key();
+        }
+
+        // If the table doesn't have primary keys, chunk key is in the after struct for insert or
+        // the before struct for delete/update
+        Envelope.Operation op = Envelope.operationFor(record);
+        Struct value = (Struct) record.value();
+        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+            return value.getStruct(Envelope.FieldName.AFTER);
+        } else {
+            return value.getStruct(Envelope.FieldName.BEFORE);
         }
     }
 
     /** upsert binlog events to snapshot events collection. */
-    public static void upsertBinlogForNoPKTable(
-            List<SourceRecord> snapshotRecords,
+    public static void upsertBinlog(
+            Map<Struct, List<SourceRecord>> snapshotRecords,
             SourceRecord binlogRecord,
             RowType splitBoundaryType,
             SchemaNameAdjuster nameAdjuster,
@@ -125,84 +107,88 @@ public class RecordUtils {
         if (isDataChangeRecord(binlogRecord)) {
             Struct value = (Struct) binlogRecord.value();
             if (value != null) {
-                Envelope.Operation operation =
-                        Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
-                switch (operation) {
-                    case CREATE:
-                        upsertBinlogForNoPKTable(
-                                snapshotRecords,
-                                binlogRecord,
-                                splitBoundaryType,
-                                nameAdjuster,
-                                splitStart,
-                                splitEnd,
-                                Envelope.FieldName.AFTER);
-                        break;
-                    case UPDATE:
-                        Struct before = getDataStruct(binlogRecord, Envelope.FieldName.BEFORE);
-                        Struct after = getDataStruct(binlogRecord, Envelope.FieldName.AFTER);
-                        if (splitKeyRangeContains(
-                                getSplitKey(splitBoundaryType, nameAdjuster, before),
-                                splitStart,
-                                splitEnd)) {
-                            upsertBinlogForNoPKTable(snapshotRecords, binlogRecord, before, true);
+                Struct keyStruct = getStructContainsChunkKey(binlogRecord);
+                if (splitKeyRangeContains(
+                        getSplitKey(splitBoundaryType, nameAdjuster, keyStruct),
+                        splitStart,
+                        splitEnd)) {
+                    boolean hasPrimaryKey = binlogRecord.key() != null;
+                    Envelope.Operation operation =
+                            Envelope.Operation.forCode(
+                                    value.getString(Envelope.FieldName.OPERATION));
+                    switch (operation) {
+                        case CREATE:
+                            upsertBinlog(
+                                    snapshotRecords,
+                                    binlogRecord,
+                                    hasPrimaryKey
+                                            ? keyStruct
+                                            : createReadOpValue(
+                                                    binlogRecord, Envelope.FieldName.AFTER),
+                                    false);
+                            break;
+                        case UPDATE:
+                            Struct structFromAfter =
+                                    createReadOpValue(binlogRecord, Envelope.FieldName.AFTER);
+                            if (!hasPrimaryKey) {
+                                upsertBinlog(
+                                        snapshotRecords,
+                                        binlogRecord,
+                                        createReadOpValue(binlogRecord, Envelope.FieldName.BEFORE),
+                                        true);
+                                if (!splitKeyRangeContains(
+                                        getSplitKey(
+                                                splitBoundaryType, nameAdjuster, structFromAfter),
+                                        splitStart,
+                                        splitEnd)) {
+                                    LOG.warn(
+                                            "The updated chunk key is out of the split range. Cannot provide exactly-once semantics.");
+                                }
+                            }
                             // If the chunk key changed, we still send here
                             // This will cause the at-least-once semantics
-                            upsertBinlogForNoPKTable(snapshotRecords, binlogRecord, after, false);
-                        }
-                        break;
-                    case DELETE:
-                        upsertBinlogForNoPKTable(
-                                snapshotRecords,
-                                binlogRecord,
-                                splitBoundaryType,
-                                nameAdjuster,
-                                splitStart,
-                                splitEnd,
-                                Envelope.FieldName.BEFORE);
-                        break;
-                    case READ:
-                        throw new IllegalStateException(
-                                String.format(
-                                        "Binlog record shouldn't use READ operation, the the record is %s.",
-                                        binlogRecord));
+                            upsertBinlog(
+                                    snapshotRecords,
+                                    binlogRecord,
+                                    hasPrimaryKey ? keyStruct : structFromAfter,
+                                    false);
+                            break;
+                        case DELETE:
+                            upsertBinlog(
+                                    snapshotRecords,
+                                    binlogRecord,
+                                    hasPrimaryKey
+                                            ? keyStruct
+                                            : createReadOpValue(
+                                                    binlogRecord, Envelope.FieldName.BEFORE),
+                                    true);
+                            break;
+                        case READ:
+                            throw new IllegalStateException(
+                                    String.format(
+                                            "Binlog record shouldn't use READ operation, the the record is %s.",
+                                            binlogRecord));
+                    }
                 }
             }
         }
     }
 
-    private static void upsertBinlogForNoPKTable(
-            List<SourceRecord> snapshotRecords,
+    private static void upsertBinlog(
+            Map<Struct, List<SourceRecord>> snapshotRecords,
             SourceRecord binlogRecord,
-            RowType splitBoundaryType,
-            SchemaNameAdjuster nameAdjuster,
-            Object[] splitStart,
-            Object[] splitEnd,
-            String targetStructName) {
-        Struct targetStruct = getDataStruct(binlogRecord, targetStructName);
-        if (splitKeyRangeContains(
-                getSplitKey(splitBoundaryType, nameAdjuster, targetStruct), splitStart, splitEnd)) {
-            upsertBinlogForNoPKTable(
-                    snapshotRecords,
-                    binlogRecord,
-                    targetStruct,
-                    Envelope.FieldName.BEFORE.equals(targetStructName));
-        }
-    }
-
-    private static void upsertBinlogForNoPKTable(
-            List<SourceRecord> snapshotRecords,
-            SourceRecord binlogRecord,
-            Struct value,
+            Struct keyStruct,
             boolean isDelete) {
+        boolean hasPrimaryKey = binlogRecord.key() != null;
+        List<SourceRecord> records = snapshotRecords.get(keyStruct);
         if (isDelete) {
-            Iterator<SourceRecord> iterator = snapshotRecords.iterator();
-            while (iterator.hasNext()) {
-                SourceRecord sourceRecord = iterator.next();
-                if (value.equals(sourceRecord.value())) {
-                    iterator.remove();
-                    return;
-                }
+            if (records == null || records.isEmpty()) {
+                LOG.error(
+                        "Deleting a record which is not in its split for tables without primary keys. This may happen when the chunk key column is updated in another snapshot split.");
+            } else if (hasPrimaryKey) {
+                snapshotRecords.remove(keyStruct);
+            } else {
+                snapshotRecords.get(keyStruct).remove(0);
             }
         } else {
             SourceRecord record =
@@ -214,12 +200,20 @@ public class RecordUtils {
                             binlogRecord.keySchema(),
                             binlogRecord.key(),
                             binlogRecord.valueSchema(),
-                            value);
-            snapshotRecords.add(record);
+                            createReadOpValue(binlogRecord, Envelope.FieldName.AFTER));
+            if (hasPrimaryKey) {
+                snapshotRecords.put(keyStruct, Collections.singletonList(record));
+            } else {
+                if (records == null) {
+                    snapshotRecords.put(keyStruct, new LinkedList<>());
+                    records = snapshotRecords.get(keyStruct);
+                }
+                records.add(record);
+            }
         }
     }
 
-    private static Struct getDataStruct(SourceRecord binlogRecord, String beforeOrAfter) {
+    private static Struct createReadOpValue(SourceRecord binlogRecord, String beforeOrAfter) {
         Struct value = (Struct) binlogRecord.value();
 
         Envelope envelope = Envelope.fromSchema(binlogRecord.valueSchema());
@@ -391,12 +385,6 @@ public class RecordUtils {
         String dbName = source.getString(DATABASE_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
         return new TableId(dbName, null, tableName);
-    }
-
-    /** Get split key from the key struct in SourceRecord. */
-    public static Object[] getSplitKey(
-            RowType splitBoundaryType, SourceRecord dataRecord, SchemaNameAdjuster nameAdjuster) {
-        return getSplitKey(splitBoundaryType, nameAdjuster, (Struct) dataRecord.key());
     }
 
     public static Object[] getSplitKey(

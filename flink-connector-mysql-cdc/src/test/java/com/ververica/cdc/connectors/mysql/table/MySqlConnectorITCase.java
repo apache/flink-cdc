@@ -23,10 +23,12 @@ import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 
@@ -55,6 +57,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -63,6 +66,8 @@ import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMy
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 /** Integration tests for MySQL Table source. */
 @RunWith(Parameterized.class)
@@ -267,12 +272,14 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNoPKTableWithoutChunkKey() throws Exception {
-        // We use one parallelism here to make sure all records sent to the same sink task
-        if (incrementalSnapshot) {
-            return;
-        }
-        runConsumingForNoPKTableTest("");
+    public void testNoPKTableWithoutChunkKey() {
+        Throwable throwable = assertThrows(Throwable.class, () -> runConsumingForNoPKTableTest(""));
+        Optional<ValidationException> validationException =
+                ExceptionUtils.findThrowable(throwable, ValidationException.class);
+        assertTrue(validationException.isPresent());
+        assertEquals(
+                "'scan.incremental.snapshot.chunk.key-column' is required for table without primary key when 'scan.incremental.snapshot.enabled' enabled.",
+                validationException.get().getCause().getMessage());
     }
 
     // This test always enable the incrementalSnapshot
