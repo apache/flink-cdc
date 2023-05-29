@@ -1,11 +1,11 @@
 # OceanBase CDC Connector
 
-The OceanBase CDC connector allows for reading snapshot data and incremental data from OceanBase. This document describes how to setup the OceanBase CDC connector to run SQL queries against OceanBase.
+The OceanBase CDC connector allows for reading snapshot data and incremental data from OceanBase. This document describes how to set up the OceanBase CDC connector to run SQL queries against OceanBase.
 
 Dependencies
 ------------
 
-In order to setup the OceanBase CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+In order to set up the OceanBase CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ```xml
 <dependency>
@@ -27,9 +27,9 @@ Download [flink-sql-connector-oceanbase-cdc-2.4-SNAPSHOT.jar](https://repo1.mave
 Setup OceanBase and LogProxy Server
 ----------------------
 
-1. Setup the OceanBase cluster following the [deployment doc](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.1/deploy-the-distributed-oceanbase-cluster).
+1. Set up the OceanBase cluster following the [doc](https://github.com/oceanbase/oceanbase#quick-start).
 
-2. Create a user with password in `sys` tenant, this user is used in OceanBase LogProxy. See [user management doc](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.1/create-user-3).
+2. Create a user with password in `sys` tenant, this user is used in OceanBase LogProxy.
 
    ```shell
    mysql -h${host} -P${port} -uroot
@@ -53,7 +53,7 @@ Setup OceanBase and LogProxy Server
     mysql> show parameters like 'obconfig_url';
     ```
 
-5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#quick-start).
+5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#getting-started).
 
 How to create a OceanBase CDC table
 ----------------
@@ -79,8 +79,8 @@ Flink SQL> CREATE TABLE orders (
     'username' = 'user@test_tenant',
     'password' = 'pswd',
     'tenant-name' = 'test_tenant',
-    'database-name' = 'test_db',
-    'table-name' = 'orders',
+    'database-name' = '^test_db$',
+    'table-name' = '^orders$',
     'hostname' = '127.0.0.1',
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
@@ -314,8 +314,8 @@ CREATE TABLE products (
    'username' = 'user@test_tenant',
    'password' = 'pswd',
    'tenant-name' = 'test_tenant',
-   'database-name' = 'test_db',
-   'table-name' = 'orders',
+   'database-name' = '^test_db$',
+   'table-name' = '^orders$',
    'hostname' = '127.0.0.1',
    'port' = '2881',
    'rootserver-list' = '127.0.0.1:2882:2881',
@@ -400,13 +400,13 @@ public class OceanBaseSourceExample {
                       .username("user@test_tenant")
                       .password("pswd")
                       .tenantName("test_tenant")
-                      .databaseName("test_db")
-                      .tableName("test_table")
+                      .databaseName("^test_db$")
+                      .tableName("^test_table$")
                       .hostname("127.0.0.1")
                       .port(2881)
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
-                      .serverTimeZone(serverTimezone)
+                      .serverTimeZone(serverTimeZone)
                       .deserializer(deserializer)
                       .build();
 
@@ -422,6 +422,8 @@ public class OceanBaseSourceExample {
 ```
 Data Type Mapping
 ----------------
+
+### Mysql Mode
 
 <div class="wy-table-responsive">
     <table class="colwidths-auto docutils">

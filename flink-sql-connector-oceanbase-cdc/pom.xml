@@ -56,8 +56,8 @@ under the License.
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-oceanbase-cdc</include>
                                     <include>mysql:mysql-connector-java</include>
-                                    <include>com.oceanbase.logclient:*</include>
-                                    <include>io.netty:netty-all</include>
+                                    <include>com.oceanbase:*</include>
+                                    <include>io.netty:*</include>
                                     <include>com.google.protobuf:protobuf-java</include>
                                     <include>commons-codec:commons-codec</include>
                                     <include>org.lz4:lz4-java</include>

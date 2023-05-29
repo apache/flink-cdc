@@ -43,15 +43,9 @@ under the License.
 
         <!-- OceanBase Log Client -->
         <dependency>
-            <groupId>com.oceanbase.logclient</groupId>
-            <artifactId>logproxy-client</artifactId>
+            <groupId>com.oceanbase</groupId>
+            <artifactId>oblogclient-logproxy</artifactId>
             <version>${oblogclient.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>logback-classic</artifactId>
-                    <groupId>ch.qos.logback</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <!-- The MySQL JDBC driver for reading snapshot-->
