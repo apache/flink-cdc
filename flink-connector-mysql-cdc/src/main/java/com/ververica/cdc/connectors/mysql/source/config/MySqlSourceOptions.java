@@ -245,4 +245,15 @@ public class MySqlSourceOptions {
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
                                     + "By default, the chunk key is the first column of the primary key."
                                     + "This column must be a column of the primary key.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
+            ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to close idle readers at the end of the snapshot phase. This feature depends on "
+                                    + "FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be "
+                                    + "greater than or equal to 1.14, and the configuration 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' needs to be set to"
+                                    + "true.");
 }

@@ -34,6 +34,8 @@ public interface SourceConfig extends Serializable {
 
     boolean isIncludeSchemaChanges();
 
+    boolean isCloseIdleReaders();
+
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface
     interface Factory<C extends SourceConfig> extends Serializable {

@@ -56,6 +56,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.PORT;
+import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -119,6 +120,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -154,6 +157,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 distributionFactorLower,
                 startupOptions,
                 scanNewlyAddedTableEnabled,
+                closeIdleReaders,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
                 chunkKeyColumn);
@@ -198,6 +202,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         return options;

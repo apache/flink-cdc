@@ -55,6 +55,11 @@ public interface SplitAssigner {
      */
     boolean waitingForFinishedSplits();
 
+    /** Whether the split assigner is finished stream split assigning. */
+    default boolean isStreamSplitAssigned() {
+        return false;
+    }
+
     /**
      * Gets the finished splits' information. This is useful metadata to generate a stream split
      * that considering finished snapshot splits.

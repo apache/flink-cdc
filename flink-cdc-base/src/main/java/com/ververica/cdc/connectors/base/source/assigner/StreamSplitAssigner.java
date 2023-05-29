@@ -118,6 +118,11 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
+    public boolean isStreamSplitAssigned() {
+        return isStreamSplitAssigned;
+    }
+
+    @Override
     public void close() {}
 
     // ------------------------------------------------------------------------------------------

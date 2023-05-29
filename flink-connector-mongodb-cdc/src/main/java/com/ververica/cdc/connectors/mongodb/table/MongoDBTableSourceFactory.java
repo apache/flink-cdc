@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COLLECTION;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.CONNECTION_OPTIONS;
@@ -92,6 +93,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                         : ZoneId.of(zoneId);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        boolean enableCloseIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
 
         int splitSizeMB = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
@@ -121,7 +123,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 localTimeZone,
                 enableParallelRead,
                 splitMetaGroupSize,
-                splitSizeMB);
+                splitSizeMB,
+                enableCloseIdleReaders);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -160,6 +163,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         options.add(CHUNK_META_GROUP_SIZE);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         return options;
     }
 }

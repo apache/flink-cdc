@@ -53,6 +53,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
+            boolean closeIdleReaders,
             Properties dbzProperties,
             Configuration dbzConfiguration,
             String driverClassName,
@@ -73,6 +74,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 dbzProperties,
                 dbzConfiguration);
         this.driverClassName = driverClassName;
