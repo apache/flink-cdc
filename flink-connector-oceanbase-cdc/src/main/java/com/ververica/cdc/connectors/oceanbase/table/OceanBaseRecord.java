@@ -66,7 +66,11 @@ public class OceanBaseRecord implements Serializable {
         if (field.getValue() == null) {
             return null;
         }
-        return field.getValue().toString(field.getEncoding());
+        String encoding = field.getEncoding();
+        if ("binary".equalsIgnoreCase(encoding)) {
+            return field.getValue().toString("utf8");
+        }
+        return field.getValue().toString(encoding);
     }
 
     public SourceInfo getSourceInfo() {
