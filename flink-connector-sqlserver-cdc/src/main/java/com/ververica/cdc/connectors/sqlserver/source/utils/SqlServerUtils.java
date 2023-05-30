@@ -158,7 +158,7 @@ public class SqlServerUtils {
                 });
     }
 
-    public static RowType getSplitType(Table table) {
+    public static Column getSplitColumn(Table table) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty()) {
             throw new ValidationException(
@@ -169,7 +169,11 @@ public class SqlServerUtils {
         }
 
         // use first field in primary key as the split key
-        return getSplitType(primaryKeys.get(0));
+        return primaryKeys.get(0);
+    }
+
+    public static RowType getSplitType(Table table) {
+        return getSplitType(getSplitColumn(table));
     }
 
     private static RowType getSplitType(Column splitColumn) {

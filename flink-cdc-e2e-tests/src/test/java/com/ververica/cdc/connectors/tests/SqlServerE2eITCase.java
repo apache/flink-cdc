@@ -23,6 +23,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
@@ -38,6 +39,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -56,6 +58,20 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path sqlServerCdcJar =
             TestUtils.getResource("sqlserver-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+
+    @Parameterized.Parameter(1)
+    public boolean parallelismSnapshot;
+
+    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
+    public static List<Object[]> parameters() {
+        final List<String> flinkVersions = getFlinkVersion();
+        List<Object[]> params = new ArrayList<>();
+        for (String flinkVersion : flinkVersions) {
+            params.add(new Object[] {flinkVersion, true});
+            params.add(new Object[] {flinkVersion, false});
+        }
+        return params;
+    }
 
     @Rule
     public MSSQLServerContainer sqlServer =
@@ -102,7 +118,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                         " 'password' = '" + sqlServer.getPassword() + "',",
                         " 'database-name' = 'inventory',",
                         " 'table-name' = 'dbo.products',",
-                        " 'scan.incremental.snapshot.enabled' = 'true',",
+                        " 'scan.incremental.snapshot.enabled' = '" + parallelismSnapshot + "',",
                         " 'scan.incremental.snapshot.chunk.size' = '4'",
                         ");",
                         "CREATE TABLE products_sink (",

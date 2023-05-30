@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.sqlserver.source.dialect;
 
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -82,20 +81,6 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
         }
     }
 
-    public static Column getSplitColumn(Table table) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
-        }
-
-        // use first field in primary key as the split key
-        return primaryKeys.get(0);
-    }
-
     @Override
     public Collection<SnapshotSplit> generateSplits(TableId tableId) {
         try (JdbcConnection jdbc = dialect.openJdbcConnection(sourceConfig)) {
@@ -104,7 +89,7 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             long start = System.currentTimeMillis();
 
             Table table = dialect.queryTableSchema(jdbc, tableId).getTable();
-            Column splitColumn = getSplitColumn(table);
+            Column splitColumn = SqlServerUtils.getSplitColumn(table);
             final List<ChunkRange> chunks;
             try {
                 chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
