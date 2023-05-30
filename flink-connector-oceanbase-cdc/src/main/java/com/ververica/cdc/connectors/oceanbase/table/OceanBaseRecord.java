@@ -29,15 +29,18 @@ public class OceanBaseRecord implements Serializable {
 
     private final SourceInfo sourceInfo;
     private final boolean isSnapshotRecord;
-    private Map<String, Object> jdbcFields;
-    private DataMessage.Record.Type opt;
-    private Map<String, Object> logMessageFieldsBefore;
-    private Map<String, Object> logMessageFieldsAfter;
+    private final Map<String, Object> jdbcFields;
+    private final DataMessage.Record.Type opt;
+    private final Map<String, Object> logMessageFieldsBefore;
+    private final Map<String, Object> logMessageFieldsAfter;
 
     public OceanBaseRecord(SourceInfo sourceInfo, Map<String, Object> jdbcFields) {
         this.sourceInfo = sourceInfo;
         this.isSnapshotRecord = true;
         this.jdbcFields = jdbcFields;
+        this.opt = null;
+        this.logMessageFieldsBefore = null;
+        this.logMessageFieldsAfter = null;
     }
 
     public OceanBaseRecord(
@@ -46,6 +49,7 @@ public class OceanBaseRecord implements Serializable {
             List<DataMessage.Record.Field> logMessageFieldList) {
         this.sourceInfo = sourceInfo;
         this.isSnapshotRecord = false;
+        this.jdbcFields = null;
         this.opt = opt;
         this.logMessageFieldsBefore = new HashMap<>();
         this.logMessageFieldsAfter = new HashMap<>();
