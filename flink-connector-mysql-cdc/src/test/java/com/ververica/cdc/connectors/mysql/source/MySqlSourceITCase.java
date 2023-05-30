@@ -156,9 +156,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
                 new Object[][] {
-                    {"customers", null},
-                    {"customers_no_pk", null},
-                    {"customers_no_pk", "id"}
+                    {"customers", null}, {"customers", "id"}, {"customers_no_pk", "id"}
                 });
     }
 
