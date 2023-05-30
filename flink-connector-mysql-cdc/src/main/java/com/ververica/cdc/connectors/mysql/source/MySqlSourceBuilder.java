@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.source;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
@@ -123,8 +124,8 @@ public class MySqlSourceBuilder<T> {
      * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
      * key column when read the snapshot of table.
      */
-    public MySqlSourceBuilder<T> chunkKeyColumn(String chunkKeyColumn) {
-        this.configFactory.chunkKeyColumn(chunkKeyColumn);
+    public MySqlSourceBuilder<T> chunkKeyColumn(ObjectPath objectPath, String chunkKeyColumn) {
+        this.configFactory.chunkKeyColumn(objectPath, chunkKeyColumn);
         return this;
     }
 

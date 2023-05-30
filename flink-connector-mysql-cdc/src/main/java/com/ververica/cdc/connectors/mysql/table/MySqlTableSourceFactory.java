@@ -32,6 +32,8 @@ import com.ververica.cdc.debezium.table.DebeziumOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -109,10 +111,12 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
+        String chunkKeyColumn =
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         if (enableParallelRead) {
-            validatePrimaryKeyIfEnableParallel(physicalSchema);
+            validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
@@ -146,7 +150,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 scanNewlyAddedTableEnabled,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
-                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null));
+                chunkKeyColumn);
     }
 
     @Override
@@ -267,12 +271,14 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         return StartupOptions.specificOffset(offsetBuilder.build());
     }
 
-    private void validatePrimaryKeyIfEnableParallel(ResolvedSchema physicalSchema) {
-        if (!physicalSchema.getPrimaryKey().isPresent()) {
+    private void validatePrimaryKeyIfEnableParallel(
+            ResolvedSchema physicalSchema, @Nullable String chunkKeyColumn) {
+        if (chunkKeyColumn == null && !physicalSchema.getPrimaryKey().isPresent()) {
             throw new ValidationException(
                     String.format(
-                            "The primary key is necessary when enable '%s' to 'true'",
-                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED));
+                            "'%s' is required for table without primary key when '%s' enabled.",
+                            SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key(),
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
         }
     }
 

@@ -49,8 +49,11 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -58,13 +61,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.formatMessageTimestamp;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isLowWatermarkEvent;
-import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.splitKeyRangeContains;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.upsertBinlog;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -248,7 +249,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             boolean reachBinlogEnd = false;
             SourceRecord lowWatermark = null;
             SourceRecord highWatermark = null;
-            Map<Struct, SourceRecord> snapshotRecords = new LinkedHashMap<>();
+
+            Map<Struct, List<SourceRecord>> snapshotRecords = new HashMap<>();
             while (!reachBinlogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
@@ -274,12 +276,23 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                     }
 
                     if (!reachBinlogStart) {
-                        snapshotRecords.put((Struct) record.key(), record);
-                    } else {
-                        if (isRequiredBinlogRecord(record)) {
-                            // upsert binlog events through the record key
-                            upsertBinlog(snapshotRecords, record);
+                        if (record.key() != null) {
+                            snapshotRecords.put(
+                                    (Struct) record.key(), Collections.singletonList(record));
+                        } else {
+                            List<SourceRecord> records =
+                                    snapshotRecords.computeIfAbsent(
+                                            (Struct) record.value(), key -> new LinkedList<>());
+                            records.add(record);
                         }
+                    } else {
+                        upsertBinlog(
+                                snapshotRecords,
+                                record,
+                                currentSnapshotSplit.getSplitKeyType(),
+                                nameAdjuster,
+                                currentSnapshotSplit.getSplitStart(),
+                                currentSnapshotSplit.getSplitEnd());
                     }
                 }
             }
@@ -288,7 +301,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
             final List<SourceRecord> normalizedRecords = new ArrayList<>();
             normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(formatMessageTimestamp(snapshotRecords.values()));
+            normalizedRecords.addAll(
+                    formatMessageTimestamp(
+                            snapshotRecords.values().stream()
+                                    .flatMap(Collection::stream)
+                                    .collect(Collectors.toList())));
             normalizedRecords.add(highWatermark);
 
             final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
@@ -316,16 +333,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                 String.format(
                         "The first record should be low watermark signal event, but actual is %s",
                         lowWatermark));
-    }
-
-    private boolean isRequiredBinlogRecord(SourceRecord record) {
-        if (isDataChangeRecord(record)) {
-            Object[] key =
-                    getSplitKey(currentSnapshotSplit.getSplitKeyType(), record, nameAdjuster);
-            return splitKeyRangeContains(
-                    key, currentSnapshotSplit.getSplitStart(), currentSnapshotSplit.getSplitEnd());
-        }
-        return false;
     }
 
     @Override

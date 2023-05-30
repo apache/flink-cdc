@@ -32,7 +32,9 @@ import io.debezium.connector.mysql.MySqlValueConverters;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
+import io.debezium.relational.Selectors;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.slf4j.Logger;
@@ -43,6 +45,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
@@ -133,6 +136,20 @@ public class DebeziumUtils {
                             + "'. Make sure your server is correctly configured",
                     e);
         }
+    }
+
+    /** Create a TableFilter by database name and table name. */
+    public static Tables.TableFilter createTableFilter(String database, String table) {
+        final Selectors.TableSelectionPredicateBuilder eligibleTables =
+                Selectors.tableSelector().includeDatabases(database);
+
+        Predicate<TableId> tablePredicate = eligibleTables.includeTables(table).build();
+
+        Predicate<TableId> finalTablePredicate =
+                tablePredicate.and(
+                        Tables.TableFilter.fromPredicate(MySqlConnectorConfig::isNotBuiltInTable)
+                                ::isIncluded);
+        return finalTablePredicate::test;
     }
 
     // --------------------------------------------------------------------------------------------

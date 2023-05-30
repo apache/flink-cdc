@@ -40,6 +40,7 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +62,7 @@ import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getBinlogPosition;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSplitKey;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStructContainsChunkKey;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 
@@ -226,20 +228,21 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             if (hasEnterPureBinlogPhase(tableId, position)) {
                 return true;
             }
+
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
                 RowType splitKeyType =
                         ChunkUtils.getChunkKeyColumnType(
                                 statefulTaskContext.getDatabaseSchema().tableFor(tableId),
-                                statefulTaskContext.getSourceConfig().getChunkKeyColumn());
-                Object[] key =
+                                statefulTaskContext.getSourceConfig().getChunkKeyColumns());
+
+                Struct target = getStructContainsChunkKey(sourceRecord);
+                Object[] chunkKey =
                         getSplitKey(
-                                splitKeyType,
-                                sourceRecord,
-                                statefulTaskContext.getSchemaNameAdjuster());
+                                splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (RecordUtils.splitKeyRangeContains(
-                                    key, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
+                                    chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
                             && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }

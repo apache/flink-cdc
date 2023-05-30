@@ -35,6 +35,28 @@ VALUES (default,"scooter","Small 2-wheel scooter",3.14),
        (default,"jacket","water resistent black wind breaker",0.1),
        (default,"spare tire","24 inch spare tire",22.2);
 
+-- Create and populate our products using a single insert with many rows
+CREATE TABLE products_no_pk (
+  type INTEGER ,
+  name VARCHAR(255) DEFAULT 'flink',
+  description VARCHAR(512),
+  weight FLOAT
+);
+
+INSERT INTO products_no_pk
+VALUES (100,"scooter","Small 2-wheel scooter",3.14),
+       (101,"car battery","12V car battery",8.1),
+       (102,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3",0.8),
+       (102,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3",0.8),
+       (103,"hammer","12oz carpenter's hammer",0.75),
+       (103,"hammer","14oz carpenter's hammer",0.875),
+       (103,"hammer","16oz carpenter's hammer",1.0),
+       (104,"rocks","box of assorted rocks",5.3),
+       (104,"rocks","box of assorted rocks",5.3),
+       (104,"rocks","box of assorted rocks",5.3),
+       (105,"jacket","water resistent black wind breaker",0.1),
+       (106,"spare tire","24 inch spare tire",22.2);
+
 -- Create and populate the products on hand using multiple inserts
 CREATE TABLE products_on_hand (
   product_id INTEGER NOT NULL PRIMARY KEY,
