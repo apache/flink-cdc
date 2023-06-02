@@ -29,6 +29,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -79,7 +80,6 @@ public class SqlServerTimezoneITCase extends SqlServerTestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'server-time-zone'='%s'"
                                 + ")",
@@ -88,8 +88,7 @@ public class SqlServerTimezoneITCase extends SqlServerTestBase {
                         MSSQL_SERVER_CONTAINER.getUsername(),
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         "column_type_test",
-                        "dbo",
-                        "full_types",
+                        "dbo.full_types",
                         localTimeZone);
         String sinkDDL =
                 "CREATE TABLE sink (\n"
@@ -119,17 +118,17 @@ public class SqlServerTimezoneITCase extends SqlServerTestBase {
         switch (localTimeZone) {
             case "Asia/Shanghai":
                 expected =
-                        Arrays.asList(
+                        Collections.singletonList(
                                 "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T09:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
             case "Europe/Berlin":
                 expected =
-                        Arrays.asList(
+                        Collections.singletonList(
                                 "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T03:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
             default:
                 expected =
-                        Arrays.asList(
+                        Collections.singletonList(
                                 "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
         }
@@ -137,22 +136,5 @@ public class SqlServerTimezoneITCase extends SqlServerTestBase {
         assertEquals(expected, actual);
 
         result.getJobClient().get().cancel().get();
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 }

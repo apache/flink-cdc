@@ -143,8 +143,7 @@ Flink SQL> CREATE TABLE products (
     'username' = 'sa',
     'password' = 'Password!',
     'database-name' = 'inventory',
-    'schema-name' = 'dbo',
-    'table-name' = 'products'
+    'table-name' = 'dbo.products'
   );
 
 Flink SQL> CREATE TABLE orders (
@@ -161,8 +160,7 @@ Flink SQL> CREATE TABLE orders (
     'username' = 'sa',
     'password' = 'Password!',
     'database-name' = 'inventory',
-    'schema-name' = 'dbo',
-    'table-name' = 'orders'
+    'table-name' = 'dbo.orders'
 );
 
 Flink SQL> CREATE TABLE enriched_orders (

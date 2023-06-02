@@ -26,13 +26,11 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
-import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 
-import com.ververica.cdc.debezium.DebeziumSourceFunction;
+import com.ververica.cdc.connectors.base.options.JdbcSourceOptions;
+import com.ververica.cdc.connectors.base.options.SourceOptions;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
@@ -44,7 +42,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
 
 /** Test for {@link SqlServerTableSource} created by {@link SqlServerTableFactory}. */
@@ -79,8 +76,7 @@ public class SqlServerTableFactoryTest {
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
     private static final String MY_DATABASE = "myDB";
-    private static final String MY_SCHEMA = "dbo";
-    private static final String MY_TABLE = "myTable";
+    private static final String MY_TABLE = "dbo.myTable";
     private static final Properties PROPERTIES = new Properties();
 
     @Test
@@ -95,13 +91,24 @@ public class SqlServerTableFactoryTest {
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
-                        MY_SCHEMA,
                         MY_TABLE,
                         ZoneId.of("UTC"),
                         MY_USERNAME,
                         MY_PASSWORD,
                         PROPERTIES,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -120,13 +127,24 @@ public class SqlServerTableFactoryTest {
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
-                        MY_SCHEMA,
                         MY_TABLE,
                         ZoneId.of("UTC"),
                         MY_USERNAME,
                         MY_PASSWORD,
                         dbzProperties,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -147,25 +165,29 @@ public class SqlServerTableFactoryTest {
                         1433,
                         MY_LOCALHOST,
                         MY_DATABASE,
-                        MY_SCHEMA,
                         MY_TABLE,
                         ZoneId.of("UTC"),
                         MY_USERNAME,
                         MY_PASSWORD,
                         PROPERTIES,
-                        StartupOptions.initial());
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
 
         assertEquals(expectedSource, actualSource);
-
-        ScanTableSource.ScanRuntimeProvider provider =
-                sqlServerTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
-        DebeziumSourceFunction<RowData> debeziumSourceFunction =
-                (DebeziumSourceFunction<RowData>)
-                        ((SourceFunctionProvider) provider).createSourceFunction();
-        assertProducedTypeOfSourceFunction(debeziumSourceFunction, expectedSource.producedDataType);
     }
 
     private Map<String, String> getAllOptions() {
@@ -173,7 +195,6 @@ public class SqlServerTableFactoryTest {
         options.put("connector", "sqlserver-cdc");
         options.put("hostname", MY_LOCALHOST);
         options.put("database-name", MY_DATABASE);
-        options.put("schema-name", MY_SCHEMA);
         options.put("table-name", MY_TABLE);
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);

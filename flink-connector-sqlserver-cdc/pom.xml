@@ -30,6 +30,12 @@ under the License.
 
     <dependencies>
 
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-base</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Debezium dependencies -->
         <dependency>
             <groupId>com.ververica</groupId>
@@ -137,6 +143,7 @@ under the License.
             <version>${version.awaitility}</version>
             <scope>test</scope>
         </dependency>
+
 
     </dependencies>
 
