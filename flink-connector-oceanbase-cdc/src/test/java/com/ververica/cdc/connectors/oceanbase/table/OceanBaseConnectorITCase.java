@@ -558,6 +558,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
     public static void assertContainsInAnyOrder(List<String> expected, List<String> actual) {
         assertTrue(expected != null && actual != null);
-        assertTrue(actual.containsAll(expected));
+        assertTrue(
+                String.format("expected: %s, actual: %s", expected, actual),
+                actual.containsAll(expected));
     }
 }
