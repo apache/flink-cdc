@@ -187,7 +187,7 @@ public class OceanBaseSource {
                     && (StringUtils.isNotEmpty(databaseName)
                             || StringUtils.isNotEmpty(tableName))) {
                 throw new IllegalArgumentException(
-                        "'database-name' and 'table-name' should be configured with 'INITIAL' mode");
+                        "If startup mode is not 'INITIAL', 'database-name' and 'table-name' must not be configured");
             }
             if (StringUtils.isNotEmpty(databaseName) || StringUtils.isNotEmpty(tableName)) {
                 if (StringUtils.isEmpty(databaseName) || StringUtils.isEmpty(tableName)) {

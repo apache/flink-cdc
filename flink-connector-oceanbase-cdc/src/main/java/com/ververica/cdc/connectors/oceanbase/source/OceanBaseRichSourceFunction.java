@@ -225,7 +225,11 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                 LOG.info("Pattern matched tables: {}", matchedTables);
                 localTableSet.addAll(matchedTables);
             } catch (SQLException e) {
-                LOG.error("Query table list by 'databaseName' and 'tableName' failed", e);
+                LOG.error(
+                        String.format(
+                                "Query table list by 'database-name' %s and 'table-name' %s failed.",
+                                databaseName, tableName),
+                        e);
                 throw new FlinkRuntimeException(e);
             }
         }
