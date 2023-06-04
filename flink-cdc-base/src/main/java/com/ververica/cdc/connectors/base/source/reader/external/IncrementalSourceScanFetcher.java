@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.base.source.reader.external;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -200,6 +201,11 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         } catch (Exception e) {
             LOG.error("Close scan fetcher error", e);
         }
+    }
+
+    @VisibleForTesting
+    public ExecutorService getExecutorService() {
+        return executorService;
     }
 
     private void assertLowWatermark(SourceRecord lowWatermark) {

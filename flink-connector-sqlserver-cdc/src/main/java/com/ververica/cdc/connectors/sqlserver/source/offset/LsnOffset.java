@@ -52,7 +52,7 @@ public class LsnOffset extends Offset {
     }
 
     public Lsn getLcn() {
-        return Lsn.valueOf(offset.get(SourceInfo.CHANGE_LSN_KEY));
+        return Lsn.valueOf(offset.get(SourceInfo.COMMIT_LSN_KEY));
     }
 
     @Override
