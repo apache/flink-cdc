@@ -30,29 +30,6 @@ under the License.
     <version>2.4-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <modules>
-        <module>flink-cdc-base</module>
-        <module>flink-connector-debezium</module>
-        <module>flink-connector-test-util</module>
-        <module>flink-connector-mysql-cdc</module>
-        <module>flink-connector-postgres-cdc</module>
-        <module>flink-connector-oracle-cdc</module>
-        <module>flink-connector-mongodb-cdc</module>
-        <module>flink-connector-oceanbase-cdc</module>
-        <module>flink-connector-sqlserver-cdc</module>
-        <module>flink-connector-tidb-cdc</module>
-        <module>flink-connector-db2-cdc</module>
-        <module>flink-sql-connector-mysql-cdc</module>
-        <module>flink-sql-connector-postgres-cdc</module>
-        <module>flink-sql-connector-mongodb-cdc</module>
-        <module>flink-sql-connector-oracle-cdc</module>
-        <module>flink-sql-connector-oceanbase-cdc</module>
-        <module>flink-sql-connector-sqlserver-cdc</module>
-        <module>flink-sql-connector-tidb-cdc</module>
-        <module>flink-sql-connector-db2-cdc</module>
-        <module>flink-cdc-e2e-tests</module>
-    </modules>
-
     <licenses>
         <license>
             <name>The Apache Software License, Version 2.0</name>
@@ -478,7 +455,57 @@ under the License.
 
     <profiles>
         <profile>
+            <id>default</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>flink-cdc-base</module>
+                <module>flink-connector-debezium</module>
+                <module>flink-connector-test-util</module>
+                <module>flink-connector-mysql-cdc</module>
+                <module>flink-connector-postgres-cdc</module>
+                <module>flink-connector-oracle-cdc</module>
+                <module>flink-connector-mongodb-cdc</module>
+                <module>flink-connector-oceanbase-cdc</module>
+                <module>flink-connector-sqlserver-cdc</module>
+                <module>flink-connector-tidb-cdc</module>
+                <module>flink-connector-db2-cdc</module>
+                <module>flink-sql-connector-mysql-cdc</module>
+                <module>flink-sql-connector-postgres-cdc</module>
+                <module>flink-sql-connector-mongodb-cdc</module>
+                <module>flink-sql-connector-oracle-cdc</module>
+                <module>flink-sql-connector-oceanbase-cdc</module>
+                <module>flink-sql-connector-sqlserver-cdc</module>
+                <module>flink-sql-connector-tidb-cdc</module>
+                <module>flink-sql-connector-db2-cdc</module>
+                <module>flink-cdc-e2e-tests</module>
+            </modules>
+        </profile>
+        <profile>
             <id>release</id>
+            <modules>
+                <module>flink-cdc-base</module>
+                <module>flink-connector-debezium</module>
+                <module>flink-connector-test-util</module>
+                <module>flink-connector-mysql-cdc</module>
+                <module>flink-connector-postgres-cdc</module>
+                <module>flink-connector-oracle-cdc</module>
+                <module>flink-connector-mongodb-cdc</module>
+                <module>flink-connector-oceanbase-cdc</module>
+                <module>flink-connector-sqlserver-cdc</module>
+                <module>flink-connector-tidb-cdc</module>
+                <module>flink-connector-db2-cdc</module>
+                <module>flink-sql-connector-mysql-cdc</module>
+                <module>flink-sql-connector-postgres-cdc</module>
+                <module>flink-sql-connector-mongodb-cdc</module>
+                <module>flink-sql-connector-oracle-cdc</module>
+                <module>flink-sql-connector-oceanbase-cdc</module>
+                <module>flink-sql-connector-sqlserver-cdc</module>
+                <module>flink-sql-connector-tidb-cdc</module>
+                <module>flink-sql-connector-db2-cdc</module>
+                <module>flink-cdc-e2e-tests</module>
+            </modules>
             <build>
                 <plugins>
                     <plugin>
@@ -580,6 +607,14 @@ under the License.
                     </plugins>
                 </pluginManagement>
             </build>
+        </profile>
+        <profile>
+            <id>self-hosted-pipeline</id>
+            <modules>
+                <module>flink-connector-debezium</module>
+                <module>flink-connector-oceanbase-cdc</module>
+                <module>flink-sql-connector-oceanbase-cdc</module>
+            </modules>
         </profile>
     </profiles>
 </project>
