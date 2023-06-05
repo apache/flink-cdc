@@ -61,6 +61,7 @@ under the License.
             <artifactId>postgresql</artifactId>
             <version>42.2.27</version>
         </dependency>
+
         <!-- test dependencies on Debezium -->
 
         <dependency>
@@ -151,14 +152,6 @@ under the License.
         </dependency>
 
         <!-- tests will have log4j as the default logging framework available -->
-
-        <!-- Logging API -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>${slf4j.version}</version>
-            <scope>test</scope>
-        </dependency>
 
     </dependencies>
 
