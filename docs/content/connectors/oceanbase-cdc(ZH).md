@@ -25,8 +25,8 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 
 ### 配置 OceanBase 数据库和 oblogproxy 服务
 
-1. 按照 [部署文档](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.1/deploy-the-distributed-oceanbase-cluster) 配置 OceanBase 集群。
-2. 在 sys 租户中，为 oblogproxy 创建一个带密码的用户。更多信息，参考 [用户管理文档](https://open.oceanbase.com/docs/community/oceanbase-database/V3.1.1/create-user-3)。
+1. 按照 [文档](https://github.com/oceanbase/oceanbase#quick-start) 配置 OceanBase 集群。
+2. 在 sys 租户中，为 oblogproxy 创建一个带密码的用户。
 
     ```bash
     mysql -h${host} -P${port} -uroot
@@ -47,7 +47,7 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
     mysql> show parameters like 'obconfig_url';
     ```
 
-5. 按照 [快速入门 文档](https://github.com/oceanbase/oblogproxy#quick-start) 配置 oblogproxy。
+5. 按照 [文档](https://github.com/oceanbase/oblogproxy#getting-started) 配置 oblogproxy。
 
 ## 创建 OceanBase CDC 表
 
@@ -72,8 +72,8 @@ Flink SQL> CREATE TABLE orders (
     'username' = 'user@test_tenant',
     'password' = 'pswd',
     'tenant-name' = 'test_tenant',
-    'database-name' = 'test_db',
-    'table-name' = 'orders',
+    'database-name' = '^test_db$',
+    'table-name' = '^orders$',
     'hostname' = '127.0.0.1',
     'port' = '2881',
     'rootserver-list' = '127.0.0.1:2882:2881',
@@ -96,39 +96,197 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
 1. 使用 `database-name` 和 `table-name` 匹配正则表达式中的数据库和表名。 由于`obcdc`（以前的`liboblog`）现在只支持`fnmatch`匹配，我们不能直接使用正则过滤 changelog 事件，所以通过两个选项去匹配去指定监听表只能在`initial`启动模式下使用。
 2. 使用 `table-list` 去匹配数据库名和表名的准确列表。
 
-
-配置项 | 是否必选 | 默认值 | 类型 | 描述
----- | ----- | ------ | ----- | ----
-connector | 是 | 无 | String | 指定要使用的连接器。此处为 `oceanbase-cdc`。
-scan.startup.mode | 是 | 无 | String | 指定 OceanBase CDC 消费者的启动模式。可取值为 `initial`、`latest-offset` 或`timestamp`。
-scan.startup.timestamp | 否 | 无 | Long | 起始点的时间戳，单位为秒。仅在 `scan.startup.mode` 的值为 `timestamp` 时适用。
-username | 是 | 无 | String | 连接 OceanBase 数据库的用户的名称。
-password | 是 | 无 | String | 连接 OceanBase 数据库时使用的密码。
-tenant-name | 是 | 无 | String | 待监控 OceanBase 数据库的租户名，应该填入精确值。
-database-name | 是 | 无 | String | 待监控 OceanBase 数据库的数据库名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。
-table-name | 否 | 无 | String | 待监控 OceanBase 数据库的表名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。
-table-list | 否 | 无 | String | 待监控 OceanBase 数据库的全路径的表名列表，逗号分隔，如："db1.table1, db2.table2"。
-hostname | 否 | 无 | String | OceanBase 数据库或 OceanBbase 代理 ODP 的 IP 地址或主机名。
-port | 否 | 无 | Integer | OceanBase 数据库服务器的整数端口号。可以是 OceanBase 服务器的 SQL 端口号（默认值为 2881）<br>或 OceanBase代理服务的端口号（默认值为 2883）。
-connect.timeout |  否 | 30s | Duration | 连接器在尝试连接到 OceanBase 数据库服务器超时前的最长时间。
-server-time-zone |  否 | +00:00 | String | 数据库服务器中的会话时区，用户控制 OceanBase 的时间类型如何转换为 STRING。<br>合法的值可以是格式为"±hh:mm"的 UTC 时区偏移量，<br>如果 mysql 数据库中的时区信息表已创建，合法的值则可以是创建的时区。
-logproxy.host | 是 | 无 | String | OceanBase 日志代理服务 的 IP 地址或主机名。
-logproxy.port | 是 | 无 | Integer | OceanBase 日志代理服务 的端口号。
-logproxy.client.id | 否 | 按规则生成 | String |	OceanBase日志代理服务的客户端链接，默认值的生成规则是 {flink_ip}_{process_id}_{timestamp}_{thread_id}_{tenant}。
-rootserver-list | 是 | 无 | String | OceanBase root 服务器列表，服务器格式为 `ip:rpc_port:sql_port`，<br>多个服务器地址使用英文分号 `;` 隔开，OceanBase 社区版本必填。
-config-url | 否 |  无 | String |	从配置服务器获取服务器信息的 url, OceanBase 企业版本必填。
-working-mode | 否 | storage | String | 日志代理中 `obcdc` 的工作模式 , 可以是 `storage` 或 `memory`。
+<div class="highlight">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 10%">配置项</th>
+                <th class="text-left" style="width: 8%">是否必选</th>
+                <th class="text-left" style="width: 7%">默认值</th>
+                <th class="text-left" style="width: 10%">类型</th>
+                <th class="text-left" style="width: 65%">描述</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>connector</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>指定要使用的连接器，此处为 <code>'oceanbase-cdc'</code>。</td>
+            </tr>
+            <tr>
+                <td>scan.startup.mode</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>指定 OceanBase CDC 消费者的启动模式。可取值为<code>'initial'</code>,<code>'latest-offset'</code> or
+                    <code>'timestamp'</code>。</td>
+            </tr>
+            <tr>
+                <td>scan.startup.timestamp</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>Long</td>
+                <td>起始点的时间戳，单位为秒。仅在启动模式为 <code>'timestamp'</code> 时可用。</td>
+            </tr>
+            <tr>
+                <td>username</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>连接 OceanBase 数据库的用户的名称。</td>
+            </tr>
+            <tr>
+                <td>password</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>连接 OceanBase 数据库时使用的密码。</td>
+            </tr>
+            <tr>
+                <td>tenant-name</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>待监控 OceanBase 数据库的租户名，应该填入精确值。</td>
+            </tr>
+            <tr>
+                <td>database-name</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>待监控 OceanBase 数据库的数据库名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。</td>
+            </tr>
+            <tr>
+                <td>table-name</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>待监控 OceanBase 数据库的表名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。</td>
+            </tr>
+            <tr>
+                <td>table-list</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>待监控 OceanBase 数据库的全路径的表名列表，逗号分隔，如："db1.table1, db2.table2"。</td>
+            </tr>
+            <tr>
+                <td>hostname</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>OceanBase 数据库或 OceanBbase 代理 ODP 的 IP 地址或主机名。</td>
+            </tr>
+            <tr>
+                <td>port</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>Integer</td>
+                <td>
+                    OceanBase 数据库服务器的整数端口号。可以是 OceanBase 服务器的 SQL 端口号（默认值为 2881）<br>
+                    或 OceanBase代理服务的端口号（默认值为 2883）</td>
+            </tr>
+            <tr>
+                <td>connect.timeout</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">30s</td>
+                <td>Duration</td>
+                <td>连接器在尝试连接到 OceanBase 数据库服务器超时前的最长时间。</td>
+            </tr>
+            <tr>
+                <td>server-time-zone</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">+00:00</td>
+                <td>String</td>
+                <td>
+                    数据库服务器中的会话时区，用户控制 OceanBase 的时间类型如何转换为 STRING。<br>
+                    合法的值可以是格式为"±hh:mm"的 UTC 时区偏移量，<br>
+                    如果 mysql 数据库中的时区信息表已创建，合法的值则可以是创建的时区。
+                </td>
+            </tr>
+            <tr>
+                <td>logproxy.host</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>OceanBase 日志代理服务 的 IP 地址或主机名。</td>
+            </tr>
+            <tr>
+                <td>logproxy.port</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>Integer</td>
+                <td>OceanBase 日志代理服务 的端口号。</td>
+            </tr>
+            <tr>
+                <td>logproxy.client.id</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">规则生成</td>
+                <td>String</td>
+                <td>OceanBase日志代理服务的客户端连接 ID，默认值的生成规则是 {flink_ip}_{process_id}_{timestamp}_{thread_id}_{tenant}。</td>
+            </tr>
+            <tr>
+                <td>rootserver-list</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>OceanBase root 服务器列表，服务器格式为 `ip:rpc_port:sql_port`，<br>多个服务器地址使用英文分号 `;` 隔开，OceanBase 社区版本必填。</td>
+            </tr>
+            <tr>
+                <td>config-url</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>从配置服务器获取服务器信息的 url, OceanBase 企业版本必填。</td>
+            </tr>
+            <tr>
+                <td>working-mode</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">storage</td>
+                <td>String</td>
+                <td>日志代理中 `libobcdc` 的工作模式 , 可以是 `storage` 或 `memory`。</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
 ## 支持的元数据
 
 在创建表时，您可以使用以下格式的元数据作为只读列（VIRTUAL）。
 
-列名 | 数据类型 | 描述
------ | ----- | -----
-tenant_name | STRING NOT NULL | 当前记录所属的租户名称。
-database_name | STRING NOT NULL | 当前记录所属的数据库名称。
-table_name | STRING NOT NULL | 当前记录所属的表名称。
-op_ts | TIMESTAMP_LTZ(3) NOT NULL | 该值表示此修改在数据库中发生的时间。如果这条记录是该表在快照阶段读取的记录，则该值返回 0。
+<table class="colwidths-auto docutils">
+    <thead>
+        <tr>
+            <th class="text-left" style="width: 15%">列名</th>
+            <th class="text-left" style="width: 30%">数据类型</th>
+            <th class="text-left" style="width: 55%">描述</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>tenant_name</td>
+            <td>STRING NOT NULL</td>
+            <td>当前记录所属的租户名称。</td>
+        </tr>
+        <tr>
+            <td>database_name</td>
+            <td>STRING NOT NULL</td>
+            <td>当前记录所属的库名。</td>
+        </tr>
+        <tr>
+            <td>table_name</td>
+            <td>STRING NOT NULL</td>
+            <td>当前记录所属的表名称。</td>
+        </tr>
+        <tr>
+            <td>op_ts</td>
+            <td>TIMESTAMP_LTZ(3) NOT NULL</td>
+            <td>该值表示此修改在数据库中发生的时间。如果这条记录是该表在快照阶段读取的记录，则该值返回 0。</td>
+        </tr>
+    </tbody>
+</table>
 
 如下 SQL 展示了如何在表中使用这些元数据列：
 
@@ -151,8 +309,8 @@ CREATE TABLE products (
    'username' = 'user@test_tenant',
    'password' = 'pswd',
    'tenant-name' = 'test_tenant',
-   'database-name' = 'test_db',
-   'table-name' = 'orders',
+   'database-name' = '^test_db$',
+   'table-name' = '^orders$',
    'hostname' = '127.0.0.1',
    'port' = '2881',
    'rootserver-list' = '127.0.0.1:2882:2881',
@@ -234,13 +392,13 @@ public class OceanBaseSourceExample {
                       .username("user@test_tenant")
                       .password("pswd")
                       .tenantName("test_tenant")
-                      .databaseName("test_db")
-                      .tableName("test_table")
+                      .databaseName("^test_db$")
+                      .tableName("^test_table$")
                       .hostname("127.0.0.1")
                       .port(2881)
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
-                      .serverTimeZone(serverTimezone)
+                      .serverTimeZone(serverTimeZone)
                       .deserializer(deserializer)
                       .build();
 
@@ -257,30 +415,185 @@ public class OceanBaseSourceExample {
 
 ## 数据类型映射
 
-OceanBase 数据类型 | Flink SQL 类型 | 描述
------ | ----- | ------
-BOOLEAN <br>TINYINT(1) <br>BIT(1)&nbsp;&nbsp;&nbsp; | BOOLEAN |
-TINYINT | TINYINT |
-SMALLINT <br>TINYINT UNSIGNED | SMALLINT |
-INT <br>MEDIUMINT <br>SMALLINT UNSIGNED | INT |
-BIGINT <br>INT UNSIGNED | BIGINT |
-BIGINT UNSIGNED | DECIMAL(20, 0) |
-REAL <br>FLOAT | FLOAT |
-DOUBLE | DOUBLE |
-NUMERIC(p, s)<br>DECIMAL(p, s)<br>where p <= 38 | DECIMAL(p, s) |
-NUMERIC(p, s)<br>DECIMAL(p, s)<br>where 38 < p <=65 | STRING | DECIMAL 等同于 NUMERIC。在 OceanBase 数据库中，DECIMAL 数据类型的精度最高为 65。<br> 但在 Flink 中，DECIMAL 的最高精度为 38。因此，<br> 如果你定义了一个精度大于 38 的 DECIMAL 列，你应当将其映射为 STRING，以避免精度损失。 |
-DATE | DATE |
-TIME [(p)] | TIME [(p)] |
-DATETIME [(p)] | TIMESTAMP [(p)] |
-TIMESTAMP [(p)] | TIMESTAMP_LTZ [(p)] |
-CHAR(n) | CHAR(n) |
-VARCHAR(n) | VARCHAR(n) |
-BIT(n) | BINARY(⌈n/8⌉) |
-BINARY(n) | BINARY(n) |
-VARBINARY(N) | VARBINARY(N) |
-TINYTEXT<br>TEXT<br>MEDIUMTEXT<br>LONGTEXT | STRING |
-TINYBLOB<br>BLOB<br>MEDIUMBLOB<br>LONGBLOB | BYTES |
-YEAR | INT |
-ENUM | STRING |
-SET | ARRAY&lt;STRING&gt; | 因为 OceanBase 的 SET 类型是用包含一个或多个值的字符串对象表示，<br> 所以映射到 Flink 时是一个字符串数组
-JSON | STRING | JSON 类型的数据在 Flink 中会转化为 JSON 格式的字符串
+### Mysql 模式
+
+<div class="wy-table-responsive">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left">OceanBase 数据类型</th>
+                <th class="text-left">Flink SQL 类型</th>
+                <th class="text-left">描述</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    BOOLEAN<br>
+                    TINYINT(1)<br>
+                    BIT(1)
+                </td>
+                <td>BOOLEAN</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TINYINT</td>
+                <td>TINYINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    SMALLINT<br>
+                    TINYINT UNSIGNED
+                </td>
+                <td>SMALLINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    INT<br>
+                    MEDIUMINT<br>
+                    SMALLINT UNSIGNED
+                </td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    BIGINT<br>
+                    INT UNSIGNED
+                </td>
+                <td>BIGINT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BIGINT UNSIGNED</td>
+                <td>DECIMAL(20, 0)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    REAL<br>
+                    FLOAT
+                </td>
+                <td>FLOAT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    DOUBLE
+                </td>
+                <td>DOUBLE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    NUMERIC(p, s)<br>
+                    DECIMAL(p, s)<br>
+                    where p <= 38 </td>
+                <td>DECIMAL(p, s)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    NUMERIC(p, s)<br>
+                    DECIMAL(p, s)<br>
+                    where 38 < p <=65 </td>
+                <td>STRING</td>
+                <td>
+                    DECIMAL 等同于 NUMERIC。在 OceanBase 数据库中，DECIMAL 数据类型的精度最高为 65。<br>
+                    但在 Flink 中，DECIMAL 的最高精度为 38。因此，<br>
+                    如果你定义了一个精度大于 38 的 DECIMAL 列，你应当将其映射为 STRING，以避免精度损失。
+                </td>
+            </tr>
+            <tr>
+                <td>DATE</td>
+                <td>DATE</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIME [(p)]</td>
+                <td>TIME [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>DATETIME [(p)]</td>
+                <td>TIMESTAMP [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>TIMESTAMP [(p)]</td>
+                <td>TIMESTAMP_LTZ [(p)]</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>CHAR(n)</td>
+                <td>CHAR(n)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARCHAR(n)</td>
+                <td>VARCHAR(n)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BIT(n)</td>
+                <td>BINARY(⌈n/8⌉)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>BINARY(n)</td>
+                <td>BINARY(n)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>VARBINARY(N)</td>
+                <td>VARBINARY(N)</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    TINYTEXT<br>
+                    TEXT<br>
+                    MEDIUMTEXT<br>
+                    LONGTEXT
+                </td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>
+                    TINYBLOB<br>
+                    BLOB<br>
+                    MEDIUMBLOB<br>
+                    LONGBLOB
+                </td>
+                <td>BYTES</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>YEAR</td>
+                <td>INT</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>ENUM</td>
+                <td>STRING</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>SET</td>
+                <td>ARRAY&lt;STRING&gt;</td>
+                <td>
+                    因为 OceanBase 的 SET 类型是用包含一个或多个值的字符串对象表示，<br>
+                    所以映射到 Flink 时是一个字符串数组
+                </td>
+            </tr>
+            <tr>
+                <td>JSON</td>
+                <td>STRING</td>
+                <td>JSON 类型的数据在 Flink 中会转化为 JSON 格式的字符串</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
