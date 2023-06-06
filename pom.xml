@@ -611,7 +611,9 @@ under the License.
         <profile>
             <id>self-hosted-pipeline</id>
             <modules>
+                <module>flink-cdc-base</module>
                 <module>flink-connector-debezium</module>
+                <module>flink-connector-test-util</module>
                 <module>flink-connector-oceanbase-cdc</module>
                 <module>flink-sql-connector-oceanbase-cdc</module>
             </modules>
