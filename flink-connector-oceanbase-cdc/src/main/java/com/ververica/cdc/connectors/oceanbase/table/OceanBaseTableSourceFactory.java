@@ -30,6 +30,7 @@ import com.ververica.cdc.debezium.utils.JdbcUrlUtils;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /** Factory for creating configured instance of {@link OceanBaseTableSource}. */
@@ -181,6 +182,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
         ReadableConfig config = helper.getOptions();
+        validate(config);
 
         StartupMode startupMode = StartupMode.getStartupMode(config.get(SCAN_STARTUP_MODE));
 
@@ -269,5 +271,28 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CONFIG_URL);
         options.add(WORKING_MODE);
         return options;
+    }
+
+    private void validate(ReadableConfig config) {
+        String startupMode = config.get(SCAN_STARTUP_MODE);
+        if (StartupMode.getStartupMode(startupMode).equals(StartupMode.INITIAL)) {
+            String compatibleMode =
+                    Objects.requireNonNull(
+                            config.get(COMPATIBLE_MODE),
+                            "'compatible-mode' is required for 'initial' startup mode.");
+            String jdbcDriver =
+                    Objects.requireNonNull(
+                            config.get(JDBC_DRIVER),
+                            "'jdbc.driver' is required for 'initial' startup mode.");
+            if (compatibleMode.equalsIgnoreCase("oracle")) {
+                if (!jdbcDriver.toLowerCase().contains("oceanbase")) {
+                    throw new IllegalArgumentException(
+                            "OceanBase JDBC driver is required for OceanBase Enterprise Edition.");
+                }
+                Objects.requireNonNull(
+                        config.get(CONFIG_URL),
+                        "'config-url' is required for OceanBase Enterprise Edition.");
+            }
+        }
     }
 }
