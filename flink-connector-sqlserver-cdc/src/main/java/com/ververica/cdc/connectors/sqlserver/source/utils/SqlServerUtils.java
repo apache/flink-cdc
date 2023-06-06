@@ -192,14 +192,16 @@ public class SqlServerUtils {
             offsetStrMap.put(
                     entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
         }
-        return new LsnOffset(Lsn.valueOf(offsetStrMap.get(SourceInfo.CHANGE_LSN_KEY)));
+        Lsn changeLsn = Lsn.valueOf(offsetStrMap.get(SourceInfo.CHANGE_LSN_KEY));
+        Lsn commitLsn = Lsn.valueOf(offsetStrMap.get(SourceInfo.COMMIT_LSN_KEY));
+        return new LsnOffset(changeLsn, commitLsn, null);
     }
 
     /** Fetch current largest log sequence number (LSN) of the database. */
     public static LsnOffset currentLsn(SqlServerConnection connection) {
         try {
             Lsn maxLsn = connection.getMaxLsn();
-            return new LsnOffset(maxLsn);
+            return new LsnOffset(maxLsn, maxLsn, null);
         } catch (SQLException e) {
             throw new FlinkRuntimeException(e.getMessage(), e);
         }

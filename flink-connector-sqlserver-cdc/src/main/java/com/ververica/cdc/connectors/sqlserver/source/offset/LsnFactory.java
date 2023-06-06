@@ -27,7 +27,9 @@ import java.util.Map;
 public class LsnFactory extends OffsetFactory {
     @Override
     public Offset newOffset(Map<String, String> offset) {
-        return new LsnOffset(Lsn.valueOf(offset.get(SourceInfo.CHANGE_LSN_KEY)));
+        Lsn changeLsn = Lsn.valueOf(offset.get(SourceInfo.CHANGE_LSN_KEY));
+        Lsn commitLsn = Lsn.valueOf(offset.get(SourceInfo.COMMIT_LSN_KEY));
+        return new LsnOffset(changeLsn, commitLsn, null);
     }
 
     @Override
