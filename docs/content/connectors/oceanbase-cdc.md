@@ -88,7 +88,7 @@ Flink SQL> CREATE TABLE orders (
 ) WITH (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
-    'username' = 'user@test_tenant',
+    'username' = 'user@test_tenant#cluster_name',
     'password' = 'pswd',
     'tenant-name' = 'test_tenant',
     'database-name' = '^test_db$',
@@ -103,6 +103,36 @@ Flink SQL> CREATE TABLE orders (
 
 -- read snapshot and binlogs from orders table
 Flink SQL> SELECT * FROM orders;
+```
+
+If you want to use OceanBase Oracle mode, you need to add the OceanBase jdbc jar file to Flink and set up the enterprise edition of oblogproxy, then you can create a table in Flink as following:
+
+```sql
+Flink SQL> CREATE TABLE orders (
+    order_id     INT,
+    order_date   TIMESTAMP(0),
+    customer_name STRING,
+    price        DECIMAL(10, 5),
+    product_id   INT,
+    order_status BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'oceanbase-cdc',
+    'scan.startup.mode' = 'initial',
+    'username' = 'user@test_tenant#cluster_name',
+    'password' = 'pswd',
+    'tenant-name' = 'test_tenant',
+    'database-name' = '^test_db$',
+    'table-name' = '^orders$',
+    'hostname' = '127.0.0.1',
+    'port' = '2881',
+    'compatible-mode' = 'oracle',
+    'jdbc.driver' = 'com.oceanbase.jdbc.Driver',
+    'config-url' = 'http://127.0.0.1:8080/services?Action=ObRootServiceInfo&User_ID=xxx&UID=xxx&ObRegion=xxx',
+    'logproxy.host' = '127.0.0.1',
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+);
 ```
 
 You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial](https://ververica.github.io/flink-cdc-connectors/release-2.3//content/quickstart/oceanbase-tutorial.html) for more information.
@@ -262,6 +292,13 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td style="word-wrap: break-word;">storage</td>
                 <td>String</td>
                 <td>Working mode of `obcdc` in LogProxy, can be `storage` or `memory`.</td>
+            </tr>
+            <tr>
+                <td>compatible-mode</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">mysql</td>
+                <td>String</td>
+                <td>Compatible mode of OceanBase, can be `mysql` or `oracle`.</td>
             </tr>
             <tr>
                 <td>jdbc.driver</td>
@@ -430,6 +467,7 @@ public class OceanBaseSourceExample {
                       .tableName("^test_table$")
                       .hostname("127.0.0.1")
                       .port(2881)
+                      .compatibleMode("mysql")
                       .jdbcDriver("com.mysql.jdbc.Driver")
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)

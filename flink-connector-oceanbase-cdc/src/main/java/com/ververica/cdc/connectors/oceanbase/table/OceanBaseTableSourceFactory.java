@@ -111,6 +111,13 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Integer port number of OceanBase database server or OceanBase proxy server.");
 
+    public static final ConfigOption<String> COMPATIBLE_MODE =
+            ConfigOptions.key("compatible-mode")
+                    .stringType()
+                    .defaultValue("mysql")
+                    .withDescription(
+                            "The compatible mode of OceanBase, can be 'mysql' or 'oracle'.");
+
     public static final ConfigOption<String> JDBC_DRIVER =
             ConfigOptions.key("jdbc.driver")
                     .stringType()
@@ -189,6 +196,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
         String hostname = config.get(HOSTNAME);
         Integer port = config.get(PORT);
+        String compatibleMode = config.get(COMPATIBLE_MODE);
         String jdbcDriver = config.get(JDBC_DRIVER);
 
         String logProxyHost = config.get(LOG_PROXY_HOST);
@@ -214,6 +222,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 connectTimeout,
                 hostname,
                 port,
+                compatibleMode,
                 jdbcDriver,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 logProxyHost,
@@ -251,6 +260,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(TABLE_LIST);
         options.add(HOSTNAME);
         options.add(PORT);
+        options.add(COMPATIBLE_MODE);
         options.add(JDBC_DRIVER);
         options.add(CONNECT_TIMEOUT);
         options.add(SERVER_TIME_ZONE);

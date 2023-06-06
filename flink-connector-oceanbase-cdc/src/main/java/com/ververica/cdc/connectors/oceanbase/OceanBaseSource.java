@@ -57,6 +57,7 @@ public class OceanBaseSource {
         // snapshot reading config
         private String hostname;
         private Integer port;
+        private String compatibleMode;
         private String jdbcDriver;
         private Properties jdbcProperties;
 
@@ -126,6 +127,11 @@ public class OceanBaseSource {
             return this;
         }
 
+        public Builder<T> compatibleMode(String compatibleMode) {
+            this.compatibleMode = compatibleMode;
+            return this;
+        }
+
         public Builder<T> jdbcDriver(String jdbcDriver) {
             this.jdbcDriver = jdbcDriver;
             return this;
@@ -181,6 +187,9 @@ public class OceanBaseSource {
                 case INITIAL:
                     checkNotNull(hostname, "hostname shouldn't be null on startup mode 'initial'");
                     checkNotNull(port, "port shouldn't be null on startup mode 'initial'");
+                    checkNotNull(
+                            compatibleMode,
+                            "compatibleMode shouldn't be null on startup mode 'initial'");
                     checkNotNull(
                             jdbcDriver, "jdbcDriver shouldn't be null on startup mode 'initial'");
                     startupTimestamp = 0L;
@@ -263,6 +272,7 @@ public class OceanBaseSource {
                     connectTimeout,
                     hostname,
                     port,
+                    compatibleMode,
                     jdbcDriver,
                     jdbcProperties,
                     logProxyHost,

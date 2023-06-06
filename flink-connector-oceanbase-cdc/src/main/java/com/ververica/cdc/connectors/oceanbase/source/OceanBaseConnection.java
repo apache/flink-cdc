@@ -40,7 +40,7 @@ public class OceanBaseConnection extends JdbcConnection {
     private static final String OB_URL_PATTERN =
             "jdbc:oceanbase://${hostname}:${port}/?connectTimeout=${connectTimeout}";
 
-    private String compatibleMode;
+    private final String compatibleMode;
 
     public OceanBaseConnection(
             String hostname,
@@ -48,12 +48,14 @@ public class OceanBaseConnection extends JdbcConnection {
             String user,
             String password,
             Duration timeout,
+            String compatibleMode,
             String jdbcDriver,
             Properties jdbcProperties,
             ClassLoader classLoader) {
         super(
                 config(hostname, port, user, password, timeout),
                 factory(jdbcDriver, jdbcProperties, classLoader));
+        this.compatibleMode = compatibleMode;
     }
 
     private static Configuration config(
@@ -101,22 +103,6 @@ public class OceanBaseConnection extends JdbcConnection {
     }
 
     /**
-     * Get the compatible mode of this connection, should be 'MySQL' or 'Oracle'.
-     *
-     * @return The compatible mode.
-     */
-    public String getCompatibleMode() {
-        if (compatibleMode == null) {
-            try {
-                compatibleMode = connection().getMetaData().getDatabaseProductName();
-            } catch (SQLException e) {
-                throw new RuntimeException("Failed to get compatible mode", e);
-            }
-        }
-        return compatibleMode;
-    }
-
-    /**
      * Get table list by database name pattern and table name pattern.
      *
      * @param dbPattern Database name pattern.
@@ -127,7 +113,7 @@ public class OceanBaseConnection extends JdbcConnection {
     public List<String> getTables(String dbPattern, String tbPattern) throws SQLException {
         List<String> result = new ArrayList<>();
         DatabaseMetaData metaData = connection().getMetaData();
-        switch (getCompatibleMode().toLowerCase()) {
+        switch (compatibleMode.toLowerCase()) {
             case "mysql":
                 List<String> dbNames = getResultList(metaData.getCatalogs(), "TABLE_CAT");
                 dbNames =
@@ -161,8 +147,7 @@ public class OceanBaseConnection extends JdbcConnection {
                 }
                 break;
             default:
-                throw new FlinkRuntimeException(
-                        "Unsupported database mode: " + getCompatibleMode());
+                throw new FlinkRuntimeException("Unsupported compatible mode: " + compatibleMode);
         }
         return result;
     }

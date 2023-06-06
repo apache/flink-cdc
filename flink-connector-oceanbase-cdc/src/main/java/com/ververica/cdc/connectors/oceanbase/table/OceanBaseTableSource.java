@@ -59,6 +59,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
 
     private final String hostname;
     private final Integer port;
+    private final String compatibleMode;
     private final String jdbcDriver;
     private final Properties jdbcProperties;
 
@@ -93,6 +94,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             Duration connectTimeout,
             String hostname,
             Integer port,
+            String compatibleMode,
             String jdbcDriver,
             Properties jdbcProperties,
             String logProxyHost,
@@ -114,6 +116,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.connectTimeout = connectTimeout;
         this.hostname = hostname;
         this.port = port;
+        this.compatibleMode = compatibleMode;
         this.jdbcDriver = jdbcDriver;
         this.jdbcProperties = jdbcProperties;
         this.logProxyHost = checkNotNull(logProxyHost);
@@ -161,6 +164,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .connectTimeout(connectTimeout)
                         .hostname(hostname)
                         .port(port)
+                        .compatibleMode(compatibleMode)
                         .jdbcDriver(jdbcDriver)
                         .jdbcProperties(jdbcProperties)
                         .logProxyHost(logProxyHost)
@@ -220,6 +224,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         connectTimeout,
                         hostname,
                         port,
+                        compatibleMode,
                         jdbcDriver,
                         jdbcProperties,
                         logProxyHost,
@@ -255,6 +260,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.connectTimeout, that.connectTimeout)
                 && Objects.equals(this.hostname, that.hostname)
                 && Objects.equals(this.port, that.port)
+                && Objects.equals(this.compatibleMode, that.compatibleMode)
                 && Objects.equals(this.jdbcDriver, that.jdbcDriver)
                 && Objects.equals(this.jdbcProperties, that.jdbcProperties)
                 && Objects.equals(this.logProxyHost, that.logProxyHost)
@@ -283,6 +289,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 connectTimeout,
                 hostname,
                 port,
+                compatibleMode,
                 jdbcDriver,
                 jdbcProperties,
                 logProxyHost,

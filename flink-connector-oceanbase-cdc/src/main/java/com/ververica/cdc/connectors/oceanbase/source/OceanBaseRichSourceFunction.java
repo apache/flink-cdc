@@ -82,6 +82,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final Duration connectTimeout;
     private final String hostname;
     private final Integer port;
+    private final String compatibleMode;
     private final String jdbcDriver;
     private final Properties jdbcProperties;
     private final String logProxyHost;
@@ -112,6 +113,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             Duration connectTimeout,
             String hostname,
             Integer port,
+            String compatibleMode,
             String jdbcDriver,
             Properties jdbcProperties,
             String logProxyHost,
@@ -129,6 +131,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.connectTimeout = checkNotNull(connectTimeout);
         this.hostname = hostname;
         this.port = port;
+        this.compatibleMode = compatibleMode;
         this.jdbcDriver = jdbcDriver;
         this.jdbcProperties = jdbcProperties;
         this.logProxyHost = checkNotNull(logProxyHost);
@@ -178,6 +181,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                             username,
                             password,
                             connectTimeout,
+                            compatibleMode,
                             jdbcDriver,
                             jdbcProperties,
                             getClass().getClassLoader());
@@ -213,7 +217,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         }
 
         if (StringUtils.isNotBlank(databaseName) && StringUtils.isNotBlank(tableName)) {
-            LOG.info("Connection database mode: {}", getSnapshotConnection().getCompatibleMode());
             try {
                 List<String> tables = getSnapshotConnection().getTables(databaseName, tableName);
                 LOG.info("Pattern matched tables: {}", tables);
@@ -251,9 +254,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         OceanBaseRecord.SourceInfo sourceInfo =
                 new OceanBaseRecord.SourceInfo(
                         tenantName, databaseName, tableName, resolvedTimestamp);
-        String databaseMode = getSnapshotConnection().getCompatibleMode();
         String fullName;
-        if ("mysql".equalsIgnoreCase(databaseMode)) {
+        if ("mysql".equalsIgnoreCase(compatibleMode)) {
             fullName = String.format("`%s`.`%s`", databaseName, tableName);
         } else {
             fullName = String.format("%s.%s", databaseName, tableName);

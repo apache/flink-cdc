@@ -81,7 +81,7 @@ Flink SQL> CREATE TABLE orders (
 ) WITH (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
-    'username' = 'user@test_tenant',
+    'username' = 'user@test_tenant#cluster_name',
     'password' = 'pswd',
     'tenant-name' = 'test_tenant',
     'database-name' = '^test_db$',
@@ -96,6 +96,36 @@ Flink SQL> CREATE TABLE orders (
 
 -- 从表 orders 中读取快照数据和 binlog 数据
 Flink SQL> SELECT * FROM orders;
+```
+
+如果您使用的是企业版的 OceanBase Oracle 模式，您需要先添加 OceanBase 的官方 JDBC 驱动 jar 包到 Flink 环境，并且部署企业版的 oblogproxy 服务，然后通过以下命令创建 OceanBase CDC 表：
+
+```sql
+Flink SQL> CREATE TABLE orders (
+    order_id     INT,
+    order_date   TIMESTAMP(0),
+    customer_name STRING,
+    price        DECIMAL(10, 5),
+    product_id   INT,
+    order_status BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'oceanbase-cdc',
+    'scan.startup.mode' = 'initial',
+    'username' = 'user@test_tenant#cluster_name',
+    'password' = 'pswd',
+    'tenant-name' = 'test_tenant',
+    'database-name' = '^test_db$',
+    'table-name' = '^orders$',
+    'hostname' = '127.0.0.1',
+    'port' = '2881',
+    'compatible-mode' = 'oracle',
+    'jdbc.driver' = 'com.oceanbase.jdbc.Driver',
+    'config-url' = 'http://127.0.0.1:8080/services?Action=ObRootServiceInfo&User_ID=xxx&UID=xxx&ObRegion=xxx',
+    'logproxy.host' = '127.0.0.1',
+    'logproxy.port' = '2983',
+    'working-mode' = 'memory'
+);
 ```
 
 您也可以访问 Flink CDC 官网文档，快速体验将数据从 OceanBase 导入到 Elasticsearch。更多信息，参考 [Flink CDC 官网文档](https://ververica.github.io/flink-cdc-connectors/release-2.2/content/%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B/oceanbase-tutorial-zh.html)。
@@ -261,6 +291,13 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>日志代理中 `libobcdc` 的工作模式 , 可以是 `storage` 或 `memory`。</td>
             </tr>
             <tr>
+                <td>compatible-mode</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">mysql</td>
+                <td>String</td>
+                <td>OceanBase 的兼容模式，可以是 `mysql` 或 `oracle`。</td>
+            </tr>
+            <tr>
                 <td>jdbc.driver</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">com.mysql.jdbc.Driver</td>
@@ -422,6 +459,7 @@ public class OceanBaseSourceExample {
                       .tableName("^test_table$")
                       .hostname("127.0.0.1")
                       .port(2881)
+                      .compatibleMode("mysql")
                       .jdbcDriver("com.mysql.jdbc.Driver")
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
