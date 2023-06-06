@@ -183,6 +183,12 @@ public class OceanBaseSource {
                             startupMode + " mode is not supported.");
             }
 
+            if (!startupMode.equals(StartupMode.INITIAL)
+                    && (StringUtils.isNotEmpty(databaseName)
+                            || StringUtils.isNotEmpty(tableName))) {
+                throw new IllegalArgumentException(
+                        "If startup mode is not 'INITIAL', 'database-name' and 'table-name' must not be configured");
+            }
             if (StringUtils.isNotEmpty(databaseName) || StringUtils.isNotEmpty(tableName)) {
                 if (StringUtils.isEmpty(databaseName) || StringUtils.isEmpty(tableName)) {
                     throw new IllegalArgumentException(

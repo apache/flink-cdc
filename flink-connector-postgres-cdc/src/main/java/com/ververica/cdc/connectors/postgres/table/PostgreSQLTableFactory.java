@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.postgres.table;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -25,6 +26,7 @@ import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import com.ververica.cdc.connectors.postgres.utils.OptionUtils;
 import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 
 import java.util.HashSet;
@@ -135,6 +137,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                     physicalSchema.getPrimaryKey().isPresent(),
                     "Primary key must be present when upsert mode is selected.");
         }
+
+        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new PostgreSQLTableSource(
                 physicalSchema,

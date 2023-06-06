@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mongodb.table;
 
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -24,6 +25,8 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
+
+import com.ververica.cdc.connectors.base.utils.OptionUtils;
 
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -95,6 +98,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
         checkPrimaryKey(physicalSchema.getPrimaryKey().get(), "Primary key must be _id field");
+
+        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new MongoDBTableSource(
                 physicalSchema,

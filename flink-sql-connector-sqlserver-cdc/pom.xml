@@ -55,6 +55,7 @@ under the License.
                                     <include>io.debezium:debezium-core</include>
                                     <include>io.debezium:debezium-connector-sqlserver</include>
                                     <include>com.ververica:flink-connector-debezium</include>
+                                    <include>com.ververica:flink-cdc-base</include>
                                     <include>com.ververica:flink-connector-sqlserver-cdc</include>
                                     <include>com.microsoft.sqlserver:*</include>
                                     <include>org.apache.kafka:*</include>

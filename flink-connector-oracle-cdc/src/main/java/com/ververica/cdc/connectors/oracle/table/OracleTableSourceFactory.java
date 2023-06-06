@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.oracle.table;
 
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -25,6 +26,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.utils.OptionUtils;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.Duration;
@@ -100,6 +102,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
         }
+
+        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new OracleTableSource(
                 physicalSchema,
