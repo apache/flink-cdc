@@ -141,22 +141,25 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     @Override
     public void run(SourceContext<T> ctx) throws Exception {
         outputCollector.context = ctx;
+        try {
+            LOG.info("Start to initial table whitelist");
+            initTableWhiteList();
 
-        LOG.info("Start to initial table whitelist");
-        initTableWhiteList();
+            LOG.info("Start readChangeRecords process");
+            readChangeRecords();
 
-        LOG.info("Start readChangeRecords process");
-        readChangeRecords();
+            if (shouldReadSnapshot()) {
+                LOG.info("Snapshot reading started");
+                readSnapshotRecords();
+                LOG.info("Snapshot reading finished");
+            } else {
+                LOG.info("Snapshot reading skipped");
+            }
 
-        if (shouldReadSnapshot()) {
-            LOG.info("Snapshot reading started");
-            readSnapshotRecords();
-            LOG.info("Snapshot reading finished");
-        } else {
-            LOG.info("Snapshot reading skipped");
+            logProxyClient.join();
+        } finally {
+            cancel();
         }
-
-        logProxyClient.join();
     }
 
     private boolean shouldReadSnapshot() {
