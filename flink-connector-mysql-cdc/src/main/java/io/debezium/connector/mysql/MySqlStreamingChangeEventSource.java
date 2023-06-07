@@ -36,6 +36,7 @@ import io.debezium.config.CommonConnectorConfig.EventProcessingFailureHandlingMo
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig.GtidNewChannelPosition;
 import io.debezium.connector.mysql.MySqlConnectorConfig.SecureConnectionMode;
+import io.debezium.connector.mysql.util.ErrorMessageUtils;
 import io.debezium.data.Envelope.Operation;
 import io.debezium.function.BlockingConsumer;
 import io.debezium.pipeline.ErrorHandler;
@@ -88,6 +89,8 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * <p>Line 268 ~ 270: Clean cache on rotate event to prevent it from growing indefinitely. We should
  * remove this class after we bumped a higher debezium version where the
  * https://issues.redhat.com/browse/DBZ-5126 has been fixed.
+ *
+ * <p>Line 1386 : Add more error details for some exceptions.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlOffsetContext> {
@@ -1380,6 +1383,7 @@ public class MySqlStreamingChangeEventSource
                             + e.getSQLState()
                             + ".";
         }
+        msg = ErrorMessageUtils.optimizeErrorMessage(msg);
         return new DebeziumException(msg, error);
     }
 

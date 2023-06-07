@@ -76,9 +76,13 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     }
 
     protected static MySqlContainer createMySqlContainer(MySqlVersion version) {
+        return createMySqlContainer(version, "docker/server-gtids/my.cnf");
+    }
+
+    protected static MySqlContainer createMySqlContainer(MySqlVersion version, String configPath) {
         return (MySqlContainer)
                 new MySqlContainer(version)
-                        .withConfigurationOverride("docker/server-gtids/my.cnf")
+                        .withConfigurationOverride(configPath)
                         .withSetupSQL("docker/setup.sql")
                         .withDatabaseName("flink-test")
                         .withUsername("flinkuser")

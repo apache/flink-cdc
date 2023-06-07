@@ -442,7 +442,24 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 "sourceIdleTime", (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
 
         // start the real debezium consumer
-        debeziumChangeFetcher.runFetchLoop();
+        try {
+            debeziumChangeFetcher.runFetchLoop();
+        } catch (Throwable t) {
+            if (t.getMessage() != null
+                    && t.getMessage()
+                            .contains(
+                                    "A slave with the same server_uuid/server_id as this slave has connected to the master")) {
+                throw new RuntimeException(
+                        "The 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
+                                + "The server id conflict may happen in the following situations: \n"
+                                + "1. The server id has been used by other mysql cdc table in the current job.\n"
+                                + "2. The server id has been used by the mysql cdc table in other jobs.\n"
+                                + "3. The server id has been used by other sync tools like canal, debezium and so on.\n",
+                        t);
+            } else {
+                throw t;
+            }
+        }
     }
 
     @Override
