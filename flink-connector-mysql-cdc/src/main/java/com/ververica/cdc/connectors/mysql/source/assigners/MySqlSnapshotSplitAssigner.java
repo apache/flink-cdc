@@ -82,6 +82,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final int currentParallelism;
     private final List<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
+
+    private final MySqlPartition partition;
     private final Object lock = new Object();
 
     private volatile Throwable uncaughtSplitterException;
@@ -157,6 +159,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.chunkSplitter =
                 createChunkSplitter(sourceConfig, isTableIdCaseSensitive, chunkSplitterState);
+        this.partition =
+                new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
     }
 
     @Override
@@ -276,7 +280,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             synchronized (lock) {
                 List<MySqlSnapshotSplit> splits;
                 try {
-                    splits = chunkSplitter.splitChunks(nextTable);
+                    splits = chunkSplitter.splitChunks(partition, nextTable);
                 } catch (Exception e) {
                     throw new IllegalStateException(
                             "Error when splitting chunks for " + nextTable, e);
@@ -539,13 +543,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
             // split the remaining tables
             for (TableId nextTable : remainingTables) {
-                splitTable(
-                                new MySqlPartition.Provider(sourceConfig.getMySqlConnectorConfig())
-                                        .getPartitions()
-                                        .iterator()
-                                        .next(),
-                                nextTable);
-                }
+                splitTable(nextTable);
+            }
         } catch (Throwable e) {
             synchronized (lock) {
                 if (uncaughtSplitterException == null) {

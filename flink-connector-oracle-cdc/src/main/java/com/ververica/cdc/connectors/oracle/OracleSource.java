@@ -165,6 +165,8 @@ public class OracleSource {
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }
+            // we need this in order not to lose any transaction during snapshot to streaming switch
+            props.setProperty("internal.log.mining.transaction.snapshot.boundary.mode", "all");
 
             switch (startupOptions.startupMode) {
                 case INITIAL:

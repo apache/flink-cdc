@@ -58,11 +58,6 @@ public class MySqlErrorHandler extends ErrorHandler {
     }
 
     @Override
-    protected boolean isRetriable(Throwable throwable) {
-        return false;
-    }
-
-    @Override
     public void setProducerThrowable(Throwable producerThrowable) {
         if (isTableNotFoundException(producerThrowable)) {
             Matcher matcher =

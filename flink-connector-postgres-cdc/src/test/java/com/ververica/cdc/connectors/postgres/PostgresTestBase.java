@@ -18,6 +18,9 @@ package com.ververica.cdc.connectors.postgres;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
+import io.debezium.config.Configuration;
+import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.jdbc.JdbcConfiguration;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +38,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -124,5 +128,10 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    protected PostgresConnection createConnection(Map<String, String> properties) {
+        Configuration config = Configuration.from(properties);
+        return new PostgresConnection(JdbcConfiguration.adapt(config), "test-connection");
     }
 }

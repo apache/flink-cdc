@@ -82,6 +82,7 @@ public class MySqlSourceReader<T>
     private final Map<String, MySqlBinlogSplit> uncompletedBinlogSplits;
     private final int subtaskId;
     private final MySqlSourceReaderContext mySqlSourceReaderContext;
+    private final MySqlPartition partition;
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
 
     public MySqlSourceReader(
@@ -103,6 +104,8 @@ public class MySqlSourceReader<T>
         this.subtaskId = context.getSourceReaderContext().getIndexOfSubtask();
         this.mySqlSourceReaderContext = context;
         this.suspendedBinlogSplit = null;
+        this.partition =
+                new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
     }
 
     @Override
@@ -401,7 +404,8 @@ public class MySqlSourceReader<T>
                 Map<TableId, TableChanges.TableChange> tableSchemas;
                 if (split.getTableSchemas().isEmpty()) {
                     tableSchemas =
-                            TableDiscoveryUtils.discoverSchemaForCapturedTables(sourceConfig, jdbc);
+                            TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                                    partition, sourceConfig, jdbc);
                     LOG.info(
                             "Source reader {} discovers table schema for binlog split {} success",
                             subtaskId,
@@ -409,7 +413,8 @@ public class MySqlSourceReader<T>
                 } else {
                     List<TableId> existedTables = new ArrayList<>(split.getTableSchemas().keySet());
                     tableSchemas =
-                            discoverSchemaForNewAddedTables(existedTables, sourceConfig, jdbc);
+                            discoverSchemaForNewAddedTables(
+                                    partition, existedTables, sourceConfig, jdbc);
                     LOG.info(
                             "Source reader {} discovers table schema for new added tables of binlog split {} success",
                             subtaskId,

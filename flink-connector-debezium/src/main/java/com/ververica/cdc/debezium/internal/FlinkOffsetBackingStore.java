@@ -63,6 +63,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
     protected Map<ByteBuffer, ByteBuffer> data = new HashMap<>();
     protected ExecutorService executor;
 
+    @SuppressWarnings("unchecked")
     @Override
     public void configure(WorkerConfig config) {
         // eagerly initialize the executor, because OffsetStorageWriter will use it later

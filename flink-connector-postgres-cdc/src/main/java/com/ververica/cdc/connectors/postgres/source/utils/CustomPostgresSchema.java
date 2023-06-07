@@ -21,6 +21,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
+import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -67,6 +68,8 @@ public class CustomPostgresSchema {
         final PostgresOffsetContext offsetContext =
                 PostgresOffsetContext.initialContext(dbzConfig, jdbcConnection, Clock.SYSTEM);
 
+        PostgresPartition partition = new PostgresPartition(dbzConfig.getLogicalName());
+
         // set the events to populate proper sourceInfo into offsetContext
         offsetContext.event(tableId, Instant.now());
 
@@ -87,15 +90,13 @@ public class CustomPostgresSchema {
 
         // TODO: check whether we always set isFromSnapshot = true
         SchemaChangeEvent schemaChangeEvent =
-                new SchemaChangeEvent(
-                        offsetContext.getPartition(),
-                        offsetContext.getOffset(),
-                        offsetContext.getSourceInfo(),
+                SchemaChangeEvent.ofCreate(
+                        partition,
+                        offsetContext,
                         dbzConfig.databaseName(),
                         tableId.schema(),
                         null,
                         table,
-                        SchemaChangeEvent.SchemaChangeEventType.CREATE,
                         true);
 
         for (TableChanges.TableChange tableChange : schemaChangeEvent.getTableChanges()) {

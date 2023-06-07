@@ -53,8 +53,8 @@ import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.document.Array;
 import io.debezium.connector.mysql.MySqlPartition;
+import io.debezium.document.Array;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
@@ -121,10 +121,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverSchemaForCapturedTables(
-                            new MySqlPartition.Provider(sourceConfig.getMySqlConnectorConfig())
-                                    .getPartitions()
-                                    .iterator()
-                                    .next(),
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
                             sourceConfig,
                             jdbc);
             binlogSplit =

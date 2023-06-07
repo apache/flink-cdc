@@ -40,7 +40,7 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.createMy
 import static com.ververica.cdc.connectors.mysql.source.utils.StatementUtils.quote;
 
 /** A component used to get schema by table path. */
-public class MySqlSchema {
+public class MySqlSchema implements AutoCloseable {
     private static final String SHOW_CREATE_TABLE = "SHOW CREATE TABLE ";
     private static final String DESC_TABLE = "DESC ";
 
@@ -169,5 +169,10 @@ public class MySqlSchema {
                             "Failed to read schema for table %s by running %s", tableId, descTable),
                     e);
         }
+    }
+
+    @Override
+    public void close() {
+        databaseSchema.close();
     }
 }

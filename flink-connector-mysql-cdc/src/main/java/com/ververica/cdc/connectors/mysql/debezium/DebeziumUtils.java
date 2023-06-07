@@ -52,6 +52,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtil
 
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
+    private static final String QUOTED_CHARACTER = "`";
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
@@ -61,8 +62,8 @@ public class DebeziumUtils {
                 new JdbcConnection(
                         JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
                         new JdbcConnectionFactory(sourceConfig),
-                        "`",
-                        "`");
+                        QUOTED_CHARACTER,
+                        QUOTED_CHARACTER);
         try {
             jdbc.connect();
         } catch (Exception e) {

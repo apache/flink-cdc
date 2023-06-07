@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
 import static com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
@@ -85,10 +86,10 @@ public class StatefulTaskContext {
     private MySqlOffsetContext offsetContext;
     private MySqlPartition mySqlPartition;
     private TopicSelector<TableId> topicSelector;
-    private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
-    private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
+    private SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
+    private StreamingChangeEventSourceMetrics<MySqlPartition> streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
-    private EventDispatcher.SnapshotReceiver snapshotReceiver;
+    private EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
     private SignalEventDispatcher signalEventDispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
@@ -114,11 +115,12 @@ public class StatefulTaskContext {
                         .getDbzConfiguration()
                         .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 mySqlSplit.getTableSchemas().values());
+
+        Optional.ofNullable(databaseSchema).ifPresent(MySqlDatabaseSchema::close);
         this.databaseSchema =
                 DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
 
-        this.mySqlPartition =
-                new MySqlPartition.Provider(connectorConfig).getPartitions().iterator().next();
+        this.mySqlPartition = new MySqlPartition(connectorConfig.getLogicalName());
 
         this.offsetContext =
                 loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
@@ -171,8 +173,8 @@ public class StatefulTaskContext {
         this.streamingChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
-        this.errorHandler = new MySqlErrorHandler(
-                        connectorConfig, queue, taskContext, sourceConfig);
+        this.errorHandler =
+                new MySqlErrorHandler(connectorConfig, queue, taskContext, sourceConfig);
     }
 
     private void validateAndLoadDatabaseHistory(
@@ -365,7 +367,7 @@ public class StatefulTaskContext {
         return dispatcher;
     }
 
-    public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
+    public EventDispatcher.SnapshotReceiver<MySqlPartition> getSnapshotReceiver() {
         return snapshotReceiver;
     }
 
@@ -393,11 +395,12 @@ public class StatefulTaskContext {
         return topicSelector;
     }
 
-    public SnapshotChangeEventSourceMetrics getSnapshotChangeEventSourceMetrics() {
+    public SnapshotChangeEventSourceMetrics<MySqlPartition> getSnapshotChangeEventSourceMetrics() {
         return snapshotChangeEventSourceMetrics;
     }
 
-    public StreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
+    public StreamingChangeEventSourceMetrics<MySqlPartition>
+            getStreamingChangeEventSourceMetrics() {
         return streamingChangeEventSourceMetrics;
     }
 

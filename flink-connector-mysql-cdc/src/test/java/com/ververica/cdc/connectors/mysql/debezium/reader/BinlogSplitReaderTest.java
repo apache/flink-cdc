@@ -397,6 +397,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -429,6 +432,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 assertThrows(Throwable.class, () -> readBinlogSplits(dataType, reader, 1));
         Optional<SchemaOutOfSyncException> schemaOutOfSyncException =
                 ExceptionUtils.findThrowable(throwable, SchemaOutOfSyncException.class);
+
+        reader.close();
+
         assertTrue(schemaOutOfSyncException.isPresent());
         assertEquals(
                 "Internal schema representation is probably out of sync with real database schema. "
@@ -486,6 +492,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -539,6 +548,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+U[109, user_4, Pittsburgh, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -590,6 +602,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -643,6 +658,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -701,6 +719,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Shanghai, 123567891234, 15213]",
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -752,6 +773,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 },
                 DEFAULT_TIMEOUT,
                 "Timeout waiting for heartbeat event");
+        binlogReader.close();
     }
 
     @Test
@@ -831,10 +853,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverSchemaForCapturedTables(
-                            new MySqlPartition.Provider(sourceConfig.getMySqlConnectorConfig())
-                                    .getPartitions()
-                                    .iterator()
-                                    .next(),
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
                             sourceConfig,
                             jdbc);
             return MySqlBinlogSplit.fillTableSchemas(

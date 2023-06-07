@@ -22,6 +22,7 @@ import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
@@ -125,6 +126,26 @@ public class EventDispatcherImpl<T extends DataCollectionId>
 
     public ChangeEventQueue<DataChangeEvent> getQueue() {
         return queue;
+    }
+
+    @Override
+    public void dispatchSchemaChangeEvent(
+            MySqlPartition partition,
+            T dataCollectionId,
+            SchemaChangeEventEmitter schemaChangeEventEmitter)
+            throws InterruptedException {
+        if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
+            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
+                LOG.trace("Filtering schema change event for {}", dataCollectionId);
+                return;
+            }
+        }
+        schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
+        IncrementalSnapshotChangeEventSource<MySqlPartition, T> incrementalEventSource =
+                getIncrementalSnapshotChangeEventSource();
+        if (incrementalEventSource != null) {
+            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+        }
     }
 
     @Override

@@ -472,7 +472,6 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         Collections.sort(expected);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
-        Thread.sleep(1 * 1000);
     }
 
     @Test

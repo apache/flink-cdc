@@ -805,6 +805,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         if (useLegacyImplementation) {
             // should fail because user specifies to use the legacy implementation
             try {
+                source.close();
                 runThread.sync();
                 fail("Should fail.");
             } catch (Exception e) {
@@ -906,6 +907,9 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                                                     "Retrieve schema history failed, the schema records for engine %s has been removed,"
                                                             + " this might because the debezium engine has been shutdown due to other errors.",
                                                     engineInstanceName)));
+                } finally {
+                    source.close();
+                    runThread.sync();
                 }
             }
         }
