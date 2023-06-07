@@ -91,6 +91,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
+    private static final UniqueDatabase customer3_0Database =
+            new UniqueDatabase(MYSQL_CONTAINER, "customer3.0", TEST_USER, TEST_PASSWORD);
 
     private final UniqueDatabase userDatabase1 =
             new UniqueDatabase(MYSQL_CONTAINER, "user_1", TEST_USER, TEST_PASSWORD);
@@ -1231,6 +1233,74 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 };
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testReadingWithDotTableName() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        customer3_0Database.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE customers ("
+                                + " `id` INTEGER NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'debezium.internal.implementation' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customer3_0Database.getUsername(),
+                        customer3_0Database.getPassword(),
+                        customer3_0Database.getDatabaseName(),
+                        "customers3.0",
+                        getDezImplementation(),
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "SELECT id,\n" + "name,\n" + "address,\n" + "phone_number FROM customers");
+
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        try (Connection connection = customer3_0Database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE `customers3.0` SET address = 'Hangzhou' WHERE id=103;");
+            statement.execute(
+                    "INSERT INTO `customers3.0` VALUES(110, 'newCustomer', 'Berlin', '12345678')");
+        }
+
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[104, user_4, Shanghai, 123567891234]",
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "+I[110, newCustomer, Berlin, 12345678]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+        customer3_0Database.dropDatabase();
     }
 
     @Test
