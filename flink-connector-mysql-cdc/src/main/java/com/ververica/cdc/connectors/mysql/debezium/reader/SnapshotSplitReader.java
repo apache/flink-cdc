@@ -95,7 +95,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("snapshot-reader-" + subtaskId).build();
+                new ThreadFactoryBuilder()
+                        .setNameFormat("debezium-reader-" + subtaskId)
+                        .setUncaughtExceptionHandler(
+                                (thread, throwable) -> setReadException(throwable))
+                        .build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
@@ -120,7 +124,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit);
-        executorService.submit(
+        executorService.execute(
                 () -> {
                     try {
                         currentTaskRunning = true;
@@ -160,20 +164,14 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                                     new SnapshotBinlogSplitChangeEventSourceContextImpl(),
                                     mySqlOffsetContext);
                         } else {
-                            readException =
+                            setReadException(
                                     new IllegalStateException(
                                             String.format(
                                                     "Read snapshot for mysql split %s fail",
-                                                    currentSnapshotSplit));
+                                                    currentSnapshotSplit)));
                         }
                     } catch (Exception e) {
-                        currentTaskRunning = false;
-                        LOG.error(
-                                String.format(
-                                        "Execute snapshot read task for mysql split %s fail",
-                                        currentSnapshotSplit),
-                                e);
-                        readException = e;
+                        setReadException(e);
                     }
                 });
     }
@@ -333,6 +331,19 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                 String.format(
                         "The first record should be low watermark signal event, but actual is %s",
                         lowWatermark));
+    }
+
+    private void setReadException(Throwable throwable) {
+        currentTaskRunning = false;
+        LOG.error(
+                String.format(
+                        "Execute snapshot read task for mysql split %s fail", currentSnapshotSplit),
+                throwable);
+        if (readException == null) {
+            readException = throwable;
+        } else {
+            readException.addSuppressed(throwable);
+        }
     }
 
     @Override
