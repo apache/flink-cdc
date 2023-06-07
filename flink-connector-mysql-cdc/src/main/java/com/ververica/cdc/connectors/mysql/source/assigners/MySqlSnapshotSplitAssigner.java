@@ -291,7 +291,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             } else if (!remainingTables.isEmpty()) {
                 try {
                     // wait for the asynchronous split to complete
-                    lock.wait();
+                    lock.wait(100);
                 } catch (InterruptedException e) {
                     throw new FlinkRuntimeException(
                             "InterruptedException while waiting for asynchronously snapshot split");
