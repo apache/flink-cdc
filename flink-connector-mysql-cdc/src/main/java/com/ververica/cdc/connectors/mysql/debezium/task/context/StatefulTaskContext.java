@@ -176,7 +176,7 @@ public class StatefulTaskContext {
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */
-    private MySqlOffsetContext loadStartingOffsetState(
+    protected MySqlOffsetContext loadStartingOffsetState(
             OffsetContext.Loader<MySqlOffsetContext> loader, MySqlSplit mySqlSplit) {
         BinlogOffset offset =
                 mySqlSplit.isSnapshotSplit()

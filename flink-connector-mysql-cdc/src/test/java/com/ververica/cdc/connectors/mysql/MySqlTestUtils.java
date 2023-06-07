@@ -49,6 +49,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.Assert.assertTrue;
+
 /** Utils to help test. */
 public class MySqlTestUtils {
 
@@ -171,6 +173,20 @@ public class MySqlTestUtils {
                     "io.debezium.connector.mysql.transforms.ReadToInsertEvent");
         }
         return debeziumProps;
+    }
+
+    public static void assertContainsErrorMsg(Throwable t, String errorMsg) {
+        Throwable temp = t;
+        boolean findFixMsg = false;
+        while (temp != null) {
+            findFixMsg = findFixMsg || temp.getMessage().contains(errorMsg);
+            if (findFixMsg) {
+                break;
+            } else {
+                temp = temp.getCause();
+            }
+        }
+        assertTrue(findFixMsg);
     }
 
     // ---------------------------------------------------------------------------------------

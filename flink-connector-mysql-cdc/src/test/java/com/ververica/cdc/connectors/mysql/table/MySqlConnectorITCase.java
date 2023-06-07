@@ -24,6 +24,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.api.bridge.java.StreamStatementSet;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
@@ -63,11 +64,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
+import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.assertContainsErrorMsg;
 import static com.ververica.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /** Integration tests for MySQL Table source. */
 @RunWith(Parameterized.class)
@@ -78,7 +81,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
 
-    private static final MySqlContainer MYSQL8_CONTAINER = createMySqlContainer(MySqlVersion.V8_0);
+    private static final MySqlContainer MYSQL8_CONTAINER =
+            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
@@ -99,8 +103,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private final UniqueDatabase userDatabase2 =
             new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
 
-    private final UniqueDatabase charsetTestDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "charset_test", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase inventoryDatabase8 =
+            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -1257,7 +1261,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.internal.implementation' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
@@ -1268,7 +1271,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         customer3_0Database.getPassword(),
                         customer3_0Database.getDatabaseName(),
                         "customers3.0",
-                        getDezImplementation(),
                         incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
@@ -2011,6 +2013,71 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testServerIdConflict() {
+        try {
+            env.setRestartStrategy(RestartStrategies.noRestart());
+            customerDatabase.createAndInitialize();
+            int base = 5400;
+            for (int i = 0; i < 2; i++) {
+                String sourceDDL =
+                        String.format(
+                                "CREATE TABLE debezium_source%d ("
+                                        + " `id` INTEGER NOT NULL,"
+                                        + " `name` STRING,"
+                                        + " `address` STRING,"
+                                        + " `phone_name` STRING,"
+                                        + " primary key (`id`) not enforced"
+                                        + ") WITH ("
+                                        + " 'connector' = 'mysql-cdc',"
+                                        + " 'hostname' = '%s',"
+                                        + " 'port' = '%s',"
+                                        + " 'username' = '%s',"
+                                        + " 'password' = '%s',"
+                                        + " 'database-name' = '%s',"
+                                        + " 'table-name' = '%s',"
+                                        + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                        + " 'server-id' = '%s',"
+                                        + " 'server-time-zone' = 'UTC',"
+                                        + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                        + ")",
+                                i,
+                                MYSQL_CONTAINER.getHost(),
+                                MYSQL_CONTAINER.getDatabasePort(),
+                                customerDatabase.getUsername(),
+                                customerDatabase.getPassword(),
+                                customerDatabase.getDatabaseName(),
+                                "customers",
+                                incrementalSnapshot,
+                                getServerId(base),
+                                getSplitSize());
+                String sinkDDL =
+                        String.format(
+                                "CREATE TABLE blackhole_table%d WITH ('connector' = 'blackhole')\n"
+                                        + " LIKE debezium_source%d (EXCLUDING ALL)",
+                                i, i);
+                tEnv.executeSql(sourceDDL);
+                tEnv.executeSql(sinkDDL);
+            }
+
+            StreamStatementSet statementSet = tEnv.createStatementSet();
+            statementSet.addInsertSql(
+                    "Insert into blackhole_table0 select * from debezium_source0");
+            statementSet.addInsertSql(
+                    "Insert into blackhole_table1 select * from debezium_source1");
+            statementSet.execute().await();
+            fail();
+        } catch (Throwable t) {
+            assertContainsErrorMsg(
+                    t,
+                    "The 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
+                            + "The server id conflict may happen in the following situations: \n"
+                            + "1. The server id has been used by other mysql cdc table in the current job.\n"
+                            + "2. The server id has been used by the mysql cdc table in other jobs.\n"
+                            + "3. The server id has been used by other sync tools like canal, debezium and so on.\n");
+        }
+    }
+
     // ------------------------------------------------------------------------------------
 
     private String getServerId() {
@@ -2020,6 +2087,13 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             return serverId + "-" + (serverId + env.getParallelism());
         }
         return String.valueOf(serverId);
+    }
+
+    protected String getServerId(int base) {
+        if (incrementalSnapshot) {
+            return base + "-" + (base + DEFAULT_PARALLELISM);
+        }
+        return String.valueOf(base);
     }
 
     private int getSplitSize() {
