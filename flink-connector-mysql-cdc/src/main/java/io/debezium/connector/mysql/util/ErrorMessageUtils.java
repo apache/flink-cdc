@@ -27,7 +27,8 @@ public class ErrorMessageUtils {
             Pattern.compile(
                     ".*The connector is trying to read binlog.*but this is no longer available on the server.*");
     private static final Pattern MISSING_TRANSACTION_WHEN_BINLOG_EXPIRE =
-            Pattern.compile(".*Cannot replicate because the master purged required binary logs.*");
+            Pattern.compile(
+                    ".*Cannot replicate because the (master|source) purged required binary logs.*");
 
     /** Add more error details for some exceptions. */
     public static String optimizeErrorMessage(String msg) {
