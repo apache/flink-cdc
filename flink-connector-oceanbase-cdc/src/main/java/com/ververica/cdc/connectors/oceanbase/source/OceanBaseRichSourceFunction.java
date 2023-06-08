@@ -38,6 +38,7 @@ import com.oceanbase.clogproxy.client.listener.RecordListener;
 import com.oceanbase.oms.logmessage.LogMessage;
 import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
 import com.ververica.cdc.connectors.oceanbase.table.OceanBaseRecord;
+import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -56,6 +58,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -80,11 +83,16 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final String tableName;
     private final String tableList;
     private final Duration connectTimeout;
+    private final Integer connectMaxRetries;
     private final String hostname;
     private final Integer port;
-    private final String compatibleMode;
+    private final OceanBaseDialect dialect;
     private final String jdbcDriver;
     private final Properties jdbcProperties;
+    private final Integer connectionPoolSize;
+    private final boolean snapshotChunkEnabled;
+    private final String snapshotChunkKeyColumn;
+    private final Integer snapshotChunkSize;
     private final String logProxyHost;
     private final int logProxyPort;
     private final ClientConf logProxyClientConf;
@@ -97,7 +105,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private transient Set<String> tableSet;
     private transient volatile long resolvedTimestamp;
     private transient volatile long startTimestamp;
-    private transient volatile OceanBaseConnection snapshotConnection;
+    private transient OceanBaseDataSource dataSource;
+    private transient OceanBaseSnapshotChunkSplitter chunkSplitter;
     private transient LogProxyClient logProxyClient;
     private transient ListState<Long> offsetState;
     private transient OutputCollector<T> outputCollector;
@@ -111,11 +120,16 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             String tableName,
             String tableList,
             Duration connectTimeout,
+            Integer connectMaxRetries,
             String hostname,
             Integer port,
             String compatibleMode,
             String jdbcDriver,
             Properties jdbcProperties,
+            Integer connectionPoolSize,
+            boolean snapshotChunkEnabled,
+            String snapshotChunkKeyColumn,
+            Integer snapshotChunkSize,
             String logProxyHost,
             int logProxyPort,
             ClientConf logProxyClientConf,
@@ -129,11 +143,19 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.tableName = tableName;
         this.tableList = tableList;
         this.connectTimeout = checkNotNull(connectTimeout);
+        this.connectMaxRetries = connectMaxRetries;
         this.hostname = hostname;
         this.port = port;
-        this.compatibleMode = compatibleMode;
+        this.dialect =
+                "mysql".equalsIgnoreCase(compatibleMode)
+                        ? new OceanBaseMysqlDialect()
+                        : new OceanBaseOracleDialect();
         this.jdbcDriver = jdbcDriver;
         this.jdbcProperties = jdbcProperties;
+        this.connectionPoolSize = connectionPoolSize;
+        this.snapshotChunkEnabled = snapshotChunkEnabled;
+        this.snapshotChunkKeyColumn = snapshotChunkKeyColumn;
+        this.snapshotChunkSize = snapshotChunkSize;
         this.logProxyHost = checkNotNull(logProxyHost);
         this.logProxyPort = checkNotNull(logProxyPort);
         this.logProxyClientConf = checkNotNull(logProxyClientConf);
@@ -175,32 +197,21 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         return resolvedTimestamp <= 0 && snapshot;
     }
 
-    private OceanBaseConnection getSnapshotConnection() {
-        if (snapshotConnection == null) {
-            snapshotConnection =
-                    new OceanBaseConnection(
+    private OceanBaseDataSource getDataSource() {
+        if (dataSource == null) {
+            dataSource =
+                    new OceanBaseDataSource(
                             hostname,
                             port,
                             username,
                             password,
                             connectTimeout,
-                            compatibleMode,
+                            connectMaxRetries,
                             jdbcDriver,
                             jdbcProperties,
-                            getClass().getClassLoader());
+                            connectionPoolSize);
         }
-        return snapshotConnection;
-    }
-
-    private void closeSnapshotConnection() {
-        if (snapshotConnection != null) {
-            try {
-                snapshotConnection.close();
-            } catch (SQLException e) {
-                LOG.error("Failed to close snapshotConnection", e);
-            }
-            snapshotConnection = null;
-        }
+        return dataSource;
     }
 
     private void initTableWhiteList() {
@@ -221,7 +232,9 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
         if (StringUtils.isNotBlank(databaseName) && StringUtils.isNotBlank(tableName)) {
             try {
-                List<String> tables = getSnapshotConnection().getTables(databaseName, tableName);
+                List<String> tables =
+                        OceanBaseJdbcUtils.getTables(
+                                getDataSource(), dialect, databaseName, tableName);
                 LOG.info("Pattern matched tables: {}", tables);
                 localTableSet.addAll(tables);
             } catch (SQLException e) {
@@ -243,60 +256,71 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.obReaderConfig.setTableWhiteList(String.format("%s.*.*", tenantName));
     }
 
-    protected void readSnapshotRecords() {
-        tableSet.forEach(
-                table -> {
-                    String[] schema = table.split("\\.");
-                    readSnapshotRecordsByTable(schema[0], schema[1]);
-                });
+    void readSnapshotRecords() throws Exception {
+        chunkSplitter =
+                new OceanBaseSnapshotChunkSplitter(getDataSource(), connectionPoolSize, dialect);
+        for (String table : tableSet) {
+            String[] schema = table.split("\\.");
+            String dbName = schema[0];
+            String tableName = schema[1];
+            OceanBaseRecord.SourceInfo sourceInfo =
+                    new OceanBaseRecord.SourceInfo(
+                            tenantName, dbName, tableName, resolvedTimestamp);
+
+            List<String> chunkKeyColumns;
+            if (!snapshotChunkEnabled) {
+                chunkKeyColumns = null;
+            } else {
+                if (StringUtils.isNoneBlank(snapshotChunkKeyColumn)) {
+                    chunkKeyColumns =
+                            Arrays.stream(snapshotChunkKeyColumn.split(","))
+                                    .map(String::trim)
+                                    .collect(Collectors.toList());
+                } else {
+                    chunkKeyColumns =
+                            OceanBaseJdbcUtils.getChunkKeyColumns(
+                                    getDataSource(), dialect, dbName, tableName);
+                }
+            }
+            chunkSplitter.split(
+                    dbName,
+                    tableName,
+                    chunkKeyColumns,
+                    snapshotChunkSize,
+                    getResultSetConsumer(sourceInfo));
+        }
+        chunkSplitter.waitTermination();
+        chunkSplitter.close();
+        chunkSplitter.checkException();
+
         snapshotCompleted.set(true);
         resolvedTimestamp = startTimestamp;
     }
 
-    private void readSnapshotRecordsByTable(String databaseName, String tableName) {
-        OceanBaseRecord.SourceInfo sourceInfo =
-                new OceanBaseRecord.SourceInfo(
-                        tenantName, databaseName, tableName, resolvedTimestamp);
-        String fullName;
-        if ("mysql".equalsIgnoreCase(compatibleMode)) {
-            fullName = String.format("`%s`.`%s`", databaseName, tableName);
-        } else {
-            fullName = String.format("%s.%s", databaseName, tableName);
-        }
-        try {
-            LOG.info("Start to read snapshot from {}", fullName);
-            getSnapshotConnection()
-                    .query(
-                            "SELECT * FROM " + fullName,
-                            rs -> {
-                                ResultSetMetaData metaData = rs.getMetaData();
-                                while (rs.next()) {
-                                    Map<String, Object> fieldMap = new HashMap<>();
-                                    for (int i = 0; i < metaData.getColumnCount(); i++) {
-                                        fieldMap.put(
-                                                metaData.getColumnName(i + 1), rs.getObject(i + 1));
-                                    }
-                                    OceanBaseRecord record =
-                                            new OceanBaseRecord(sourceInfo, fieldMap);
-                                    try {
-                                        deserializer.deserialize(record, outputCollector);
-                                    } catch (Exception e) {
-                                        LOG.error("Deserialize snapshot record failed ", e);
-                                        throw new FlinkRuntimeException(e);
-                                    }
-                                }
-                            });
-            LOG.info("Read snapshot from {} finished", fullName);
-        } catch (SQLException e) {
-            LOG.error("Read snapshot from table " + fullName + " failed", e);
-            throw new FlinkRuntimeException(e);
-        }
+    private JdbcConnection.ResultSetConsumer getResultSetConsumer(
+            OceanBaseRecord.SourceInfo sourceInfo) {
+        return rs -> {
+            ResultSetMetaData metaData = rs.getMetaData();
+            while (rs.next()) {
+                Map<String, Object> fieldMap = new HashMap<>();
+                for (int i = 0; i < metaData.getColumnCount(); i++) {
+                    fieldMap.put(metaData.getColumnName(i + 1), rs.getObject(i + 1));
+                }
+                OceanBaseRecord record = new OceanBaseRecord(sourceInfo, fieldMap);
+                try {
+                    deserializer.deserialize(record, outputCollector);
+                } catch (Exception e) {
+                    LOG.error("Deserialize snapshot record failed ", e);
+                    throw new FlinkRuntimeException(e);
+                }
+            }
+        };
     }
 
     protected void readChangeRecords() throws InterruptedException, TimeoutException {
         if (resolvedTimestamp > 0) {
             obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
-            LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
+            LOG.info("Try to start LogProxyClient from timestamp: {}", resolvedTimestamp);
         }
 
         logProxyClient =
@@ -369,11 +393,11 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                 });
 
         logProxyClient.start();
-        LOG.info("LogProxyClient started");
+        LOG.info("Wait for LogProxyClient to start");
         if (!latch.await(connectTimeout.getSeconds(), TimeUnit.SECONDS)) {
-            throw new TimeoutException("Timeout to receive messages in RecordListener");
+            throw new TimeoutException("Timeout to receive messages from LogProxy");
         }
-        LOG.info("LogProxyClient packet processing started from timestamp {}", startTimestamp);
+        LOG.info("LogProxyClient started from timestamp: {}", startTimestamp);
     }
 
     private OceanBaseRecord getChangeRecord(LogMessage message) {
@@ -429,7 +453,12 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void cancel() {
-        closeSnapshotConnection();
+        if (chunkSplitter != null) {
+            chunkSplitter.close();
+        }
+        if (dataSource != null) {
+            dataSource.close();
+        }
         if (logProxyClient != null) {
             logProxyClient.stop();
         }

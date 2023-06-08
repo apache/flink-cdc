@@ -48,6 +48,12 @@ under the License.
             <version>${oblogclient.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>4.0.3</version>
+        </dependency>
+
         <!-- The MySQL JDBC driver for reading snapshot-->
         <dependency>
             <groupId>mysql</groupId>

@@ -55,6 +55,7 @@ under the License.
                                     <include>io.debezium:debezium-core</include>
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-oceanbase-cdc</include>
+                                    <include>com.zaxxer:HikariCP</include>
                                     <include>mysql:mysql-connector-java</include>
                                     <include>com.oceanbase:*</include>
                                     <include>io.netty:*</include>
