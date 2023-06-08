@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -58,6 +59,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
 
     private final String hostname;
     private final Integer port;
+    private final String compatibleMode;
+    private final String jdbcDriver;
+    private final Properties jdbcProperties;
 
     private final String logProxyHost;
     private final Integer logProxyPort;
@@ -90,6 +94,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             Duration connectTimeout,
             String hostname,
             Integer port,
+            String compatibleMode,
+            String jdbcDriver,
+            Properties jdbcProperties,
             String logProxyHost,
             Integer logProxyPort,
             String logProxyClientId,
@@ -109,6 +116,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.connectTimeout = connectTimeout;
         this.hostname = hostname;
         this.port = port;
+        this.compatibleMode = compatibleMode;
+        this.jdbcDriver = jdbcDriver;
+        this.jdbcProperties = jdbcProperties;
         this.logProxyHost = checkNotNull(logProxyHost);
         this.logProxyPort = checkNotNull(logProxyPort);
         this.logProxyClientId = logProxyClientId;
@@ -154,6 +164,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .connectTimeout(connectTimeout)
                         .hostname(hostname)
                         .port(port)
+                        .compatibleMode(compatibleMode)
+                        .jdbcDriver(jdbcDriver)
+                        .jdbcProperties(jdbcProperties)
                         .logProxyHost(logProxyHost)
                         .logProxyPort(logProxyPort)
                         .logProxyClientId(logProxyClientId)
@@ -211,6 +224,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         connectTimeout,
                         hostname,
                         port,
+                        compatibleMode,
+                        jdbcDriver,
+                        jdbcProperties,
                         logProxyHost,
                         logProxyPort,
                         logProxyClientId,
@@ -244,6 +260,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.connectTimeout, that.connectTimeout)
                 && Objects.equals(this.hostname, that.hostname)
                 && Objects.equals(this.port, that.port)
+                && Objects.equals(this.compatibleMode, that.compatibleMode)
+                && Objects.equals(this.jdbcDriver, that.jdbcDriver)
+                && Objects.equals(this.jdbcProperties, that.jdbcProperties)
                 && Objects.equals(this.logProxyHost, that.logProxyHost)
                 && Objects.equals(this.logProxyPort, that.logProxyPort)
                 && Objects.equals(this.logProxyClientId, that.logProxyClientId)
@@ -270,6 +289,9 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 connectTimeout,
                 hostname,
                 port,
+                compatibleMode,
+                jdbcDriver,
+                jdbcProperties,
                 logProxyHost,
                 logProxyPort,
                 logProxyClientId,

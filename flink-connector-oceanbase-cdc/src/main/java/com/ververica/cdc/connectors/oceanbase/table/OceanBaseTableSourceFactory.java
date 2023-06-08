@@ -26,9 +26,11 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.connectors.oceanbase.utils.OptionUtils;
+import com.ververica.cdc.debezium.utils.JdbcUrlUtils;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /** Factory for creating configured instance of {@link OceanBaseTableSource}. */
@@ -110,6 +112,20 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "Integer port number of OceanBase database server or OceanBase proxy server.");
 
+    public static final ConfigOption<String> COMPATIBLE_MODE =
+            ConfigOptions.key("compatible-mode")
+                    .stringType()
+                    .defaultValue("mysql")
+                    .withDescription(
+                            "The compatible mode of OceanBase, can be 'mysql' or 'oracle'.");
+
+    public static final ConfigOption<String> JDBC_DRIVER =
+            ConfigOptions.key("jdbc.driver")
+                    .stringType()
+                    .defaultValue("com.mysql.jdbc.Driver")
+                    .withDescription(
+                            "JDBC driver class name, use 'com.mysql.jdbc.Driver' by default.");
+
     public static final ConfigOption<String> LOG_PROXY_HOST =
             ConfigOptions.key("logproxy.host")
                     .stringType()
@@ -161,11 +177,12 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validate();
+        helper.validateExcept(JdbcUrlUtils.PROPERTIES_PREFIX);
 
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
         ReadableConfig config = helper.getOptions();
+        validate(config);
 
         StartupMode startupMode = StartupMode.getStartupMode(config.get(SCAN_STARTUP_MODE));
 
@@ -181,6 +198,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
         String hostname = config.get(HOSTNAME);
         Integer port = config.get(PORT);
+        String compatibleMode = config.get(COMPATIBLE_MODE);
+        String jdbcDriver = config.get(JDBC_DRIVER);
 
         String logProxyHost = config.get(LOG_PROXY_HOST);
         Integer logProxyPort = config.get(LOG_PROXY_PORT);
@@ -205,6 +224,9 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 connectTimeout,
                 hostname,
                 port,
+                compatibleMode,
+                jdbcDriver,
+                JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 logProxyHost,
                 logProxyPort,
                 logProxyClientId,
@@ -240,6 +262,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(TABLE_LIST);
         options.add(HOSTNAME);
         options.add(PORT);
+        options.add(COMPATIBLE_MODE);
+        options.add(JDBC_DRIVER);
         options.add(CONNECT_TIMEOUT);
         options.add(SERVER_TIME_ZONE);
         options.add(LOG_PROXY_CLIENT_ID);
@@ -247,5 +271,28 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CONFIG_URL);
         options.add(WORKING_MODE);
         return options;
+    }
+
+    private void validate(ReadableConfig config) {
+        String startupMode = config.get(SCAN_STARTUP_MODE);
+        if (StartupMode.getStartupMode(startupMode).equals(StartupMode.INITIAL)) {
+            String compatibleMode =
+                    Objects.requireNonNull(
+                            config.get(COMPATIBLE_MODE),
+                            "'compatible-mode' is required for 'initial' startup mode.");
+            String jdbcDriver =
+                    Objects.requireNonNull(
+                            config.get(JDBC_DRIVER),
+                            "'jdbc.driver' is required for 'initial' startup mode.");
+            if (compatibleMode.equalsIgnoreCase("oracle")) {
+                if (!jdbcDriver.toLowerCase().contains("oceanbase")) {
+                    throw new IllegalArgumentException(
+                            "OceanBase JDBC driver is required for OceanBase Enterprise Edition.");
+                }
+                Objects.requireNonNull(
+                        config.get(CONFIG_URL),
+                        "'config-url' is required for OceanBase Enterprise Edition.");
+            }
+        }
     }
 }
