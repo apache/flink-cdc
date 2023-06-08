@@ -55,6 +55,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String tableName;
     private final String tableList;
     private final Duration connectTimeout;
+    private final Integer connectMaxRetries;
     private final String serverTimeZone;
 
     private final String hostname;
@@ -62,6 +63,10 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String compatibleMode;
     private final String jdbcDriver;
     private final Properties jdbcProperties;
+    private final Boolean snapshotChunkEnabled;
+    private final String snapshotChunkKeyColumn;
+    private final Integer snapshotChunkSize;
+    private final Integer connectionPoolSize;
 
     private final String logProxyHost;
     private final Integer logProxyPort;
@@ -92,11 +97,16 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             String tableList,
             String serverTimeZone,
             Duration connectTimeout,
+            Integer connectMaxRetries,
             String hostname,
             Integer port,
             String compatibleMode,
             String jdbcDriver,
             Properties jdbcProperties,
+            Boolean snapshotChunkEnabled,
+            String snapshotChunkKeyColumn,
+            Integer snapshotChunkSize,
+            Integer connectionPoolSize,
             String logProxyHost,
             Integer logProxyPort,
             String logProxyClientId,
@@ -114,11 +124,16 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.tableList = tableList;
         this.serverTimeZone = serverTimeZone;
         this.connectTimeout = connectTimeout;
+        this.connectMaxRetries = connectMaxRetries;
         this.hostname = hostname;
         this.port = port;
         this.compatibleMode = compatibleMode;
         this.jdbcDriver = jdbcDriver;
         this.jdbcProperties = jdbcProperties;
+        this.snapshotChunkEnabled = snapshotChunkEnabled;
+        this.snapshotChunkKeyColumn = snapshotChunkKeyColumn;
+        this.snapshotChunkSize = snapshotChunkSize;
+        this.connectionPoolSize = connectionPoolSize;
         this.logProxyHost = checkNotNull(logProxyHost);
         this.logProxyPort = checkNotNull(logProxyPort);
         this.logProxyClientId = logProxyClientId;
@@ -162,11 +177,16 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .tableList(tableList)
                         .serverTimeZone(serverTimeZone)
                         .connectTimeout(connectTimeout)
+                        .connectMaxRetries(connectMaxRetries)
                         .hostname(hostname)
                         .port(port)
                         .compatibleMode(compatibleMode)
                         .jdbcDriver(jdbcDriver)
                         .jdbcProperties(jdbcProperties)
+                        .snapshotChunkEnabled(snapshotChunkEnabled)
+                        .snapshotChunkKeyColumn(snapshotChunkKeyColumn)
+                        .snapshotChunkSize(snapshotChunkSize)
+                        .connectionPoolSize(connectionPoolSize)
                         .logProxyHost(logProxyHost)
                         .logProxyPort(logProxyPort)
                         .logProxyClientId(logProxyClientId)
@@ -222,11 +242,16 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         tableList,
                         serverTimeZone,
                         connectTimeout,
+                        connectMaxRetries,
                         hostname,
                         port,
                         compatibleMode,
                         jdbcDriver,
                         jdbcProperties,
+                        snapshotChunkEnabled,
+                        snapshotChunkKeyColumn,
+                        snapshotChunkSize,
+                        connectionPoolSize,
                         logProxyHost,
                         logProxyPort,
                         logProxyClientId,
@@ -258,11 +283,16 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.tableList, that.tableList)
                 && Objects.equals(this.serverTimeZone, that.serverTimeZone)
                 && Objects.equals(this.connectTimeout, that.connectTimeout)
+                && Objects.equals(this.connectMaxRetries, that.connectMaxRetries)
                 && Objects.equals(this.hostname, that.hostname)
                 && Objects.equals(this.port, that.port)
                 && Objects.equals(this.compatibleMode, that.compatibleMode)
                 && Objects.equals(this.jdbcDriver, that.jdbcDriver)
                 && Objects.equals(this.jdbcProperties, that.jdbcProperties)
+                && Objects.equals(this.snapshotChunkEnabled, that.snapshotChunkEnabled)
+                && Objects.equals(this.snapshotChunkKeyColumn, that.snapshotChunkKeyColumn)
+                && Objects.equals(this.snapshotChunkSize, that.snapshotChunkSize)
+                && Objects.equals(this.connectionPoolSize, that.connectionPoolSize)
                 && Objects.equals(this.logProxyHost, that.logProxyHost)
                 && Objects.equals(this.logProxyPort, that.logProxyPort)
                 && Objects.equals(this.logProxyClientId, that.logProxyClientId)
@@ -287,11 +317,16 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 tableList,
                 serverTimeZone,
                 connectTimeout,
+                connectMaxRetries,
                 hostname,
                 port,
                 compatibleMode,
                 jdbcDriver,
                 jdbcProperties,
+                snapshotChunkEnabled,
+                snapshotChunkKeyColumn,
+                snapshotChunkSize,
+                connectionPoolSize,
                 logProxyHost,
                 logProxyPort,
                 logProxyClientId,

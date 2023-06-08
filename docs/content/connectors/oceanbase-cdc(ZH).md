@@ -238,6 +238,13 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>连接器在尝试连接到 OceanBase 数据库服务器超时前的最长时间。</td>
             </tr>
             <tr>
+                <td>connect.max-retries</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">3</td>
+                <td>Integer</td>
+                <td>创建连接时的最大尝试次数。</td>
+            </tr>
+            <tr>
                 <td>server-time-zone</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">+00:00</td>
@@ -247,6 +254,34 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                     合法的值可以是格式为"±hh:mm"的 UTC 时区偏移量，<br>
                     如果 mysql 数据库中的时区信息表已创建，合法的值则可以是创建的时区。
                 </td>
+            </tr>
+            <tr>
+                <td>scan.snapshot.chunk.enabled</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>String</td>
+                <td>是否在全量阶段开启切块并发读取。</td>
+            </tr>
+            <tr>
+                <td>scan.snapshot.chunk.key-column</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>作为数据切分键的列，多个列用逗号分隔。</td>
+            </tr>
+            <tr>
+                <td>scan.snapshot.chunk.size</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">1000</td>
+                <td>Integer</td>
+                <td>快照数据切块的数据量大小。</td>
+            </tr>
+            <tr>
+                <td>connection.pool.size</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">20</td>
+                <td>Integer</td>
+                <td>连接池连接数大小。</td>
             </tr>
             <tr>
                 <td>logproxy.host</td>

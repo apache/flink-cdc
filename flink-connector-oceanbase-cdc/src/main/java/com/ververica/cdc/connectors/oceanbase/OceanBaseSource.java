@@ -53,6 +53,7 @@ public class OceanBaseSource {
         private String tableList;
         private String serverTimeZone;
         private Duration connectTimeout;
+        private Integer connectMaxRetries;
 
         // snapshot reading config
         private String hostname;
@@ -60,6 +61,10 @@ public class OceanBaseSource {
         private String compatibleMode;
         private String jdbcDriver;
         private Properties jdbcProperties;
+        private Integer connectionPoolSize;
+        private Boolean snapshotChunkEnabled;
+        private String snapshotChunkKeyColumn;
+        private Integer snapshotChunkSize;
 
         // incremental reading config
         private String logProxyHost;
@@ -117,6 +122,11 @@ public class OceanBaseSource {
             return this;
         }
 
+        public Builder<T> connectMaxRetries(Integer connectMaxRetries) {
+            this.connectMaxRetries = connectMaxRetries;
+            return this;
+        }
+
         public Builder<T> hostname(String hostname) {
             this.hostname = hostname;
             return this;
@@ -139,6 +149,26 @@ public class OceanBaseSource {
 
         public Builder<T> jdbcProperties(Properties jdbcProperties) {
             this.jdbcProperties = jdbcProperties;
+            return this;
+        }
+
+        public Builder<T> connectionPoolSize(Integer connectionPoolSize) {
+            this.connectionPoolSize = connectionPoolSize;
+            return this;
+        }
+
+        public Builder<T> snapshotChunkEnabled(boolean snapshotChunkEnabled) {
+            this.snapshotChunkEnabled = snapshotChunkEnabled;
+            return this;
+        }
+
+        public Builder<T> snapshotChunkKeyColumn(String snapshotChunkKeyColumn) {
+            this.snapshotChunkKeyColumn = snapshotChunkKeyColumn;
+            return this;
+        }
+
+        public Builder<T> snapshotChunkSize(Integer snapshotChunkSize) {
+            this.snapshotChunkSize = snapshotChunkSize;
             return this;
         }
 
@@ -187,11 +217,23 @@ public class OceanBaseSource {
                 case INITIAL:
                     checkNotNull(hostname, "hostname shouldn't be null on startup mode 'initial'");
                     checkNotNull(port, "port shouldn't be null on startup mode 'initial'");
-                    checkNotNull(
-                            compatibleMode,
-                            "compatibleMode shouldn't be null on startup mode 'initial'");
-                    checkNotNull(
-                            jdbcDriver, "jdbcDriver shouldn't be null on startup mode 'initial'");
+                    if (compatibleMode == null) {
+                        compatibleMode = "mysql";
+                    }
+                    if (jdbcDriver == null) {
+                        jdbcDriver = "com.mysql.jdbc.Driver";
+                    }
+                    if (snapshotChunkEnabled == null) {
+                        snapshotChunkEnabled = true;
+                    }
+                    if (snapshotChunkEnabled) {
+                        if (connectionPoolSize == null) {
+                            connectionPoolSize = 20;
+                        }
+                        if (snapshotChunkSize == null) {
+                            snapshotChunkSize = 1000;
+                        }
+                    }
                     startupTimestamp = 0L;
                     break;
                 case LATEST_OFFSET:
@@ -232,6 +274,10 @@ public class OceanBaseSource {
                 connectTimeout = Duration.ofSeconds(30);
             }
 
+            if (connectMaxRetries == null) {
+                connectMaxRetries = 3;
+            }
+
             if (logProxyClientId == null) {
                 logProxyClientId =
                         String.format(
@@ -270,11 +316,16 @@ public class OceanBaseSource {
                     tableName,
                     tableList,
                     connectTimeout,
+                    connectMaxRetries,
                     hostname,
                     port,
                     compatibleMode,
                     jdbcDriver,
                     jdbcProperties,
+                    connectionPoolSize,
+                    snapshotChunkEnabled,
+                    snapshotChunkKeyColumn,
+                    snapshotChunkSize,
                     logProxyHost,
                     logProxyPort,
                     clientConf,

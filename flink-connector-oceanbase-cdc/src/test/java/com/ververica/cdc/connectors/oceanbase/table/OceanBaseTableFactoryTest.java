@@ -81,10 +81,15 @@ public class OceanBaseTableFactoryTest {
     private static final String TABLE_LIST = "db.table";
     private static final String SERVER_TIME_ZONE = "+00:00";
     private static final String CONNECT_TIMEOUT = "30s";
+    private static final Integer CONNECT_MAX_RETRIES = 3;
     private static final String HOSTNAME = "127.0.0.1";
     private static final Integer PORT = 2881;
     private static final String COMPATIBLE_MODE = "mysql";
     private static final String DRIVER_CLASS = "com.mysql.jdbc.Driver";
+    private static final boolean SNAPSHOT_CHUNK_ENABLED = true;
+    private static final String SNAPSHOT_CHUNK_KEY_COLUMN = "aaa";
+    private static final Integer SNAPSHOT_CHUNK_SIZE = 1000;
+    private static final Integer CONNECTION_POOL_SIZE = 20;
     private static final String LOG_PROXY_HOST = "127.0.0.1";
     private static final Integer LOG_PROXY_PORT = 2983;
     private static final String LOG_PROXY_CLIENT_ID = "clientId";
@@ -112,11 +117,16 @@ public class OceanBaseTableFactoryTest {
                         TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
+                        CONNECT_MAX_RETRIES,
                         null,
                         null,
                         COMPATIBLE_MODE,
                         DRIVER_CLASS,
                         new Properties(),
+                        SNAPSHOT_CHUNK_ENABLED,
+                        null,
+                        SNAPSHOT_CHUNK_SIZE,
+                        CONNECTION_POOL_SIZE,
                         LOG_PROXY_HOST,
                         LOG_PROXY_PORT,
                         null,
@@ -138,6 +148,10 @@ public class OceanBaseTableFactoryTest {
         options.put("port", String.valueOf(PORT));
         options.put("compatible-mode", COMPATIBLE_MODE);
         options.put("jdbc.driver", DRIVER_CLASS);
+        options.put("scan.snapshot.chunk.enabled", String.valueOf(SNAPSHOT_CHUNK_ENABLED));
+        options.put("scan.snapshot.chunk.key-column", SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.put("scan.snapshot.chunk.size", String.valueOf(SNAPSHOT_CHUNK_SIZE));
+        options.put("connection.pool.size", String.valueOf(CONNECTION_POOL_SIZE));
         options.put("logproxy.client.id", LOG_PROXY_CLIENT_ID);
         options.put("rootserver-list", RS_LIST);
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
@@ -154,11 +168,16 @@ public class OceanBaseTableFactoryTest {
                         TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
+                        CONNECT_MAX_RETRIES,
                         "127.0.0.1",
                         2881,
                         COMPATIBLE_MODE,
                         DRIVER_CLASS,
                         new Properties(),
+                        SNAPSHOT_CHUNK_ENABLED,
+                        SNAPSHOT_CHUNK_KEY_COLUMN,
+                        SNAPSHOT_CHUNK_SIZE,
+                        CONNECTION_POOL_SIZE,
                         LOG_PROXY_HOST,
                         LOG_PROXY_PORT,
                         LOG_PROXY_CLIENT_ID,
@@ -196,11 +215,16 @@ public class OceanBaseTableFactoryTest {
                         TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
+                        CONNECT_MAX_RETRIES,
                         null,
                         null,
                         COMPATIBLE_MODE,
                         DRIVER_CLASS,
                         new Properties(),
+                        SNAPSHOT_CHUNK_ENABLED,
+                        null,
+                        SNAPSHOT_CHUNK_SIZE,
+                        CONNECTION_POOL_SIZE,
                         LOG_PROXY_HOST,
                         LOG_PROXY_PORT,
                         null,

@@ -98,6 +98,13 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The maximum time that the connector should wait after trying to connect to the database server or log proxy server before timing out.");
 
+    public static final ConfigOption<Integer> CONNECT_MAX_RETRIES =
+            ConfigOptions.key("connect.max-retries")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "The max times that the connector should retry to build connection.");
+
     public static final ConfigOption<String> HOSTNAME =
             ConfigOptions.key("hostname")
                     .stringType()
@@ -125,6 +132,31 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .defaultValue("com.mysql.jdbc.Driver")
                     .withDescription(
                             "JDBC driver class name, use 'com.mysql.jdbc.Driver' by default.");
+
+    public static final ConfigOption<Boolean> SCAN_SNAPSHOT_CHUNK_ENABLED =
+            ConfigOptions.key("scan.snapshot.chunk.enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription("Whether to enable chunk reading for snapshot.");
+
+    public static final ConfigOption<String> SCAN_SNAPSHOT_CHUNK_KEY_COLUMN =
+            ConfigOptions.key("scan.snapshot.chunk.key-column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The chunk key column of table snapshot, captured tables are split into multiple chunks by the chunk key when read the snapshot of table, multiple columns should be seperated by comma. By default, the chunk key is the primary key.");
+
+    public static final ConfigOption<Integer> SCAN_SNAPSHOT_CHUNK_SIZE =
+            ConfigOptions.key("scan.snapshot.chunk.size")
+                    .intType()
+                    .defaultValue(1000)
+                    .withDescription("The chunk size of table snapshot.");
+
+    public static final ConfigOption<Integer> CONNECTION_POOL_SIZE =
+            ConfigOptions.key("connection.pool.size")
+                    .intType()
+                    .defaultValue(20)
+                    .withDescription("The connection pool size.");
 
     public static final ConfigOption<String> LOG_PROXY_HOST =
             ConfigOptions.key("logproxy.host")
@@ -195,11 +227,16 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
         String serverTimeZone = config.get(SERVER_TIME_ZONE);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
+        Integer connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
 
         String hostname = config.get(HOSTNAME);
         Integer port = config.get(PORT);
         String compatibleMode = config.get(COMPATIBLE_MODE);
         String jdbcDriver = config.get(JDBC_DRIVER);
+        Boolean snapshotChunkEnabled = config.get(SCAN_SNAPSHOT_CHUNK_ENABLED);
+        String snapshotChunkKeyColumn = config.get(SCAN_SNAPSHOT_CHUNK_KEY_COLUMN);
+        Integer snapshotChunkSize = config.get(SCAN_SNAPSHOT_CHUNK_SIZE);
+        Integer connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
 
         String logProxyHost = config.get(LOG_PROXY_HOST);
         Integer logProxyPort = config.get(LOG_PROXY_PORT);
@@ -222,11 +259,16 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 tableList,
                 serverTimeZone,
                 connectTimeout,
+                connectMaxRetries,
                 hostname,
                 port,
                 compatibleMode,
                 jdbcDriver,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
+                snapshotChunkEnabled,
+                snapshotChunkKeyColumn,
+                snapshotChunkSize,
+                connectionPoolSize,
                 logProxyHost,
                 logProxyPort,
                 logProxyClientId,
@@ -264,7 +306,12 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(PORT);
         options.add(COMPATIBLE_MODE);
         options.add(JDBC_DRIVER);
+        options.add(SCAN_SNAPSHOT_CHUNK_ENABLED);
+        options.add(SCAN_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(SCAN_SNAPSHOT_CHUNK_SIZE);
+        options.add(CONNECTION_POOL_SIZE);
         options.add(CONNECT_TIMEOUT);
+        options.add(CONNECT_MAX_RETRIES);
         options.add(SERVER_TIME_ZONE);
         options.add(LOG_PROXY_CLIENT_ID);
         options.add(RS_LIST);

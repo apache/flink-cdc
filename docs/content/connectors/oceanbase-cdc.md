@@ -245,11 +245,46 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td>The maximum time that the connector should wait after trying to connect to the OceanBase database server before timing out.</td>
             </tr>
             <tr>
+                <td>connect.max-retries</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">3</td>
+                <td>Integer</td>
+                <td>The max times that the connector should retry to build connection.</td>
+            </tr>
+            <tr>
                 <td>server-time-zone</td>
                 <td>optional</td>
                 <td style="word-wrap: break-word;">+00:00</td>
                 <td>String</td>
                 <td>The session timezone which controls how temporal types are converted to STRING in OceanBase. Can be UTC offset in format "±hh:mm", or named time zones if the time zone information tables in the mysql database have been created and populated.</td>
+            </tr>
+            <tr>
+                <td>scan.snapshot.chunk.enabled</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">false</td>
+                <td>String</td>
+                <td>Whether to enable chunk reading for snapshot.</td>
+            </tr>
+            <tr>
+                <td>scan.snapshot.chunk.key-column</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk key when read the snapshot of table, multiple columns should be seperated by comma.</td>
+            </tr>
+            <tr>
+                <td>scan.snapshot.chunk.size</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">1000</td>
+                <td>Integer</td>
+                <td>Chunk size for reading snapshot.</td>
+            </tr>
+            <tr>
+                <td>connection.pool.size</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">20</td>
+                <td>Integer</td>
+                <td>The connection pool size.</td>
             </tr>
             <tr>
                 <td>logproxy.host</td>
