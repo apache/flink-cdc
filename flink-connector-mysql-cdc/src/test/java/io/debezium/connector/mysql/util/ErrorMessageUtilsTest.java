@@ -36,7 +36,7 @@ public class ErrorMessageUtilsTest {
     }
 
     @Test
-    public void testOptimizeErrorMessageWhenMissingBinlogPosition() {
+    public void testOptimizeErrorMessageWhenMissingBinlogPositionInMaster() {
         assertEquals(
                 "Cannot replicate because the master purged required binary logs. Replicate the missing transactions from elsewhere, or provision a new slave from backup. Consider increasing the master's binary log expiration period. The GTID set sent by the slave is 'b9d6f3df-79e7-11ed-9a81-0242ac110004:1-33', and the missing transactions are 'b9d6f3df-79e7-11ed-9a81-0242ac110004:34'"
                         + "\nThe required binary logs are no longer available on the server. This may happen in following situations:\n"
@@ -44,6 +44,17 @@ public class ErrorMessageUtilsTest {
                         + "2. The job runs normally, but something happens in the database and lead to the binlog cleanup. You can try to check why this cleanup happens from MySQL side.",
                 ErrorMessageUtils.optimizeErrorMessage(
                         "Cannot replicate because the master purged required binary logs. Replicate the missing transactions from elsewhere, or provision a new slave from backup. Consider increasing the master's binary log expiration period. The GTID set sent by the slave is 'b9d6f3df-79e7-11ed-9a81-0242ac110004:1-33', and the missing transactions are 'b9d6f3df-79e7-11ed-9a81-0242ac110004:34'"));
+    }
+
+    @Test
+    public void testOptimizeErrorMessageWhenMissingBinlogPositionInSource() {
+        assertEquals(
+                "Cannot replicate because the source purged required binary logs. Replicate the missing transactions from elsewhere, or provision a new slave from backup. Consider increasing the master's binary log expiration period. The GTID set sent by the slave is 'b9d6f3df-79e7-11ed-9a81-0242ac110004:1-33', and the missing transactions are 'b9d6f3df-79e7-11ed-9a81-0242ac110004:34'"
+                        + "\nThe required binary logs are no longer available on the server. This may happen in following situations:\n"
+                        + "1. The speed of CDC source reading is too slow to exceed the binlog expired period. You can consider increasing the binary log expiration period, you can also to check whether there is back pressure in the job and optimize your job.\n"
+                        + "2. The job runs normally, but something happens in the database and lead to the binlog cleanup. You can try to check why this cleanup happens from MySQL side.",
+                ErrorMessageUtils.optimizeErrorMessage(
+                        "Cannot replicate because the source purged required binary logs. Replicate the missing transactions from elsewhere, or provision a new slave from backup. Consider increasing the master's binary log expiration period. The GTID set sent by the slave is 'b9d6f3df-79e7-11ed-9a81-0242ac110004:1-33', and the missing transactions are 'b9d6f3df-79e7-11ed-9a81-0242ac110004:34'"));
     }
 
     @Test
