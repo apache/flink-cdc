@@ -136,6 +136,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                     " 'database-name' = '" + POSTGRES.getDatabaseName() + "',",
                     " 'schema-name' = 'inventory',",
                     " 'table-name' = 'products',",
+                    " 'slot.name' = 'flink_incremental',",
                     " 'scan.incremental.snapshot.chunk.size' = '5',",
                     " 'scan.incremental.snapshot.enabled' = 'true',",
                     " 'scan.startup.mode' = 'initial'",
