@@ -20,6 +20,8 @@ import io.debezium.jdbc.JdbcConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -34,25 +36,28 @@ public class OceanBaseSnapshotChunkReader {
     private final OceanBaseDialect dialect;
     private final String dbName;
     private final String tableName;
+    private final int chunkId;
 
     private final List<String> chunkKeyColumns;
-    private final List<Object> lowerBound;
-    private final List<Object> upperBound;
+    private final OceanBaseSnapshotChunkBound lowerBound;
+    private final OceanBaseSnapshotChunkBound upperBound;
     private final int chunkSize;
     private final JdbcConnection.ResultSetConsumer resultSetConsumer;
 
     public OceanBaseSnapshotChunkReader(
-            OceanBaseDialect dialect,
-            String dbName,
-            String tableName,
+            @Nonnull OceanBaseDialect dialect,
+            @Nonnull String dbName,
+            @Nonnull String tableName,
+            int chunkId,
             List<String> chunkKeyColumns,
-            List<Object> lowerBound,
-            List<Object> upperBound,
+            @Nonnull OceanBaseSnapshotChunkBound lowerBound,
+            @Nonnull OceanBaseSnapshotChunkBound upperBound,
             int chunkSize,
             JdbcConnection.ResultSetConsumer resultSetConsumer) {
         this.dialect = dialect;
         this.dbName = dbName;
         this.tableName = tableName;
+        this.chunkId = chunkId;
         this.chunkKeyColumns = chunkKeyColumns;
         this.lowerBound = lowerBound;
         this.upperBound = upperBound;
@@ -66,10 +71,34 @@ public class OceanBaseSnapshotChunkReader {
             statement.setFetchSize(chunkSize);
             String sql =
                     dialect.getQueryChunkSql(
-                            dbName, tableName, chunkKeyColumns, lowerBound, upperBound);
-            LOG.debug("Query chunk data sql: " + sql);
+                            dbName,
+                            tableName,
+                            chunkKeyColumns,
+                            lowerBound.getValue(),
+                            upperBound.getValue());
+            LOG.info("Execute query chunk data sql: " + sql);
             ResultSet resultSet = statement.executeQuery(sql);
             resultSetConsumer.accept(resultSet);
         }
+    }
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public String getTableName() {
+        return tableName;
+    }
+
+    public int getChunkId() {
+        return chunkId;
+    }
+
+    public OceanBaseSnapshotChunkBound getLowerBound() {
+        return lowerBound;
+    }
+
+    public OceanBaseSnapshotChunkBound getUpperBound() {
+        return upperBound;
     }
 }

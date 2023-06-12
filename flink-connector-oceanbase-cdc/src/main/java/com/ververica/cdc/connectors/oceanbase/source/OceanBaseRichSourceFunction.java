@@ -21,6 +21,8 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.base.LongSerializer;
+import org.apache.flink.api.common.typeutils.base.MapSerializer;
+import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
@@ -30,6 +32,8 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oceanbase.clogproxy.client.LogProxyClient;
 import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
@@ -46,7 +50,9 @@ import org.slf4j.LoggerFactory;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -54,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -103,12 +110,18 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final List<OceanBaseRecord> changeRecordBuffer = new LinkedList<>();
 
     private transient Set<String> tableSet;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, OceanBaseSnapshotChunkBound> resolvedChunkBound =
+            new ConcurrentHashMap<>();
+    private final Map<String, List<OceanBaseSnapshotChunkReader>> resolvedChunkReaderCache =
+            new ConcurrentHashMap<>();
     private transient volatile long resolvedTimestamp;
     private transient volatile long startTimestamp;
     private transient OceanBaseDataSource dataSource;
     private transient OceanBaseSnapshotChunkSplitter chunkSplitter;
     private transient LogProxyClient logProxyClient;
-    private transient ListState<Long> offsetState;
+    private transient ListState<Map<String, String>> chunkReaderState;
+    private transient ListState<Long> changeStreamState;
     private transient OutputCollector<T> outputCollector;
 
     public OceanBaseRichSourceFunction(
@@ -258,8 +271,16 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     void readSnapshotRecords() throws Exception {
         chunkSplitter =
-                new OceanBaseSnapshotChunkSplitter(getDataSource(), connectionPoolSize, dialect);
+                new OceanBaseSnapshotChunkSplitter(
+                        getDataSource(), connectionPoolSize, dialect, getCheckpointListener());
         for (String table : tableSet) {
+            OceanBaseSnapshotChunkBound startChunkBound =
+                    resolvedChunkBound.computeIfAbsent(
+                            table, k -> OceanBaseSnapshotChunkBound.START_BOUND);
+            if (OceanBaseSnapshotChunkBound.END_BOUND.equals(startChunkBound)) {
+                continue;
+            }
+
             String[] schema = table.split("\\.");
             String dbName = schema[0];
             String tableName = schema[1];
@@ -282,19 +303,70 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                     getDataSource(), dialect, dbName, tableName);
                 }
             }
+
             chunkSplitter.split(
                     dbName,
                     tableName,
                     chunkKeyColumns,
+                    startChunkBound,
                     snapshotChunkSize,
                     getResultSetConsumer(sourceInfo));
         }
+
         chunkSplitter.waitTermination();
         chunkSplitter.close();
         chunkSplitter.checkException();
 
         snapshotCompleted.set(true);
         resolvedTimestamp = startTimestamp;
+    }
+
+    private OceanBaseSnapshotChunkSplitter.ReadCompleteListener getCheckpointListener() {
+        return chunkReader -> {
+            String table =
+                    String.format("%s.%s", chunkReader.getDbName(), chunkReader.getTableName());
+            OceanBaseSnapshotChunkBound stateBound = resolvedChunkBound.get(table);
+            if (chunkReader.getLowerBound().equals(stateBound)) {
+                resolvedChunkBound.put(table, chunkReader.getUpperBound());
+            } else {
+                resolvedChunkReaderCache
+                        .computeIfAbsent(table, k -> new ArrayList<>())
+                        .add(chunkReader);
+                flushResolvedChunkCache(table);
+            }
+        };
+    }
+
+    private synchronized void flushResolvedChunkCache(String table) {
+        List<OceanBaseSnapshotChunkReader> cachedReaderList = resolvedChunkReaderCache.get(table);
+        if (cachedReaderList == null || cachedReaderList.isEmpty()) {
+            return;
+        }
+        OceanBaseSnapshotChunkBound stateBound =
+                resolvedChunkBound.computeIfAbsent(
+                        table, k -> OceanBaseSnapshotChunkBound.START_BOUND);
+        List<OceanBaseSnapshotChunkReader> matchedList = new LinkedList<>();
+        for (OceanBaseSnapshotChunkReader reader :
+                cachedReaderList.stream()
+                        .sorted(Comparator.comparingInt(OceanBaseSnapshotChunkReader::getChunkId))
+                        .collect(Collectors.toList())) {
+            if (reader.getLowerBound().equals(stateBound)) {
+                matchedList.add(reader);
+                stateBound = reader.getUpperBound();
+            } else {
+                break;
+            }
+        }
+        if (matchedList.isEmpty()) {
+            return;
+        }
+        resolvedChunkBound.put(table, stateBound);
+        cachedReaderList.removeAll(matchedList);
+        if (cachedReaderList.isEmpty()) {
+            resolvedChunkReaderCache.remove(table);
+        } else {
+            resolvedChunkReaderCache.put(table, cachedReaderList);
+        }
     }
 
     private JdbcConnection.ResultSetConsumer getResultSetConsumer(
@@ -426,26 +498,63 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void snapshotState(FunctionSnapshotContext context) throws Exception {
-        LOG.info(
-                "snapshotState checkpoint: {} at resolvedTimestamp: {}",
-                context.getCheckpointId(),
-                resolvedTimestamp);
-        offsetState.clear();
-        offsetState.add(resolvedTimestamp);
+        if (shouldReadSnapshot() && !snapshotCompleted.get()) {
+            Map<String, String> map = new HashMap<>();
+            for (Map.Entry<String, OceanBaseSnapshotChunkBound> entry :
+                    resolvedChunkBound.entrySet()) {
+                map.put(entry.getKey(), objectMapper.writeValueAsString(entry.getValue()));
+            }
+            LOG.info(
+                    "snapshotState checkpoint: {} at resolvedChunkBound: {}",
+                    context.getCheckpointId(),
+                    map);
+            chunkReaderState.clear();
+            chunkReaderState.add(map);
+        } else {
+            LOG.info(
+                    "snapshotState checkpoint: {} at resolvedTimestamp: {}",
+                    context.getCheckpointId(),
+                    resolvedTimestamp);
+            changeStreamState.clear();
+            changeStreamState.add(resolvedTimestamp);
+        }
     }
 
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
         LOG.info("initialize checkpoint");
-        offsetState =
+        chunkReaderState =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        "resolvedChunkBoundState",
+                                        new MapSerializer<>(
+                                                StringSerializer.INSTANCE,
+                                                StringSerializer.INSTANCE)));
+        changeStreamState =
                 context.getOperatorStateStore()
                         .getListState(
                                 new ListStateDescriptor<>(
                                         "resolvedTimestampState", LongSerializer.INSTANCE));
         if (context.isRestored()) {
-            for (final Long offset : offsetState.get()) {
-                resolvedTimestamp = offset;
-                LOG.info("Restore State from resolvedTimestamp: {}", resolvedTimestamp);
+            for (final Long offset : changeStreamState.get()) {
+                if (offset > 0) {
+                    resolvedTimestamp = offset;
+                    LOG.info("Restore State from resolvedTimestamp: {}", resolvedTimestamp);
+                    return;
+                } else {
+                    break;
+                }
+            }
+            for (final Map<String, String> map : chunkReaderState.get()) {
+                objectMapper.enable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT);
+                for (Map.Entry<String, String> entry : map.entrySet()) {
+                    resolvedChunkBound.put(
+                            entry.getKey(),
+                            objectMapper.readValue(
+                                    entry.getValue(), OceanBaseSnapshotChunkBound.class));
+                }
+                LOG.info("Restore State from resolvedChunkBound: {}", map);
                 return;
             }
         }
