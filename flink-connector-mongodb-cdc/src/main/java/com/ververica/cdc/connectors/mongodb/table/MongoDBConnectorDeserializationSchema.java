@@ -124,10 +124,9 @@ public class MongoDBConnectorDeserializationSchema
         Schema valueSchema = record.valueSchema();
 
         OperationType op = operationTypeFor(record);
+
         BsonDocument documentKey =
-                checkNotNull(
-                        extractBsonDocument(
-                                value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD));
+                extractBsonDocument(value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD);
         BsonDocument fullDocument =
                 extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_FIELD);
 
