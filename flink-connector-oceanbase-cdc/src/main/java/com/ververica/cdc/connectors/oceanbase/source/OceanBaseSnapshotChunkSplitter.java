@@ -20,6 +20,8 @@ import io.debezium.jdbc.JdbcConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -50,7 +52,10 @@ public class OceanBaseSnapshotChunkSplitter implements AutoCloseable {
     private transient volatile boolean closed = false;
 
     public OceanBaseSnapshotChunkSplitter(
-            OceanBaseDataSource dataSource, int readerNum, OceanBaseDialect dialect) {
+            OceanBaseDataSource dataSource,
+            int readerNum,
+            OceanBaseDialect dialect,
+            ReadCompleteListener readCompleteListener) {
         this.dataSource = dataSource;
         this.readerNum = readerNum;
         this.dialect = dialect;
@@ -69,6 +74,7 @@ public class OceanBaseSnapshotChunkSplitter implements AutoCloseable {
                                         chunkReaders.poll(1000, TimeUnit.MILLISECONDS);
                                 if (chunk != null) {
                                     chunk.read(dataSource);
+                                    readCompleteListener.accept(chunk);
                                 }
                             } catch (Exception e) {
                                 this.exception = e;
@@ -81,9 +87,10 @@ public class OceanBaseSnapshotChunkSplitter implements AutoCloseable {
     }
 
     public void split(
-            String dbName,
-            String tableName,
+            @Nonnull String dbName,
+            @Nonnull String tableName,
             List<String> chunkKeyColumns,
+            @Nonnull OceanBaseSnapshotChunkBound startChunkBound,
             int chunkSize,
             JdbcConnection.ResultSetConsumer resultSetConsumer)
             throws Exception {
@@ -95,9 +102,10 @@ public class OceanBaseSnapshotChunkSplitter implements AutoCloseable {
                             dialect,
                             dbName,
                             tableName,
+                            0,
                             chunkKeyColumns,
-                            null,
-                            null,
+                            OceanBaseSnapshotChunkBound.START_BOUND,
+                            OceanBaseSnapshotChunkBound.END_BOUND,
                             Integer.MIN_VALUE,
                             resultSetConsumer));
             return;
@@ -105,15 +113,20 @@ public class OceanBaseSnapshotChunkSplitter implements AutoCloseable {
 
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement()) {
-            List<Object> lowerBound = null;
-            List<Object> upperBound = null;
+            OceanBaseSnapshotChunkBound lowerBound;
+            OceanBaseSnapshotChunkBound upperBound = startChunkBound;
 
+            int chunkId = 0;
             do {
                 checkException();
                 String sql =
                         dialect.getQueryNewChunkBoundSql(
-                                dbName, tableName, chunkKeyColumns, upperBound, chunkSize);
-                LOG.debug("Execute query chunk bound sql: " + sql);
+                                dbName,
+                                tableName,
+                                chunkKeyColumns,
+                                upperBound.getValue(),
+                                chunkSize);
+                LOG.info("Execute query chunk bound sql: " + sql);
                 ResultSet rs = statement.executeQuery(sql);
                 List<Object> result;
                 if (rs.next()) {
@@ -125,18 +138,22 @@ public class OceanBaseSnapshotChunkSplitter implements AutoCloseable {
                     result = null;
                 }
                 lowerBound = upperBound;
-                upperBound = result;
+                upperBound =
+                        result == null
+                                ? OceanBaseSnapshotChunkBound.END_BOUND
+                                : OceanBaseSnapshotChunkBound.middleOf(result);
                 chunkReaders.put(
                         new OceanBaseSnapshotChunkReader(
                                 dialect,
                                 dbName,
                                 tableName,
+                                chunkId++,
                                 chunkKeyColumns,
                                 lowerBound,
                                 upperBound,
                                 chunkSize,
                                 resultSetConsumer));
-            } while (upperBound != null);
+            } while (!OceanBaseSnapshotChunkBound.END_BOUND.equals(upperBound));
         }
     }
 
@@ -168,5 +185,9 @@ public class OceanBaseSnapshotChunkSplitter implements AutoCloseable {
                 }
             }
         }
+    }
+
+    interface ReadCompleteListener {
+        void accept(OceanBaseSnapshotChunkReader chunkReader) throws Exception;
     }
 }
