@@ -130,6 +130,7 @@ public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
                 SourceRecord snapshotRecord =
                         createSourceRecord(
                                 createPartitionMap(
+                                        sourceConfig.getScheme(),
                                         sourceConfig.getHosts(),
                                         collectionId.catalog(),
                                         collectionId.table()),

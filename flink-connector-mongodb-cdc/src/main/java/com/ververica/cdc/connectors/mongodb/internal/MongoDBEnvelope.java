@@ -41,6 +41,8 @@ public class MongoDBEnvelope {
 
     public static final String MONGODB_SCHEME = "mongodb";
 
+    public static final String MONGODB_SRV_SCHEME = "mongodb+srv";
+
     public static final String ID_FIELD = "_id";
 
     public static final String DATA_FIELD = "_data";

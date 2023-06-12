@@ -33,6 +33,7 @@ public class MongoDBSourceConfig implements SourceConfig {
 
     private static final long serialVersionUID = 1L;
 
+    private final String scheme;
     private final String hosts;
     @Nullable private final String username;
     @Nullable private final String password;
@@ -49,6 +50,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final int splitSizeMB;
 
     MongoDBSourceConfig(
+            String scheme,
             String hosts,
             @Nullable String username,
             @Nullable String password,
@@ -63,14 +65,14 @@ public class MongoDBSourceConfig implements SourceConfig {
             int heartbeatIntervalMillis,
             int splitMetaGroupSize,
             int splitSizeMB) {
+        this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
         this.password = password;
         this.databaseList = databaseList;
         this.collectionList = collectionList;
         this.connectionString =
-                buildConnectionString(username, password, hosts, connectionOptions)
-                        .getConnectionString();
+                buildConnectionString(username, password, scheme, hosts, connectionOptions);
         this.batchSize = batchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
         this.pollMaxBatchSize = pollMaxBatchSize;
@@ -79,6 +81,10 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
+    }
+
+    public String getScheme() {
+        return scheme;
     }
 
     public String getHosts() {
@@ -166,6 +172,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && heartbeatIntervalMillis == that.heartbeatIntervalMillis
                 && splitMetaGroupSize == that.splitMetaGroupSize
                 && splitSizeMB == that.splitSizeMB
+                && Objects.equals(scheme, that.scheme)
                 && Objects.equals(hosts, that.hosts)
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
@@ -177,6 +184,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     @Override
     public int hashCode() {
         return Objects.hash(
+                scheme,
                 hosts,
                 username,
                 password,

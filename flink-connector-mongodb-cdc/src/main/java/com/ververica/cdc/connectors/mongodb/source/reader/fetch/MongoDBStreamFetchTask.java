@@ -145,6 +145,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                     changeRecord =
                             createSourceRecord(
                                     createPartitionMap(
+                                            sourceConfig.getScheme(),
                                             sourceConfig.getHosts(),
                                             namespace.getDatabaseName(),
                                             namespace.getCollectionName()),
@@ -277,7 +278,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                     changeStreamCursor,
                     sourceConfig.getHeartbeatIntervalMillis(),
                     HEARTBEAT_TOPIC_NAME,
-                    createHeartbeatPartitionMap(sourceConfig.getHosts()));
+                    createHeartbeatPartitionMap(sourceConfig.getScheme(), sourceConfig.getHosts()));
         }
         return null;
     }
