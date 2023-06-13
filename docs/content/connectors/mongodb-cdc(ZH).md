@@ -147,6 +147,13 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>指定要使用的连接器，此处应为 <code>mongodb-cdc</code>.</td>
     </tr>
     <tr>
+      <td>scheme</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">mongodb</td>
+      <td>String</td>
+      <td>指定 MongoDB 连接协议。 eg. <code>mongodb or mongodb+srv.</code></td>
+    </tr>
+    <tr>
       <td>hosts</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
