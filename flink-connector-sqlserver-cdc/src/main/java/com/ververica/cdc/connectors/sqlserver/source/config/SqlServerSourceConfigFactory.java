@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** Factory for creating {@link SqlServerSourceConfig}. */
@@ -47,6 +48,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
 
     @Override
     public SqlServerSourceConfig create(int subtask) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         props.setProperty("connector.class", SqlServerConnector.class.getCanonicalName());
 
@@ -98,6 +100,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 props,
                 dbzConfiguration,
                 DRIVER_ClASS_NAME,

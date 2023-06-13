@@ -163,6 +163,14 @@ public class IncrementalSourceEnumerator
                 continue;
             }
 
+            if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
+                // close idle readers when snapshot phase finished.
+                context.signalNoMoreSplits(nextAwaiting);
+                awaitingReader.remove();
+                LOG.info("Close idle reader of subtask {}", nextAwaiting);
+                continue;
+            }
+
             Optional<SourceSplitBase> split = splitAssigner.getNext();
             if (split.isPresent()) {
                 final SourceSplitBase sourceSplit = split.get();

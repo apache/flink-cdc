@@ -24,6 +24,7 @@ import io.debezium.connector.mysql.MySqlConnectorConfig;
 import java.util.Properties;
 import java.util.UUID;
 
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to initialize {@link MySqlSourceConfig}. */
@@ -47,6 +48,7 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
 
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig create(int subtaskId) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         // hard code server name, because we don't need to distinguish it, docs:
         // Logical name that identifies and provides a namespace for the particular
@@ -113,6 +115,7 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                closeIdleReaders,
                 props,
                 dbzConfiguration,
                 driverClassName,

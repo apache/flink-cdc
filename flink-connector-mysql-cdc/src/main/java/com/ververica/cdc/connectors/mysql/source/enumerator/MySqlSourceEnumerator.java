@@ -187,6 +187,14 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 continue;
             }
 
+            if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
+                // close idle readers when snapshot phase finished.
+                context.signalNoMoreSplits(nextAwaiting);
+                awaitingReader.remove();
+                LOG.info("Close idle reader of subtask {}", nextAwaiting);
+                continue;
+            }
+
             Optional<MySqlSplit> split = splitAssigner.getNext();
             if (split.isPresent()) {
                 final MySqlSplit mySqlSplit = split.get();

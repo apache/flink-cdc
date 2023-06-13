@@ -42,6 +42,7 @@ import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOption
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.mysql.source.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
@@ -71,6 +72,7 @@ public class MySqlSourceConfigFactory implements Serializable {
             CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
@@ -260,8 +262,24 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more
+     * https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished.
+     */
+    public MySqlSourceConfigFactory closeIdleReaders(boolean closeIdleReaders) {
+        this.closeIdleReaders = closeIdleReaders;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         // hard code server name, because we don't need to distinguish it, docs:
         // Logical name that identifies and provides a namespace for the particular
@@ -342,6 +360,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorLower,
                 includeSchemaChanges,
                 scanNewlyAddedTableEnabled,
+                closeIdleReaders,
                 props,
                 jdbcProperties,
                 chunkKeyColumns);

@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.base.options;
 
+import org.apache.flink.annotation.Experimental;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -111,4 +112,14 @@ public class SourceOptions {
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
+            ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to close idle readers at the end of the snapshot phase. This feature depends on "
+                                    + "FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be "
+                                    + "greater than or equal to 1.14 when enabling this feature.");
 }

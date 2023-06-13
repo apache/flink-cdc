@@ -130,6 +130,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
+    public boolean isStreamSplitAssigned() {
+        return isBinlogSplitAssigned;
+    }
+
+    @Override
     public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
         return snapshotSplitAssigner.getFinishedSplitInfos();
     }

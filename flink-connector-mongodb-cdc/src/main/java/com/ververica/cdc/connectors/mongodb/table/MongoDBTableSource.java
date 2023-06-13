@@ -79,6 +79,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean enableParallelRead;
     private final Integer splitMetaGroupSize;
     private final Integer splitSizeMB;
+    private final boolean closeIdlerReaders;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -108,7 +109,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             ZoneId localTimeZone,
             boolean enableParallelRead,
             @Nullable Integer splitMetaGroupSize,
-            @Nullable Integer splitSizeMB) {
+            @Nullable Integer splitSizeMB,
+            boolean closeIdlerReaders) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -129,6 +131,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.enableParallelRead = enableParallelRead;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
+        this.closeIdlerReaders = closeIdlerReaders;
     }
 
     @Override
@@ -178,6 +181,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     MongoDBSource.<RowData>builder()
                             .scheme(scheme)
                             .hosts(hosts)
+                            .closeIdleReaders(closeIdlerReaders)
                             .deserializer(deserializer);
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
@@ -271,7 +275,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         localTimeZone,
                         enableParallelRead,
                         splitMetaGroupSize,
-                        splitSizeMB);
+                        splitSizeMB,
+                        closeIdlerReaders);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -305,7 +310,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(splitMetaGroupSize, that.splitMetaGroupSize)
                 && Objects.equals(splitSizeMB, that.splitSizeMB)
                 && Objects.equals(producedDataType, that.producedDataType)
-                && Objects.equals(metadataKeys, that.metadataKeys);
+                && Objects.equals(metadataKeys, that.metadataKeys)
+                && Objects.equals(closeIdlerReaders, that.closeIdlerReaders);
     }
 
     @Override
@@ -330,7 +336,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 splitMetaGroupSize,
                 splitSizeMB,
                 producedDataType,
-                metadataKeys);
+                metadataKeys,
+                closeIdlerReaders);
     }
 
     @Override

@@ -171,6 +171,11 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     }
 
     @Override
+    public boolean isStreamSplitAssigned() {
+        return isStreamSplitAssigned;
+    }
+
+    @Override
     public void close() {
         snapshotSplitAssigner.close();
     }

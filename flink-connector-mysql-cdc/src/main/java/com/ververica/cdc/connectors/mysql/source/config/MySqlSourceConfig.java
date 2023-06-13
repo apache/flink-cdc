@@ -57,6 +57,7 @@ public class MySqlSourceConfig implements Serializable {
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean closeIdleReaders;
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
 
@@ -87,6 +88,7 @@ public class MySqlSourceConfig implements Serializable {
             double distributionFactorLower,
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
+            boolean closeIdleReaders,
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns) {
@@ -109,6 +111,7 @@ public class MySqlSourceConfig implements Serializable {
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.closeIdleReaders = closeIdleReaders;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
@@ -191,6 +194,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isScanNewlyAddedTableEnabled() {
         return scanNewlyAddedTableEnabled;
+    }
+
+    public boolean isCloseIdleReaders() {
+        return closeIdleReaders;
     }
 
     public Properties getDbzProperties() {
