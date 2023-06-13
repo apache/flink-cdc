@@ -19,12 +19,8 @@ package com.ververica.cdc.connectors.postgres.source.utils;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.DecimalType;
-import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.relational.Column;
-
-import static org.apache.flink.table.api.DataTypes.FIELD;
-import static org.apache.flink.table.api.DataTypes.ROW;
 
 /** A utility class for converting Postgres types to Flink types. */
 public class PostgresTypeUtils {
@@ -72,11 +68,6 @@ public class PostgresTypeUtils {
         } else {
             return dataType.notNull();
         }
-    }
-
-    public static RowType getSplitType(Column splitColumn) {
-        return (RowType)
-                ROW(FIELD(splitColumn.name(), fromDbzColumn(splitColumn))).getLogicalType();
     }
 
     /**

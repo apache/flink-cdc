@@ -34,13 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -87,7 +81,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                     try {
                         streamFetchTask.execute(taskContext);
                     } catch (Exception e) {
-                        currentTaskRunning = false;
+                        this.currentTaskRunning = false;
                         LOG.error(
                                 String.format(
                                         "Execute stream read task for stream split %s fail",
@@ -119,7 +113,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
             sourceRecordsSet.add(new SourceRecords(sourceRecords));
             return sourceRecordsSet.iterator();
         } else {
-            return null;
+            return Collections.emptyIterator();
         }
     }
 

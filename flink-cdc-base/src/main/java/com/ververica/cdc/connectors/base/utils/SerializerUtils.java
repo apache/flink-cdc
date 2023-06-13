@@ -79,9 +79,13 @@ public class SerializerUtils {
         }
     }
 
+    /**
+     * Check whether the catalog should be used before the schema.
+     *
+     * @param tableId the table id
+     * @return false if catalog is not defined but the schema is defined; otherwise return true
+     */
     public static boolean shouldUseCatalogBeforeSchema(TableId tableId) {
-        // if catalog is not defined but the schema is defined return this flag as false
-        // otherwise return true
         return !(tableId.catalog() == null && tableId.schema() != null);
     }
 }

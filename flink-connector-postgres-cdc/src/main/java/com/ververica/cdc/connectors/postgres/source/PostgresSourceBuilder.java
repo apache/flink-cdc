@@ -36,6 +36,8 @@ public class PostgresSourceBuilder<T> {
     private final PostgresSourceConfigFactory configFactory = new PostgresSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
 
+    private PostgresSourceBuilder() {}
+
     /**
      * The name of the Postgres logical decoding plug-in installed on the server. Supported values
      * are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and
@@ -236,6 +238,10 @@ public class PostgresSourceBuilder<T> {
                 PostgresOffsetFactory offsetFactory,
                 PostgresDialect dataSourceDialect) {
             super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+        }
+
+        public static PostgresSourceBuilder builder() {
+            return new PostgresSourceBuilder<>();
         }
     }
 }
