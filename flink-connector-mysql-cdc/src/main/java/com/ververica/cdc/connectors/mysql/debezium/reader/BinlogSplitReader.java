@@ -266,13 +266,16 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             pureBinlogPhaseTables.add(tableId);
             return true;
         }
-        // capture dynamically new added tables
-        // TODO: there is still very little chance that we can't capture new added table.
-        //  That the tables dynamically added after discovering captured tables in enumerator
-        //  and before the lowest binlog offset of all table splits. This interval should be
-        //  very short, so we don't support it for now.
-        return !maxSplitHighWatermarkMap.containsKey(tableId)
-                && capturedTableFilter.isIncluded(tableId);
+
+        // Use still need to capture new sharding table if user disable scan new added table,
+        // The history records for all new added tables(including sharding table and normal table)
+        // will be capture after restore from a savepoint if user enable scan new added table
+        if (!statefulTaskContext.getSourceConfig().isScanNewlyAddedTableEnabled()) {
+            // the new added sharding table without history records
+            return !maxSplitHighWatermarkMap.containsKey(tableId)
+                    && capturedTableFilter.isIncluded(tableId);
+        }
+        return false;
     }
 
     private void configureFilter() {
