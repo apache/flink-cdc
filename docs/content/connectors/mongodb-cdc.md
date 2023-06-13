@@ -206,11 +206,19 @@ Connector Options
       </td>
     </tr>
     <tr>
-      <td>copy.existing</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether copy existing data from source collections.</td>
+        <td>scan.startup.mode</td>
+        <td>optional</td>
+        <td style="word-wrap: break-word;">initial</td>
+        <td>String</td>
+        <td>Optional startup mode for MongoDB CDC consumer, valid enumerations are "initial", "latest-offset" and "timestamp".
+            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+    </tr>
+    <tr>
+        <td>scan.startup.timestamp-millis</td>
+        <td>optional</td>
+        <td style="word-wrap: break-word;">(none)</td>
+        <td>Long</td>
+        <td>Timestamp in millis of the start point, only used for <code>'timestamp'</code> startup mode.</td>
     </tr>
     <tr>
       <td>copy.existing.queue.size</td>
@@ -337,20 +345,40 @@ Features
 
 The MongoDB CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change stream events with **exactly-once processing** even failures happen. 
 
-### Snapshot When Startup Or Not
+### Startup Reading Position
 
-The config option `copy.existing` specifies whether do snapshot when MongoDB CDC consumer startup. <br>Defaults to `true`.
+The config option `scan.startup.mode` specifies the startup mode for MongoDB CDC consumer. The valid enumerations are:
 
-### Snapshot Data Filters
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest oplog.
+- `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
+  the end of the oplog which means only have the changes since the connector was started.
+- `timestamp`: Skip snapshot phase and start reading oplog events from a specific timestamp.
 
-The config option `copy.existing.pipeline` describing the filters when copying existing data.<br>
-This can filter only required data and improve the use of indexes by the copying manager.
-
-In the following example, the `$match` aggregation operator ensures that only documents in which the closed field is set to false are copied.
-
+For example in DataStream API:
+```java
+MongoDBSource.builder()
+    .startupOptions(StartupOptions.latest()) // Start from latest offset
+    .startupOptions(StartupOptions.timestamp(1667232000000L) // Start from timestamp
+    .build()
 ```
-'copy.existing.pipeline' = '[ { "$match": { "closed": "false" } } ]'
+
+and with SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.startup.mode' = 'latest-offset', -- Start from latest offset
+    ...
+    'scan.incremental.snapshot.enabled' = 'true', -- To use timestamp startup mode should enable incremental snapshot.
+    'scan.startup.mode' = 'timestamp', -- Start from timestamp
+    'scan.startup.timestamp-millis' = '1667232000000' -- Timestamp under timestamp startup mode
+    ...
+)
 ```
+
+**Notes:**
+- 'timestamp' startup mode is not supported by legacy source. To use timestamp startup mode, you need to enable incremental snapshot.
+
 
 ### Change Streams
 

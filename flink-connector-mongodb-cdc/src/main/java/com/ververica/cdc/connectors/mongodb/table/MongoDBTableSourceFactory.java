@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mongodb.table;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
@@ -26,6 +27,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.utils.OptionUtils;
 
 import java.time.ZoneId;
@@ -34,10 +36,11 @@ import java.util.Set;
 
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_MODE;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COLLECTION;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.CONNECTION_OPTIONS;
-import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING_QUEUE_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.DATABASE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
@@ -83,7 +86,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         Integer heartbeatIntervalMillis = config.get(HEARTBEAT_INTERVAL_MILLIS);
 
-        Boolean copyExisting = config.get(COPY_EXISTING);
+        StartupOptions startupOptions = getStartupOptions(config);
         Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
 
         String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
@@ -114,7 +117,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 database,
                 collection,
                 connectionOptions,
-                copyExisting,
+                startupOptions,
                 copyExistingQueueSize,
                 batchSize,
                 pollMaxBatchSize,
@@ -131,6 +134,31 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         checkArgument(
                 pk.getColumns().size() == 1 && pk.getColumns().contains(DOCUMENT_ID_FIELD),
                 message);
+    }
+
+    private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
+    private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
+
+    private static StartupOptions getStartupOptions(ReadableConfig config) {
+        String modeString = config.get(SCAN_STARTUP_MODE);
+
+        switch (modeString.toLowerCase()) {
+            case SCAN_STARTUP_MODE_VALUE_INITIAL:
+                return StartupOptions.initial();
+            case SCAN_STARTUP_MODE_VALUE_LATEST:
+                return StartupOptions.latest();
+            case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
+            default:
+                throw new ValidationException(
+                        String.format(
+                                "Invalid value for option '%s'. Supported values are [%s, %s], but was: %s",
+                                SCAN_STARTUP_MODE.key(),
+                                SCAN_STARTUP_MODE_VALUE_INITIAL,
+                                SCAN_STARTUP_MODE_VALUE_LATEST,
+                                modeString));
+        }
     }
 
     @Override
@@ -154,7 +182,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CONNECTION_OPTIONS);
         options.add(DATABASE);
         options.add(COLLECTION);
-        options.add(COPY_EXISTING);
+        options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(COPY_EXISTING_QUEUE_SIZE);
         options.add(BATCH_SIZE);
         options.add(POLL_MAX_BATCH_SIZE);

@@ -44,6 +44,11 @@ public class BinlogOffsetFactory extends OffsetFactory {
     }
 
     @Override
+    public Offset createTimestampOffset(long timestampMillis) {
+        return new BinlogOffset(timestampMillis / 1000);
+    }
+
+    @Override
     public Offset createInitialOffset() {
         return BinlogOffset.INITIAL_OFFSET;
     }

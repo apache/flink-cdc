@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mongodb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -29,6 +30,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
 import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceBuilder;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -69,7 +71,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String password;
     private final String database;
     private final String collection;
-    private final Boolean copyExisting;
+    private final StartupOptions startupOptions;
     private final Integer copyExistingQueueSize;
     private final Integer batchSize;
     private final Integer pollMaxBatchSize;
@@ -100,7 +102,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String database,
             @Nullable String collection,
             @Nullable String connectionOptions,
-            @Nullable Boolean copyExisting,
+            StartupOptions startupOptions,
             @Nullable Integer copyExistingQueueSize,
             @Nullable Integer batchSize,
             @Nullable Integer pollMaxBatchSize,
@@ -119,7 +121,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.database = database;
         this.collection = collection;
         this.connectionOptions = connectionOptions;
-        this.copyExisting = copyExisting;
+        this.startupOptions = checkNotNull(startupOptions);
         this.copyExistingQueueSize = copyExistingQueueSize;
         this.batchSize = batchSize;
         this.pollMaxBatchSize = pollMaxBatchSize;
@@ -182,6 +184,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .scheme(scheme)
                             .hosts(hosts)
                             .closeIdleReaders(closeIdlerReaders)
+                            .startupOptions(startupOptions)
                             .deserializer(deserializer);
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
@@ -189,7 +192,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             Optional.ofNullable(username).ifPresent(builder::username);
             Optional.ofNullable(password).ifPresent(builder::password);
             Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
-            Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
             Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
             Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
             Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
@@ -206,12 +208,24 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .hosts(hosts)
                             .deserializer(deserializer);
 
+            switch (startupOptions.startupMode) {
+                case INITIAL:
+                    builder.copyExisting(true);
+                    break;
+                case LATEST_OFFSET:
+                    builder.copyExisting(false);
+                    break;
+                default:
+                    throw new ValidationException(
+                            startupOptions.startupMode
+                                    + " is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
+            }
+
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
             Optional.ofNullable(username).ifPresent(builder::username);
             Optional.ofNullable(password).ifPresent(builder::password);
             Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
-            Optional.ofNullable(copyExisting).ifPresent(builder::copyExisting);
             Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
             Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
             Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
@@ -266,7 +280,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         database,
                         collection,
                         connectionOptions,
-                        copyExisting,
+                        startupOptions,
                         copyExistingQueueSize,
                         batchSize,
                         pollMaxBatchSize,
@@ -299,7 +313,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(database, that.database)
                 && Objects.equals(collection, that.collection)
                 && Objects.equals(connectionOptions, that.connectionOptions)
-                && Objects.equals(copyExisting, that.copyExisting)
+                && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
                 && Objects.equals(batchSize, that.batchSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
@@ -325,7 +339,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 database,
                 collection,
                 connectionOptions,
-                copyExisting,
+                startupOptions,
                 copyExistingQueueSize,
                 batchSize,
                 pollMaxBatchSize,

@@ -57,6 +57,10 @@ public class BinlogOffset extends Offset {
         this(filename, position, 0L, 0L, 0L, null, null);
     }
 
+    public BinlogOffset(long binlogEpochSecs) {
+        this(null, 0L, 0L, 0L, binlogEpochSecs, null, null);
+    }
+
     public BinlogOffset(
             String filename,
             long position,

@@ -136,18 +136,13 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
-     * copy.existing
+     * scan.startup.mode
      *
-     * <p>Copy existing data from source collections and convert them to Change Stream events on
-     * their respective topics. Any changes to the data that occur during the copy process are
-     * applied once the copy is completed.
+     * <p>Optional startup mode for MongoDB CDC consumer, valid enumerations are initial,
+     * latest-offset, timestamp. Default: initial
      */
-    public MongoDBSourceBuilder<T> copyExisting(boolean copyExisting) {
-        if (copyExisting) {
-            this.configFactory.startupOptions(StartupOptions.initial());
-        } else {
-            this.configFactory.startupOptions(StartupOptions.latest());
-        }
+    public MongoDBSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
+        this.configFactory.startupOptions(startupOptions);
         return this;
     }
 
