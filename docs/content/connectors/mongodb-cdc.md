@@ -147,6 +147,13 @@ Connector Options
       <td>Specify what connector to use, here should be <code>mongodb-cdc</code>.</td>
     </tr>
     <tr>
+      <td>scheme</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">mongodb</td>
+      <td>String</td>
+      <td>The protocol connected to MongoDB. eg. <code>mongodb or mongodb+srv.</code></td>
+    </tr>
+    <tr>
       <td>hosts</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>

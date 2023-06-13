@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
@@ -52,6 +53,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -111,6 +113,7 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         SCHEMA,
+                        SCHEME.defaultValue(),
                         MY_HOSTS,
                         USER,
                         PASSWORD,
@@ -133,6 +136,7 @@ public class MongoDBTableFactoryTest {
     @Test
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
+        options.put("scheme", MONGODB_SRV_SCHEME);
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
         options.put("copy.existing", "false");
         options.put("copy.existing.queue.size", "100");
@@ -148,6 +152,7 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         SCHEMA,
+                        MONGODB_SRV_SCHEME,
                         MY_HOSTS,
                         USER,
                         PASSWORD,
@@ -182,6 +187,7 @@ public class MongoDBTableFactoryTest {
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
+                        SCHEME.defaultValue(),
                         MY_HOSTS,
                         USER,
                         PASSWORD,

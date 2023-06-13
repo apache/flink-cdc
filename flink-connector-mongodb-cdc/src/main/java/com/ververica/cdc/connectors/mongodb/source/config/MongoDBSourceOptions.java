@@ -20,8 +20,18 @@ import org.apache.flink.annotation.Experimental;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
+
 /** Configurations for {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}. */
 public class MongoDBSourceOptions {
+
+    public static final ConfigOption<String> SCHEME =
+            ConfigOptions.key("scheme")
+                    .stringType()
+                    .defaultValue(MONGODB_SCHEME)
+                    .withDescription(
+                            "The protocol connected to MongoDB. eg. mongodb or mongodb+srv. "
+                                    + "The +srv indicates to the client that the hostname that follows corresponds to a DNS SRV record. Defaults to mongodb.");
 
     public static final ConfigOption<String> HOSTS =
             ConfigOptions.key("hosts")

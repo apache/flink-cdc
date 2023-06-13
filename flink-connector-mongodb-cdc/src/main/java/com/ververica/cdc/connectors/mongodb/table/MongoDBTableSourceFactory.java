@@ -46,6 +46,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.USERNAME;
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -65,6 +66,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         final ReadableConfig config = helper.getOptions();
 
+        String scheme = config.get(SCHEME);
         String hosts = config.get(HOSTS);
         String connectionOptions = config.getOptional(CONNECTION_OPTIONS).orElse(null);
 
@@ -103,6 +105,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         return new MongoDBTableSource(
                 physicalSchema,
+                scheme,
                 hosts,
                 username,
                 password,
@@ -142,6 +145,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(SCHEME);
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(CONNECTION_OPTIONS);
