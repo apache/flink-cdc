@@ -201,10 +201,4 @@ public enum AssignerStatus {
     public static boolean isNewlyAddedAssigningSnapshotFinished(AssignerStatus assignerStatus) {
         return assignerStatus == NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED;
     }
-
-    /** Returns whether the split assigner has finished all tables assignment. */
-    public static boolean isAssigningFinished(AssignerStatus assignerStatus) {
-        return assignerStatus == INITIAL_ASSIGNING_FINISHED
-                || assignerStatus == NEWLY_ADDED_ASSIGNING_FINISHED;
-    }
 }

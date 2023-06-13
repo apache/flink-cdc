@@ -36,7 +36,7 @@ public class EnvironmentUtils {
     public static void checkSupportCheckpointsAfterTasksFinished(boolean closeIdleReaders) {
         if (closeIdleReaders && !supportCheckpointsAfterTasksFinished()) {
             throw new UnsupportedOperationException(
-                    "To enabled checkpoints after tasks finished requires flink version greater than or equal to 1.14, current version is "
+                    "The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true. But the current version is "
                             + runtimeFlinkVersion());
         }
     }

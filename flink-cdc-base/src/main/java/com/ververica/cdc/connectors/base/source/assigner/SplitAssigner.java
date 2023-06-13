@@ -57,7 +57,7 @@ public interface SplitAssigner {
 
     /** Whether the split assigner is finished stream split assigning. */
     default boolean isStreamSplitAssigned() {
-        return false;
+        throw new UnsupportedOperationException("Not support to assigning StreamSplit.");
     }
 
     /**

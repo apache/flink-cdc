@@ -24,7 +24,7 @@ public class VersionComparable implements Comparable<VersionComparable> {
     private int patchVersion;
     private String versionString;
 
-    public VersionComparable(String versionString) {
+    private VersionComparable(String versionString) {
         this.versionString = versionString;
         try {
             int pos = versionString.indexOf('-');

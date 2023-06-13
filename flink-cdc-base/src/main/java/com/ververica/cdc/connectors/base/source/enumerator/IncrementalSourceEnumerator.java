@@ -163,17 +163,20 @@ public class IncrementalSourceEnumerator
                 continue;
             }
 
+            if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
+                // close idle readers when snapshot phase finished.
+                context.signalNoMoreSplits(nextAwaiting);
+                awaitingReader.remove();
+                LOG.info("Close idle reader of subtask {}", nextAwaiting);
+                continue;
+            }
+
             Optional<SourceSplitBase> split = splitAssigner.getNext();
             if (split.isPresent()) {
                 final SourceSplitBase sourceSplit = split.get();
                 context.assignSplit(sourceSplit, nextAwaiting);
                 awaitingReader.remove();
                 LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
-            } else if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
-                // close idle readers when snapshot phase finished.
-                context.signalNoMoreSplits(nextAwaiting);
-                awaitingReader.remove();
-                LOG.info("Close idle reader of subtask {}", nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
                 break;

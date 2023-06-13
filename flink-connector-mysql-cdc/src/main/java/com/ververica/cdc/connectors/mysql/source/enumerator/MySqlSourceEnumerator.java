@@ -53,7 +53,6 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
 
 /**
@@ -188,18 +187,20 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 continue;
             }
 
+            if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
+                // close idle readers when snapshot phase finished.
+                context.signalNoMoreSplits(nextAwaiting);
+                awaitingReader.remove();
+                LOG.info("Close idle reader of subtask {}", nextAwaiting);
+                continue;
+            }
+
             Optional<MySqlSplit> split = splitAssigner.getNext();
             if (split.isPresent()) {
                 final MySqlSplit mySqlSplit = split.get();
                 context.assignSplit(mySqlSplit, nextAwaiting);
                 awaitingReader.remove();
                 LOG.info("Assign split {} to subtask {}", mySqlSplit, nextAwaiting);
-            } else if (isAssigningFinished(splitAssigner.getAssignerStatus())
-                    && sourceConfig.isCloseIdleReaders()) {
-                // close idle readers when snapshot phase finished.
-                context.signalNoMoreSplits(nextAwaiting);
-                awaitingReader.remove();
-                LOG.info("Close idle reader of subtask {}", nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
                 requestBinlogSplitUpdateIfNeed();

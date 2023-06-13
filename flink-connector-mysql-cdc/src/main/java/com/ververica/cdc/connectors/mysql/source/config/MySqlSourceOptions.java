@@ -254,6 +254,5 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "Whether to close idle readers at the end of the snapshot phase. This feature depends on "
                                     + "FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be "
-                                    + "greater than or equal to 1.14, and the configuration 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' needs to be set to"
-                                    + "true.");
+                                    + "greater than or equal to 1.14 when enabling this feature.");
 }
