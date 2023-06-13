@@ -18,6 +18,10 @@
     <option name="links">
       <list>
         <IssueNavigationLink>
+          <option name="issueRegexp" value="CDC\-(\d+)" />
+          <option name="linkRegexp" value="https://github.com/ververica/flink-cdc-connectors/issues/$1" />
+        </IssueNavigationLink>
+        <IssueNavigationLink>
           <option name="issueRegexp" value="#(\d+)" />
           <option name="linkRegexp" value="https://github.com/ververica/flink-cdc-connectors/pull/$1" />
         </IssueNavigationLink>
