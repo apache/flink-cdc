@@ -261,6 +261,13 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>Integer</td>
       <td>增量快照的区块大小 mb。</td>
     </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在快照结束后关闭空闲的Reader. 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true.</td>
+    </tr>
     </tbody>
 </table>
 </div>
