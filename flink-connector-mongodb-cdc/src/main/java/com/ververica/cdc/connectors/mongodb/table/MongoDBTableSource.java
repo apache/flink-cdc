@@ -50,7 +50,7 @@ import java.util.stream.Stream;
 
 import static com.mongodb.MongoNamespace.checkCollectionNameValidity;
 import static com.mongodb.MongoNamespace.checkDatabaseNameValidity;
-import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.containsRegexMetaCharacters;
+import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.inferIsRegularExpression;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -158,8 +158,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         String collectionList = null;
         if (StringUtils.isNotEmpty(database) && StringUtils.isNotEmpty(collection)) {
             // explicitly specified database and collection.
-            if (!containsRegexMetaCharacters(database)
-                    && !containsRegexMetaCharacters(collection)) {
+            if (!inferIsRegularExpression(database) && !inferIsRegularExpression(collection)) {
                 checkDatabaseNameValidity(database);
                 checkCollectionNameValidity(collection);
                 databaseList = database;

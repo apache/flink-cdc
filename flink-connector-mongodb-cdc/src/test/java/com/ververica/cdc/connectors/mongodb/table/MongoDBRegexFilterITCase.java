@@ -246,6 +246,26 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testMatchDatabaseAndCollectionContainsDash() throws Exception {
+        // 1. Given collections:
+        // db0: [coll-a1, coll-a2, coll-b1, coll-b2]
+        String db0 = ROUTER.executeCommandFileInSeparateDatabase("ns-regex");
+
+        TableResult result = submitTestCase(db0, "coll-a1");
+
+        // 2. Wait change stream records come
+        waitForSinkSize("mongodb_sink", 1);
+
+        // 3. Check results
+        String[] expected = new String[] {String.format("+I[%s, coll-a1, A101]", db0)};
+
+        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        assertThat(actual, containsInAnyOrder(expected));
+
+        result.getJobClient().get().cancel().get();
+    }
+
     private TableResult submitTestCase(String database, String collection) throws Exception {
         String sourceDDL =
                 "CREATE TABLE mongodb_source ("
