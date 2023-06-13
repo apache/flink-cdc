@@ -112,12 +112,12 @@ public class IncrementalSourceRecordEmitter<T>
             }
         } else if (isDataChangeRecord(element)) {
             LOG.trace("Process DataChangeRecord: {}; splitState = {}", element, splitState);
-            updateStartingOffsetForSplit(splitState, element);
+            updateStreamSplitState(splitState, element);
             reportMetrics(element);
             emitElement(element, output);
         } else if (isHeartbeatEvent(element)) {
             LOG.trace("Process Heartbeat: {}; splitState = {}", element, splitState);
-            updateStartingOffsetForSplit(splitState, element);
+            updateStreamSplitState(splitState, element);
         } else {
             // unknown element
             LOG.info(
@@ -125,7 +125,7 @@ public class IncrementalSourceRecordEmitter<T>
         }
     }
 
-    private void updateStartingOffsetForSplit(SourceSplitState splitState, SourceRecord element) {
+    private void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
         if (splitState.isStreamSplitState()) {
             Offset position = getOffsetPosition(element);
             splitState.asStreamSplitState().setStartingOffset(position);

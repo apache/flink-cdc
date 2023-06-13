@@ -274,13 +274,6 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td>The max retry times that the connector should retry to build database server connection.</td>
     </tr>
     <tr>
-          <td>scan.incremental.snapshot.chunk.size</td>
-          <td>optional</td>
-          <td style="word-wrap: break-word;">8096</td>
-          <td>Integer</td>
-          <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
-    </tr>
-    <tr>
           <td>scan.snapshot.fetch.size</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">1024</td>

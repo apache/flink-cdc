@@ -30,15 +30,14 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.ZoneOffset;
 
 /**
  * A factory for creating various Debezium objects
  *
  * <p>It is a hack to access package-private constructor in debezium.
  */
-public class PostgresObjectFactory {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PostgresObjectFactory.class);
+public class PostgresObjectUtils {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PostgresObjectUtils.class);
 
     /** Create a new PostgresSchema and initialize the content of the schema. */
     public static PostgresSchema newSchema(
@@ -75,18 +74,7 @@ public class PostgresObjectFactory {
     public static PostgresConnection.PostgresValueConverterBuilder newPostgresValueConverterBuilder(
             PostgresConnectorConfig config) {
         return typeRegistry ->
-                new PostgresValueConverter(
-                        StandardCharsets.UTF_8,
-                        config.getDecimalMode(),
-                        config.getTemporalPrecisionMode(),
-                        ZoneOffset.UTC,
-                        null,
-                        config.includeUnknownDatatypes(),
-                        typeRegistry,
-                        config.hStoreHandlingMode(),
-                        config.binaryHandlingMode(),
-                        config.intervalHandlingMode(),
-                        config.toastedValuePlaceholder());
+                PostgresValueConverter.of(config, StandardCharsets.UTF_8, typeRegistry);
     }
 
     // modified from

@@ -67,14 +67,4 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                     .defaultValue(Duration.ofSeconds(30))
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available replication slot offsets");
-    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
-            ConfigOptions.key("scan.incremental.snapshot.enabled")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription(
-                            "Incremental snapshot is a new mechanism to read snapshot of a table. "
-                                    + "Compared to the old snapshot mechanism, the incremental snapshot has many advantages, including:\n"
-                                    + "(1) source can be parallel during snapshot reading, \n"
-                                    + "(2) source can perform checkpoints in the chunk granularity during snapshot reading, \n"
-                                    + "(3) source doesn't need to acquire global read lock before snapshot reading.");
 }

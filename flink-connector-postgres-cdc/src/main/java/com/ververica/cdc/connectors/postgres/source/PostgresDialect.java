@@ -47,7 +47,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static io.debezium.connector.postgresql.PostgresObjectFactory.newPostgresValueConverterBuilder;
+import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresValueConverterBuilder;
 import static io.debezium.connector.postgresql.Utils.currentOffset;
 
 /** The dialect for Postgres. */

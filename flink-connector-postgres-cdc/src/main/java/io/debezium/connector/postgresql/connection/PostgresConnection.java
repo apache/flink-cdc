@@ -103,23 +103,7 @@ public class PostgresConnection extends JdbcConnection {
      */
     public PostgresConnection(
             Configuration config, PostgresValueConverterBuilder valueConverterBuilder) {
-        super(
-                config,
-                FACTORY,
-                PostgresConnection::validateServerVersion,
-                PostgresConnection::defaultSettings);
-
-        if (Objects.isNull(valueConverterBuilder)) {
-            this.typeRegistry = null;
-            this.defaultValueConverter = null;
-        } else {
-            this.typeRegistry = new TypeRegistry(this);
-
-            final PostgresValueConverter valueConverter =
-                    valueConverterBuilder.build(this.typeRegistry);
-            this.defaultValueConverter =
-                    new PostgresDefaultValueConverter(valueConverter, this.getTimestampUtils());
-        }
+        this(config, valueConverterBuilder, FACTORY);
     }
 
     /** Creates a Postgres connection using the supplied configuration with customized factory */

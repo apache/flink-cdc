@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.postgres.source;
 
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -26,6 +25,7 @@ import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkRange;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.JdbcSourceChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.utils.ObjectUtils;
+import com.ververica.cdc.connectors.postgres.source.utils.ChunkUtils;
 import com.ververica.cdc.connectors.postgres.source.utils.PostgresQueryUtils;
 import com.ververica.cdc.connectors.postgres.source.utils.PostgresTypeUtils;
 import io.debezium.jdbc.JdbcConnection;
@@ -36,8 +36,6 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -47,8 +45,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static java.math.BigDecimal.ROUND_CEILING;
@@ -83,36 +79,6 @@ public class PostgresChunkSplitter implements JdbcSourceChunkSplitter {
         }
     }
 
-    public static Column getSplitColumn(Table table, @Nullable String chunkKeyColumn) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
-        }
-
-        if (chunkKeyColumn != null) {
-            Optional<Column> targetPkColumn =
-                    primaryKeys.stream()
-                            .filter(col -> chunkKeyColumn.equals(col.name()))
-                            .findFirst();
-            if (targetPkColumn.isPresent()) {
-                return targetPkColumn.get();
-            }
-            throw new ValidationException(
-                    String.format(
-                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                            chunkKeyColumn,
-                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
-                            table.id()));
-        }
-
-        // use first field in primary key as the split key
-        return primaryKeys.get(0);
-    }
-
     @Override
     public Collection<SnapshotSplit> generateSplits(TableId tableId) {
         try (JdbcConnection jdbc = dialect.openJdbcConnection(sourceConfig)) {
@@ -122,7 +88,7 @@ public class PostgresChunkSplitter implements JdbcSourceChunkSplitter {
 
             Table table =
                     Objects.requireNonNull(dialect.queryTableSchema(jdbc, tableId)).getTable();
-            Column splitColumn = getSplitColumn(table, sourceConfig.getChunkKeyColumn());
+            Column splitColumn = ChunkUtils.getSplitColumn(table, sourceConfig.getChunkKeyColumn());
             final List<ChunkRange> chunks;
             try {
                 chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);

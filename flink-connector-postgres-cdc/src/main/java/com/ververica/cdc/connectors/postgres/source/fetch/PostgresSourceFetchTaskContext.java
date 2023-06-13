@@ -24,15 +24,14 @@ import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
-import com.ververica.cdc.connectors.postgres.source.PostgresChunkSplitter;
 import com.ververica.cdc.connectors.postgres.source.PostgresDialect;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
-import com.ververica.cdc.connectors.postgres.source.utils.PostgresTypeUtils;
+import com.ververica.cdc.connectors.postgres.source.utils.ChunkUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
-import io.debezium.connector.postgresql.PostgresObjectFactory;
+import io.debezium.connector.postgresql.PostgresObjectUtils;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
@@ -65,8 +64,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SNAPSHOT_MODE;
-import static io.debezium.connector.postgresql.PostgresObjectFactory.createReplicationConnection;
-import static io.debezium.connector.postgresql.PostgresObjectFactory.newPostgresValueConverterBuilder;
+import static io.debezium.connector.postgresql.PostgresObjectUtils.createReplicationConnection;
+import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresValueConverterBuilder;
 
 /** The context of {@link PostgresScanFetchTask} and {@link PostgresStreamFetchTask}. */
 public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
@@ -135,7 +134,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
         try {
             this.schema =
-                    PostgresObjectFactory.newSchema(
+                    PostgresObjectUtils.newSchema(
                             jdbcConnection,
                             dbzConfig,
                             jdbcConnection.getTypeRegistry(),
@@ -148,7 +147,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.offsetContext =
                 loadStartingOffsetState(
                         new PostgresOffsetContext.Loader(dbzConfig), sourceSplitBase);
-        this.taskContext = PostgresObjectFactory.newTaskContext(dbzConfig, schema, topicSelector);
+        this.taskContext = PostgresObjectUtils.newTaskContext(dbzConfig, schema, topicSelector);
 
         this.replicationConnection.compareAndSet(
                 null,
@@ -172,7 +171,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         .build();
 
         this.errorHandler = new PostgresErrorHandler(dbzConnectorConfig.getLogicalName(), queue);
-        this.metadataProvider = PostgresObjectFactory.newEventMetadataProvider();
+        this.metadataProvider = PostgresObjectUtils.newEventMetadataProvider();
         this.dispatcher =
                 new JdbcSourceEventDispatcher(
                         dbzConfig,
@@ -199,9 +198,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public RowType getSplitType(Table table) {
-        Column splitColumn =
-                PostgresChunkSplitter.getSplitColumn(table, sourceConfig.getChunkKeyColumn());
-        return PostgresTypeUtils.getSplitType(splitColumn);
+        Column splitColumn = ChunkUtils.getSplitColumn(table, sourceConfig.getChunkKeyColumn());
+        return ChunkUtils.getSplitType(splitColumn);
     }
 
     @Override
@@ -238,6 +236,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return new TableId(null, schemaName, tableName);
     }
 
+    @Override
     public Offset getStreamOffset(SourceRecord sourceRecord) {
         return PostgresOffset.of(sourceRecord);
     }
