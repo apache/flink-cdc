@@ -41,7 +41,7 @@ import static java.lang.String.format;
  *     NEWLY_ADDED_ASSIGNING ---onFinish()--→ NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED---onBinlogSplitUpdated()---> NEWLY_ADDED_ASSIGNING_FINISHED(end)
  *              ↑                                                                                                               |
  *              |                                                                                                               |
- *              |--------------- startAssignNewlyTables() //found newly added tables,, assign newly added tables ---------------|
+ *              |--------------- startAssignNewlyTables() //found newly added tables, assign newly added tables ----------------|
  * </pre>
  */
 public enum AssignerStatus {
@@ -178,6 +178,15 @@ public enum AssignerStatus {
     public static boolean isSnapshotAssigningFinished(AssignerStatus assignerStatus) {
         return assignerStatus == INITIAL_ASSIGNING_FINISHED
                 || assignerStatus == NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED;
+    }
+
+    /**
+     * Returns whether the split assigner has assigned all splits, which indicates it can assign
+     * splits for newly added tables or not.
+     */
+    public static boolean isAssigningFinished(AssignerStatus assignerStatus) {
+        return assignerStatus == INITIAL_ASSIGNING_FINISHED
+                || assignerStatus == NEWLY_ADDED_ASSIGNING_FINISHED;
     }
 
     /** Returns whether the split assigner is assigning snapshot splits. */

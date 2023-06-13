@@ -155,6 +155,11 @@ public class MySqlSourceReader<T>
                                     finishedUnackedSplits.put(
                                             newAddedSplitState.toMySqlSplit().splitId(),
                                             newAddedSplitState.toMySqlSplit().asSnapshotSplit()));
+            Preconditions.checkState(finishedSplitIds.values().size() == 1);
+            LOG.info(
+                    "Source reader {} finished binlog split and snapshot split {}",
+                    subtaskId,
+                    finishedSplitIds.values().iterator().next().toMySqlSplit().splitId());
             this.addSplits(Collections.singletonList(mySqlBinlogSplitState.toMySqlSplit()));
         } else {
             Preconditions.checkState(finishedSplitIds.size() == 1);
@@ -163,7 +168,8 @@ public class MySqlSourceReader<T>
                 if (mySqlSplit.isBinlogSplit()) {
                     suspendedBinlogSplit = toSuspendedBinlogSplit(mySqlSplit.asBinlogSplit());
                     LOG.info(
-                            "binlog split reader suspended success after the newly added table process, current offset {}",
+                            "Source reader {} suspended binlog split reader success after the newly added table process, current offset {}",
+                            subtaskId,
                             suspendedBinlogSplit.getStartingOffset());
                     context.sendSourceEventToCoordinator(
                             new LatestFinishedSplitsNumberRequestEvent());
@@ -196,7 +202,7 @@ public class MySqlSourceReader<T>
         // restore for finishedUnackedSplits
         List<MySqlSplit> unfinishedSplits = new ArrayList<>();
         for (MySqlSplit split : splits) {
-            LOG.info("Add Split: " + split);
+            LOG.info("Source reader {} adds split {}", subtaskId, split);
             if (split.isSnapshotSplit()) {
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
                 if (snapshotSplit.isSnapshotReadFinished()) {
@@ -243,7 +249,7 @@ public class MySqlSourceReader<T>
         if (sourceEvent instanceof FinishedSnapshotSplitsAckEvent) {
             FinishedSnapshotSplitsAckEvent ackEvent = (FinishedSnapshotSplitsAckEvent) sourceEvent;
             LOG.debug(
-                    "The subtask {} receives ack event for {} from enumerator.",
+                    "Source reader {} receives ack event for {} from enumerator.",
                     subtaskId,
                     ackEvent.getFinishedSplits());
             for (String splitId : ackEvent.getFinishedSplits()) {
@@ -252,16 +258,17 @@ public class MySqlSourceReader<T>
         } else if (sourceEvent instanceof FinishedSnapshotSplitsRequestEvent) {
             // report finished snapshot splits
             LOG.debug(
-                    "The subtask {} receives request to report finished snapshot splits.",
+                    "Source reader {} receives request to report finished snapshot splits.",
                     subtaskId);
             reportFinishedSnapshotSplitsIfNeed();
         } else if (sourceEvent instanceof BinlogSplitMetaEvent) {
             LOG.debug(
-                    "The subtask {} receives binlog meta with group id {}.",
+                    "Source reader {} receives binlog meta with group id {}.",
                     subtaskId,
                     ((BinlogSplitMetaEvent) sourceEvent).getMetaGroupId());
             fillMetadataForBinlogSplit((BinlogSplitMetaEvent) sourceEvent);
         } else if (sourceEvent instanceof BinlogSplitUpdateRequestEvent) {
+            LOG.info("Source reader {} receives binlog split update event.", subtaskId);
             handleBinlogSplitUpdateRequest();
         } else if (sourceEvent instanceof LatestFinishedSplitsNumberEvent) {
             updateBinlogSplit((LatestFinishedSplitsNumberEvent) sourceEvent);
@@ -283,10 +290,14 @@ public class MySqlSourceReader<T>
             this.addSplits(Collections.singletonList(binlogSplit));
 
             context.sendSourceEventToCoordinator(new BinlogSplitUpdateAckEvent());
-            LOG.info("Notify enumerator that binlog split has been updated.");
+            LOG.info(
+                    "Source reader {} notifies enumerator that binlog split has been updated.",
+                    subtaskId);
 
             mySqlSourceReaderContext.wakeupSuspendedBinlogSplitReader();
-            LOG.info("Wake up suspended binlog reader as binlog split has been updated.");
+            LOG.info(
+                    "Source reader {} wakes up suspended binlog reader as binlog split has been updated.",
+                    subtaskId);
         } else {
             LOG.warn("Unexpected event {}, this should not happen.", sourceEvent);
         }
@@ -302,7 +313,7 @@ public class MySqlSourceReader<T>
                     new FinishedSnapshotSplitsReportEvent(finishedOffsets);
             context.sendSourceEventToCoordinator(reportEvent);
             LOG.debug(
-                    "The subtask {} reports offsets of finished snapshot splits {}.",
+                    "Source reader {} reports offsets of finished snapshot splits {}.",
                     subtaskId,
                     finishedOffsets);
         }
@@ -319,7 +330,7 @@ public class MySqlSourceReader<T>
                     new BinlogSplitMetaRequestEvent(splitId, nextMetaGroupId);
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
-            LOG.info("The meta of binlog split {} has been collected success", splitId);
+            LOG.info("Source reader {} collects meta of binlog split success", subtaskId);
             this.addSplits(Collections.singletonList(binlogSplit));
         }
     }
@@ -348,10 +359,14 @@ public class MySqlSourceReader<T>
                         binlogSplit.splitId(),
                         MySqlBinlogSplit.appendFinishedSplitInfos(
                                 binlogSplit, newAddedMetadataGroup));
-                LOG.info("Fill metadata of group {} to binlog split", newAddedMetadataGroup.size());
+                LOG.info(
+                        "Source reader {} fills metadata of group {} to binlog split",
+                        subtaskId,
+                        newAddedMetadataGroup.size());
             } else {
                 LOG.warn(
-                        "Received out of oder binlog meta event for split {}, the received meta group id is {}, but expected is {}, ignore it",
+                        "Source reader {} receives out of oder binlog meta event for split {}, the received meta group id is {}, but expected is {}, ignore it",
+                        subtaskId,
                         metadataEvent.getSplitId(),
                         receivedMetaGroupId,
                         expectedMetaGroupId);
@@ -359,7 +374,8 @@ public class MySqlSourceReader<T>
             requestBinlogSplitMetaIfNeeded(uncompletedBinlogSplits.get(binlogSplit.splitId()));
         } else {
             LOG.warn(
-                    "Received binlog meta event for split {}, but the uncompleted split map does not contain it",
+                    "Source reader {} receives binlog meta event for split {}, but the uncompleted split map does not contain it",
+                    subtaskId,
                     metadataEvent.getSplitId());
         }
     }
@@ -375,24 +391,30 @@ public class MySqlSourceReader<T>
                     tableSchemas =
                             TableDiscoveryUtils.discoverSchemaForCapturedTables(sourceConfig, jdbc);
                     LOG.info(
-                            "The table schema discovery for binlog split {} success",
+                            "Source reader {} discovers table schema for binlog split {} success",
+                            subtaskId,
                             split.splitId());
                 } else {
                     List<TableId> existedTables = new ArrayList<>(split.getTableSchemas().keySet());
                     tableSchemas =
                             discoverSchemaForNewAddedTables(existedTables, sourceConfig, jdbc);
                     LOG.info(
-                            "The table schema discovery for new added tables of binlog split {} success",
+                            "Source reader {} discovers table schema for new added tables of binlog split {} success",
+                            subtaskId,
                             split.splitId());
                 }
                 return MySqlBinlogSplit.fillTableSchemas(split, tableSchemas);
             } catch (SQLException e) {
-                LOG.error("Failed to obtains table schemas due to {}", e.getMessage());
+                LOG.error(
+                        "Source reader {} failed to obtains table schemas due to {}",
+                        subtaskId,
+                        e.getMessage());
                 throw new FlinkRuntimeException(e);
             }
         } else {
             LOG.warn(
-                    "The binlog split {} has table schemas yet, skip the table schema discovery",
+                    "Source reader {} skip the table schema discovery, the binlog split {} has table schemas yet.",
+                    subtaskId,
                     split);
             return split;
         }

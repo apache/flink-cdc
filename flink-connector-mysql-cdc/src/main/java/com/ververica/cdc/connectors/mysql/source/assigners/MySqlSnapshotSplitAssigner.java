@@ -56,6 +56,7 @@ import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.discoverCapturedTables;
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
+import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isAssigningSnapshotSplits;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
 import static com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus.isSnapshotAssigningFinished;
@@ -207,7 +208,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     // tables
                     LOG.info("Found newly added tables, start capture newly added tables process");
                     remainingTables.addAll(newlyAddedTables);
-                    if (isSnapshotAssigningFinished(assignerStatus)) {
+                    if (isAssigningFinished(assignerStatus)) {
                         // start the newly added tables process under binlog reading phase
                         LOG.info(
                                 "Found newly added tables, start capture newly added tables process under binlog reading phase");
@@ -410,9 +411,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void startAssignNewlyAddedTables() {
         Preconditions.checkState(
-                isSnapshotAssigningFinished(assignerStatus),
-                "Invalid assigner status {}",
-                assignerStatus);
+                isAssigningFinished(assignerStatus), "Invalid assigner status {}", assignerStatus);
         assignerStatus = assignerStatus.startAssignNewlyTables();
     }
 

@@ -152,6 +152,32 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testNewlyAddedTableForExistsPipelineThrice() throws Exception {
+        testNewlyAddedTableOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                false,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai",
+                "address_shenzhen");
+    }
+
+    @Test
+    public void testNewlyAddedTableForExistsPipelineThriceWithAheadBinlog() throws Exception {
+        testNewlyAddedTableOneByOne(
+                DEFAULT_PARALLELISM,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                true,
+                "address_hangzhou",
+                "address_beijing",
+                "address_shanghai",
+                "address_shenzhen");
+    }
+
+    @Test
     public void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
@@ -494,7 +520,6 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             connection.setAutoCommit(false);
             // make binlog events for the first split
             String tableId = customDatabase.getDatabaseName() + "." + tableName;
-            String cityName = tableName.split("_")[1];
             connection.execute(
                     format(
                             "UPDATE %s SET COUNTRY = 'CHINA' where id = 416874195632735147",
