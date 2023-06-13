@@ -320,6 +320,13 @@ During a snapshot operation, the connector will query each included table to pro
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
           See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
+    </tr>
     </tbody>
 </table>
 </div>
