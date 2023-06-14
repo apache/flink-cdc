@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mysql;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,5 +51,12 @@ public abstract class LegacyMySqlTestBase extends AbstractTestBase {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
+    }
+
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping containers...");
+        MYSQL_CONTAINER.stop();
+        LOG.info("Containers are stopped.");
     }
 }
