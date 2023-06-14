@@ -161,7 +161,7 @@ public class OracleSource {
             props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
             props.setProperty("database.dbname", checkNotNull(database));
             if (schemaList != null) {
-                props.setProperty("schema.whitelist", String.join(",", schemaList));
+                props.setProperty("schema.include.list", String.join(",", schemaList));
             }
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));

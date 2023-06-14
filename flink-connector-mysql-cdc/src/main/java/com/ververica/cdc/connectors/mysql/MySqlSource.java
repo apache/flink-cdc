@@ -180,10 +180,10 @@ public class MySqlSource {
                 props.setProperty("database.server.id", String.valueOf(serverId));
             }
             if (databaseList != null) {
-                props.setProperty("database.whitelist", String.join(",", databaseList));
+                props.setProperty("database.include.list", String.join(",", databaseList));
             }
             if (tableList != null) {
-                props.setProperty("table.whitelist", String.join(",", tableList));
+                props.setProperty("table.include.list", String.join(",", tableList));
             }
             if (serverTimeZone != null) {
                 props.setProperty("database.serverTimezone", serverTimeZone);
