@@ -31,6 +31,8 @@ public abstract class OffsetFactory implements Serializable {
 
     public abstract Offset newOffset(Long position);
 
+    public abstract Offset createTimestampOffset(long timestampMillis);
+
     public abstract Offset createInitialOffset();
 
     public abstract Offset createNoStoppingOffset();

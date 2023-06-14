@@ -45,6 +45,11 @@ public class LsnFactory extends OffsetFactory {
     }
 
     @Override
+    public Offset createTimestampOffset(long timestampMillis) {
+        throw new UnsupportedOperationException("not supported create new Offset by timestamp.");
+    }
+
+    @Override
     public Offset createInitialOffset() {
         return LsnOffset.INITIAL_OFFSET;
     }

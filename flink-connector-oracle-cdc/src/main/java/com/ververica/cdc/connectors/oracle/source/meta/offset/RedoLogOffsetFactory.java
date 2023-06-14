@@ -46,6 +46,12 @@ public class RedoLogOffsetFactory extends OffsetFactory {
     }
 
     @Override
+    public Offset createTimestampOffset(long timestampMillis) {
+        throw new UnsupportedOperationException(
+                "Do not support to create RedoLogOffset by timestamp.");
+    }
+
+    @Override
     public Offset createInitialOffset() {
         return RedoLogOffset.INITIAL_OFFSET;
     }
