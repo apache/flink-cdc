@@ -159,10 +159,11 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
         }
     }
