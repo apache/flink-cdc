@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 /** Utilities to discovery matched collections. */
 public class CollectionDiscoveryUtils {
 
-    public static final String REGEX_META_CHARACTERS = ".$|()[]{}<>^?*+-=!\\";
+    public static final String REGEX_META_CHARACTERS = ".$|()[]{}<>^?*+=!\\";
 
     public static final String ADD_NS_FIELD_NAME = "_ns_";
 
@@ -45,6 +45,10 @@ public class CollectionDiscoveryUtils {
                     String.format(
                             "{'$addFields': {'%s': {'$concat': ['$ns.db', '.', '$ns.coll']}}}",
                             ADD_NS_FIELD_NAME));
+
+    private static final Pattern RANGE_PATTERN =
+            Pattern.compile(
+                    "\\[(([a-z]-[a-z])|([A-Z]-[A-Z])|((0|[1-9][0-9]*)-(0|[1-9][0-9]*)))+\\]");
 
     private CollectionDiscoveryUtils() {}
 
@@ -192,6 +196,14 @@ public class CollectionDiscoveryUtils {
             }
         }
         return false;
+    }
+
+    public static boolean containsRegexRange(String literal) {
+        return RANGE_PATTERN.matcher(literal).find();
+    }
+
+    public static boolean inferIsRegularExpression(String literal) {
+        return containsRegexMetaCharacters(literal) || containsRegexRange(literal);
     }
 
     public static Pattern completionPattern(String pattern) {
