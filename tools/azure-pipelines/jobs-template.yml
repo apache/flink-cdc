@@ -62,11 +62,11 @@ jobs:
           targetPath: $(FLINK_ARTIFACT_DIR)
           artifact: FlinkCompileArtifact-${{parameters.stage_name}}
 
-  - job: test_${{parameters.stage_name}}
+  - job: test_1_${{parameters.stage_name}}
     dependsOn: compile_${{parameters.stage_name}}
     condition: and(succeeded(), not(eq(variables['MODE'], 'e2e')))
     pool: ${{parameters.test_pool_definition}}
-    timeoutInMinutes: 60
+    timeoutInMinutes: 70
     cancelTimeoutInMinutes: 1
     workspace:
       clean: all
@@ -130,7 +130,7 @@ jobs:
           targetPath: $(DEBUG_FILES_OUTPUT_DIR)
           artifact: logs-${{parameters.stage_name}}-$(DEBUG_FILES_NAME)
 
-  - job: test_${{parameters.stage_name}}
+  - job: test_2_${{parameters.stage_name}}
     dependsOn: compile_${{parameters.stage_name}}
     condition: and(succeeded(), not(eq(variables['MODE'], 'e2e')))
     pool: ${{parameters.test_pool_definition}}
