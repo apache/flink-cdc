@@ -61,7 +61,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn) {
+            List<String> chunkKeyColumn) {
         super(
                 startupOptions,
                 databaseList,

@@ -34,16 +34,23 @@ public class ChunkUtils {
 
     private ChunkUtils() {}
 
-    public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
+    public static Column getChunkKeyColumn(Table table, @Nullable List<String> chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
 
-        if (chunkKeyColumn != null) {
-            Optional<Column> targetPkColumn =
-                    primaryKeys.stream()
-                            .filter(col -> chunkKeyColumn.equals(col.name()))
-                            .findFirst();
-            if (targetPkColumn.isPresent()) {
-                return targetPkColumn.get();
+        if (chunkKeyColumn != null && !chunkKeyColumn.isEmpty()) {
+            for (String chunkKey : chunkKeyColumn) {
+                String dbTableName =
+                        String.format("%s.%s.", table.id().schema(), table.id().table());
+                if (chunkKey.startsWith(dbTableName)) {
+                    String realChunkKey = chunkKey.substring(dbTableName.length());
+                    Optional<Column> targetPkColumn =
+                            primaryKeys.stream()
+                                    .filter(col -> realChunkKey.equals(col.name()))
+                                    .findFirst();
+                    if (targetPkColumn.isPresent()) {
+                        return targetPkColumn.get();
+                    }
+                }
             }
             throw new ValidationException(
                     String.format(
