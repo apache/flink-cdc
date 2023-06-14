@@ -26,7 +26,6 @@ import org.apache.flink.test.util.AbstractTestBase;
 import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -91,7 +90,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
         if (parallelismSnapshot) {
             env.setParallelism(4);
-            env.enableCheckpointing(200);
+            env.enableCheckpointing(2000);
         } else {
             env.setParallelism(1);
         }
@@ -103,7 +102,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
     }
 
     @Test
-    @Ignore("It can be open until issue 1875 fix")
     public void testConsumingAllEvents()
             throws SQLException, ExecutionException, InterruptedException {
         String sourceDDL =
@@ -783,6 +781,10 @@ public class OracleConnectorITCase extends AbstractTestBase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
+                LOG.info(
+                        "sink result size: {}, sink result: {}",
+                        TestValuesTableFactory.getRawResults(sinkName).size(),
+                        TestValuesTableFactory.getResults("sink"));
                 return TestValuesTableFactory.getRawResults(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet

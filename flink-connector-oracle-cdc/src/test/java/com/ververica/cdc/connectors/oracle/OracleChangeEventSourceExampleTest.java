@@ -39,7 +39,13 @@ import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 /** Example Tests for {@link JdbcIncrementalSource}. */
@@ -117,6 +123,136 @@ public class OracleChangeEventSourceExampleTest {
                 .print()
                 .setParallelism(1);
 
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        executorService.submit(
+                () -> {
+                    try (Connection connection = getJdbcConnection();
+                            Statement statement = connection.createStatement()) {
+
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
+                        statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+                        Thread.sleep(1000);
+                        statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
+                        Thread.sleep(1000);
+                        statement.execute("DELETE FROM debezium.products WHERE ID=112");
+
+                        //                for (int i = 100000; i < 100010; i++) {
+                        //                    Thread.sleep(1000);
+                        //                    int id = i;
+                        //                    String name = "jacket"+i;
+                        //                    String sql = "INSERT INTO debezium.products VALUES
+                        // (id, 'jacket1' , 'water resistent white wind
+                        // breaker',0.2)".replaceAll("id", id+"");
+                        //                    statement.execute(sql);
+                        //                    String deleteSql = "DELETE FROM debezium.products
+                        // WHERE ID=id".replaceAll("id", id+"");
+                        //                    statement.execute(deleteSql);
+                        //                }
+                    } catch (Exception e) {
+                        LOG.error("", e);
+                    }
+                });
+
         env.execute("Print Oracle Snapshot + RedoLog");
+    }
+
+    @Test
+    @Ignore("Test ignored because it won't stop and is used for manual test")
+    public void testConsumingAllEventsWithChunkKey() throws Exception {
+        LOG.info(
+                "getOraclePort:{},getUsername:{},getPassword:{}",
+                oracleContainer.getOraclePort(),
+                oracleContainer.getUsername(),
+                oracleContainer.getPassword());
+
+        Properties debeziumProperties = new Properties();
+        debeziumProperties.setProperty("log.mining.strategy", "online_catalog");
+        debeziumProperties.setProperty("log.mining.continuous.mine", "true");
+
+        JdbcIncrementalSource<String> oracleChangeEventSource =
+                new OracleSourceBuilder()
+                        .hostname(oracleContainer.getHost())
+                        .port(oracleContainer.getOraclePort())
+                        .databaseList("XE")
+                        .schemaList("DEBEZIUM")
+                        .tableList("DEBEZIUM.PRODUCTS")
+                        .username(oracleContainer.getUsername())
+                        .password(oracleContainer.getPassword())
+                        .deserializer(new JsonDebeziumDeserializationSchema())
+                        .includeSchemaChanges(true) // output the schema changes as well
+                        .startupOptions(StartupOptions.initial())
+                        .debeziumProperties(debeziumProperties)
+                        .chunkKeyColumn("ID")
+                        .splitSize(2)
+                        .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        // enable checkpoint
+        env.enableCheckpointing(DEFAULT_CHECKPOINT_INTERVAL);
+        // set the source parallelism to 4
+        env.fromSource(
+                        oracleChangeEventSource,
+                        WatermarkStrategy.noWatermarks(),
+                        "OracleParallelSource")
+                .setParallelism(DEFAULT_PARALLELISM)
+                .print()
+                .setParallelism(1);
+
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        executorService.submit(
+                () -> {
+                    try (Connection connection = getJdbcConnection();
+                            Statement statement = connection.createStatement()) {
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
+                        statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
+                        Thread.sleep(1000);
+                        statement.execute(
+                                "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+                        Thread.sleep(1000);
+                        statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
+                        Thread.sleep(1000);
+                        statement.execute("DELETE FROM debezium.products WHERE ID=112");
+
+                        for (int i = 100000; i < 100010; i++) {
+                            Thread.sleep(1000);
+                            int id = i;
+                            String name = "jacket" + i;
+                            String sql =
+                                    "INSERT INTO debezium.products VALUES (id, 'jacket1' , 'water resistent white wind breaker',0.2)"
+                                            .replaceAll("id", id + "");
+                            statement.execute(sql);
+                        }
+                    } catch (Exception e) {
+                        LOG.error("", e);
+                    }
+                });
+
+        env.execute("Print Oracle Snapshot + RedoLog");
+    }
+
+    public Connection getJdbcConnection() throws SQLException {
+        return DriverManager.getConnection(
+                oracleContainer.getJdbcUrl(),
+                oracleContainer.getUsername(),
+                oracleContainer.getPassword());
     }
 }

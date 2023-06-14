@@ -25,6 +25,7 @@ import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
+import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleUtils;
@@ -46,19 +47,25 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Collect;
+import oracle.sql.ROWID;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 
 /** The context for fetch task that fetching data of snapshot split from Oracle data source. */
 public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
@@ -186,7 +193,49 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public RowType getSplitType(Table table) {
-        return OracleUtils.getSplitType(table);
+        OracleSourceConfig oracleSourceConfig = getSourceConfig();
+        // config chunk key column then return type of this column
+        if (Objects.nonNull(oracleSourceConfig.getChunkKeyColumn())) {
+            return OracleUtils.getSplitType(table);
+        }
+
+        // RowId is chunk key column by default
+        return OracleUtils.getSplitType(
+                Column.editor().jdbcType(Types.VARCHAR).name(ROWID.class.getSimpleName()).create());
+    }
+
+    @Override
+    public boolean isDataChangeRecord(SourceRecord record) {
+        return SourceRecordUtils.isDataChangeRecord(record);
+    }
+
+    @Override
+    public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
+        RowType splitKeyType =
+                getSplitType(getDatabaseSchema().tableFor(SourceRecordUtils.getTableId(record)));
+
+        // RowId is chunk key column by default, compare RowId
+        if (splitKeyType.getFieldNames().contains(ROWID.class.getSimpleName())) {
+            ConnectHeaders headers = (ConnectHeaders) record.headers();
+            ROWID rowId = null;
+            try {
+                rowId = new ROWID(headers.iterator().next().value().toString());
+            } catch (SQLException e) {
+                LOG.error("{} can not convert to RowId", record);
+            }
+            Object[] rowIds = new ROWID[] {rowId};
+            return SourceRecordUtils.splitKeyRangeContains(rowIds, splitStart, splitEnd);
+        } else {
+            // config chunk key column compare
+            Object[] key =
+                    SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
+            return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
+        }
+    }
+
+    @Override
+    public TableId getTableId(SourceRecord record) {
+        return SourceRecordUtils.getTableId(record);
     }
 
     @Override
