@@ -54,6 +54,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.USERNAME;
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** Factory for creating configured instance of {@link MongoDBTableSource}. */
 public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
@@ -149,7 +150,12 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
-                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
+                return StartupOptions.timestamp(
+                        checkNotNull(
+                                config.get(SCAN_STARTUP_TIMESTAMP_MILLIS),
+                                String.format(
+                                        "To use timestamp startup mode, the startup timestamp millis '%s' must be set.",
+                                        SCAN_STARTUP_TIMESTAMP_MILLIS.key())));
             default:
                 throw new ValidationException(
                         String.format(
