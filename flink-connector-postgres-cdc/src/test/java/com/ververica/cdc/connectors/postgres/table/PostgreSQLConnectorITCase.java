@@ -28,6 +28,8 @@ import com.ververica.cdc.connectors.postgres.PostgresTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -44,6 +46,7 @@ import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
+@RunWith(Parameterized.class)
 public class PostgreSQLConnectorITCase extends PostgresTestBase {
     private static final String SLOT_NAME = "flinktest";
 
@@ -54,6 +57,17 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+
+    private final boolean parallelismSnapshot;
+
+    public PostgreSQLConnectorITCase(boolean parallelismSnapshot) {
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {true}, new Object[] {false}};
+    }
 
     @Before
     public void before() {
@@ -81,6 +95,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
@@ -90,6 +105,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
+                        parallelismSnapshot,
                         SLOT_NAME);
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -187,6 +203,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
@@ -196,6 +213,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
+                        parallelismSnapshot,
                         "replica_identity_slot");
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -281,6 +299,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
+
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
@@ -290,6 +310,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getDatabaseName(),
                         "inventory",
                         "full_types",
+                        parallelismSnapshot,
                         SLOT_NAME);
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -367,6 +388,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
@@ -376,6 +398,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
+                        parallelismSnapshot,
                         "meta_data_slot");
 
         String sinkDDL =
@@ -466,6 +489,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'slot.name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'changelog-mode' = '%s'"
                                 + ")",
                         POSTGERS_CONTAINER.getHost(),
@@ -476,6 +500,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "inventory",
                         "products",
                         "replica_identity_slot",
+                        parallelismSnapshot,
                         "upsert");
         String sinkDDL =
                 "CREATE TABLE sink ("

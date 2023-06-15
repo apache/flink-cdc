@@ -47,6 +47,7 @@ public interface OffsetDeserializerSerializer extends Serializable {
                         : null;
             case 2:
             case 3:
+            case 4:
                 return readOffsetPosition(in);
             default:
                 throw new IOException("Unknown version: " + offsetVersion);

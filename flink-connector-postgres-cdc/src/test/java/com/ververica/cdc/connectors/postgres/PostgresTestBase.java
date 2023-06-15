@@ -53,8 +53,8 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     // use newer version of postgresql image to support pgoutput plugin
     // when testing postgres 13, only 13-alpine supports both amd64 and arm64
-    private static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:13-alpine")
+    protected static final DockerImageName PG_IMAGE =
+            DockerImageName.parse("debezium/postgres:13")
                     .asCompatibleSubstituteFor("postgres");
 
     public static final PostgreSQLContainer<?> POSTGERS_CONTAINER =

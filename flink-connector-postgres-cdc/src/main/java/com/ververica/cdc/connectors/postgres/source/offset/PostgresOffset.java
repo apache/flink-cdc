@@ -23,6 +23,7 @@ import io.debezium.time.Conversions;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 
+import javax.annotation.Nullable;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -75,12 +76,16 @@ public class PostgresOffset extends Offset {
         return Lsn.valueOf(Long.valueOf(this.offset.get(SourceInfo.LSN_KEY)));
     }
 
+    @Nullable
     public Long getTxid() {
-        return Long.valueOf(this.offset.get(SourceInfo.TXID_KEY));
+        String txid = this.offset.get(SourceInfo.TXID_KEY);
+        return txid == null ? null : Long.valueOf(txid);
     }
 
+    @Nullable
     public Long getLastCommitTs() {
-        return Long.valueOf(this.offset.get(SourceInfo.TIMESTAMP_USEC_KEY));
+        String lastCommitTs = this.offset.get(SourceInfo.TIMESTAMP_USEC_KEY);
+        return lastCommitTs == null ? null : Long.valueOf(lastCommitTs);
     }
 
     @Override
@@ -95,9 +100,9 @@ public class PostgresOffset extends Offset {
         return "Offset{lsn="
                 + getLsn()
                 + ", txId="
-                + getTxid()
+                + (getTxid() == null ? "null" : getTxid())
                 + ", lastCommitTs="
-                + getLastCommitTs()
+                + (getLastCommitTs() == null ? "null" : getLastCommitTs())
                 + "]";
     }
 
