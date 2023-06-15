@@ -35,6 +35,7 @@ import com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetch
 import com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleSchema;
 import io.debezium.connector.oracle.OracleConnection;
+import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -88,7 +89,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     @Override
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
         return OracleConnectionUtils.createOracleConnection(
-                sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+                (OracleConnectorConfig) sourceConfig.getDbzConnectorConfig());
     }
 
     @Override
@@ -116,7 +117,9 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
-        try (OracleConnection jdbc = createOracleConnection(sourceConfig.getDbzConfiguration())) {
+        try (OracleConnection jdbc =
+                createOracleConnection(
+                        (OracleConnectorConfig) sourceConfig.getDbzConnectorConfig())) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {
@@ -142,7 +145,8 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public OracleSourceFetchTaskContext createFetchTaskContext(
             SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         final OracleConnection jdbcConnection =
-                createOracleConnection(taskSourceConfig.getDbzConfiguration());
+                createOracleConnection(
+                        (OracleConnectorConfig) taskSourceConfig.getDbzConnectorConfig());
         return new OracleSourceFetchTaskContext(taskSourceConfig, this, jdbcConnection);
     }
 

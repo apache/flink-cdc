@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.oracle.source.utils;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
-import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
@@ -245,7 +244,7 @@ public class OracleUtils {
         TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         OracleConnection oracleConnection =
-                OracleConnectionUtils.createOracleConnection(dbzOracleConfig.getJdbcConfig());
+                OracleConnectionUtils.createOracleConnection(dbzOracleConfig);
         //        OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
         OracleValueConverters oracleValueConverters =
                 new OracleValueConverters(dbzOracleConfig, oracleConnection);
@@ -265,7 +264,7 @@ public class OracleUtils {
         TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         OracleConnection oracleConnection =
-                OracleConnectionUtils.createOracleConnection((Configuration) dbzOracleConfig);
+                OracleConnectionUtils.createOracleConnection(dbzOracleConfig);
         OracleValueConverters oracleValueConverters =
                 new OracleValueConverters(dbzOracleConfig, oracleConnection);
         StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =
