@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.oracle.source.utils;
 
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
@@ -28,8 +27,6 @@ import io.debezium.connector.oracle.OracleTopicSelector;
 import io.debezium.connector.oracle.OracleValueConverters;
 import io.debezium.connector.oracle.StreamingAdapter;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.relational.Column;
-import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
@@ -40,14 +37,11 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.rowToArray;
-import static org.apache.flink.table.api.DataTypes.FIELD;
-import static org.apache.flink.table.api.DataTypes.ROW;
 
 /** Utils to prepare Oracle SQL statement. */
 public class OracleUtils {
@@ -245,20 +239,6 @@ public class OracleUtils {
         }
     }
 
-    public static RowType getSplitType(Table table) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
-        }
-
-        // use first field in primary key as the split key
-        return getSplitType(primaryKeys.get(0));
-    }
-
     /** Creates a new {@link OracleDatabaseSchema} to monitor the latest oracle database schemas. */
     public static OracleDatabaseSchema createOracleDatabaseSchema(
             OracleConnectorConfig dbzOracleConfig) {
@@ -311,26 +291,6 @@ public class OracleUtils {
                     entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
         }
         return new RedoLogOffset(offsetStrMap);
-    }
-
-    public static RowType getSplitType(Column splitColumn) {
-        return (RowType)
-                ROW(FIELD(splitColumn.name(), OracleTypeUtils.fromDbzColumn(splitColumn)))
-                        .getLogicalType();
-    }
-
-    public static Column getSplitColumn(Table table) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
-        }
-
-        // use first field in primary key as the split key
-        return primaryKeys.get(0);
     }
 
     public static String quote(String dbOrTableName) {

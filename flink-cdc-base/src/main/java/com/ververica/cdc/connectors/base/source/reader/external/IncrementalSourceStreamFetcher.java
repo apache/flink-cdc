@@ -111,7 +111,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                 if (shouldEmit(event.getRecord())) {
                     sourceRecords.add(event.getRecord());
                 } else {
-                    LOG.info("{} data change event should not emit", event);
+                    LOG.debug("{} data change event should not emit", event);
                 }
             }
         }

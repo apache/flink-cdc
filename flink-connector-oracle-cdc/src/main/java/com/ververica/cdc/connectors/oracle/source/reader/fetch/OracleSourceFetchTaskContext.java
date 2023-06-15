@@ -29,6 +29,7 @@ import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleUtils;
+import com.ververica.cdc.connectors.oracle.util.ChunkUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.oracle.OracleChangeEventSourceMetricsFactory;
 import io.debezium.connector.oracle.OracleConnection;
@@ -47,7 +48,6 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
-import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -62,10 +62,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.sql.Types;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Objects;
+
+import static com.ververica.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
 
 /** The context for fetch task that fetching data of snapshot split from Oracle data source. */
 public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
@@ -194,14 +194,8 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     @Override
     public RowType getSplitType(Table table) {
         OracleSourceConfig oracleSourceConfig = getSourceConfig();
-        // config chunk key column then return type of this column
-        if (Objects.nonNull(oracleSourceConfig.getChunkKeyColumn())) {
-            return OracleUtils.getSplitType(table);
-        }
-
-        // RowId is chunk key column by default
-        return OracleUtils.getSplitType(
-                Column.editor().jdbcType(Types.VARCHAR).name(ROWID.class.getSimpleName()).create());
+        return ChunkUtils.getSplitType(
+                getChunkKeyColumn(table, oracleSourceConfig.getChunkKeyColumn()));
     }
 
     @Override

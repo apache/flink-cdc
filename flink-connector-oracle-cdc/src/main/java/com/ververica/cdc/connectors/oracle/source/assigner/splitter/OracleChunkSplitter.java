@@ -74,7 +74,8 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
             long start = System.currentTimeMillis();
 
             Table table = dialect.queryTableSchema(jdbc, tableId).getTable();
-            Column splitColumn = getSplitColumn(table, sourceConfig);
+            Column splitColumn =
+                    ChunkUtils.getChunkKeyColumn(table, sourceConfig.getChunkKeyColumn());
             final List<ChunkRange> chunks;
             try {
                 chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
@@ -376,9 +377,5 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
             }
             LOG.info("JdbcSourceChunkSplitter has split {} chunks for table {}", count, tableId);
         }
-    }
-
-    public static Column getSplitColumn(Table table, JdbcSourceConfig sourceConfig) {
-        return ChunkUtils.getChunkKeyColumn(table, sourceConfig.getChunkKeyColumn());
     }
 }

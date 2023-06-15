@@ -90,7 +90,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
         if (parallelismSnapshot) {
             env.setParallelism(4);
-            env.enableCheckpointing(2000);
+            env.enableCheckpointing(200);
         } else {
             env.setParallelism(1);
         }
@@ -150,11 +150,11 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 tEnv.executeSql(
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
-        waitForSnapshotStarted("sink");
+        // There
+        waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-
             statement.execute(
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
@@ -781,10 +781,10 @@ public class OracleConnectorITCase extends AbstractTestBase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                LOG.info(
-                        "sink result size: {}, sink result: {}",
-                        TestValuesTableFactory.getRawResults(sinkName).size(),
-                        TestValuesTableFactory.getResults("sink"));
+                //                LOG.info(
+                //                        "sink result size: {}, sink result: {}",
+                //                        TestValuesTableFactory.getRawResults(sinkName).size(),
+                //                        TestValuesTableFactory.getResults("sink"));
                 return TestValuesTableFactory.getRawResults(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
