@@ -30,6 +30,8 @@ import java.util.Objects;
  * <p>Emits change record based on a single {@link LogMinerDmlEntry} event.
  *
  * <p>This class overrides the emit methods to put the ROWID in the header.
+ *
+ * <p>Line 59 ~ 257: add ROWID and emit methods.
  */
 public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object> {
 
