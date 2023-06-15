@@ -410,7 +410,8 @@ public final class TransactionalBuffer implements AutoCloseable {
                                 event.getEntry().getOldValues(),
                                 event.getEntry().getNewValues(),
                                 schema.tableFor(event.getTableId()),
-                                clock));
+                                clock,
+                                event.rowId));
             }
 
             lastCommittedScn = Scn.valueOf(scn.longValue());

@@ -157,7 +157,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     }
 
     public SchemaNameAdjuster getSchemaNameAdjuster() {
-        return null;
+        return schemaNameAdjuster;
     }
 
     public abstract RelationalDatabaseSchema getDatabaseSchema();

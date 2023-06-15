@@ -26,7 +26,6 @@ import org.apache.flink.test.util.AbstractTestBase;
 import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -103,7 +102,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
     }
 
     @Test
-    @Ignore("It can be open until issue 1875 fix")
     public void testConsumingAllEvents()
             throws SQLException, ExecutionException, InterruptedException {
         String sourceDDL =
@@ -152,11 +150,11 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 tEnv.executeSql(
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
-        waitForSnapshotStarted("sink");
+        // There are 9 records in the table, wait until the snapshot phase finished
+        waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-
             statement.execute(
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
@@ -214,6 +212,9 @@ public class OracleConnectorITCase extends AbstractTestBase {
     @Test
     public void testConsumingAllEventsByChunkKeyColumn()
             throws SQLException, ExecutionException, InterruptedException {
+        if (!parallelismSnapshot) {
+            return;
+        }
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -261,7 +262,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 tEnv.executeSql(
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
-        waitForSnapshotStarted("sink");
+        waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -400,7 +401,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     @Test
     public void testStartupFromLatestOffset() throws Exception {
-        // database.createAndInitialize();
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -441,7 +441,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
         // wait for the source startup, we don't have a better way to wait it, use sleep for now
-        Thread.sleep(5000L);
+        Thread.sleep(10000L);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {

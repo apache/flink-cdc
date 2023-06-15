@@ -116,7 +116,6 @@ public class OracleChangeEventSourceExampleTest {
                 .setParallelism(DEFAULT_PARALLELISM)
                 .print()
                 .setParallelism(1);
-
         env.execute("Print Oracle Snapshot + RedoLog");
     }
 }
