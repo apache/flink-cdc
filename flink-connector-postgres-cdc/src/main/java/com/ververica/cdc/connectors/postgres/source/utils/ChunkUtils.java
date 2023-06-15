@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/** Utilities to split chunks of table. */
 public class ChunkUtils {
     public static RowType getSplitType(Column splitColumn) {
         return (RowType)

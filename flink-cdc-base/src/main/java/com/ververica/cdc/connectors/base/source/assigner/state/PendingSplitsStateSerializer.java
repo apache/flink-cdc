@@ -42,7 +42,7 @@ import static com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSer
 /** The {@link SimpleVersionedSerializer Serializer} for the {@link PendingSplitsState}. */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -101,6 +101,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 return deserializeLegacyPendingSplitsState(serialized);
             case 3:
             case 4:
+            case 5:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);

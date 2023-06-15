@@ -32,58 +32,32 @@ public class PostgresOffset extends Offset {
 
     private static final Logger LOG = org.slf4j.LoggerFactory.getLogger(PostgresOffset.class);
 
-    // ref: io.debezium.connector.postgresql.spi.OffsetState (which is not serializable)
-
-    // workaround to make LSN serializable
-    private final Long lsn;
-    private final Long txid;
-    private final Instant lastCommitTs;
+    // required by io.debezium.connector.postgresql.PostgresOffsetContext.Loader.load
+    public static final String LSN_KEY = SourceInfo.LSN_KEY;
+    public static final String TXID_KEY = SourceInfo.TXID_KEY;
+    public static final String TIMESTAMP_USEC_KEY = SourceInfo.TIMESTAMP_USEC_KEY;
 
     public static final PostgresOffset INITIAL_OFFSET =
             new PostgresOffset(Lsn.INVALID_LSN.asLong(), null, Instant.MIN);
     public static final PostgresOffset NO_STOPPING_OFFSET =
             new PostgresOffset(Lsn.valueOf("FFFFFFFF/FFFFFFFF").asLong(), null, Instant.MAX);
 
-    // the offset abstract class has a protected field Map<String, String> offset
-    // - postgres requires non-string type in
-    // io.debezium.connector.postgresql.PostgresOffsetContext.Loader.load
-    // - this feels confusing and error prone (better to refactor cdc-base?)
-    private final Map<String, ?> offset;
-
     // used by PostgresOffsetFactory
-    PostgresOffset(Map<String, String> offsetMap) {
-
-        String lastCommitTsStr = String.valueOf(offsetMap.get(SourceInfo.TIMESTAMP_USEC_KEY));
-
-        this.lsn = Long.valueOf(String.valueOf(offsetMap.get(SourceInfo.LSN_KEY)));
-        this.txid = this.longOffsetValue(offsetMap, SourceInfo.TXID_KEY);
-        this.lastCommitTs =
-                Conversions.toInstantFromMicros(
-                        Long.valueOf(
-                                String.valueOf(
-                                        offsetMap.getOrDefault(
-                                                SourceInfo.TIMESTAMP_USEC_KEY, "0"))));
-        this.offset = getOffsetMap(lsn, txid, lastCommitTs);
+    PostgresOffset(Map<String, String> offset) {
+        this.offset = offset;
     }
 
-    public PostgresOffset(Long lsn, Long txId, Instant lastCommitTs) {
-        this.lsn = lsn;
-        this.txid = txId;
-        this.lastCommitTs = lastCommitTs;
-        this.offset = getOffsetMap(lsn, txId, lastCommitTs);
-    }
-
-    private Map<String, ?> getOffsetMap(Long lsn, Long txId, Instant lastCommitTs) {
+    PostgresOffset(Long lsn, Long txId, Instant lastCommitTs) {
         // keys are from io.debezium.connector.postgresql.PostgresOffsetContext.Loader.load
-        Map<String, Object> offsetMap = new HashMap<>();
-        offsetMap.put(SourceInfo.LSN_KEY, lsn);
+        offset.put(SourceInfo.LSN_KEY, lsn.toString());
         if (txId != null) {
-            offsetMap.put(SourceInfo.TXID_KEY, txId);
+            offset.put(SourceInfo.TXID_KEY, txId.toString());
         }
         if (lastCommitTs != null) {
-            offsetMap.put(SourceInfo.TIMESTAMP_USEC_KEY, Conversions.toEpochMicros(lastCommitTs));
+            offset.put(
+                    SourceInfo.TIMESTAMP_USEC_KEY,
+                    String.valueOf(Conversions.toEpochMicros(lastCommitTs)));
         }
-        return offsetMap;
     }
 
     public static PostgresOffset of(SourceRecord dataRecord) {
@@ -101,24 +75,32 @@ public class PostgresOffset extends Offset {
     }
 
     public Lsn getLsn() {
-        return Lsn.valueOf(lsn);
+        return Lsn.valueOf(Long.valueOf(this.offset.get(LSN_KEY)));
+    }
+
+    public Long getTxid() {
+        return Long.valueOf(this.offset.get(TXID_KEY));
+    }
+
+    public Long getLastCommitTs() {
+        return Long.valueOf(this.offset.get(TIMESTAMP_USEC_KEY));
     }
 
     @Override
     public int compareTo(Offset o) {
         PostgresOffset rhs = (PostgresOffset) o;
         LOG.debug("comparing {} and {}", this, rhs);
-        return Lsn.valueOf(this.lsn).compareTo(Lsn.valueOf(rhs.lsn));
+        return this.getLsn().compareTo(rhs.getLsn());
     }
 
     @Override
     public String toString() {
         return "Offset{lsn="
-                + Lsn.valueOf(lsn)
+                + getLsn()
                 + ", txId="
-                + txid
+                + getTxid()
                 + ", lastCommitTs="
-                + lastCommitTs
+                + getLastCommitTs()
                 + "]";
     }
 
@@ -135,8 +117,7 @@ public class PostgresOffset extends Offset {
     }
 
     @Override
-    public Map<String, ?> getOffset() {
-
+    public Map<String, String> getOffset() {
         return offset;
     }
 }
