@@ -150,7 +150,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 tEnv.executeSql(
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
-        // There
+        // There are 9 records in the table, wait until the snapshot phase finished
         waitForSinkSize("sink", 9);
 
         try (Connection connection = getJdbcConnection();
@@ -781,10 +781,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                //                LOG.info(
-                //                        "sink result size: {}, sink result: {}",
-                //                        TestValuesTableFactory.getRawResults(sinkName).size(),
-                //                        TestValuesTableFactory.getResults("sink"));
                 return TestValuesTableFactory.getRawResults(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet

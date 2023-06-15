@@ -25,9 +25,11 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 
 /**
- * Copied from https://github.com/debezium/debezium project
+ * Copied from Debezium 1.6.4.Final.
  *
  * <p>Emits change record based on a single {@link LogMinerDmlEntry} event.
+ *
+ * <p>This class overrides the emit methods to put the ROWID in the header.
  */
 public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object> {
 
