@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.oracle;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
-import com.ververica.cdc.debezium.internal.DebeziumOffset;
 import io.debezium.connector.oracle.OracleConnector;
 
 import javax.annotation.Nullable;
@@ -167,7 +166,6 @@ public class OracleSource {
                 props.setProperty("table.include.list", String.join(",", tableList));
             }
 
-            DebeziumOffset specificOffset = null;
             switch (startupOptions.startupMode) {
                 case INITIAL:
                     props.setProperty("snapshot.mode", "initial");
@@ -193,7 +191,7 @@ public class OracleSource {
             }
 
             return new DebeziumSourceFunction<>(
-                    deserializer, props, specificOffset, new OracleValidator(props));
+                    deserializer, props, null, new OracleValidator(props));
         }
     }
 }
