@@ -25,6 +25,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
+import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
 import com.ververica.cdc.connectors.postgres.source.utils.PostgresQueryUtils;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
@@ -146,7 +147,8 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
         final PostgresOffsetContext.Loader loader =
                 new PostgresOffsetContext.Loader(ctx.getDbzConnectorConfig());
         final PostgresOffsetContext postgresOffsetContext =
-                loader.load(backfillSplit.getStartingOffset().getOffset());
+                PostgresOffsetUtils.getPostgresOffsetContext(
+                        loader, backfillSplit.getStartingOffset());
 
         // we should only capture events for the current table,
         // otherwise, we may not find corresponding schema

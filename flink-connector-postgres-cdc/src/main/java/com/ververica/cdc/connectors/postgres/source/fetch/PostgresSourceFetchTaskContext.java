@@ -27,6 +27,7 @@ import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchT
 import com.ververica.cdc.connectors.postgres.source.PostgresDialect;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
+import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
 import com.ververica.cdc.connectors.postgres.source.utils.ChunkUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
@@ -58,7 +59,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
@@ -103,11 +103,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                 .createInitialOffset() // get an offset for starting snapshot
                         : sourceSplitBase.asStreamSplit().getStartingOffset();
 
-        PostgresOffsetContext offsetContext =
-                loader.load(
-                        Objects.requireNonNull(offset, "offset is null for the sourceSplitBase")
-                                .getOffset());
-        return offsetContext;
+        return PostgresOffsetUtils.getPostgresOffsetContext(loader, offset);
     }
 
     @Override
