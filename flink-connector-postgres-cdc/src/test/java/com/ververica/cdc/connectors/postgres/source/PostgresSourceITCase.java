@@ -372,7 +372,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private String getSlotName() {
         final Random random = new Random();
-        int id = random.nextInt(100);
+        int id = random.nextInt(10000);
         return "flink_" + id;
     }
 

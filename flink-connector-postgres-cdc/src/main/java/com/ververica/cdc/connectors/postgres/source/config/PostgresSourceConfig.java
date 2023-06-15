@@ -33,7 +33,10 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     private static final long serialVersionUID = 1L;
 
+    private final int subtaskId;
+
     public PostgresSourceConfig(
+            int subtaskId,
             StartupOptions startupOptions,
             List<String> databaseList,
             List<String> schemaList,
@@ -81,6 +84,11 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 connectMaxRetries,
                 connectionPoolSize,
                 chunkKeyColumn);
+        this.subtaskId = subtaskId;
+    }
+
+    public int getSubtaskId() {
+        return subtaskId;
     }
 
     @Override

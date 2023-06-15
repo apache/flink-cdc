@@ -24,6 +24,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
 import com.ververica.cdc.connectors.postgres.source.utils.PostgresQueryUtils;
@@ -152,11 +153,17 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
 
         // we should only capture events for the current table,
         // otherwise, we may not find corresponding schema
+        PostgresSourceConfig pgSourceConfig = (PostgresSourceConfig) ctx.getSourceConfig();
         Configuration dbzConf =
                 ctx.getDbzConnectorConfig()
                         .getConfig()
                         .edit()
                         .with("table.include.list", split.getTableId().toString())
+                        .with(
+                                "slot.name",
+                                pgSourceConfig.getDbzProperties().getProperty("slot.name")
+                                        + "_"
+                                        + pgSourceConfig.getSubtaskId())
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
@@ -174,6 +181,7 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                         ctx.getReplicationConnection(),
                         backfillSplit);
         LOG.info("Execute backfillReadTask for split {}", split);
+        LOG.info("Slot name {}", dbzConf.getString("slot.name"));
         backfillReadTask.execute(new PostgresChangeEventSourceContext(), postgresOffsetContext);
     }
 

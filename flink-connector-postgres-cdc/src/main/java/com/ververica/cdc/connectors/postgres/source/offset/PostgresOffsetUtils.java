@@ -19,9 +19,9 @@ package com.ververica.cdc.connectors.postgres.source.offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /** Utils for handling {@link PostgresOffset}. */
 public class PostgresOffsetUtils {
@@ -32,11 +32,13 @@ public class PostgresOffsetUtils {
                 Objects.requireNonNull(offset, "offset is null for the sourceSplitBase")
                         .getOffset();
         // all the keys happen to be long type for PostgresOffsetContext.Loader.load
-        Map<String, Object> offsetMap =
-                offsetStrMap.entrySet().stream()
-                        .collect(
-                                Collectors.toMap(
-                                        Map.Entry::getKey, e -> Long.parseLong(e.getValue())));
+        Map<String, Object> offsetMap = new HashMap<>();
+        for (String key : offsetStrMap.keySet()) {
+            String value = offsetStrMap.get(key);
+            if (value != null) {
+                offsetMap.put(key, Long.parseLong(value));
+            }
+        }
         return loader.load(offsetMap);
     }
 }

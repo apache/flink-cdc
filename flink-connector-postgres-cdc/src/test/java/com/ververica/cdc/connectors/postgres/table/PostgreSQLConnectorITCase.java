@@ -299,7 +299,6 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'slot.name' = '%s'"
                                 + ")",

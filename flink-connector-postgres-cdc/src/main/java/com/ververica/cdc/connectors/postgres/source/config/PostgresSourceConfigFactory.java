@@ -90,6 +90,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
         Configuration dbzConfiguration = Configuration.from(props);
         return new PostgresSourceConfig(
+                subtaskId,
                 startupOptions,
                 Collections.singletonList(database),
                 schemaList,
