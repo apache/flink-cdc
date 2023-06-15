@@ -130,9 +130,15 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         if (snapshotResult.isCompletedOrSkipped()) {
             final RedoLogSplitReadTask backfillBinlogReadTask =
                     createBackfillRedoLogReadTask(backfillBinlogSplit, sourceFetchContext);
+
+            final LogMinerOracleOffsetContextLoader loader =
+                    new LogMinerOracleOffsetContextLoader(
+                            ((OracleSourceFetchTaskContext) context).getDbzConnectorConfig());
+            final OracleOffsetContext oracleOffsetContext =
+                    loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
             backfillBinlogReadTask.execute(
-                    new SnapshotBinlogSplitChangeEventSourceContext(),
-                    sourceFetchContext.getOffsetContext());
+                    new SnapshotBinlogSplitChangeEventSourceContext(), oracleOffsetContext);
+            taskRunning = false;
         } else {
             taskRunning = false;
             throw new IllegalStateException(
