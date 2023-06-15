@@ -47,6 +47,12 @@ under the License.
             <artifactId>debezium-connector-mysql</artifactId>
             <version>${debezium.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.zendesk</groupId>
+            <artifactId>mysql-binlog-connector-java</artifactId>
+            <version>${mysql.binlog.version}</version>
+        </dependency>
+
 
         <!-- geometry dependencies -->
         <dependency>
