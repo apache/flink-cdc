@@ -175,7 +175,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
     private SnapshotPendingSplitsState deserializeLegacySnapshotPendingSplitsState(
             int splitVersion, DataInputDeserializer in) throws IOException {
-        List<TableId> alreadyProcessedTables = readTableIds(in);
+        List<TableId> alreadyProcessedTables = readTableIds(2, in);
         List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
         Map<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
@@ -221,13 +221,13 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
     private SnapshotPendingSplitsState deserializeSnapshotPendingSplitsState(
             int version, int splitVersion, DataInputDeserializer in) throws IOException {
-        List<TableId> alreadyProcessedTables = readTableIds(in);
+        List<TableId> alreadyProcessedTables = readTableIds(version, in);
         List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
         Map<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
         boolean isAssignerFinished = in.readBoolean();
-        List<TableId> remainingTableIds = readTableIds(in);
+        List<TableId> remainingTableIds = readTableIds(version, in);
         boolean isTableIdCaseSensitive = in.readBoolean();
         final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
         final Map<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
@@ -366,11 +366,14 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         }
     }
 
-    private List<TableId> readTableIds(DataInputDeserializer in) throws IOException {
+    private List<TableId> readTableIds(int version, DataInputDeserializer in) throws IOException {
         List<TableId> tableIds = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
-            boolean useCatalogBeforeSchema = in.readBoolean();
+            boolean useCatalogBeforeSchema = true;
+            if (version >= 5) {
+                useCatalogBeforeSchema = in.readBoolean();
+            }
             String tableIdStr = in.readUTF();
             tableIds.add(TableId.parse(tableIdStr, useCatalogBeforeSchema));
         }

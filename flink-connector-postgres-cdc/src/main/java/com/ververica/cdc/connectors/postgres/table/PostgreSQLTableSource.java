@@ -29,6 +29,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
 import com.ververica.cdc.connectors.postgres.source.PostgresSourceBuilder;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -177,8 +178,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         .build();
 
         if (enableParallelRead) {
-            PostgresSourceBuilder.PostgresIncrementalSource<RowData> parallelSource =
-                    new PostgresSourceBuilder<RowData>()
+            JdbcIncrementalSource<RowData> parallelSource =
+                    PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
                             .hostname(hostname)
                             .port(port)
                             .database(database)

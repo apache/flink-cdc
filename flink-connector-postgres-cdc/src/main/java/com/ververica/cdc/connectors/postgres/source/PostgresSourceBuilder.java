@@ -240,7 +240,7 @@ public class PostgresSourceBuilder<T> {
             super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
         }
 
-        public static PostgresSourceBuilder builder() {
+        public static <T> PostgresSourceBuilder<T> builder() {
             return new PostgresSourceBuilder<>();
         }
     }

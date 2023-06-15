@@ -42,6 +42,11 @@ public class PostgresOffsetFactory extends OffsetFactory {
     }
 
     @Override
+    public Offset createTimestampOffset(long timestampMillis) {
+        throw new FlinkRuntimeException("not supported create new Offset from timestamp.");
+    }
+
+    @Override
     public Offset createInitialOffset() {
         return PostgresOffset.INITIAL_OFFSET;
     }

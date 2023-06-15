@@ -21,11 +21,14 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.time.Conversions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 /** A utility class for accessing various Debezium package-private methods. */
 public final class Utils {
@@ -38,7 +41,7 @@ public final class Utils {
 
     public static PostgresOffset currentOffset(PostgresConnection jdbcConnection) {
         Long lsn;
-        long txId;
+        Long txId;
         try {
             lsn = jdbcConnection.currentXLogLocation();
             txId = jdbcConnection.currentTransactionId();
@@ -54,7 +57,15 @@ public final class Utils {
                     "JDBC connection fails to commit: " + e.getMessage(), e);
         }
 
-        return new PostgresOffset(lsn, txId, Instant.MIN);
+        Map<String, String> offsetMap = new HashMap<>();
+        offsetMap.put(SourceInfo.LSN_KEY, lsn.toString());
+        if (txId != null) {
+            offsetMap.put(SourceInfo.TXID_KEY, txId.toString());
+        }
+        offsetMap.put(
+                SourceInfo.TIMESTAMP_USEC_KEY,
+                String.valueOf(Conversions.toEpochMicros(Instant.MIN)));
+        return PostgresOffset.of(offsetMap);
     }
 
     public static PostgresSchema refreshSchema(

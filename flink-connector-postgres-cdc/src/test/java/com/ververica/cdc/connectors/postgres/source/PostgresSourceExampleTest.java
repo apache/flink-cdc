@@ -100,7 +100,7 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
                 new JsonDebeziumDeserializationSchema();
 
         JdbcIncrementalSource<String> postgresIncrementalSource =
-                new PostgresSourceBuilder<String>()
+                PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
                         .hostname(POSTGERS_CONTAINER.getHost())
                         .port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
                         .database(inventoryDatabase.getDatabaseName())
@@ -144,7 +144,7 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
         debeziumProps.setProperty("snapshot.mode", "never");
 
         JdbcIncrementalSource<RowData> postgresIncrementalSource =
-                new PostgresSourceBuilder<RowData>()
+                PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
                         .hostname(POSTGERS_CONTAINER.getHost())
                         .port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
                         .database(inventoryDatabase.getDatabaseName())

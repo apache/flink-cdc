@@ -32,11 +32,6 @@ public class PostgresOffset extends Offset {
 
     private static final Logger LOG = org.slf4j.LoggerFactory.getLogger(PostgresOffset.class);
 
-    // required by io.debezium.connector.postgresql.PostgresOffsetContext.Loader.load
-    public static final String LSN_KEY = SourceInfo.LSN_KEY;
-    public static final String TXID_KEY = SourceInfo.TXID_KEY;
-    public static final String TIMESTAMP_USEC_KEY = SourceInfo.TIMESTAMP_USEC_KEY;
-
     public static final PostgresOffset INITIAL_OFFSET =
             new PostgresOffset(Lsn.INVALID_LSN.asLong(), null, Instant.MIN);
     public static final PostgresOffset NO_STOPPING_OFFSET =
@@ -48,16 +43,18 @@ public class PostgresOffset extends Offset {
     }
 
     PostgresOffset(Long lsn, Long txId, Instant lastCommitTs) {
+        Map<String, String> offsetMap = new HashMap<>();
         // keys are from io.debezium.connector.postgresql.PostgresOffsetContext.Loader.load
-        offset.put(SourceInfo.LSN_KEY, lsn.toString());
+        offsetMap.put(SourceInfo.LSN_KEY, lsn.toString());
         if (txId != null) {
-            offset.put(SourceInfo.TXID_KEY, txId.toString());
+            offsetMap.put(SourceInfo.TXID_KEY, txId.toString());
         }
         if (lastCommitTs != null) {
-            offset.put(
+            offsetMap.put(
                     SourceInfo.TIMESTAMP_USEC_KEY,
                     String.valueOf(Conversions.toEpochMicros(lastCommitTs)));
         }
+        this.offset = offsetMap;
     }
 
     public static PostgresOffset of(SourceRecord dataRecord) {
@@ -75,15 +72,15 @@ public class PostgresOffset extends Offset {
     }
 
     public Lsn getLsn() {
-        return Lsn.valueOf(Long.valueOf(this.offset.get(LSN_KEY)));
+        return Lsn.valueOf(Long.valueOf(this.offset.get(SourceInfo.LSN_KEY)));
     }
 
     public Long getTxid() {
-        return Long.valueOf(this.offset.get(TXID_KEY));
+        return Long.valueOf(this.offset.get(SourceInfo.TXID_KEY));
     }
 
     public Long getLastCommitTs() {
-        return Long.valueOf(this.offset.get(TIMESTAMP_USEC_KEY));
+        return Long.valueOf(this.offset.get(SourceInfo.TIMESTAMP_USEC_KEY));
     }
 
     @Override
