@@ -110,6 +110,13 @@ under the License.
         </dependency>
         <dependency>
             <groupId>com.ververica</groupId>
+            <artifactId>flink-connector-vitess-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-connector-test-util</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -338,6 +345,16 @@ under the License.
                             <artifactId>flink-sql-connector-db2-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>db2-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ververica</groupId>
+                            <artifactId>flink-sql-connector-vitess-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>vitess-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
