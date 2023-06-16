@@ -38,27 +38,23 @@ import java.util.stream.Collectors;
 /** Formatter that formats the {@link org.apache.kafka.connect.source.SourceRecord} to String. */
 public class RecordsFormatter {
 
-    private final DataType dataType;
-    private final ZoneId zoneId;
-
-    private TypeInformation<RowData> typeInfo;
-    private DebeziumDeserializationSchema<RowData> deserializationSchema;
-    private SimpleCollector collector;
-    private RowRowConverter rowRowConverter;
+    private final TypeInformation<RowData> typeInfo;
+    private final DebeziumDeserializationSchema<RowData> deserializationSchema;
+    private final SimpleCollector collector;
+    private final RowRowConverter rowRowConverter;
 
     public RecordsFormatter(DataType dataType) {
         this(dataType, ZoneId.of("UTC"));
     }
 
     public RecordsFormatter(DataType dataType, ZoneId zoneId) {
-        this.dataType = dataType;
-        this.zoneId = zoneId;
         this.typeInfo =
                 (TypeInformation<RowData>) TypeConversions.fromDataTypeToLegacyInfo(dataType);
         this.deserializationSchema =
                 RowDataDebeziumDeserializeSchema.newBuilder()
                         .setPhysicalRowType((RowType) dataType.getLogicalType())
                         .setResultTypeInfo(typeInfo)
+                        .setServerTimeZone(zoneId)
                         .build();
         this.collector = new SimpleCollector();
         this.rowRowConverter = RowRowConverter.create(dataType);
