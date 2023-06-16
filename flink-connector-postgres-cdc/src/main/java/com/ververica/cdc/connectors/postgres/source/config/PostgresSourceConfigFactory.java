@@ -34,6 +34,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** Factory to create Configuration for Postgres source. */
 public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
+    private static final long serialVersionUID = 1L;
+
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
 
     private static final String JDBC_DRIVER = "org.postgresql.Driver";
@@ -63,7 +65,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
-        props.setProperty("slot.name", checkNotNull(slotName));
+        String slotNameForSubTask = checkNotNull(slotName) + "_" + subtaskId;
+        props.setProperty("slot.name", checkNotNull(slotNameForSubTask));
         // database history
         props.setProperty(
                 "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
@@ -72,6 +75,9 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
         // we have to enable heartbeat for PG to make sure DebeziumChangeConsumer#handleBatch
         // is invoked after job restart
+        // Enable TCP keep-alive probe to verify that the database connection is still alive
+        props.setProperty("database.tcpKeepAlive", String.valueOf(true));
+        props.setProperty("slot.drop.on.stop", String.valueOf(true));
         props.setProperty("heartbeat.interval.ms", String.valueOf(heartbeatInterval.toMillis()));
         props.setProperty("include.schema.changes", String.valueOf(includeSchemaChanges));
 

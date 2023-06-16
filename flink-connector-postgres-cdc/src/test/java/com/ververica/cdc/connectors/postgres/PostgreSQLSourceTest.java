@@ -38,7 +38,6 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -70,7 +69,6 @@ import static org.junit.Assert.fail;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Tests for {@link PostgreSQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
-@Ignore
 public class PostgreSQLSourceTest extends PostgresTestBase {
     private static final String SLOT_NAME = "flink";
 

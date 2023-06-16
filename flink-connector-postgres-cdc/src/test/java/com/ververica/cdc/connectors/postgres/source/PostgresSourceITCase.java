@@ -46,7 +46,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -368,12 +367,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
         assertTrue(!hasNextData(iterator));
-    }
-
-    private String getSlotName() {
-        final Random random = new Random();
-        int id = random.nextInt(10000);
-        return "flink_" + id;
     }
 
     private void sleepMs(long millis) {

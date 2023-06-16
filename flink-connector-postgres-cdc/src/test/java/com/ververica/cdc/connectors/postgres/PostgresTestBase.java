@@ -35,6 +35,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -92,6 +93,12 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                 POSTGERS_CONTAINER.withDatabaseName(databaseName).getJdbcUrl(),
                 POSTGERS_CONTAINER.getUsername(),
                 POSTGERS_CONTAINER.getPassword());
+    }
+
+    public static String getSlotName() {
+        final Random random = new Random();
+        int id = random.nextInt(10000);
+        return "flink_" + id;
     }
 
     /**

@@ -27,7 +27,6 @@ import org.apache.flink.util.ExceptionUtils;
 import com.ververica.cdc.connectors.postgres.PostgresTestBase;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -47,10 +46,8 @@ import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
-@Ignore
 @RunWith(Parameterized.class)
 public class PostgreSQLConnectorITCase extends PostgresTestBase {
-    private static final String SLOT_NAME = "flinktest";
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -113,7 +110,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "inventory",
                         "products",
                         parallelismSnapshot,
-                        SLOT_NAME);
+                        getSlotName());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -317,7 +314,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "inventory",
                         "full_types",
                         parallelismSnapshot,
-                        SLOT_NAME);
+                        getSlotName());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + "    id INTEGER NOT NULL,"
