@@ -168,11 +168,12 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "108,jacket,water resistent black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
                         "111,jacket,new water resistent white wind breaker,0.5");
+        // Oracle cdc's backfill task will cost much time, increase the timeout here
         proxy.checkResultWithTimeout(
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                150000L);
+                300000L);
     }
 
     private Connection getOracleJdbcConnection() throws SQLException {

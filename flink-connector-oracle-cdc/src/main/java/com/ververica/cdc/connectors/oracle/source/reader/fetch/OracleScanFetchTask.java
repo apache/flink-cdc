@@ -130,9 +130,15 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         if (snapshotResult.isCompletedOrSkipped()) {
             final RedoLogSplitReadTask backfillBinlogReadTask =
                     createBackfillRedoLogReadTask(backfillBinlogSplit, sourceFetchContext);
+
+            final LogMinerOracleOffsetContextLoader loader =
+                    new LogMinerOracleOffsetContextLoader(
+                            ((OracleSourceFetchTaskContext) context).getDbzConnectorConfig());
+            final OracleOffsetContext oracleOffsetContext =
+                    loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
             backfillBinlogReadTask.execute(
-                    new SnapshotBinlogSplitChangeEventSourceContext(),
-                    sourceFetchContext.getOffsetContext());
+                    new SnapshotBinlogSplitChangeEventSourceContext(), oracleOffsetContext);
+            taskRunning = false;
         } else {
             taskRunning = false;
             throw new IllegalStateException(
@@ -280,7 +286,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                     "Snapshot step 3 - Determining high watermark {} for split {}",
                     highWatermark,
                     snapshotSplit);
-            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(lowWatermark);
+            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(highWatermark);
             dispatcher.dispatchWatermarkEvent(
                     offsetContext.getPartition(), snapshotSplit, highWatermark, WatermarkKind.HIGH);
             return SnapshotResult.completed(ctx.offset);
