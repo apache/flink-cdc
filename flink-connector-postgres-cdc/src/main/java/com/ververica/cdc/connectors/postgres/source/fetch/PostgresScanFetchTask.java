@@ -101,8 +101,8 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                         ctx.getDispatcher(),
                         ctx.getSnapshotChangeEventSourceMetrics(),
                         split,
-                        "a",
-                        "b");
+                        ctx.getSlotName(),
+                        ctx.getPluginName());
 
         SnapshotSplitChangeEventSourceContext changeEventSourceContext =
                 new SnapshotSplitChangeEventSourceContext();

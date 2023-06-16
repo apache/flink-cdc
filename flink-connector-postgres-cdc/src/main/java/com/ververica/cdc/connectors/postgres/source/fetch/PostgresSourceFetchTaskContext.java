@@ -63,6 +63,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.PLUGIN_NAME;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SNAPSHOT_MODE;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.createReplicationConnection;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresValueConverterBuilder;
@@ -259,5 +261,15 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     public Snapshotter getSnapShotter() {
         return snapShotter;
+    }
+
+    public String getSlotName() {
+        return sourceConfig.getDbzProperties().getProperty(SLOT_NAME.name());
+    }
+
+    public String getPluginName() {
+        return PostgresConnectorConfig.LogicalDecoder.parse(
+                        sourceConfig.getDbzProperties().getProperty(PLUGIN_NAME.name()))
+                .getPostgresPluginName();
     }
 }
