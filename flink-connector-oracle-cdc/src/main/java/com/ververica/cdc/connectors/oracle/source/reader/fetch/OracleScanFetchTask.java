@@ -280,7 +280,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                     "Snapshot step 3 - Determining high watermark {} for split {}",
                     highWatermark,
                     snapshotSplit);
-            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(highWatermark);
+            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(lowWatermark);
             dispatcher.dispatchWatermarkEvent(
                     offsetContext.getPartition(), snapshotSplit, highWatermark, WatermarkKind.HIGH);
             return SnapshotResult.completed(ctx.offset);
