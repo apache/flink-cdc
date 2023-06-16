@@ -35,11 +35,13 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,6 +49,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECTION_POOL_SIZE;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECT_MAX_RETRIES;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.HEARTBEAT_INTERVAL;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -119,7 +130,19 @@ public class PostgreSQLTableFactoryTest {
                         "decoderbufs",
                         MY_SLOT_NAME,
                         DebeziumChangelogMode.ALL,
-                        PROPERTIES);
+                        PROPERTIES,
+                        false,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -147,7 +170,19 @@ public class PostgreSQLTableFactoryTest {
                         "wal2json",
                         MY_SLOT_NAME,
                         DebeziumChangelogMode.UPSERT,
-                        dbzProperties);
+                        dbzProperties,
+                        false,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -175,7 +210,19 @@ public class PostgreSQLTableFactoryTest {
                         "decoderbufs",
                         MY_SLOT_NAME,
                         DebeziumChangelogMode.ALL,
-                        new Properties());
+                        new Properties(),
+                        false,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
@@ -188,6 +235,85 @@ public class PostgreSQLTableFactoryTest {
                 (DebeziumSourceFunction<RowData>)
                         ((SourceFunctionProvider) provider).createSourceFunction();
         assertProducedTypeOfSourceFunction(debeziumSourceFunction, expectedSource.producedDataType);
+    }
+
+    @Test
+    public void testEnableParallelReadSource() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
+        properties.put("scan.snapshot.fetch.size", "100");
+        properties.put("connect.timeout", "45s");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        SCHEMA,
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.ALL,
+                        PROPERTIES,
+                        true,
+                        8000,
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        100,
+                        Duration.ofSeconds(45),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null);
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testStartupFromLatestOffset() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
+        properties.put("scan.snapshot.fetch.size", "100");
+        properties.put("connect.timeout", "45s");
+        properties.put("scan.startup.mode", "latest-offset");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        SCHEMA,
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.ALL,
+                        PROPERTIES,
+                        true,
+                        8000,
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        100,
+                        Duration.ofSeconds(45),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.latest(),
+                        null);
+        assertEquals(expectedSource, actualSource);
     }
 
     @Test
@@ -264,6 +390,7 @@ public class PostgreSQLTableFactoryTest {
         options.put("username", MY_USERNAME);
         options.put("password", MY_PASSWORD);
         options.put("slot.name", MY_SLOT_NAME);
+        options.put("scan.incremental.snapshot.enabled", String.valueOf(false));
         return options;
     }
 

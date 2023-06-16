@@ -44,7 +44,7 @@ import java.util.Map;
 public abstract class SourceSplitSerializer
         implements SimpleVersionedSerializer<SourceSplitBase>, OffsetDeserializerSerializer {
 
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -67,6 +67,9 @@ public abstract class SourceSplitSerializer
 
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
             out.writeInt(SNAPSHOT_SPLIT_FLAG);
+            boolean useCatalogBeforeSchema =
+                    SerializerUtils.shouldUseCatalogBeforeSchema(snapshotSplit.getTableId());
+            out.writeBoolean(useCatalogBeforeSchema);
             out.writeUTF(snapshotSplit.getTableId().toString());
             out.writeUTF(snapshotSplit.splitId());
             out.writeUTF(snapshotSplit.getSplitKeyType().asSerializableString());
@@ -114,6 +117,7 @@ public abstract class SourceSplitSerializer
             case 1:
             case 2:
             case 3:
+            case 4:
                 return deserializeSplit(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -125,7 +129,11 @@ public abstract class SourceSplitSerializer
 
         int splitKind = in.readInt();
         if (splitKind == SNAPSHOT_SPLIT_FLAG) {
-            TableId tableId = TableId.parse(in.readUTF());
+            boolean useCatalogBeforeSchema = true;
+            if (version >= 4) {
+                useCatalogBeforeSchema = in.readBoolean();
+            }
+            TableId tableId = TableId.parse(in.readUTF(), useCatalogBeforeSchema);
             String splitId = in.readUTF();
             RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
             Object[] splitBoundaryStart = SerializerUtils.serializedStringToRow(in.readUTF());
@@ -174,6 +182,9 @@ public abstract class SourceSplitSerializer
         final int size = tableSchemas.size();
         out.writeInt(size);
         for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
+            boolean useCatalogBeforeSchema =
+                    SerializerUtils.shouldUseCatalogBeforeSchema(entry.getKey());
+            out.writeBoolean(useCatalogBeforeSchema);
             out.writeUTF(entry.getKey().toString());
             final String tableChangeStr =
                     documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
@@ -189,7 +200,8 @@ public abstract class SourceSplitSerializer
         Map<TableId, TableChange> tableSchemas = new HashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
-            TableId tableId = TableId.parse(in.readUTF());
+            boolean useCatalogBeforeSchema = in.readBoolean();
+            TableId tableId = TableId.parse(in.readUTF(), useCatalogBeforeSchema);
             final String tableChangeStr;
             switch (version) {
                 case 1:
@@ -197,6 +209,7 @@ public abstract class SourceSplitSerializer
                     break;
                 case 2:
                 case 3:
+                case 4:
                     final int len = in.readInt();
                     final byte[] bytes = new byte[len];
                     in.read(bytes);
@@ -227,13 +240,18 @@ public abstract class SourceSplitSerializer
         List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
-            TableId tableId = TableId.parse(in.readUTF());
+            String tableIdStr = in.readUTF();
             String splitId = in.readUTF();
             Object[] splitStart = SerializerUtils.serializedStringToRow(in.readUTF());
             Object[] splitEnd = SerializerUtils.serializedStringToRow(in.readUTF());
             OffsetFactory offsetFactory =
                     (OffsetFactory) SerializerUtils.serializedStringToObject(in.readUTF());
             Offset highWatermark = readOffsetPosition(version, in);
+            boolean useCatalogBeforeSchema = true;
+            if (version >= 4) {
+                useCatalogBeforeSchema = in.readBoolean();
+            }
+            TableId tableId = TableId.parse(tableIdStr, useCatalogBeforeSchema);
 
             finishedSplitsInfo.add(
                     new FinishedSnapshotSplitInfo(

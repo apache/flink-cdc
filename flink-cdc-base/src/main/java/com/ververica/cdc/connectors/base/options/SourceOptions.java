@@ -35,9 +35,8 @@ public class SourceOptions {
                                     + "(1) source can be parallel during snapshot reading, \n"
                                     + "(2) source can perform checkpoints in the chunk granularity during snapshot reading, \n"
                                     + "(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.\n"
-                                    + "If you would like the source run in parallel, each parallel reader should have an unique server id, "
+                                    + "For MySQL, if you would like the source run in parallel, each parallel reader should have an unique server id, "
                                     + "so the 'server-id' must be a range like '5400-6400', and the range must be larger than the parallelism.");
-
     public static final ConfigOption<Integer> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE =
             ConfigOptions.key("scan.incremental.snapshot.chunk.size")
                     .intType()

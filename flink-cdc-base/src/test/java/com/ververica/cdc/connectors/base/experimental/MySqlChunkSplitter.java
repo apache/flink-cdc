@@ -343,7 +343,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
     }
 
     private static void maySleep(int count, TableId tableId) {
-        // every 100 queries to sleep 1s
+        // every 10 queries to sleep 100ms
         if (count % 10 == 0) {
             try {
                 Thread.sleep(100);

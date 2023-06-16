@@ -25,6 +25,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSpl
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
+import com.ververica.cdc.connectors.base.utils.SerializerUtils;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 
@@ -41,7 +42,7 @@ import static com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSer
 /** The {@link SimpleVersionedSerializer Serializer} for the {@link PendingSplitsState}. */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -100,6 +101,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 return deserializeLegacyPendingSplitsState(serialized);
             case 3:
             case 4:
+            case 5:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -173,7 +175,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
     private SnapshotPendingSplitsState deserializeLegacySnapshotPendingSplitsState(
             int splitVersion, DataInputDeserializer in) throws IOException {
-        List<TableId> alreadyProcessedTables = readTableIds(in);
+        List<TableId> alreadyProcessedTables = readTableIds(2, in);
         List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
         Map<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
@@ -219,13 +221,13 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
     private SnapshotPendingSplitsState deserializeSnapshotPendingSplitsState(
             int version, int splitVersion, DataInputDeserializer in) throws IOException {
-        List<TableId> alreadyProcessedTables = readTableIds(in);
+        List<TableId> alreadyProcessedTables = readTableIds(version, in);
         List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
         Map<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
         boolean isAssignerFinished = in.readBoolean();
-        List<TableId> remainingTableIds = readTableIds(in);
+        List<TableId> remainingTableIds = readTableIds(version, in);
         boolean isTableIdCaseSensitive = in.readBoolean();
         final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
         final Map<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
@@ -358,16 +360,22 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         final int size = tableIds.size();
         out.writeInt(size);
         for (TableId tableId : tableIds) {
+            boolean useCatalogBeforeSchema = SerializerUtils.shouldUseCatalogBeforeSchema(tableId);
+            out.writeBoolean(useCatalogBeforeSchema);
             out.writeUTF(tableId.toString());
         }
     }
 
-    private List<TableId> readTableIds(DataInputDeserializer in) throws IOException {
+    private List<TableId> readTableIds(int version, DataInputDeserializer in) throws IOException {
         List<TableId> tableIds = new ArrayList<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
+            boolean useCatalogBeforeSchema = true;
+            if (version >= 5) {
+                useCatalogBeforeSchema = in.readBoolean();
+            }
             String tableIdStr = in.readUTF();
-            tableIds.add(TableId.parse(tableIdStr));
+            tableIds.add(TableId.parse(tableIdStr, useCatalogBeforeSchema));
         }
         return tableIds;
     }

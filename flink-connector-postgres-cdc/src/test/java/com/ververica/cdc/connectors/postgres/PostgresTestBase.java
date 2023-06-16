@@ -48,17 +48,30 @@ import static org.junit.Assert.assertNotNull;
  */
 public abstract class PostgresTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+    public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+    public static final String DEFAULT_DB = "postgres";
 
-    private static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
+    // use newer version of postgresql image to support pgoutput plugin
+    // when testing postgres 13, only 13-alpine supports both amd64 and arm64
+    protected static final DockerImageName PG_IMAGE =
+            DockerImageName.parse("debezium/postgres:13").asCompatibleSubstituteFor("postgres");
 
-    protected static final PostgreSQLContainer<?> POSTGERS_CONTAINER =
+    public static final PostgreSQLContainer<?> POSTGERS_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
-                    .withDatabaseName("postgres")
+                    .withDatabaseName(DEFAULT_DB)
                     .withUsername("postgres")
                     .withPassword("postgres")
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+                    .withLogConsumer(new Slf4jLogConsumer(LOG))
+                    .withCommand(
+                            "postgres",
+                            "-c",
+                            // default
+                            "fsync=off",
+                            "-c",
+                            // to ensure that the slot becomes inactive during the failover
+                            "wal_sender_timeout=1000",
+                            "-c",
+                            "max_replication_slots=20");
 
     @BeforeClass
     public static void startContainers() {
@@ -70,6 +83,13 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected Connection getJdbcConnection() throws SQLException {
         return DriverManager.getConnection(
                 POSTGERS_CONTAINER.getJdbcUrl(),
+                POSTGERS_CONTAINER.getUsername(),
+                POSTGERS_CONTAINER.getPassword());
+    }
+
+    public static Connection getJdbcConnection(String databaseName) throws SQLException {
+        return DriverManager.getConnection(
+                POSTGERS_CONTAINER.withDatabaseName(databaseName).getJdbcUrl(),
                 POSTGERS_CONTAINER.getUsername(),
                 POSTGERS_CONTAINER.getPassword());
     }

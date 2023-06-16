@@ -143,6 +143,9 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         out.writeUTF(SerializerUtils.rowToSerializedString(this.getSplitEnd()));
         out.writeUTF(SerializerUtils.rowToSerializedString(this.offsetFactory));
         writeOffsetPosition(this.getHighWatermark(), out);
+        boolean useCatalogBeforeSchema =
+                SerializerUtils.shouldUseCatalogBeforeSchema(this.getTableId());
+        out.writeBoolean(useCatalogBeforeSchema);
         return out.getCopyOfBuffer();
     }
 

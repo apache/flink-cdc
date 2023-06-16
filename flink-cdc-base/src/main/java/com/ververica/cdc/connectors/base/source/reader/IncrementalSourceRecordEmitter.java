@@ -44,6 +44,7 @@ import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getFetch
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.getMessageTimestamp;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
+import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isHeartbeatEvent;
 import static com.ververica.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 
 /**
@@ -91,11 +92,14 @@ public class IncrementalSourceRecordEmitter<T>
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {
+            LOG.trace("Process WatermarkEvent: {}; splitState = {}", element, splitState);
             Offset watermark = getWatermark(element);
             if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+                LOG.trace("Set HighWatermark {} for {}", watermark, splitState);
                 splitState.asSnapshotSplitState().setHighWatermark(watermark);
             }
         } else if (isSchemaChangeEvent(element) && splitState.isStreamSplitState()) {
+            LOG.trace("Process SchemaChangeEvent: {}; splitState = {}", element, splitState);
             HistoryRecord historyRecord = getHistoryRecord(element);
             Array tableChanges =
                     historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
@@ -107,15 +111,24 @@ public class IncrementalSourceRecordEmitter<T>
                 emitElement(element, output);
             }
         } else if (isDataChangeRecord(element)) {
-            if (splitState.isStreamSplitState()) {
-                Offset position = getOffsetPosition(element);
-                splitState.asStreamSplitState().setStartingOffset(position);
-            }
+            LOG.trace("Process DataChangeRecord: {}; splitState = {}", element, splitState);
+            updateStreamSplitState(splitState, element);
             reportMetrics(element);
             emitElement(element, output);
+        } else if (isHeartbeatEvent(element)) {
+            LOG.trace("Process Heartbeat: {}; splitState = {}", element, splitState);
+            updateStreamSplitState(splitState, element);
         } else {
             // unknown element
-            LOG.info("Meet unknown element {}, just skip.", element);
+            LOG.info(
+                    "Meet unknown element {} for splitState = {}, just skip.", element, splitState);
+        }
+    }
+
+    private void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
+        if (splitState.isStreamSplitState()) {
+            Offset position = getOffsetPosition(element);
+            splitState.asStreamSplitState().setStartingOffset(position);
         }
     }
 
