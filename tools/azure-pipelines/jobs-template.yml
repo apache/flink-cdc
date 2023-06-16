@@ -84,6 +84,8 @@ jobs:
           module: tidb
         db2:
           module: db2
+        vitess:
+          module: vitess
         misc:
           module: misc
     steps:
