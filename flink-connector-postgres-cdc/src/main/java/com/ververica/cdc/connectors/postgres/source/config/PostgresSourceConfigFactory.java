@@ -65,8 +65,10 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
-        String slotNameForSubTask = checkNotNull(slotName) + "_" + subtaskId;
-        props.setProperty("slot.name", checkNotNull(slotNameForSubTask));
+        // we will create different slot name for each snapshot reader during backfiil task
+        // execution, the original slot name will be used by enumerator to create slot for
+        // global stream split
+        props.setProperty("slot.name", checkNotNull(slotName));
         // database history
         props.setProperty(
                 "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
@@ -77,7 +79,6 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         // is invoked after job restart
         // Enable TCP keep-alive probe to verify that the database connection is still alive
         props.setProperty("database.tcpKeepAlive", String.valueOf(true));
-        props.setProperty("slot.drop.on.stop", String.valueOf(true));
         props.setProperty("heartbeat.interval.ms", String.valueOf(heartbeatInterval.toMillis()));
         props.setProperty("include.schema.changes", String.valueOf(includeSchemaChanges));
 

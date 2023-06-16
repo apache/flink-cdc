@@ -35,10 +35,16 @@ import com.ververica.cdc.connectors.postgres.source.fetch.PostgresStreamFetchTas
 import com.ververica.cdc.connectors.postgres.source.utils.CustomPostgresSchema;
 import com.ververica.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
+import io.debezium.connector.postgresql.PostgresObjectUtils;
+import io.debezium.connector.postgresql.PostgresSchema;
+import io.debezium.connector.postgresql.PostgresTaskContext;
+import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
+import io.debezium.schema.TopicSelector;
 
 import javax.annotation.Nullable;
 
@@ -47,6 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static io.debezium.connector.postgresql.PostgresObjectUtils.createReplicationConnection;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresValueConverterBuilder;
 import static io.debezium.connector.postgresql.Utils.currentOffset;
 
@@ -82,6 +89,30 @@ public class PostgresDialect implements JdbcDataSourceDialect {
             throw new FlinkRuntimeException(e);
         }
         return jdbc;
+    }
+
+    public PostgresReplicationConnection openPostgresReplicationConnection() {
+        try {
+            PostgresConnection jdbcConnection =
+                    (PostgresConnection) openJdbcConnection(sourceConfig);
+            PostgresConnectorConfig pgConnectorConfig = sourceConfig.getDbzConnectorConfig();
+            TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(pgConnectorConfig);
+            PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
+                    newPostgresValueConverterBuilder(pgConnectorConfig);
+            PostgresSchema schema =
+                    PostgresObjectUtils.newSchema(
+                            jdbcConnection,
+                            pgConnectorConfig,
+                            jdbcConnection.getTypeRegistry(),
+                            topicSelector,
+                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
+            PostgresTaskContext taskContext =
+                    PostgresObjectUtils.newTaskContext(pgConnectorConfig, schema, topicSelector);
+            return (PostgresReplicationConnection)
+                    createReplicationConnection(taskContext, false, pgConnectorConfig);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to initialize PostgresReplicationConnection", e);
+        }
     }
 
     @Override

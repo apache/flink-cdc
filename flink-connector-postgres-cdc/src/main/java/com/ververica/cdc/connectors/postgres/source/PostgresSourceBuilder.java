@@ -17,14 +17,27 @@
 package com.ververica.cdc.connectors.postgres.source;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.api.connector.source.SplitEnumerator;
+import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
+import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
+import com.ververica.cdc.connectors.base.source.assigner.StreamSplitAssigner;
+import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import com.ververica.cdc.connectors.postgres.source.enumerator.PostgresSourceEnumerator;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import io.debezium.relational.TableId;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -238,6 +251,38 @@ public class PostgresSourceBuilder<T> {
                 PostgresOffsetFactory offsetFactory,
                 PostgresDialect dataSourceDialect) {
             super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+        }
+
+        @Override
+        public SplitEnumerator<SourceSplitBase, PendingSplitsState> createEnumerator(
+                SplitEnumeratorContext<SourceSplitBase> enumContext) {
+            final SplitAssigner splitAssigner;
+            PostgresSourceConfig sourceConfig = (PostgresSourceConfig) configFactory.create(0);
+            if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
+                try {
+                    final List<TableId> remainingTables =
+                            dataSourceDialect.discoverDataCollections(sourceConfig);
+                    boolean isTableIdCaseSensitive =
+                            dataSourceDialect.isDataCollectionIdCaseSensitive(sourceConfig);
+                    splitAssigner =
+                            new HybridSplitAssigner<>(
+                                    sourceConfig,
+                                    enumContext.currentParallelism(),
+                                    remainingTables,
+                                    isTableIdCaseSensitive,
+                                    dataSourceDialect,
+                                    offsetFactory);
+                } catch (Exception e) {
+                    throw new FlinkRuntimeException(
+                            "Failed to discover captured tables for enumerator", e);
+                }
+            } else {
+                splitAssigner =
+                        new StreamSplitAssigner(sourceConfig, dataSourceDialect, offsetFactory);
+            }
+
+            return new PostgresSourceEnumerator(
+                    enumContext, sourceConfig, splitAssigner, (PostgresDialect) dataSourceDialect);
         }
 
         public static <T> PostgresSourceBuilder<T> builder() {

@@ -116,7 +116,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                     " 'table-name' = 'products',",
                     " 'slot.name' = 'flink',", // dropping the slot allows WAL segments to be
                     // discarded by the database
-                    " 'debezium.slot.drop_on_stop' = 'true'",
+                    " 'debezium.slot.drop.on.slot' = 'true'",
                     ");");
 
     List<String> sourceSqlWithIncrementalSnapshot =

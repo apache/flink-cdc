@@ -131,6 +131,10 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         waitForSnapshotStarted("sink");
 
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
 
@@ -218,7 +222,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "inventory",
                         "products",
                         parallelismSnapshot,
-                        "replica_identity_slot");
+                        getSlotName());
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -238,6 +242,10 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "INSERT INTO sink SELECT name, SUM(weight) FROM debezium_source GROUP BY name");
         waitForSnapshotStarted("sink");
 
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
 
@@ -349,7 +357,10 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
 
         waitForSnapshotStarted("sink");
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
 
+        // generate WAL
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("UPDATE inventory.full_types SET small_c=0 WHERE id=1;");
@@ -402,7 +413,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "inventory",
                         "products",
                         parallelismSnapshot,
-                        "meta_data_slot");
+                        getSlotName());
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -426,7 +437,10 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
 
         waitForSnapshotStarted("sink");
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
 
+        // generate WAL
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
 
@@ -502,7 +516,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGERS_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
-                        "replica_identity_slot",
+                        getSlotName(),
                         parallelismSnapshot,
                         "upsert");
         String sinkDDL =
@@ -524,6 +538,10 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "INSERT INTO sink SELECT name, SUM(weight) FROM debezium_source GROUP BY name");
         waitForSnapshotStarted("sink");
 
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
 
@@ -583,7 +601,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
         while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
+            Thread.sleep(300);
         }
     }
 
