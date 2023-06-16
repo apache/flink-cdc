@@ -172,7 +172,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                150000L);
+                300000L);
     }
 
     private Connection getOracleJdbcConnection() throws SQLException {
