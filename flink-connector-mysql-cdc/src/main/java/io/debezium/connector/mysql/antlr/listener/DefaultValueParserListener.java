@@ -6,20 +6,17 @@
 
 package io.debezium.connector.mysql.antlr.listener;
 
-import io.debezium.connector.mysql.MySqlDefaultValueConverter;
-import io.debezium.connector.mysql.MySqlValueConverters;
-import io.debezium.ddl.parser.mysql.generated.MySqlParser.CurrentTimestampContext;
-import io.debezium.ddl.parser.mysql.generated.MySqlParser.DefaultValueContext;
+import io.debezium.ddl.parser.mysql.generated.MySqlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParserBaseListener;
 import io.debezium.relational.ColumnEditor;
 
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Copied from Debezium project(v1.6.4.Final) to fix
+ * Copied from Debezium project(v1.9.7.Final) to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1506.
  *
- * <p>Line 66~77: use the actual default string value when the sql contains COLLATE. We should
+ * <p>Line 48~59: use the actual default string value when the sql contains COLLATE. We should
  * remove this class after we bumped a higher debezium version where the
  * https://issues.redhat.com/browse/DBZ-5587 has been fixed.
  */
@@ -28,32 +25,17 @@ public class DefaultValueParserListener extends MySqlParserBaseListener {
     private final ColumnEditor columnEditor;
     private final AtomicReference<Boolean> optionalColumn;
 
-    private final MySqlDefaultValueConverter defaultValueConverter;
-
-    /**
-     * Whether to convert the column's default value into the corresponding schema type or not. This
-     * is done for column definitions of ALTER TABLE statements but not for CREATE TABLE. In case of
-     * the latter, the default value conversion is handled by the CREATE TABLE statement listener
-     * itself, as a default character set given at the table level might have to be applied.
-     */
-    private final boolean convertDefault;
-
     private boolean converted;
 
     public DefaultValueParserListener(
-            ColumnEditor columnEditor,
-            MySqlValueConverters converters,
-            AtomicReference<Boolean> optionalColumn,
-            boolean convertDefault) {
+            ColumnEditor columnEditor, AtomicReference<Boolean> optionalColumn) {
         this.columnEditor = columnEditor;
-        this.defaultValueConverter = new MySqlDefaultValueConverter(converters);
         this.optionalColumn = optionalColumn;
-        this.convertDefault = convertDefault;
         this.converted = false;
     }
 
     @Override
-    public void enterDefaultValue(DefaultValueContext ctx) {
+    public void enterDefaultValue(MySqlParser.DefaultValueContext ctx) {
         String sign = "";
         if (ctx.NULL_LITERAL() != null) {
             return;
@@ -64,10 +46,10 @@ public class DefaultValueParserListener extends MySqlParserBaseListener {
         if (ctx.constant() != null) {
             if (ctx.constant().stringLiteral() != null) {
                 if (ctx.constant().stringLiteral().COLLATE() == null) {
-                    columnEditor.defaultValue(
+                    columnEditor.defaultValueExpression(
                             sign + unquote(ctx.constant().stringLiteral().getText()));
                 } else {
-                    columnEditor.defaultValue(
+                    columnEditor.defaultValueExpression(
                             sign
                                     + unquote(
                                             ctx.constant()
@@ -76,45 +58,40 @@ public class DefaultValueParserListener extends MySqlParserBaseListener {
                                                     .getText()));
                 }
             } else if (ctx.constant().decimalLiteral() != null) {
-                columnEditor.defaultValue(sign + ctx.constant().decimalLiteral().getText());
+                columnEditor.defaultValueExpression(
+                        sign + ctx.constant().decimalLiteral().getText());
             } else if (ctx.constant().BIT_STRING() != null) {
-                columnEditor.defaultValue(unquoteBinary(ctx.constant().BIT_STRING().getText()));
+                columnEditor.defaultValueExpression(
+                        unquoteBinary(ctx.constant().BIT_STRING().getText()));
             } else if (ctx.constant().booleanLiteral() != null) {
-                columnEditor.defaultValue(ctx.constant().booleanLiteral().getText());
+                columnEditor.defaultValueExpression(ctx.constant().booleanLiteral().getText());
             } else if (ctx.constant().REAL_LITERAL() != null) {
-                columnEditor.defaultValue(ctx.constant().REAL_LITERAL().getText());
+                columnEditor.defaultValueExpression(ctx.constant().REAL_LITERAL().getText());
             }
         } else if (ctx.currentTimestamp() != null && !ctx.currentTimestamp().isEmpty()) {
             if (ctx.currentTimestamp().size() > 1 || (ctx.ON() == null && ctx.UPDATE() == null)) {
-                final CurrentTimestampContext currentTimestamp = ctx.currentTimestamp(0);
+                final MySqlParser.CurrentTimestampContext currentTimestamp =
+                        ctx.currentTimestamp(0);
                 if (currentTimestamp.CURRENT_TIMESTAMP() != null
                         || currentTimestamp.NOW() != null) {
-                    columnEditor.defaultValue("1970-01-01 00:00:00");
+                    columnEditor.defaultValueExpression("1970-01-01 00:00:00");
                 } else {
-                    columnEditor.defaultValue(currentTimestamp.getText());
+                    columnEditor.defaultValueExpression(currentTimestamp.getText());
                 }
             }
         }
-        convertDefaultValue(true);
+        exitDefaultValue(true);
         super.enterDefaultValue(ctx);
     }
 
-    public void convertDefaultValue(boolean skipIfUnknownOptional) {
-        // For CREATE TABLE are all column default values converted only after charset is known.
-        if (convertDefault) {
-            if (!converted && (optionalColumn.get() != null || !skipIfUnknownOptional)) {
-                convertDefaultValueToSchemaType(columnEditor);
-                converted = true;
+    public void exitDefaultValue(boolean skipIfUnknownOptional) {
+        boolean isOptionalColumn = optionalColumn.get() != null;
+        if (!converted && (isOptionalColumn || !skipIfUnknownOptional)) {
+            if (isOptionalColumn) {
+                columnEditor.optional(optionalColumn.get().booleanValue());
             }
+            converted = true;
         }
-    }
-
-    private void convertDefaultValueToSchemaType(ColumnEditor columnEditor) {
-        if (optionalColumn.get() != null) {
-            columnEditor.optional(optionalColumn.get().booleanValue());
-        }
-
-        defaultValueConverter.setColumnDefaultValue(columnEditor);
     }
 
     private String unquote(String stringLiteral) {

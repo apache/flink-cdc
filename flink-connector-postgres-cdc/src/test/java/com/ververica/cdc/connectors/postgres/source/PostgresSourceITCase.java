@@ -457,9 +457,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         properties.put("user", customDatabase.getUsername());
         properties.put("password", customDatabase.getPassword());
         properties.put("dbname", customDatabase.getDatabaseName());
-        io.debezium.config.Configuration configuration =
-                io.debezium.config.Configuration.from(properties);
-        return new PostgresConnection(configuration);
+        return createConnection(properties);
     }
 
     // ------------------------------------------------------------------------

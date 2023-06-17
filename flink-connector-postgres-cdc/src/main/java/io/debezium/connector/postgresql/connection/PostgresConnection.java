@@ -30,7 +30,6 @@ import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.postgresql.core.BaseConnection;
-import org.postgresql.core.ConnectionFactory;
 import org.postgresql.jdbc.PgConnection;
 import org.postgresql.jdbc.TimestampUtils;
 import org.postgresql.replication.LogSequenceNumber;
@@ -40,7 +39,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,16 +54,15 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@link JdbcConnection} connection extension used for connecting to Postgres instances.
  *
  * @author Horia Chiorean
- *     <p>Copied from Debezium 1.6.4-Final with two additional methods:
- *     <ul>
- *       <li>Constructor PostgresConnection( Configuration config, PostgresValueConverterBuilder
- *           valueConverterBuilder, ConnectionFactory factory) to allow passing a custom
- *           ConnectionFactory
- *       <li>override connection() to return a unwrapped PgConnection (otherwise, it will complain
- *           about HikariProxyConnection cannot be cast to class org.postgresql.core.BaseConnection)
- *     </ul>
  */
 public class PostgresConnection extends JdbcConnection {
+
+    public static final String CONNECTION_STREAMING = "Debezium Streaming";
+    public static final String CONNECTION_SLOT_INFO = "Debezium Slot Info";
+    public static final String CONNECTION_DROP_SLOT = "Debezium Drop Slot";
+    public static final String CONNECTION_VALIDATE_CONNECTION = "Debezium Validate Connection";
+    public static final String CONNECTION_HEARTBEAT = "Debezium Heartbeat";
+    public static final String CONNECTION_GENERAL = "Debezium General";
 
     private static Logger LOGGER = LoggerFactory.getLogger(PostgresConnection.class);
 
@@ -100,22 +103,38 @@ public class PostgresConnection extends JdbcConnection {
      * @param config {@link Configuration} instance, may not be null.
      * @param valueConverterBuilder supplies a configured {@link PostgresValueConverter} for a given
      *     {@link TypeRegistry}
+     * @param connectionUsage a symbolic name of the connection to be tracked in monitoring tools
      */
     public PostgresConnection(
-            Configuration config, PostgresValueConverterBuilder valueConverterBuilder) {
-        this(config, valueConverterBuilder, FACTORY);
+            JdbcConfiguration config,
+            PostgresValueConverterBuilder valueConverterBuilder,
+            String connectionUsage) {
+        this(config, valueConverterBuilder, connectionUsage, FACTORY);
     }
 
-    /** Creates a Postgres connection using the supplied configuration with customized factory */
+    /**
+     * Creates a Postgres connection using the supplied configuration. If necessary this connection
+     * is able to resolve data type mappings. Such a connection requires a {@link
+     * PostgresValueConverter}, and will provide its own {@link TypeRegistry}. Usually only one such
+     * connection per connector is needed.
+     *
+     * @param config {@link Configuration} instance, may not be null.
+     * @param valueConverterBuilder supplies a configured {@link PostgresValueConverter} for a given
+     *     {@link TypeRegistry}
+     * @param connectionUsage a symbolic name of the connection to be tracked in monitoring tools
+     */
     public PostgresConnection(
-            Configuration config,
+            JdbcConfiguration config,
             PostgresValueConverterBuilder valueConverterBuilder,
+            String connectionUsage,
             ConnectionFactory factory) {
         super(
-                config,
+                addDefaultSettings(config, connectionUsage),
                 factory,
                 PostgresConnection::validateServerVersion,
-                PostgresConnection::defaultSettings);
+                null,
+                "\"",
+                "\"");
 
         if (Objects.isNull(valueConverterBuilder)) {
             this.typeRegistry = null;
@@ -130,6 +149,45 @@ public class PostgresConnection extends JdbcConnection {
         }
     }
 
+    /**
+     * Create a Postgres connection using the supplied configuration and {@link TypeRegistry}
+     *
+     * @param config {@link Configuration} instance, may not be null.
+     * @param typeRegistry an existing/already-primed {@link TypeRegistry} instance
+     * @param connectionUsage a symbolic name of the connection to be tracked in monitoring tools
+     */
+    public PostgresConnection(
+            PostgresConnectorConfig config, TypeRegistry typeRegistry, String connectionUsage) {
+        super(
+                addDefaultSettings(config.getJdbcConfig(), connectionUsage),
+                FACTORY,
+                PostgresConnection::validateServerVersion,
+                null,
+                "\"",
+                "\"");
+        if (Objects.isNull(typeRegistry)) {
+            this.typeRegistry = null;
+            this.defaultValueConverter = null;
+        } else {
+            this.typeRegistry = typeRegistry;
+            final PostgresValueConverter valueConverter =
+                    PostgresValueConverter.of(config, this.getDatabaseCharset(), typeRegistry);
+            this.defaultValueConverter =
+                    new PostgresDefaultValueConverter(valueConverter, this.getTimestampUtils());
+        }
+    }
+
+    /**
+     * Creates a Postgres connection using the supplied configuration. The connector is the regular
+     * one without datatype resolution capabilities.
+     *
+     * @param config {@link Configuration} instance, may not be null.
+     * @param connectionUsage a symbolic name of the connection to be tracked in monitoring tools
+     */
+    public PostgresConnection(JdbcConfiguration config, String connectionUsage) {
+        this(config, null, connectionUsage);
+    }
+
     /** Return an unwrapped PgConnection instead of HikariProxyConnection */
     @Override
     public synchronized Connection connection() throws SQLException {
@@ -141,41 +199,16 @@ public class PostgresConnection extends JdbcConnection {
         return conn;
     }
 
-    /**
-     * Create a Postgres connection using the supplied configuration and {@link TypeRegistry}
-     *
-     * @param config {@link Configuration} instance, may not be null.
-     * @param typeRegistry an existing/already-primed {@link TypeRegistry} instance
-     */
-    public PostgresConnection(Configuration config, TypeRegistry typeRegistry) {
-        super(
-                config,
-                FACTORY,
-                PostgresConnection::validateServerVersion,
-                PostgresConnection::defaultSettings);
-        if (Objects.isNull(typeRegistry)) {
-            this.typeRegistry = null;
-            this.defaultValueConverter = null;
-        } else {
-            this.typeRegistry = typeRegistry;
-            final PostgresValueConverter valueConverter =
-                    PostgresValueConverter.of(
-                            new PostgresConnectorConfig(config),
-                            this.getDatabaseCharset(),
-                            typeRegistry);
-            this.defaultValueConverter =
-                    new PostgresDefaultValueConverter(valueConverter, this.getTimestampUtils());
-        }
-    }
-
-    /**
-     * Creates a Postgres connection using the supplied configuration. The connector is the regular
-     * one without datatype resolution capabilities.
-     *
-     * @param config {@link Configuration} instance, may not be null.
-     */
-    public PostgresConnection(Configuration config) {
-        this(config, (TypeRegistry) null);
+    static JdbcConfiguration addDefaultSettings(
+            JdbcConfiguration configuration, String connectionUsage) {
+        // we require Postgres 9.4 as the minimum server version since that's where logical
+        // replication was first introduced
+        return JdbcConfiguration.adapt(
+                configuration
+                        .edit()
+                        .with("assumeMinServerVersion", "9.4")
+                        .with("ApplicationName", connectionUsage)
+                        .build());
     }
 
     /**
@@ -598,12 +631,6 @@ public class PostgresConnection extends JdbcConnection {
         }
     }
 
-    protected static void defaultSettings(Configuration.Builder builder) {
-        // we require Postgres 9.4 as the minimum server version since that's where logical
-        // replication was first introduced
-        builder.with("assumeMinServerVersion", "9.4");
-    }
-
     private static void validateServerVersion(Statement statement) throws SQLException {
         DatabaseMetaData metaData = statement.getConnection().getMetaData();
         int majorVersion = metaData.getDatabaseMajorVersion();
@@ -611,6 +638,15 @@ public class PostgresConnection extends JdbcConnection {
         if (majorVersion < 9 || (majorVersion == 9 && minorVersion < 4)) {
             throw new SQLException("Cannot connect to a version of Postgres lower than 9.4");
         }
+    }
+
+    @Override
+    public String quotedColumnIdString(String columnName) {
+        if (columnName.contains("\"")) {
+            columnName = columnName.replaceAll("\"", "\"\"");
+        }
+
+        return super.quotedColumnIdString(columnName);
     }
 
     @Override
@@ -684,9 +720,10 @@ public class PostgresConnection extends JdbcConnection {
                 column.scale(nativeType.getDefaultScale());
             }
 
-            final String defaultValue = columnMetadata.getString(13);
-            if (defaultValue != null) {
-                getDefaultValue(column.create(), defaultValue).ifPresent(column::defaultValue);
+            final String defaultValueExpression = columnMetadata.getString(13);
+            if (defaultValueExpression != null
+                    && getDefaultValueConverter().supportConversion(column.typeName())) {
+                column.defaultValueExpression(defaultValueExpression);
             }
 
             return Optional.of(column);
@@ -695,9 +732,10 @@ public class PostgresConnection extends JdbcConnection {
         return Optional.empty();
     }
 
-    @Override
-    protected Optional<Object> getDefaultValue(Column column, String defaultValue) {
-        return defaultValueConverter.parseDefaultValue(column, defaultValue);
+    public PostgresDefaultValueConverter getDefaultValueConverter() {
+        Objects.requireNonNull(
+                defaultValueConverter, "Connection does not provide default value converter");
+        return defaultValueConverter;
     }
 
     public TypeRegistry getTypeRegistry() {
@@ -772,6 +810,16 @@ public class PostgresConnection extends JdbcConnection {
             // not a known type
             return super.getColumnValue(rs, columnIndex, column, table, schema);
         }
+    }
+
+    @Override
+    protected String[] supportedTableTypes() {
+        return new String[] {"VIEW", "MATERIALIZED VIEW", "TABLE", "PARTITIONED TABLE"};
+    }
+
+    @Override
+    protected boolean isTableType(String tableType) {
+        return "TABLE".equals(tableType) || "PARTITIONED TABLE".equals(tableType);
     }
 
     @FunctionalInterface

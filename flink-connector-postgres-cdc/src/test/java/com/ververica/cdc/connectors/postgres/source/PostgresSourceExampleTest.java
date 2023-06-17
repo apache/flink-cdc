@@ -37,7 +37,6 @@ import com.ververica.cdc.connectors.postgres.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
-import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import org.junit.Ignore;
@@ -253,7 +252,7 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
         properties.put("dbname", inventoryDatabase.getDatabaseName());
         properties.put("user", inventoryDatabase.getUsername());
         properties.put("password", inventoryDatabase.getPassword());
-        PostgresConnection connection = new PostgresConnection(Configuration.from(properties));
+        PostgresConnection connection = createConnection(properties);
         connection.connect();
         return connection;
     }

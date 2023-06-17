@@ -26,6 +26,7 @@ import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSource;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.connector.mysql.MySqlTaskContext;
@@ -74,18 +75,22 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
     }
 
     @Override
-    public void execute(ChangeEventSourceContext context, MySqlOffsetContext offsetContext)
+    public void execute(
+            ChangeEventSourceContext context,
+            MySqlPartition partition,
+            MySqlOffsetContext offsetContext)
             throws InterruptedException {
         this.context = context;
-        super.execute(context, offsetContext);
+        super.execute(context, partition, offsetContext);
     }
 
     @Override
-    protected void handleEvent(MySqlOffsetContext offsetContext, Event event) {
+    protected void handleEvent(
+            MySqlPartition partition, MySqlOffsetContext offsetContext, Event event) {
         if (!eventFilter.test(event)) {
             return;
         }
-        super.handleEvent(offsetContext, event);
+        super.handleEvent(partition, offsetContext, event);
         // check do we need to stop for read binlog for snapshot split.
         if (isBoundedRead()) {
             final BinlogOffset currentBinlogOffset = getBinlogPosition(offsetContext.getOffset());

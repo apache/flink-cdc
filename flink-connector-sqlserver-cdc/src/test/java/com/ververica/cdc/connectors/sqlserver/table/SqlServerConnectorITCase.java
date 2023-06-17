@@ -65,7 +65,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
 
     @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
     public static Object[] parameters() {
-        return new Object[][] {new Object[] {false}, new Object[] {true}};
+        return new Object[] {false, true};
     }
 
     @Before

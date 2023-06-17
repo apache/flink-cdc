@@ -20,10 +20,11 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerValueConverters;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
-import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,21 +36,22 @@ import java.util.List;
 public class SqlServerConnectionUtils {
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerConnectionUtils.class);
 
-    public static SqlServerConnection createSqlServerConnection(Configuration dbzConfiguration) {
-        final SqlServerConnectorConfig connectorConfig =
-                new SqlServerConnectorConfig(dbzConfiguration);
+    public static SqlServerConnection createSqlServerConnection(
+            RelationalDatabaseConnectorConfig connectorConfig) {
+        Configuration dbzConnectorConfig = connectorConfig.getJdbcConfig();
+
         final SqlServerValueConverters valueConverters =
                 new SqlServerValueConverters(
                         connectorConfig.getDecimalMode(),
                         connectorConfig.getTemporalPrecisionMode(),
                         connectorConfig.binaryHandlingMode());
         return new SqlServerConnection(
-                dbzConfiguration,
-                Clock.system(),
-                connectorConfig.getSourceTimestampMode(),
+                JdbcConfiguration.adapt(dbzConnectorConfig),
+                ((SqlServerConnectorConfig) connectorConfig).getSourceTimestampMode(),
                 valueConverters,
                 SqlServerConnectionUtils.class::getClassLoader,
-                connectorConfig.getSkippedOperations());
+                connectorConfig.getSkippedOperations(),
+                false);
     }
 
     public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)

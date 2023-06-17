@@ -235,7 +235,7 @@ public class DebeziumChangeFetcher<T> {
 
             deserialization.deserialize(record, debeziumCollector);
 
-            if (!isSnapshotRecord(record)) {
+            if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");
                 isInDbSnapshotPhase = false;
             }
