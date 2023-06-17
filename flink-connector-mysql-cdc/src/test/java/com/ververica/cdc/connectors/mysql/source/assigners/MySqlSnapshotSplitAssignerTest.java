@@ -444,7 +444,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         2,
                         2000.0d,
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        new String[] {customerDatabase.getDatabaseName() + ".customer_general_ci"});
+                        new String[] {"customer_general_ci"});
         assertEquals(expected, splits);
     }
 
