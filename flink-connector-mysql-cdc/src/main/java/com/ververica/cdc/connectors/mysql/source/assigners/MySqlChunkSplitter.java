@@ -313,7 +313,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 queryNextChunkMaxAndCount(
                         jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
         Object chunkEnd = chunkEndAndCount[0];
-        Integer chunkCount = Integer.valueOf(chunkEndAndCount[1].toString());
+        Integer actualCount = Integer.valueOf(chunkEndAndCount[1].toString());
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
@@ -331,7 +331,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 return null;
             }
         }
-        if (Objects.equals(chunkEnd, max) || chunkSize > chunkCount) {
+        if (Objects.equals(chunkEnd, max) || chunkSize > actualCount) {
             return null;
         } else {
             return chunkEnd;
