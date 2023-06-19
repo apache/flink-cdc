@@ -48,7 +48,12 @@ public class PostgresObjectUtils {
             PostgresValueConverter valueConverter)
             throws SQLException {
         PostgresSchema schema =
-                new PostgresSchema(config, typeRegistry, topicSelector, valueConverter);
+                new PostgresSchema(
+                        config,
+                        typeRegistry,
+                        connection.getDefaultValueConverter(),
+                        topicSelector,
+                        valueConverter);
         schema.refresh(connection, false);
         return schema;
     }
@@ -83,9 +88,11 @@ public class PostgresObjectUtils {
     // - old: ReplicationConnection createReplicationConnection(PostgresTaskContext taskContext,
     // boolean doSnapshot, int maxRetries, Duration retryDelay)
     // - new: ReplicationConnection createReplicationConnection(PostgresTaskContext taskContext,
-    // boolean doSnapshot, PostgresConnectorConfig connectorConfig)
+    // PostgresConnection postgresConnection, boolean doSnapshot, PostgresConnectorConfig
+    // connectorConfig)
     public static ReplicationConnection createReplicationConnection(
             PostgresTaskContext taskContext,
+            PostgresConnection postgresConnection,
             boolean doSnapshot,
             PostgresConnectorConfig connectorConfig) {
         int maxRetries = connectorConfig.maxRetries();
@@ -96,7 +103,7 @@ public class PostgresObjectUtils {
         while (retryCount <= maxRetries) {
             try {
                 LOGGER.info("Creating a new replication connection for {}", taskContext);
-                return taskContext.createReplicationConnection(doSnapshot);
+                return taskContext.createReplicationConnection(doSnapshot, postgresConnection);
             } catch (SQLException ex) {
                 retryCount++;
                 if (retryCount > maxRetries) {

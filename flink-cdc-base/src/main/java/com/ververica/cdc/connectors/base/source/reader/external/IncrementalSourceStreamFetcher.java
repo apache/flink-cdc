@@ -244,10 +244,15 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         this.pureStreamPhaseTables.clear();
     }
 
-    public void stopReadTask() {
+    public void stopReadTask() throws Exception {
         this.currentTaskRunning = false;
+
+        if (taskContext != null) {
+            taskContext.close();
+        }
+
         if (streamFetchTask != null) {
-            streamFetchTask.stop();
+            streamFetchTask.close();
         }
     }
 }

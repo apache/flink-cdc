@@ -32,8 +32,10 @@ import com.ververica.cdc.connectors.postgres.source.utils.ChunkUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
+import io.debezium.connector.postgresql.PostgresEventDispatcher;
 import io.debezium.connector.postgresql.PostgresObjectUtils;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
+import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
 import io.debezium.connector.postgresql.PostgresTopicSelector;
@@ -45,7 +47,6 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
-import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.spi.ChangeEventSourceMetricsFactory;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.relational.Column;
@@ -69,6 +70,9 @@ import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresVa
 
 /** The context of {@link PostgresScanFetchTask} and {@link PostgresStreamFetchTask}. */
 public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
+
+    private static final String CONNECTION_NAME = "postgres-fetch-task-connection";
+
     private static final Logger LOG = LoggerFactory.getLogger(PostgresSourceFetchTaskContext.class);
 
     private PostgresTaskContext taskContext;
@@ -77,12 +81,13 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private final AtomicReference<ReplicationConnection> replicationConnection =
             new AtomicReference<>();
     private PostgresOffsetContext offsetContext;
+    private PostgresPartition partition;
     private PostgresSchema schema;
     private ErrorHandler errorHandler;
-    private JdbcSourceEventDispatcher dispatcher;
+    private JdbcSourceEventDispatcher<PostgresPartition> dispatcher;
+    private PostgresEventDispatcher<TableId> postgresDispatcher;
     private EventMetadataProvider metadataProvider;
-    private SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
-    private StreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
+    private SnapshotChangeEventSourceMetrics<PostgresPartition> snapshotChangeEventSourceMetrics;
     private Snapshotter snapShotter;
 
     public PostgresSourceFetchTaskContext(
@@ -119,7 +124,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                 newPostgresValueConverterBuilder(dbzConfig);
         this.jdbcConnection =
-                new PostgresConnection(dbzConfig.getJdbcConfig(), valueConverterBuilder);
+                new PostgresConnection(
+                        dbzConfig.getJdbcConfig(), valueConverterBuilder, CONNECTION_NAME);
 
         TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(dbzConfig);
         EmbeddedFlinkDatabaseHistory.registerHistory(
@@ -143,20 +149,22 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.offsetContext =
                 loadStartingOffsetState(
                         new PostgresOffsetContext.Loader(dbzConfig), sourceSplitBase);
+        this.partition = new PostgresPartition(dbzConfig.getLogicalName());
         this.taskContext = PostgresObjectUtils.newTaskContext(dbzConfig, schema, topicSelector);
 
         this.replicationConnection.compareAndSet(
                 null,
                 createReplicationConnection(
-                        this.taskContext, this.snapShotter.shouldSnapshot(), dbzConfig));
+                        this.taskContext,
+                        jdbcConnection,
+                        this.snapShotter.shouldSnapshot(),
+                        dbzConfig));
 
-        final int queueSize =
-                sourceSplitBase.isSnapshotSplit() ? Integer.MAX_VALUE : dbzConfig.getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
                         .pollInterval(dbzConfig.getPollInterval())
                         .maxBatchSize(dbzConfig.getMaxBatchSize())
-                        .maxQueueSize(queueSize)
+                        .maxQueueSize(dbzConfig.getMaxQueueSize())
                         .maxQueueSizeInBytes(dbzConfig.getMaxQueueSizeInBytes())
                         .loggingContextSupplier(
                                 () ->
@@ -166,10 +174,10 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         // .buffering()
                         .build();
 
-        this.errorHandler = new PostgresErrorHandler(dbzConnectorConfig.getLogicalName(), queue);
+        this.errorHandler = new PostgresErrorHandler(getDbzConnectorConfig(), queue);
         this.metadataProvider = PostgresObjectUtils.newEventMetadataProvider();
         this.dispatcher =
-                new JdbcSourceEventDispatcher(
+                new JdbcSourceEventDispatcher<>(
                         dbzConfig,
                         topicSelector,
                         schema,
@@ -179,12 +187,21 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         metadataProvider,
                         schemaNameAdjuster);
 
-        ChangeEventSourceMetricsFactory metricsFactory =
-                new DefaultChangeEventSourceMetricsFactory();
+        this.postgresDispatcher =
+                new PostgresEventDispatcher<>(
+                        dbzConfig,
+                        topicSelector,
+                        schema,
+                        queue,
+                        dbzConfig.getTableFilters().dataCollectionFilter(),
+                        DataChangeEvent::new,
+                        metadataProvider,
+                        schemaNameAdjuster);
+
+        ChangeEventSourceMetricsFactory<PostgresPartition> metricsFactory =
+                new DefaultChangeEventSourceMetricsFactory<>();
         this.snapshotChangeEventSourceMetrics =
                 metricsFactory.getSnapshotMetrics(taskContext, queue, metadataProvider);
-        this.streamingChangeEventSourceMetrics =
-                metricsFactory.getStreamingMetrics(taskContext, queue, metadataProvider);
     }
 
     @Override
@@ -204,13 +221,22 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
-    public JdbcSourceEventDispatcher getDispatcher() {
+    public JdbcSourceEventDispatcher<PostgresPartition> getDispatcher() {
         return dispatcher;
+    }
+
+    public PostgresEventDispatcher<TableId> getPostgresDispatcher() {
+        return postgresDispatcher;
     }
 
     @Override
     public PostgresOffsetContext getOffsetContext() {
         return offsetContext;
+    }
+
+    @Override
+    public PostgresPartition getPartition() {
+        return partition;
     }
 
     @Override
@@ -237,6 +263,11 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return PostgresOffset.of(sourceRecord);
     }
 
+    @Override
+    public void close() {
+        jdbcConnection.close();
+    }
+
     public PostgresConnection getConnection() {
         return jdbcConnection;
     }
@@ -249,12 +280,9 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return replicationConnection.get();
     }
 
-    public SnapshotChangeEventSourceMetrics getSnapshotChangeEventSourceMetrics() {
+    public SnapshotChangeEventSourceMetrics<PostgresPartition>
+            getSnapshotChangeEventSourceMetrics() {
         return snapshotChangeEventSourceMetrics;
-    }
-
-    public StreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
-        return streamingChangeEventSourceMetrics;
     }
 
     public Snapshotter getSnapShotter() {

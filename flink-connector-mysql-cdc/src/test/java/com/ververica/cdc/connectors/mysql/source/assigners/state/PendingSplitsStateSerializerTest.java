@@ -256,6 +256,11 @@ public class PendingSplitsStateSerializerTest {
         }
 
         @Override
+        public String comment() {
+            return "";
+        }
+
+        @Override
         public TableEditor edit() {
             throw new UnsupportedOperationException("Not implemented.");
         }

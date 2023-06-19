@@ -200,7 +200,7 @@ public class SqlServerUtils {
     /** Fetch current largest log sequence number (LSN) of the database. */
     public static LsnOffset currentLsn(SqlServerConnection connection) {
         try {
-            Lsn maxLsn = connection.getMaxLsn();
+            Lsn maxLsn = connection.getMaxLsn(connection.database());
             return new LsnOffset(maxLsn, maxLsn, null);
         } catch (SQLException e) {
             throw new FlinkRuntimeException(e.getMessage(), e);
@@ -251,7 +251,7 @@ public class SqlServerUtils {
     }
 
     public static SqlServerDatabaseSchema createSqlServerDatabaseSchema(
-            SqlServerConnectorConfig connectorConfig) {
+            SqlServerConnectorConfig connectorConfig, SqlServerConnection connection) {
         TopicSelector<TableId> topicSelector =
                 SqlServerTopicSelector.defaultSelector(connectorConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
@@ -262,7 +262,11 @@ public class SqlServerUtils {
                         connectorConfig.binaryHandlingMode());
 
         return new SqlServerDatabaseSchema(
-                connectorConfig, valueConverters, topicSelector, schemaNameAdjuster);
+                connectorConfig,
+                connection.getDefaultValueConverter(),
+                valueConverters,
+                topicSelector,
+                schemaNameAdjuster);
     }
 
     // --------------------------private method-------------------------------

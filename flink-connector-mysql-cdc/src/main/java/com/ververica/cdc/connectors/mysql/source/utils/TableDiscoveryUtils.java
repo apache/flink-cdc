@@ -21,6 +21,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
@@ -96,18 +97,21 @@ public class TableDiscoveryUtils {
     }
 
     public static Map<TableId, TableChange> discoverSchemaForCapturedTables(
-            MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
+            MySqlPartition partition, MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
         final List<TableId> capturedTableIds;
         try {
             capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Failed to discover captured tables", e);
         }
-        return discoverSchemaForCapturedTables(capturedTableIds, sourceConfig, jdbc);
+        return discoverSchemaForCapturedTables(partition, capturedTableIds, sourceConfig, jdbc);
     }
 
     public static Map<TableId, TableChange> discoverSchemaForNewAddedTables(
-            List<TableId> existedTables, MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
+            MySqlPartition partition,
+            List<TableId> existedTables,
+            MySqlSourceConfig sourceConfig,
+            MySqlConnection jdbc) {
         final List<TableId> capturedTableIds;
         try {
             capturedTableIds =
@@ -119,24 +123,30 @@ public class TableDiscoveryUtils {
         }
         return capturedTableIds.isEmpty()
                 ? new HashMap<>()
-                : discoverSchemaForCapturedTables(capturedTableIds, sourceConfig, jdbc);
+                : discoverSchemaForCapturedTables(partition, capturedTableIds, sourceConfig, jdbc);
     }
 
     public static Map<TableId, TableChange> discoverSchemaForCapturedTables(
-            List<TableId> capturedTableIds, MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
+            MySqlPartition partition,
+            List<TableId> capturedTableIds,
+            MySqlSourceConfig sourceConfig,
+            MySqlConnection jdbc) {
         if (capturedTableIds.isEmpty()) {
             throw new IllegalArgumentException(
                     String.format(
                             "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
                             sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
         }
+
         // fetch table schemas
-        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive());
-        Map<TableId, TableChange> tableSchemas = new HashMap<>();
-        for (TableId tableId : capturedTableIds) {
-            TableChange tableSchema = mySqlSchema.getTableSchema(jdbc, tableId);
-            tableSchemas.put(tableId, tableSchema);
+        try (MySqlSchema mySqlSchema =
+                new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
+            Map<TableId, TableChange> tableSchemas = new HashMap<>();
+            for (TableId tableId : capturedTableIds) {
+                TableChange tableSchema = mySqlSchema.getTableSchema(partition, jdbc, tableId);
+                tableSchemas.put(tableId, tableSchema);
+            }
+            return tableSchemas;
         }
-        return tableSchemas;
     }
 }

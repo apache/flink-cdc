@@ -83,7 +83,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
 
     @Override
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        return createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+        return createSqlServerConnection(sourceConfig.getDbzConnectorConfig());
     }
 
     @Override
@@ -112,7 +112,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
         try (SqlServerConnection jdbc =
-                createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig())) {
+                createSqlServerConnection(sourceConfig.getDbzConnectorConfig())) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {
@@ -138,9 +138,9 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
     public SqlServerSourceFetchTaskContext createFetchTaskContext(
             SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         final SqlServerConnection jdbcConnection =
-                createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+                createSqlServerConnection(sourceConfig.getDbzConnectorConfig());
         final SqlServerConnection metaDataConnection =
-                createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+                createSqlServerConnection(sourceConfig.getDbzConnectorConfig());
         return new SqlServerSourceFetchTaskContext(
                 taskSourceConfig, this, jdbcConnection, metaDataConnection);
     }
