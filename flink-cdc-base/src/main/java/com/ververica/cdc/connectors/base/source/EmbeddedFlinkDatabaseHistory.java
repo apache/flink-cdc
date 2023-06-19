@@ -108,6 +108,12 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     }
 
     @Override
+    public void recover(
+            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
+        offsets.forEach((source, position) -> recover(source, position, schema, ddlParser));
+    }
+
+    @Override
     public void stop() {
         listener.stopped();
     }

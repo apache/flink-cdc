@@ -65,8 +65,11 @@ public class MongoDBFetchTaskContext implements FetchTask.Context {
     }
 
     public void configure(SourceSplitBase sourceSplitBase) {
-        final int queueSize =
-                sourceSplitBase.isSnapshotSplit() ? Integer.MAX_VALUE : sourceConfig.getBatchSize();
+        // we need to use small batch size instead of INT.MAX as earlier because
+        // now under the hood of debezium the ArrayDequeue was used as queue implementation
+        // TODO: replace getBatchSize with getSnapshotBatchSize
+        //  when SNAPSHOT_BATCH_SIZE option will be added
+        final int queueSize = sourceConfig.getBatchSize();
 
         this.changeEventQueue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
@@ -191,4 +194,7 @@ public class MongoDBFetchTaskContext implements FetchTask.Context {
                         })
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public void close() throws Exception {}
 }

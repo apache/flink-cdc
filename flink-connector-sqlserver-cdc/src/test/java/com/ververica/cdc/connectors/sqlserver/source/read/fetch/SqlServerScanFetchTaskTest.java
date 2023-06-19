@@ -33,6 +33,7 @@ import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanF
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerSourceFetchTaskContext;
 import com.ververica.cdc.connectors.sqlserver.testutils.RecordsFormatter;
 import io.debezium.connector.sqlserver.SqlServerConnection;
+import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.EventDispatcher;
@@ -88,10 +89,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 new MakeChangeEventTaskContext(
                         sourceConfig,
                         sqlServerDialect,
-                        createSqlServerConnection(
-                                sourceConfig.getDbzConnectorConfig().getJdbcConfig()),
-                        createSqlServerConnection(
-                                sourceConfig.getDbzConnectorConfig().getJdbcConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
                         () -> executeSql(sourceConfig, changingDataSql));
 
         final DataType dataType =
@@ -143,10 +142,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 new MakeChangeEventTaskContext(
                         sourceConfig,
                         sqlServerDialect,
-                        createSqlServerConnection(
-                                sourceConfig.getDbzConnectorConfig().getJdbcConfig()),
-                        createSqlServerConnection(
-                                sourceConfig.getDbzConnectorConfig().getJdbcConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
                         () -> executeSql(sourceConfig, insertDataSql));
 
         final DataType dataType =
@@ -200,10 +197,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 new MakeChangeEventTaskContext(
                         sourceConfig,
                         sqlServerDialect,
-                        createSqlServerConnection(
-                                sourceConfig.getDbzConnectorConfig().getJdbcConfig()),
-                        createSqlServerConnection(
-                                sourceConfig.getDbzConnectorConfig().getJdbcConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
                         () -> executeSql(sourceConfig, deleteDataSql));
 
         final DataType dataType =
@@ -299,9 +294,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     private boolean executeSql(SqlServerSourceConfig sourceConfig, String[] sqlStatements) {
-        JdbcConnection connection =
-                createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig());
-        try {
+        try (JdbcConnection connection =
+                createSqlServerConnection(sourceConfig.getDbzConnectorConfig())) {
             connection.setAutoCommit(false);
             connection.execute(sqlStatements);
             connection.commit();
@@ -312,9 +306,9 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         return true;
     }
 
-    class MakeChangeEventTaskContext extends SqlServerSourceFetchTaskContext {
+    static class MakeChangeEventTaskContext extends SqlServerSourceFetchTaskContext {
 
-        private Supplier<Boolean> makeChangeEventFunction;
+        private final Supplier<Boolean> makeChangeEventFunction;
 
         public MakeChangeEventTaskContext(
                 JdbcSourceConfig jdbcSourceConfig,
@@ -327,12 +321,14 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         }
 
         @Override
-        public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
-            EventDispatcher.SnapshotReceiver snapshotReceiver = super.getSnapshotReceiver();
-            return new EventDispatcher.SnapshotReceiver() {
+        public EventDispatcher.SnapshotReceiver<SqlServerPartition> getSnapshotReceiver() {
+            EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver =
+                    super.getSnapshotReceiver();
+            return new EventDispatcher.SnapshotReceiver<SqlServerPartition>() {
 
                 @Override
                 public void changeRecord(
+                        SqlServerPartition partition,
                         DataCollectionSchema schema,
                         Envelope.Operation operation,
                         Object key,
@@ -340,7 +336,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                         OffsetContext offset,
                         ConnectHeaders headers)
                         throws InterruptedException {
-                    snapshotReceiver.changeRecord(schema, operation, key, value, offset, headers);
+                    snapshotReceiver.changeRecord(
+                            partition, schema, operation, key, value, offset, headers);
                 }
 
                 @Override

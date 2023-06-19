@@ -81,6 +81,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     public void testOracleCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
+                        "SET 'execution.checkpointing.interval' = '3s';",
                         "CREATE TABLE products_source (",
                         " ID INT NOT NULL,",
                         " NAME STRING,",

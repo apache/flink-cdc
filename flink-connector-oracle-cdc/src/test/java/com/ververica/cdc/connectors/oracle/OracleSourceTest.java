@@ -575,6 +575,8 @@ public class OracleSourceTest extends AbstractTestBase {
         Properties debeziumProperties = new Properties();
         debeziumProperties.setProperty("debezium.log.mining.strategy", "online_catalog");
         debeziumProperties.setProperty("debezium.log.mining.continuous.mine", "true");
+        // ignore APEX XE system tables changes
+        debeziumProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
         return OracleSource.<SourceRecord>builder()
                 .hostname(oracleContainer.getHost())
                 .port(oracleContainer.getOraclePort())

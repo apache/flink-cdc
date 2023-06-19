@@ -99,6 +99,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
 
     List<String> sourceSql =
             Arrays.asList(
+                    "SET 'execution.checkpointing.interval' = '3s';",
                     "CREATE TABLE products_source (",
                     " `id` INT NOT NULL,",
                     " name STRING,",

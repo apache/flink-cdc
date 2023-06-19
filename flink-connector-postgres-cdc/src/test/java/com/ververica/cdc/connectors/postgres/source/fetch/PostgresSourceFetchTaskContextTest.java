@@ -35,7 +35,7 @@ import static org.junit.Assert.assertEquals;
 public class PostgresSourceFetchTaskContextTest {
 
     private PostgresConnectorConfig connectorConfig;
-    private OffsetContext.Loader offsetLoader;
+    private OffsetContext.Loader<PostgresOffsetContext> offsetLoader;
 
     @Before
     public void beforeEach() {
@@ -44,14 +44,13 @@ public class PostgresSourceFetchTaskContextTest {
     }
 
     @Test
-    public void shouldNotResetLsnWhenLastCommitLsnIsNull() throws Exception {
+    public void shouldNotResetLsnWhenLastCommitLsnIsNull() {
         final Map<String, Object> offsetValues = new HashMap<>();
         offsetValues.put(SourceInfo.LSN_KEY, 12345L);
         offsetValues.put(SourceInfo.TIMESTAMP_USEC_KEY, 67890L);
         offsetValues.put(PostgresOffsetContext.LAST_COMMIT_LSN_KEY, null);
 
-        final PostgresOffsetContext offsetContext =
-                (PostgresOffsetContext) offsetLoader.load(offsetValues);
+        final PostgresOffsetContext offsetContext = offsetLoader.load(offsetValues);
         assertEquals(lastKnownLsn(offsetContext), Lsn.valueOf(12345L));
     }
 }

@@ -25,7 +25,9 @@ import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
+import io.debezium.connector.postgresql.PostgresEventDispatcher;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
+import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresStreamingChangeEventSource;
 import io.debezium.connector.postgresql.PostgresTaskContext;
@@ -35,6 +37,7 @@ import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
+import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +83,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getSnapShotter(),
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getPostgresDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getTaskContext().getClock(),
                         sourceFetchContext.getDatabaseSchema(),
@@ -89,16 +93,19 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
         StreamSplitChangeEventSourceContext changeEventSourceContext =
                 new StreamSplitChangeEventSourceContext();
         streamSplitReadTask.execute(
-                changeEventSourceContext, sourceFetchContext.getOffsetContext());
+                changeEventSourceContext,
+                sourceFetchContext.getPartition(),
+                sourceFetchContext.getOffsetContext());
     }
 
     @Override
-    public void stop() {
+    public void close() {
         LOG.debug("stopping StreamFetchTask for split: {}", split);
         if (streamSplitReadTask != null) {
             ((StreamSplitChangeEventSourceContext) streamSplitReadTask.context).finished();
         }
         stopped = true;
+        taskRunning = false;
     }
 
     @Override
@@ -154,7 +161,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
     public static class StreamSplitReadTask extends PostgresStreamingChangeEventSource {
         private static final Logger LOG = LoggerFactory.getLogger(StreamSplitReadTask.class);
         private final StreamSplit streamSplit;
-        private final JdbcSourceEventDispatcher dispatcher;
+        private final JdbcSourceEventDispatcher<PostgresPartition> dispatcher;
         private final ErrorHandler errorHandler;
 
         public ChangeEventSourceContext context;
@@ -164,7 +171,8 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                 PostgresConnectorConfig connectorConfig,
                 Snapshotter snapshotter,
                 PostgresConnection connection,
-                JdbcSourceEventDispatcher dispatcher,
+                JdbcSourceEventDispatcher<PostgresPartition> dispatcher,
+                PostgresEventDispatcher<TableId> postgresEventDispatcher,
                 ErrorHandler errorHandler,
                 Clock clock,
                 PostgresSchema schema,
@@ -176,7 +184,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                     connectorConfig,
                     snapshotter,
                     connection,
-                    dispatcher,
+                    postgresEventDispatcher,
                     errorHandler,
                     clock,
                     schema,
@@ -188,7 +196,10 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public void execute(ChangeEventSourceContext context, PostgresOffsetContext offsetContext)
+        public void execute(
+                ChangeEventSourceContext context,
+                PostgresPartition partition,
+                PostgresOffsetContext offsetContext)
                 throws InterruptedException {
             this.context = context;
             this.offsetContext = offsetContext;
@@ -197,7 +208,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
 
             offsetContext.setStreamingStoppingLsn(
                     ((PostgresOffset) streamSplit.getEndingOffset()).getLsn());
-            super.execute(context, offsetContext);
+            super.execute(context, partition, offsetContext);
             if (isBoundedRead()) {
 
                 LOG.debug("StreamSplit is bounded read: {}", streamSplit);
@@ -208,7 +219,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
 
                     try {
                         dispatcher.dispatchWatermarkEvent(
-                                offsetContext.getPartition(),
+                                partition.getSourcePartition(),
                                 streamSplit,
                                 currentOffset,
                                 WatermarkKind.END);

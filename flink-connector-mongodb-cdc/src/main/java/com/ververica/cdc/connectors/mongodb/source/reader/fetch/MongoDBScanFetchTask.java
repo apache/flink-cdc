@@ -209,6 +209,9 @@ public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
         return snapshotSplit;
     }
 
+    @Override
+    public void close() {}
+
     private StreamSplit createBackfillStreamSplit(
             ChangeStreamOffset lowWatermark, ChangeStreamOffset highWatermark) {
         return new StreamSplit(

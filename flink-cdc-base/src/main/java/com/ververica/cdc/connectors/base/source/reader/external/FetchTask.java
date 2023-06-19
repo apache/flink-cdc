@@ -44,8 +44,8 @@ public interface FetchTask<Split> {
     /** Returns the split that the task used. */
     Split getSplit();
 
-    /** Stops current task, most of the implementations don't need this. */
-    default void stop() {}
+    /** Close current task. * */
+    void close();
 
     /** Base context used in the execution of fetch task. */
     interface Context {
@@ -66,5 +66,7 @@ public interface FetchTask<Split> {
         void rewriteOutputBuffer(Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord);
 
         List<SourceRecord> formatMessageTimestamp(Collection<SourceRecord> snapshotRecords);
+
+        void close() throws Exception;
     }
 }

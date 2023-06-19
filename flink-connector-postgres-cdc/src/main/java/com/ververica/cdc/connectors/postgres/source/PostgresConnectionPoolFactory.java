@@ -19,14 +19,10 @@ package com.ververica.cdc.connectors.postgres.source;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.zaxxer.hikari.HikariDataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** A connection pool factory to create pooled Postgres {@link HikariDataSource}. */
 public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
     public static final String JDBC_URL_PATTERN = "jdbc:postgresql://%s:%s/%s";
-
-    private static final Logger LOG = LoggerFactory.getLogger(PostgresConnectionPoolFactory.class);
 
     @Override
     public String getJdbcUrl(JdbcSourceConfig sourceConfig) {

@@ -221,6 +221,9 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         return streamSplit;
     }
 
+    @Override
+    public void close() {}
+
     private MongoChangeStreamCursor<BsonDocument> openChangeStreamCursor(
             ChangeStreamDescriptor changeStreamDescriptor) {
         ChangeStreamOffset offset =
