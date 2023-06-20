@@ -100,7 +100,7 @@ import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHisto
  * <p>Note: currently, the source function can't run in multiple parallel instances.
  *
  * <p>Please refer to Debezium's documentation for the available configuration properties:
- * https://debezium.io/documentation/reference/1.5/development/engine.html#engine-properties
+ * https://debezium.io/documentation/reference/1.9/development/engine.html#engine-properties
  */
 @PublicEvolving
 public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
