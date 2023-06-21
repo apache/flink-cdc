@@ -352,10 +352,21 @@ public class MongoUtils {
                 .withDocumentClass(documentClass);
     }
 
+    public static String getMongoVersion(MongoDBSourceConfig sourceConfig) {
+        MongoClient client = MongoClientPool.getInstance().getOrCreateMongoClient(sourceConfig);
+        return client.getDatabase("config")
+                .runCommand(new BsonDocument("buildinfo", new BsonString("")))
+                .get("version")
+                .toString();
+    }
+
     public static MongoClient clientFor(MongoDBSourceConfig sourceConfig) {
         MongoClient client = MongoClientPool.getInstance().getOrCreateMongoClient(sourceConfig);
         if (sourceConfig.isFullDocPreimageEnabled()) {
-            // TODO: check mongoDB version >= 6 here
+            String mongoVersion = getMongoVersion(sourceConfig);
+            if (mongoVersion.charAt(0) < '6') {
+                throw new RuntimeException("Full Document PreImage feature requires MongoDB version >= 6.0.");
+            }
         }
         return client;
     }

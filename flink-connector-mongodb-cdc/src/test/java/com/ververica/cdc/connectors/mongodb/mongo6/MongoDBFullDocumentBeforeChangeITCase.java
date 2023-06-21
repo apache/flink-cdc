@@ -12,6 +12,9 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
+import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfigFactory;
+import com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils;
 import com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils;
 import org.bson.Document;
 import org.junit.Rule;
@@ -27,6 +30,7 @@ import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.asse
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.fetchRows;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.triggerFailover;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Integration tests for MongoDB full document before change info.
@@ -35,6 +39,17 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
 
     @Rule
     public final Timeout timeoutPerTest = Timeout.seconds(300);
+
+    @Test
+    public void testGetMongoDBVersion() throws Exception {
+        MongoDBSourceConfig config =
+                new MongoDBSourceConfigFactory()
+                        .hosts(CONTAINER.getHostAndPort())
+                        .splitSizeMB(1)
+                        .pollAwaitTimeMillis(500).create(0);
+
+        assertEquals(MongoUtils.getMongoVersion(config), "6.0.6");
+    }
 
     @Test
     public void testReadSingleCollectionWithSingleParallelism() throws Exception {
