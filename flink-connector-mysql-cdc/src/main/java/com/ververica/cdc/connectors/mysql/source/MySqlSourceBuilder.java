@@ -113,7 +113,7 @@ public class MySqlSourceBuilder<T> {
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
      * TIMESTAMP type in MYSQL converted to STRING. See more
-     * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
+     * https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types
      */
     public MySqlSourceBuilder<T> serverTimeZone(String timeZone) {
         this.configFactory.serverTimeZone(timeZone);
