@@ -18,9 +18,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertNotNull;
 
-/**
- * Container for testing MongoDB >= 5.0.3.
- */
+/** Container for testing MongoDB >= 5.0.3. */
 public class MongoDB6Container extends org.testcontainers.containers.MongoDBContainer {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDB6Container.class);
@@ -66,18 +64,14 @@ public class MongoDB6Container extends org.testcontainers.containers.MongoDBCont
         }
     }
 
-    /**
-     * Executes a mongo command file in separate database.
-     */
+    /** Executes a mongo command file in separate database. */
     public String executeCommandFileInSeparateDatabase(String fileNameIgnoreSuffix) {
         return executeCommandFileInDatabase(
                 fileNameIgnoreSuffix,
                 fileNameIgnoreSuffix + "_" + Integer.toUnsignedString(new Random().nextInt(), 36));
     }
 
-    /**
-     * Executes a mongo command file, specify a database name.
-     */
+    /** Executes a mongo command file, specify a database name. */
     public String executeCommandFileInDatabase(String fileNameIgnoreSuffix, String databaseName) {
         final String dbName = databaseName != null ? databaseName : fileNameIgnoreSuffix;
         final String ddlFile = String.format("ddl/%s.js", fileNameIgnoreSuffix);

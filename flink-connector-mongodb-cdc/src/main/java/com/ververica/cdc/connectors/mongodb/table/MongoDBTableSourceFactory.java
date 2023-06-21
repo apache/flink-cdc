@@ -57,9 +57,7 @@ import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSc
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/**
- * Factory for creating configured instance of {@link MongoDBTableSource}.
- */
+/** Factory for creating configured instance of {@link MongoDBTableSource}. */
 public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "mongodb-cdc";
@@ -105,7 +103,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         int splitSizeMB = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
 
-        boolean enableFullDocumentPreImage = config.getOptional(FULL_DOCUMENT_PREIMAGE).orElse(false);
+        boolean enableFullDocumentPreImage =
+                config.getOptional(FULL_DOCUMENT_PREIMAGE).orElse(false);
 
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());

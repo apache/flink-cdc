@@ -88,14 +88,10 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
 
-    /**
-     * Data type that describes the final output of the source.
-     */
+    /** Data type that describes the final output of the source. */
     protected DataType producedDataType;
 
-    /**
-     * Metadata that is appended at the end of a physical source row.
-     */
+    /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
 
     public MongoDBTableSource(
@@ -238,7 +234,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             }
 
             if (enableFullDocPreimage) {
-                throw new ValidationException("Full Document Preimage is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
+                throw new ValidationException(
+                        "Full Document Preimage is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
             }
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);

@@ -61,9 +61,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/**
- * Test for {@link MongoDBTableSource} created by {@link MongoDBTableSourceFactory}.
- */
+/** Test for {@link MongoDBTableSource} created by {@link MongoDBTableSourceFactory}. */
 public class MongoDBTableFactoryTest {
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -139,8 +137,7 @@ public class MongoDBTableFactoryTest {
                         CHUNK_META_GROUP_SIZE_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        FULL_DOCUMENT_PREIMAGE_ENABLED_DEFAULT
-                );
+                        FULL_DOCUMENT_PREIMAGE_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 

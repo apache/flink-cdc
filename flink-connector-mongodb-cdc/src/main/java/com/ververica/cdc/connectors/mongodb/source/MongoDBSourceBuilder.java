@@ -52,17 +52,13 @@ public class MongoDBSourceBuilder<T> {
     private final MongoDBSourceConfigFactory configFactory = new MongoDBSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
 
-    /**
-     * The protocol connected to MongoDB. For example mongodb or mongodb+srv.
-     */
+    /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceBuilder<T> scheme(String scheme) {
         this.configFactory.scheme(scheme);
         return this;
     }
 
-    /**
-     * The comma-separated list of hostname and port pairs of mongodb servers.
-     */
+    /** The comma-separated list of hostname and port pairs of mongodb servers. */
     public MongoDBSourceBuilder<T> hosts(String hosts) {
         this.configFactory.hosts(hosts);
         return this;
@@ -78,25 +74,19 @@ public class MongoDBSourceBuilder<T> {
         return this;
     }
 
-    /**
-     * Name of the database user to be used when connecting to MongoDB.
-     */
+    /** Name of the database user to be used when connecting to MongoDB. */
     public MongoDBSourceBuilder<T> username(String username) {
         this.configFactory.username(username);
         return this;
     }
 
-    /**
-     * Password to be used when connecting to MongoDB.
-     */
+    /** Password to be used when connecting to MongoDB. */
     public MongoDBSourceBuilder<T> password(String password) {
         this.configFactory.password(password);
         return this;
     }
 
-    /**
-     * Regular expressions list that match database names to be monitored.
-     */
+    /** Regular expressions list that match database names to be monitored. */
     public MongoDBSourceBuilder<T> databaseList(String... databases) {
         this.configFactory.databaseList(databases);
         return this;
@@ -208,9 +198,8 @@ public class MongoDBSourceBuilder<T> {
     /**
      * full.document.preimage
      *
-     * <p>Whether to generate update before row data based on MongoDB 6.0 Full Document Preimage feature.
-     * <code>'scan.incremental.close-idle-reader.enabled'</code> needs to be set to
-     * true.
+     * <p>Whether to generate update before row data based on MongoDB 6.0 Full Document Preimage
+     * feature. <code>'scan.incremental.close-idle-reader.enabled'</code> needs to be set to true.
      */
     public MongoDBSourceBuilder<T> enableFullDocPreimage(boolean enableFullDocPreimage) {
         this.configFactory.enableFullDocPreimage(enableFullDocPreimage);

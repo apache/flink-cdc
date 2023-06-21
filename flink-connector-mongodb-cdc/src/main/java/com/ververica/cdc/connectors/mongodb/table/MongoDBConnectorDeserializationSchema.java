@@ -85,14 +85,10 @@ public class MongoDBConnectorDeserializationSchema
 
     private static final long serialVersionUID = 1750787080613035184L;
 
-    /**
-     * TypeInformation of the produced {@link RowData}.
-     */
+    /** TypeInformation of the produced {@link RowData}. */
     private final TypeInformation<RowData> resultTypeInfo;
 
-    /**
-     * Local Time zone.
-     */
+    /** Local Time zone. */
     private final ZoneId localTimeZone;
 
     /**
@@ -102,9 +98,7 @@ public class MongoDBConnectorDeserializationSchema
      */
     protected final DeserializationRuntimeConverter physicalConverter;
 
-    /**
-     * Whether the deserializer needs to handle metadata columns.
-     */
+    /** Whether the deserializer needs to handle metadata columns. */
     protected final boolean hasMetadata;
 
     /**
@@ -135,7 +129,9 @@ public class MongoDBConnectorDeserializationSchema
                 extractBsonDocument(value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD);
         BsonDocument fullDocument =
                 extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_FIELD);
-        BsonDocument fullDocumentBeforeChange = extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_BEFORE_CHANGE_FIELD);
+        BsonDocument fullDocumentBeforeChange =
+                extractBsonDocument(
+                        value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_BEFORE_CHANGE_FIELD);
         switch (op) {
             case INSERT:
                 GenericRowData insert = extractRowData(fullDocument);
@@ -246,16 +242,12 @@ public class MongoDBConnectorDeserializationSchema
         Object convert(BsonValue docObj) throws Exception;
     }
 
-    /**
-     * Creates a runtime converter which is null safe.
-     */
+    /** Creates a runtime converter which is null safe. */
     private DeserializationRuntimeConverter createConverter(LogicalType type) {
         return wrapIntoNullableConverter(createNotNullConverter(type));
     }
 
-    /**
-     * Creates a runtime converter which assuming input object is not null.
-     */
+    /** Creates a runtime converter which assuming input object is not null. */
     private DeserializationRuntimeConverter createNotNullConverter(LogicalType type) {
         switch (type.getTypeRoot()) {
             case NULL:

@@ -22,9 +22,7 @@ import org.apache.flink.configuration.ConfigOptions;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 
-/**
- * Configurations for {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}.
- */
+/** Configurations for {@link com.ververica.cdc.connectors.mongodb.source.MongoDBSource}. */
 public class MongoDBSourceOptions {
 
     public static final ConfigOption<String> SCHEME =
@@ -141,5 +139,6 @@ public class MongoDBSourceOptions {
             ConfigOptions.key("full.document.preimage")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Enable full document preimage to avoid ChangelogNormalize. Only available when MongoDB >= 6.0. Defaults to false.");
+                    .withDescription(
+                            "Enable full document preimage to avoid ChangelogNormalize. Only available when MongoDB >= 6.0. Defaults to false.");
 }

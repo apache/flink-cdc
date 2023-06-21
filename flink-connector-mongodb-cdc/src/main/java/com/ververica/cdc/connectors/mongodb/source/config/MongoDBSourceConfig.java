@@ -28,23 +28,17 @@ import java.util.Objects;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/**
- * A MongoDB Source configuration which is used by {@link MongoDBSource}.
- */
+/** A MongoDB Source configuration which is used by {@link MongoDBSource}. */
 public class MongoDBSourceConfig implements SourceConfig {
 
     private static final long serialVersionUID = 1L;
 
     private final String scheme;
     private final String hosts;
-    @Nullable
-    private final String username;
-    @Nullable
-    private final String password;
-    @Nullable
-    private final List<String> databaseList;
-    @Nullable
-    private final List<String> collectionList;
+    @Nullable private final String username;
+    @Nullable private final String password;
+    @Nullable private final List<String> databaseList;
+    @Nullable private final List<String> collectionList;
     private final String connectionString;
     private final int batchSize;
     private final int pollAwaitTimeMillis;

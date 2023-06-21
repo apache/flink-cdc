@@ -81,9 +81,7 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.clien
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.getChangeStreamIterable;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.getCurrentClusterTime;
 
-/**
- * The task to work for fetching data of MongoDB stream split .
- */
+/** The task to work for fetching data of MongoDB stream split . */
 public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBStreamFetchTask.class);
@@ -224,8 +222,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     @Override
-    public void close() {
-    }
+    public void close() {}
 
     private MongoChangeStreamCursor<BsonDocument> openChangeStreamCursor(
             ChangeStreamDescriptor changeStreamDescriptor) {

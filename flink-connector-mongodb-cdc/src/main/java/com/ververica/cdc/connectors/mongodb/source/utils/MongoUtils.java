@@ -65,9 +65,7 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscov
 import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.isIncludeListExplicitlySpecified;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/**
- * Utilities of MongoDB operations.
- */
+/** Utilities of MongoDB operations. */
 public class MongoUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoUtils.class);
@@ -79,8 +77,7 @@ public class MongoUtils {
     public static final int ILLEGAL_OPERATION_ERROR = 20;
     public static final int UNKNOWN_FIELD_ERROR = 40415;
 
-    private MongoUtils() {
-    }
+    private MongoUtils() {}
 
     public static ChangeStreamDescriptor getChangeStreamDescriptor(
             MongoDBSourceConfig sourceConfig,
@@ -243,7 +240,7 @@ public class MongoUtils {
 
         // Nullable when no change record or postResumeToken (new in MongoDB 4.0.7).
         try (MongoChangeStreamCursor<ChangeStreamDocument<Document>> changeStreamCursor =
-                     changeStreamIterable.cursor()) {
+                changeStreamIterable.cursor()) {
             ChangeStreamDocument<Document> firstResult = changeStreamCursor.tryNext();
 
             return firstResult != null
@@ -365,7 +362,8 @@ public class MongoUtils {
         if (sourceConfig.isFullDocPreimageEnabled()) {
             String mongoVersion = getMongoVersion(sourceConfig);
             if (mongoVersion.charAt(0) < '6') {
-                throw new RuntimeException("Full Document PreImage feature requires MongoDB version >= 6.0.");
+                throw new RuntimeException(
+                        "Full Document PreImage feature requires MongoDB version >= 6.0.");
             }
         }
         return client;
