@@ -15,6 +15,8 @@ import java.nio.ByteBuffer;
  * current Debezium release java version is 11, so we need to compile this file by java 8 compiler.
  * <a href="https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror/">More
  * info</a>. Abstraction of PostgreSQL log sequence number, adapted from {@link LogSequenceNumber}.
+ *
+ * <p>Line 32: add NO_STOPPING_LSN
  */
 public class Lsn implements Comparable<Lsn> {
 
@@ -23,6 +25,9 @@ public class Lsn implements Comparable<Lsn> {
      * initializing the first WAL page at XLOG_SEG_SIZE, so no XLOG record can begin at zero.
      */
     public static final Lsn INVALID_LSN = new Lsn(0);
+
+    /** The max lsn for the wal file. */
+    public static final Lsn NO_STOPPING_LSN = Lsn.valueOf("FFFFFFFF/FFFFFFFF");
 
     private final long value;
 
@@ -79,7 +84,7 @@ public class Lsn implements Comparable<Lsn> {
         final ByteBuffer buf = ByteBuffer.allocate(8);
         buf.putInt(logicalXlog);
         buf.putInt(segment);
-        buf.position(0);
+        ((java.nio.Buffer) buf).position(0);
         final long value = buf.getLong();
 
         return Lsn.valueOf(value);
@@ -103,7 +108,7 @@ public class Lsn implements Comparable<Lsn> {
     public String asString() {
         final ByteBuffer buf = ByteBuffer.allocate(8);
         buf.putLong(value);
-        buf.position(0);
+        ((java.nio.Buffer) buf).position(0);
 
         final int logicalXlog = buf.getInt();
         final int segment = buf.getInt();
@@ -131,6 +136,10 @@ public class Lsn implements Comparable<Lsn> {
 
     public boolean isValid() {
         return this != INVALID_LSN;
+    }
+
+    public boolean isNonStopping() {
+        return this == NO_STOPPING_LSN;
     }
 
     @Override

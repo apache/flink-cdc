@@ -37,7 +37,7 @@ public class PostgresOffset extends Offset {
     public static final PostgresOffset INITIAL_OFFSET =
             new PostgresOffset(Lsn.INVALID_LSN.asLong(), null, Instant.MIN);
     public static final PostgresOffset NO_STOPPING_OFFSET =
-            new PostgresOffset(Lsn.valueOf("FFFFFFFF/FFFFFFFF").asLong(), null, Instant.MAX);
+            new PostgresOffset(Lsn.NO_STOPPING_LSN.asLong(), null, Instant.MAX);
 
     // used by PostgresOffsetFactory
     PostgresOffset(Map<String, String> offset) {

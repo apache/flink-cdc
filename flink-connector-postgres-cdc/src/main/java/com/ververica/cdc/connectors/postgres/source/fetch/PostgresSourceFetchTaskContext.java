@@ -23,8 +23,10 @@ import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.postgres.source.PostgresDialect;
+import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
@@ -43,6 +45,7 @@ import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.data.Envelope;
+import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
@@ -64,6 +67,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.DROP_SLOT_ON_STOP;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.PLUGIN_NAME;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SNAPSHOT_MODE;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.createReplicationConnection;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresValueConverterBuilder;
@@ -158,7 +164,21 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         this.taskContext,
                         jdbcConnection,
                         this.snapShotter.shouldSnapshot(),
-                        dbzConfig));
+                        sourceSplitBase instanceof StreamSplit
+                                ? dbzConfig
+                                : new PostgresConnectorConfig(
+                                        dbzConfig
+                                                .getConfig()
+                                                .edit()
+                                                .with(
+                                                        SLOT_NAME.name(),
+                                                        ((PostgresSourceConfig) sourceConfig)
+                                                                .getSlotNameForBackfillTask())
+                                                // drop slot for backfill stream split
+                                                .with(DROP_SLOT_ON_STOP.name(), true)
+                                                // Disable heartbeat event in snapshot split fetcher
+                                                .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
+                                                .build())));
 
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
@@ -287,5 +307,15 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     public Snapshotter getSnapShotter() {
         return snapShotter;
+    }
+
+    public String getSlotName() {
+        return sourceConfig.getDbzProperties().getProperty(SLOT_NAME.name());
+    }
+
+    public String getPluginName() {
+        return PostgresConnectorConfig.LogicalDecoder.parse(
+                        sourceConfig.getDbzProperties().getProperty(PLUGIN_NAME.name()))
+                .getPostgresPluginName();
     }
 }

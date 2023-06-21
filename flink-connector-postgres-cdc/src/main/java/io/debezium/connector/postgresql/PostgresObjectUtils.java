@@ -20,6 +20,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
+import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
@@ -131,5 +132,28 @@ public class PostgresObjectUtils {
         LOGGER.error("Failed to create replication connection after {} retries", maxRetries);
         throw new FlinkRuntimeException(
                 "Failed to create replication connection for " + taskContext);
+    }
+
+    public static void waitForReplicationSlotReady(
+            int retryTimes, PostgresConnection jdbcConnection, String slotName, String pluginName)
+            throws SQLException {
+        int count = 0;
+        SlotState slotState = jdbcConnection.getReplicationSlotState(slotName, pluginName);
+
+        while (slotState == null && count < retryTimes) {
+            LOGGER.info("Waiting until the replication slot is ready ...");
+            try {
+                Thread.sleep(2000L);
+            } catch (InterruptedException e) {
+                // do nothing
+            }
+            count++;
+            slotState = jdbcConnection.getReplicationSlotState(slotName, pluginName);
+        }
+        if (slotState == null) {
+            throw new IllegalStateException(
+                    String.format(
+                            "The replication slot is not ready after %d seconds.", 2 * retryTimes));
+        }
     }
 }
