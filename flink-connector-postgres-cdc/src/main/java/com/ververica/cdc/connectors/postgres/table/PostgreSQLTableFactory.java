@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.postgres.table;
 
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
@@ -28,6 +27,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.connectors.base.options.JdbcSourceOptions;
+import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.postgres.utils.OptionUtils;
 import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
@@ -36,29 +36,29 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCHEMA_NAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHANGELOG_MODE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECT_TIMEOUT;
-import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.DECODING_PLUGIN_NAME;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.HEARTBEAT_INTERVAL;
-import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.HOSTNAME;
-import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.PASSWORD;
-import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.PORT;
+import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.PG_PORT;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_STARTUP_MODE;
-import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCHEMA_NAME;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SLOT_NAME;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
-import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.TABLE_NAME;
-import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.USERNAME;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
@@ -69,77 +69,6 @@ import static org.apache.flink.util.Preconditions.checkState;
 public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "postgres-cdc";
-
-    private static final ConfigOption<String> HOSTNAME =
-            ConfigOptions.key("hostname")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("IP address or hostname of the PostgreSQL database server.");
-
-    private static final ConfigOption<Integer> PORT =
-            ConfigOptions.key("port")
-                    .intType()
-                    .defaultValue(5432)
-                    .withDescription("Integer port number of the PostgreSQL database server.");
-
-    private static final ConfigOption<String> USERNAME =
-            ConfigOptions.key("username")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Name of the PostgreSQL database to use when connecting to the PostgreSQL database server.");
-
-    private static final ConfigOption<String> PASSWORD =
-            ConfigOptions.key("password")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Password to use when connecting to the PostgreSQL database server.");
-
-    private static final ConfigOption<String> DATABASE_NAME =
-            ConfigOptions.key("database-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Database name of the PostgreSQL server to monitor.");
-
-    private static final ConfigOption<String> SCHEMA_NAME =
-            ConfigOptions.key("schema-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Schema name of the PostgreSQL database to monitor.");
-
-    private static final ConfigOption<String> TABLE_NAME =
-            ConfigOptions.key("table-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Table name of the PostgreSQL database to monitor.");
-
-    private static final ConfigOption<String> DECODING_PLUGIN_NAME =
-            ConfigOptions.key("decoding.plugin.name")
-                    .stringType()
-                    .defaultValue("decoderbufs")
-                    .withDescription(
-                            "The name of the Postgres logical decoding plug-in installed on the server.\n"
-                                    + "Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming,\n"
-                                    + "wal2json_rds_streaming and pgoutput.");
-
-    private static final ConfigOption<String> SLOT_NAME =
-            ConfigOptions.key("slot.name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "The name of the PostgreSQL logical decoding slot that was created for streaming changes "
-                                    + "from a particular plug-in for a particular database/schema. The server uses this slot "
-                                    + "to stream events to the connector that you are configuring.");
-
-    private static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
-            ConfigOptions.key("changelog-mode")
-                    .enumType(DebeziumChangelogMode.class)
-                    .defaultValue(DebeziumChangelogMode.ALL)
-                    .withDescription(
-                            "The changelog mode used for encoding streaming changes.\n"
-                                    + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
-                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. It can be used for tables with primary keys when replica identity FULL is not an option.");
 
     @Override
     public DynamicTableSource createDynamicTableSource(DynamicTableFactory.Context context) {
@@ -154,7 +83,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
         String tableName = config.get(TABLE_NAME);
-        int port = config.get(PORT);
+        int port = config.get(PG_PORT);
         String pluginName = config.get(DECODING_PLUGIN_NAME);
         String slotName = config.get(SLOT_NAME);
         DebeziumChangelogMode changelogMode = config.get(CHANGELOG_MODE);
@@ -187,6 +116,10 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
             validateIntegerOption(JdbcSourceOptions.CONNECT_MAX_RETRIES, connectMaxRetries, 0);
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
+        } else {
+            checkState(
+                    !StartupMode.LATEST_OFFSET.equals(startupOptions.startupMode),
+                    "The Postgres CDC connector does not support 'latest-offset' startup mode when 'scan.incremental.snapshot.enabled' is disabled, you can enable 'scan.incremental.snapshot.enabled' to use this startup mode.");
         }
 
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
@@ -239,7 +172,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(PORT);
+        options.add(PG_PORT);
         options.add(DECODING_PLUGIN_NAME);
         options.add(CHANGELOG_MODE);
         options.add(SCAN_STARTUP_MODE);
