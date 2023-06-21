@@ -210,27 +210,25 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                     ((PostgresOffset) streamSplit.getEndingOffset()).getLsn());
             super.execute(context, partition, offsetContext);
             if (isBoundedRead()) {
-
                 LOG.debug("StreamSplit is bounded read: {}", streamSplit);
                 final PostgresOffset currentOffset = PostgresOffset.of(offsetContext.getOffset());
-
-                if (currentOffset.isAtOrAfter(streamSplit.getEndingOffset())) {
-                    LOG.info("StreamSplitReadTask finished for {}", streamSplit);
-
-                    try {
-                        dispatcher.dispatchWatermarkEvent(
-                                partition.getSourcePartition(),
-                                streamSplit,
-                                currentOffset,
-                                WatermarkKind.END);
-                    } catch (InterruptedException e) {
-                        LOG.error("Send signal event error.", e);
-                        errorHandler.setProducerThrowable(
-                                new FlinkRuntimeException("Error processing WAL signal event", e));
-                    }
-
-                    ((PostgresScanFetchTask.PostgresChangeEventSourceContext) context).finished();
+                try {
+                    dispatcher.dispatchWatermarkEvent(
+                            partition.getSourcePartition(),
+                            streamSplit,
+                            currentOffset,
+                            WatermarkKind.END);
+                    LOG.info(
+                            "StreamSplitReadTask finished for {} at {}",
+                            streamSplit,
+                            currentOffset);
+                } catch (InterruptedException e) {
+                    LOG.error("Send signal event error.", e);
+                    errorHandler.setProducerThrowable(
+                            new FlinkRuntimeException("Error processing WAL signal event", e));
                 }
+
+                ((PostgresScanFetchTask.PostgresChangeEventSourceContext) context).finished();
             }
         }
 
