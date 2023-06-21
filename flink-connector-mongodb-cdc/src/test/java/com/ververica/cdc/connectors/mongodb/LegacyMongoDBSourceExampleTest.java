@@ -19,17 +19,16 @@ package com.ververica.cdc.connectors.mongodb;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBTestBase.MONGODB_CONTAINER;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 
 /** Example Tests for {@link MongoDBSource}. */
-public class LegacyMongoDBSourceExampleTest extends MongoDBSourceTestBase {
+public class LegacyMongoDBSourceExampleTest extends LegacyMongoDBSourceTestBase {
 
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")

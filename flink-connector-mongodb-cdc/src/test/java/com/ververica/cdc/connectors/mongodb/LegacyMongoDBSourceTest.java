@@ -57,14 +57,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertDelete;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertInsert;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertObjectIdEquals;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertReplace;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertUpdate;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
