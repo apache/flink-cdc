@@ -28,7 +28,7 @@ import java.time.Duration;
 /** Configurations for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
 public class PostgresSourceOptions extends JdbcSourceOptions {
 
-    public static final ConfigOption<Integer> PORT =
+    public static final ConfigOption<Integer> PG_PORT =
             ConfigOptions.key("port")
                     .intType()
                     .defaultValue(5432)
@@ -46,11 +46,11 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
     public static final ConfigOption<String> SLOT_NAME =
             ConfigOptions.key("slot.name")
                     .stringType()
-                    .defaultValue("flink")
+                    .noDefaultValue()
                     .withDescription(
                             "The name of the PostgreSQL logical decoding slot that was created for streaming changes "
                                     + "from a particular plug-in for a particular database/schema. The server uses this slot "
-                                    + "to stream events to the connector that you are configuring. Default is \"flink\".");
+                                    + "to stream events to the connector that you are configuring.");
 
     public static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
             ConfigOptions.key("changelog-mode")
@@ -60,6 +60,17 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                             "The changelog mode used for encoding streaming changes.\n"
                                     + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
                                     + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. It can be used for tables with primary keys when replica identity FULL is not an option.");
+
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
+            ConfigOptions.key("scan.incremental.snapshot.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Incremental snapshot is a new mechanism to read snapshot of a table. "
+                                    + "Compared to the old snapshot mechanism, the incremental snapshot has many advantages, including:\n"
+                                    + "(1) source can be parallel during snapshot reading, \n"
+                                    + "(2) source can perform checkpoints in the chunk granularity during snapshot reading, \n"
+                                    + "(3) source doesn't need to acquire global read lock before snapshot reading.");
 
     public static final ConfigOption<Duration> HEARTBEAT_INTERVAL =
             ConfigOptions.key("heartbeat.interval.ms")

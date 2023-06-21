@@ -28,6 +28,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
+
 /** The configuration for Postgres CDC source. */
 public class PostgresSourceConfig extends JdbcSourceConfig {
 
@@ -89,6 +91,10 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     public int getSubtaskId() {
         return subtaskId;
+    }
+
+    public String getSlotNameForBackfillTask() {
+        return getDbzProperties().getProperty(SLOT_NAME.name()) + "_" + subtaskId;
     }
 
     @Override
