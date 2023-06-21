@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ public class MySqlSource {
         /**
          * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
          * TIMESTAMP type in MYSQL converted to STRING. See more
-         * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
+         * https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types
          */
         public Builder<T> serverTimeZone(String timeZone) {
             this.serverTimeZone = timeZone;

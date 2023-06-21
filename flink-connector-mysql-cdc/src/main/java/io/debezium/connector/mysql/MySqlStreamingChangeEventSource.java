@@ -83,7 +83,15 @@ import java.util.function.Predicate;
 
 import static io.debezium.util.Strings.isNullOrEmpty;
 
-/** Copied from Debezium project to add more error details for some exceptions in line 1465. */
+/**
+ * Copied from Debezium project to fix
+ * https://github.com/ververica/flink-cdc-connectors/issues/1944.
+ *
+ * <p>Line 1428-1434 : Adjust GTID merging logic to support recovering from job which previously
+ * specifying starting offset on start.
+ *
+ * <p>Line 1486 : Add more error details for some exceptions.
+ */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
 
@@ -115,6 +123,7 @@ public class MySqlStreamingChangeEventSource
     private final MySqlConnection connection;
     private final EventDispatcher<MySqlPartition, TableId> eventDispatcher;
     private final ErrorHandler errorHandler;
+    private boolean isRestoredFromCheckpoint = false;
 
     @SingleThreadAccess("binlog client thread")
     private Instant eventTimestamp;
@@ -1406,11 +1415,23 @@ public class MySqlStreamingChangeEventSource
             LOGGER.info(
                     "Relevant GTID set available on server: {}", relevantAvailableServerGtidSet);
 
+            // Since the GTID recorded in the checkpoint represents the CDC-executed records, in
+            // certain scenarios
+            // (such as when the startup mode is earliest/timestamp/binlogfile), the recorded GTID
+            // may not start from
+            // the beginning. For example, A:300-500. However, during job recovery, we usually only
+            // need to focus on
+            // the last consumed point instead of consuming A:1-299. Therefore, some adjustments
+            // need to be made to the
+            // recorded offset in the checkpoint, and the available GTID for other MySQL instances
+            // should be completed.
             mergedGtidSet =
-                    relevantAvailableServerGtidSet
-                            .retainAll(uuid -> knownGtidSet.forServerWithId(uuid) != null)
-                            .with(purgedServerGtid)
-                            .with(filteredGtidSet);
+                    GtidUtils.fixRestoredGtidSet(
+                            GtidUtils.mergeGtidSetInto(
+                                    relevantAvailableServerGtidSet.retainAll(
+                                            uuid -> knownGtidSet.forServerWithId(uuid) != null),
+                                    purgedServerGtid),
+                            filteredGtidSet);
         } else {
             mergedGtidSet = availableServerGtidSet.with(filteredGtidSet);
         }
@@ -1540,6 +1561,10 @@ public class MySqlStreamingChangeEventSource
                 logStreamingSourceState(Level.DEBUG);
             }
         }
+    }
+
+    protected void setRestoredFromCheckpoint() {
+        this.isRestoredFromCheckpoint = true;
     }
 
     @FunctionalInterface
