@@ -40,7 +40,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -73,7 +72,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     private final MongoSourceTask target;
 
-    private final Field isCopyingField;
+    private final Field startedTaskField;
 
     private SourceRecord currentLastSnapshotRecord;
 
@@ -81,7 +80,8 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     public MongoDBConnectorSourceTask() throws NoSuchFieldException {
         this.target = new MongoSourceTask();
-        this.isCopyingField = MongoSourceTask.class.getDeclaredField("isCopying");
+        this.startedTaskField = MongoSourceTask.class.getDeclaredField("startedTask");
+        startedTaskField.setAccessible(true);
     }
 
     @Override
@@ -236,10 +236,12 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     }
 
     private boolean isCopying() {
-        isCopyingField.setAccessible(true);
         try {
-            return ((AtomicBoolean) isCopyingField.get(target)).get();
-        } catch (IllegalAccessException e) {
+            Object startedTask = startedTaskField.get(target);
+            Field isCopyingField = startedTask.getClass().getDeclaredField("isCopying");
+            isCopyingField.setAccessible(true);
+            return (boolean) isCopyingField.get(startedTask);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
             throw new IllegalStateException("Cannot access isCopying field of SourceTask", e);
         }
     }

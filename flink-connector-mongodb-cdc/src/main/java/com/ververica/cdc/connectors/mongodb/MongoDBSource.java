@@ -317,24 +317,24 @@ public class MongoDBSource {
 
             if (copyExisting != null) {
                 props.setProperty(
-                        MongoSourceConfig.COPY_EXISTING_CONFIG, String.valueOf(copyExisting));
+                        MongoSourceConfig.STARTUP_MODE_CONFIG,
+                        copyExisting ? "copy_existing" : "latest");
             }
 
             if (copyExistingMaxThreads != null) {
                 props.setProperty(
-                        MongoSourceConfig.COPY_EXISTING_MAX_THREADS_CONFIG,
+                        "startup.mode.copy.existing.max.threads",
                         String.valueOf(copyExistingMaxThreads));
             }
 
             if (copyExistingQueueSize != null) {
                 props.setProperty(
-                        MongoSourceConfig.COPY_EXISTING_QUEUE_SIZE_CONFIG,
+                        "startup.mode.copy.existing.queue.size",
                         String.valueOf(copyExistingQueueSize));
             }
 
             if (copyExistingPipeline != null) {
-                props.setProperty(
-                        MongoSourceConfig.COPY_EXISTING_PIPELINE_CONFIG, copyExistingPipeline);
+                props.setProperty("startup.mode.copy.existing.pipeline", copyExistingPipeline);
             }
 
             if (heartbeatIntervalMillis != null) {
