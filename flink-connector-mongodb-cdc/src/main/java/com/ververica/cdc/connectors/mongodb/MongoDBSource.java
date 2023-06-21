@@ -63,7 +63,9 @@ public class MongoDBSource {
         return new Builder<>();
     }
 
-    /** Builder class of {@link MongoDBSource}. */
+    /**
+     * Builder class of {@link MongoDBSource}.
+     */
     public static class Builder<T> {
         private String scheme = SCHEME.defaultValue();
         private String hosts;
@@ -76,6 +78,7 @@ public class MongoDBSource {
         private Integer pollAwaitTimeMillis = POLL_AWAIT_TIME_MILLIS.defaultValue();
         private Integer pollMaxBatchSize = POLL_MAX_BATCH_SIZE.defaultValue();
         private Boolean updateLookup = true;
+        private Boolean fullDocumentBeforeChange = false;
         private Boolean copyExisting = true;
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
@@ -83,7 +86,9 @@ public class MongoDBSource {
         private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
         private DebeziumDeserializationSchema<T> deserializer;
 
-        /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
+        /**
+         * The protocol connected to MongoDB. For example mongodb or mongodb+srv.
+         */
         public Builder<T> scheme(String scheme) {
             checkArgument(
                     MONGODB_SCHEME.equals(scheme) || MONGODB_SRV_SCHEME.equals(scheme),
@@ -94,7 +99,9 @@ public class MongoDBSource {
             return this;
         }
 
-        /** The comma-separated list of hostname and port pairs of mongodb servers. */
+        /**
+         * The comma-separated list of hostname and port pairs of mongodb servers.
+         */
         public Builder<T> hosts(String hosts) {
             this.hosts = hosts;
             return this;
@@ -110,19 +117,25 @@ public class MongoDBSource {
             return this;
         }
 
-        /** Name of the database user to be used when connecting to MongoDB. */
+        /**
+         * Name of the database user to be used when connecting to MongoDB.
+         */
         public Builder<T> username(String username) {
             this.username = username;
             return this;
         }
 
-        /** Password to be used when connecting to MongoDB. */
+        /**
+         * Password to be used when connecting to MongoDB.
+         */
         public Builder<T> password(String password) {
             this.password = password;
             return this;
         }
 
-        /** Regular expressions list that match database names to be monitored. */
+        /**
+         * Regular expressions list that match database names to be monitored.
+         */
         public Builder<T> databaseList(String... databaseList) {
             this.databaseList = Arrays.asList(databaseList);
             return this;
@@ -187,6 +200,18 @@ public class MongoDBSource {
          */
         public Builder<T> updateLookup(boolean updateLookup) {
             this.updateLookup = updateLookup;
+            return this;
+        }
+
+        /**
+         * change.stream.full.document.before.change
+         *
+         * <p>Configures the document pre-image your change stream returns on update operations.
+         * The pre-image is not available for source records published while copying existing data,
+         * and the pre-image configuration has no effect on copying.
+         */
+        public Builder<T> fullDocumentBeforeChange(boolean fullDocumentBeforeChange) {
+            this.fullDocumentBeforeChange = fullDocumentBeforeChange;
             return this;
         }
 
@@ -286,6 +311,10 @@ public class MongoDBSource {
             if (updateLookup) {
                 props.setProperty(
                         MongoSourceConfig.FULL_DOCUMENT_CONFIG, FULL_DOCUMENT_UPDATE_LOOKUP);
+            }
+
+            if (fullDocumentBeforeChange) {
+                props.setProperty(MongoSourceConfig.FULL_DOCUMENT_BEFORE_CHANGE_CONFIG, "true");
             }
 
             props.setProperty(

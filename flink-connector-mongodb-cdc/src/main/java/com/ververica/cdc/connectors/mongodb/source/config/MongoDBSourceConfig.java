@@ -28,17 +28,23 @@ import java.util.Objects;
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/** A MongoDB Source configuration which is used by {@link MongoDBSource}. */
+/**
+ * A MongoDB Source configuration which is used by {@link MongoDBSource}.
+ */
 public class MongoDBSourceConfig implements SourceConfig {
 
     private static final long serialVersionUID = 1L;
 
     private final String scheme;
     private final String hosts;
-    @Nullable private final String username;
-    @Nullable private final String password;
-    @Nullable private final List<String> databaseList;
-    @Nullable private final List<String> collectionList;
+    @Nullable
+    private final String username;
+    @Nullable
+    private final String password;
+    @Nullable
+    private final List<String> databaseList;
+    @Nullable
+    private final List<String> collectionList;
     private final String connectionString;
     private final int batchSize;
     private final int pollAwaitTimeMillis;
@@ -49,6 +55,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final int splitMetaGroupSize;
     private final int splitSizeMB;
     private final boolean closeIdleReaders;
+    private final boolean enableFullDocPreimage;
 
     MongoDBSourceConfig(
             String scheme,
@@ -66,7 +73,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             int heartbeatIntervalMillis,
             int splitMetaGroupSize,
             int splitSizeMB,
-            boolean closeIdleReaders) {
+            boolean closeIdleReaders,
+            boolean enableFullDocPreimage) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -84,6 +92,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
         this.closeIdleReaders = closeIdleReaders;
+        this.enableFullDocPreimage = enableFullDocPreimage;
     }
 
     public String getScheme() {
@@ -161,6 +170,10 @@ public class MongoDBSourceConfig implements SourceConfig {
     @Override
     public boolean isCloseIdleReaders() {
         return closeIdleReaders;
+    }
+
+    public boolean isFullDocPreimageEnabled() {
+        return enableFullDocPreimage;
     }
 
     @Override

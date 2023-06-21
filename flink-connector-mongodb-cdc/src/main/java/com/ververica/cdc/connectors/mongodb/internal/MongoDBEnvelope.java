@@ -61,6 +61,8 @@ public class MongoDBEnvelope {
 
     public static final String FULL_DOCUMENT_FIELD = "fullDocument";
 
+    public static final String FULL_DOCUMENT_BEFORE_CHANGE_FIELD = "fullDocumentBeforeChange";
+
     public static final String DOCUMENT_KEY_FIELD = "documentKey";
 
     public static final String OPERATION_TYPE_FIELD = "operationType";
@@ -94,6 +96,7 @@ public class MongoDBEnvelope {
                     + "    { \"name\": \"_id\", \"type\": \"string\" },"
                     + "    { \"name\": \"operationType\", \"type\": [\"string\", \"null\"] },"
                     + "    { \"name\": \"fullDocument\", \"type\": [\"string\", \"null\"] },"
+                    + "    { \"name\": \"fullDocumentBeforeChange\", \"type\": [\"string\", \"null\"] },"
                     + "    { \"name\": \"source\","
                     + "      \"type\": [{\"name\": \"source\", \"type\": \"record\", \"fields\": ["
                     + "                {\"name\": \"ts_ms\", \"type\": \"long\"},"

@@ -82,15 +82,20 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final Integer splitMetaGroupSize;
     private final Integer splitSizeMB;
     private final boolean closeIdlerReaders;
+    private final boolean enableFullDocPreimage;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
 
-    /** Data type that describes the final output of the source. */
+    /**
+     * Data type that describes the final output of the source.
+     */
     protected DataType producedDataType;
 
-    /** Metadata that is appended at the end of a physical source row. */
+    /**
+     * Metadata that is appended at the end of a physical source row.
+     */
     protected List<String> metadataKeys;
 
     public MongoDBTableSource(
@@ -112,7 +117,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean enableParallelRead,
             @Nullable Integer splitMetaGroupSize,
             @Nullable Integer splitSizeMB,
-            boolean closeIdlerReaders) {
+            boolean closeIdlerReaders,
+            boolean enableFullDocPreimage) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -134,10 +140,21 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
         this.closeIdlerReaders = closeIdlerReaders;
+        this.enableFullDocPreimage = enableFullDocPreimage;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
+        if (this.enableFullDocPreimage) {
+            // with FullDocPreimage feature
+            // U- row data can be emitted
+            return ChangelogMode.newBuilder()
+                    .addContainedKind(RowKind.INSERT)
+                    .addContainedKind(RowKind.UPDATE_BEFORE)
+                    .addContainedKind(RowKind.UPDATE_AFTER)
+                    .addContainedKind(RowKind.DELETE)
+                    .build();
+        }
         return ChangelogMode.newBuilder()
                 .addContainedKind(RowKind.INSERT)
                 .addContainedKind(RowKind.UPDATE_AFTER)
@@ -198,7 +215,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     .ifPresent(builder::heartbeatIntervalMillis);
             Optional.ofNullable(splitMetaGroupSize).ifPresent(builder::splitMetaGroupSize);
             Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
-
+            Optional.of(enableFullDocPreimage).ifPresent(builder::enableFullDocPreimage);
             return SourceProvider.of(builder.build());
         } else {
             com.ververica.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
@@ -218,6 +235,10 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     throw new ValidationException(
                             startupOptions.startupMode
                                     + " is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
+            }
+
+            if (enableFullDocPreimage) {
+                throw new ValidationException("Full Document Preimage is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
             }
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
@@ -289,7 +310,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         enableParallelRead,
                         splitMetaGroupSize,
                         splitSizeMB,
-                        closeIdlerReaders);
+                        closeIdlerReaders,
+                        enableFullDocPreimage);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

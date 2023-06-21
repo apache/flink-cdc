@@ -28,10 +28,13 @@ import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.fetchR
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.triggerFailover;
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** Integration tests for MongoDB full document before change info. */
+/**
+ * Integration tests for MongoDB full document before change info.
+ */
 public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBase {
 
-    @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
+    @Rule
+    public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     @Test
     public void testReadSingleCollectionWithSingleParallelism() throws Exception {
@@ -39,7 +42,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                 1,
                 MongoDBTestUtils.FailoverType.NONE,
                 MongoDBTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"});
+                new String[]{"customers"});
     }
 
     @Test
@@ -48,7 +51,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                 4,
                 MongoDBTestUtils.FailoverType.NONE,
                 MongoDBTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"});
+                new String[]{"customers"});
     }
 
     @Test
@@ -57,7 +60,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                 1,
                 MongoDBTestUtils.FailoverType.NONE,
                 MongoDBTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[]{"customers", "customers_1"});
     }
 
     @Test
@@ -66,7 +69,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                 4,
                 MongoDBTestUtils.FailoverType.NONE,
                 MongoDBTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[]{"customers", "customers_1"});
     }
 
     // Failover tests
@@ -75,7 +78,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"});
+                new String[]{"customers", "customers_1"});
     }
 
     @Test
@@ -83,7 +86,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"});
+                new String[]{"customers", "customers_1"});
     }
 
     @Test
@@ -91,7 +94,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"});
+                new String[]{"customers", "customers_1"});
     }
 
     @Test
@@ -99,7 +102,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"});
+                new String[]{"customers", "customers_1"});
     }
 
     @Test
@@ -108,7 +111,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                 1,
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"});
+                new String[]{"customers"});
     }
 
     @Test
@@ -117,7 +120,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                 1,
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"});
+                new String[]{"customers"});
     }
 
     private void testMongoDBParallelSource(
@@ -138,12 +141,15 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
 
         String customerDatabase = CONTAINER.executeCommandFileInSeparateDatabase("customer");
 
+        // A - enable system-level fulldoc preimage feature
+        CONTAINER.executeCommand("use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
         String sourceDDL =
                 String.format(
                         "CREATE TABLE customers ("
@@ -159,35 +165,45 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                                 + " 'hosts' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s',"
-                                + " 'heartbeat.interval.ms' = '500'"
+                                + " 'heartbeat.interval.ms' = '500',"
+                                + " 'full.document.preimage' = 'true'"
                                 + ")",
                         CONTAINER.getHostAndPort(),
                         customerDatabase,
-                        getCollectionNameRegex(customerDatabase, captureCustomerCollections));
+                        getCollectionNameRegex(customerDatabase, captureCustomerCollections)
+                );
+
+        // B - enable collection-level fulldoc preimage for change capture collection
+        for (String collectionName : captureCustomerCollections) {
+            CONTAINER.executeCommandInDatabase(
+                    String.format("db.runCommand({ collMod: '%s', changeStreamPreAndPostImages: { enabled: true } })", collectionName),
+                    customerDatabase);
+        }
+
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
-                new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]",
-                    "+I[1009, user_10, Shanghai, 123567891234]",
-                    "+I[1010, user_11, Shanghai, 123567891234]",
-                    "+I[1011, user_12, Shanghai, 123567891234]",
-                    "+I[1012, user_13, Shanghai, 123567891234]",
-                    "+I[1013, user_14, Shanghai, 123567891234]",
-                    "+I[1014, user_15, Shanghai, 123567891234]",
-                    "+I[1015, user_16, Shanghai, 123567891234]",
-                    "+I[1016, user_17, Shanghai, 123567891234]",
-                    "+I[1017, user_18, Shanghai, 123567891234]",
-                    "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
+                new String[]{
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[1019, user_20, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Shanghai, 123567891234]"
                 };
         tEnv.executeSql(sourceDDL);
         TableResult tableResult =
@@ -223,18 +239,18 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
         }
 
         String[] changeEventsForSingleTable =
-                new String[] {
-                    "-U[101, user_1, Shanghai, 123567891234]",
-                    "+U[101, user_1, Hangzhou, 123567891234]",
-                    "-D[102, user_2, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "-U[103, user_3, Shanghai, 123567891234]",
-                    "+U[103, user_3, Hangzhou, 123567891234]",
-                    "-U[1010, user_11, Shanghai, 123567891234]",
-                    "+U[1010, user_11, Hangzhou, 123567891234]",
-                    "+I[2001, user_22, Shanghai, 123567891234]",
-                    "+I[2002, user_23, Shanghai, 123567891234]",
-                    "+I[2003, user_24, Shanghai, 123567891234]"
+                new String[]{
+                        "-U[101, user_1, Shanghai, 123567891234]",
+                        "+U[101, user_1, Hangzhou, 123567891234]",
+                        "-D[102, user_2, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "-U[103, user_3, Shanghai, 123567891234]",
+                        "+U[103, user_3, Hangzhou, 123567891234]",
+                        "-U[1010, user_11, Shanghai, 123567891234]",
+                        "+U[1010, user_11, Hangzhou, 123567891234]",
+                        "+I[2001, user_22, Shanghai, 123567891234]",
+                        "+I[2002, user_23, Shanghai, 123567891234]",
+                        "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> expectedChangeStreamData = new ArrayList<>();
         for (int i = 0; i < captureCustomerCollections.length; i++) {

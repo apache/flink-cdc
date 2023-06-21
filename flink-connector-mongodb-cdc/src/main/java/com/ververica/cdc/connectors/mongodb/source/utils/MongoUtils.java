@@ -23,6 +23,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.changestream.ChangeStreamDocument;
 import com.mongodb.client.model.changestream.FullDocument;
+import com.mongodb.client.model.changestream.FullDocumentBeforeChange;
 import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
 import com.ververica.cdc.connectors.mongodb.source.connection.MongoClientPool;
 import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamDescriptor;
@@ -64,7 +65,9 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscov
 import static com.ververica.cdc.connectors.mongodb.source.utils.CollectionDiscoveryUtils.isIncludeListExplicitlySpecified;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/** Utilities of MongoDB operations. */
+/**
+ * Utilities of MongoDB operations.
+ */
 public class MongoUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoUtils.class);
@@ -76,7 +79,8 @@ public class MongoUtils {
     public static final int ILLEGAL_OPERATION_ERROR = 20;
     public static final int UNKNOWN_FIELD_ERROR = 40415;
 
-    private MongoUtils() {}
+    private MongoUtils() {
+    }
 
     public static ChangeStreamDescriptor getChangeStreamDescriptor(
             MongoDBSourceConfig sourceConfig,
@@ -131,14 +135,16 @@ public class MongoUtils {
                 descriptor.getDatabaseRegex(),
                 descriptor.getNamespaceRegex(),
                 sourceConfig.getBatchSize(),
-                sourceConfig.isUpdateLookup());
+                sourceConfig.isUpdateLookup(),
+                sourceConfig.isFullDocPreimageEnabled());
     }
 
     public static ChangeStreamIterable<Document> getChangeStreamIterable(
             MongoClient mongoClient,
             ChangeStreamDescriptor descriptor,
             int batchSize,
-            boolean updateLookup) {
+            boolean updateLookup,
+            boolean fullDocPreimage) {
         return getChangeStreamIterable(
                 mongoClient,
                 descriptor.getDatabase(),
@@ -146,7 +152,8 @@ public class MongoUtils {
                 descriptor.getDatabaseRegex(),
                 descriptor.getNamespaceRegex(),
                 batchSize,
-                updateLookup);
+                updateLookup,
+                fullDocPreimage);
     }
 
     public static ChangeStreamIterable<Document> getChangeStreamIterable(
@@ -156,7 +163,8 @@ public class MongoUtils {
             @Nullable Pattern databaseRegex,
             @Nullable Pattern namespaceRegex,
             int batchSize,
-            boolean updateLookup) {
+            boolean updateLookup,
+            boolean fullDocPreimage) {
         ChangeStreamIterable<Document> changeStream;
         if (StringUtils.isNotEmpty(database) && StringUtils.isNotEmpty(collection)) {
             MongoCollection<Document> coll =
@@ -219,6 +227,11 @@ public class MongoUtils {
         if (updateLookup) {
             changeStream.fullDocument(FullDocument.UPDATE_LOOKUP);
         }
+
+        if (fullDocPreimage) {
+            changeStream.fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
+        }
+
         return changeStream;
     }
 
@@ -226,11 +239,11 @@ public class MongoUtils {
     public static BsonDocument getLatestResumeToken(
             MongoClient mongoClient, ChangeStreamDescriptor descriptor) {
         ChangeStreamIterable<Document> changeStreamIterable =
-                getChangeStreamIterable(mongoClient, descriptor, 1, false);
+                getChangeStreamIterable(mongoClient, descriptor, 1, false, false);
 
         // Nullable when no change record or postResumeToken (new in MongoDB 4.0.7).
         try (MongoChangeStreamCursor<ChangeStreamDocument<Document>> changeStreamCursor =
-                changeStreamIterable.cursor()) {
+                     changeStreamIterable.cursor()) {
             ChangeStreamDocument<Document> firstResult = changeStreamCursor.tryNext();
 
             return firstResult != null
@@ -340,7 +353,11 @@ public class MongoUtils {
     }
 
     public static MongoClient clientFor(MongoDBSourceConfig sourceConfig) {
-        return MongoClientPool.getInstance().getOrCreateMongoClient(sourceConfig);
+        MongoClient client = MongoClientPool.getInstance().getOrCreateMongoClient(sourceConfig);
+        if (sourceConfig.isFullDocPreimageEnabled()) {
+            // TODO: check mongoDB version >= 6 here
+        }
+        return client;
     }
 
     public static String buildConnectionString(

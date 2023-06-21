@@ -85,10 +85,14 @@ public class MongoDBConnectorDeserializationSchema
 
     private static final long serialVersionUID = 1750787080613035184L;
 
-    /** TypeInformation of the produced {@link RowData}. */
+    /**
+     * TypeInformation of the produced {@link RowData}.
+     */
     private final TypeInformation<RowData> resultTypeInfo;
 
-    /** Local Time zone. */
+    /**
+     * Local Time zone.
+     */
     private final ZoneId localTimeZone;
 
     /**
@@ -98,7 +102,9 @@ public class MongoDBConnectorDeserializationSchema
      */
     protected final DeserializationRuntimeConverter physicalConverter;
 
-    /** Whether the deserializer needs to handle metadata columns. */
+    /**
+     * Whether the deserializer needs to handle metadata columns.
+     */
     protected final boolean hasMetadata;
 
     /**
@@ -129,7 +135,7 @@ public class MongoDBConnectorDeserializationSchema
                 extractBsonDocument(value, valueSchema, MongoDBEnvelope.DOCUMENT_KEY_FIELD);
         BsonDocument fullDocument =
                 extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_FIELD);
-
+        BsonDocument fullDocumentBeforeChange = extractBsonDocument(value, valueSchema, MongoDBEnvelope.FULL_DOCUMENT_BEFORE_CHANGE_FIELD);
         switch (op) {
             case INSERT:
                 GenericRowData insert = extractRowData(fullDocument);
@@ -137,9 +143,18 @@ public class MongoDBConnectorDeserializationSchema
                 emit(record, insert, out);
                 break;
             case DELETE:
-                GenericRowData delete = extractRowData(documentKey);
-                delete.setRowKind(RowKind.DELETE);
-                emit(record, delete, out);
+                // there might be FullDocBeforeChange field
+                // if fullDocumentPreImage feature is on
+                // convert it to Delete row data with full document
+                if (fullDocumentBeforeChange != null) {
+                    GenericRowData updateBefore = extractRowData(fullDocumentBeforeChange);
+                    updateBefore.setRowKind(RowKind.DELETE);
+                    emit(record, updateBefore, out);
+                } else {
+                    GenericRowData delete = extractRowData(documentKey);
+                    delete.setRowKind(RowKind.DELETE);
+                    emit(record, delete, out);
+                }
                 break;
             case UPDATE:
                 // It’s null if another operation deletes the document
@@ -147,11 +162,27 @@ public class MongoDBConnectorDeserializationSchema
                 if (fullDocument == null) {
                     break;
                 }
+                // there might be FullDocBeforeChange field
+                // if fullDocumentPreImage feature is on
+                // convert it to UB row data
+                if (fullDocumentBeforeChange != null) {
+                    GenericRowData updateBefore = extractRowData(fullDocumentBeforeChange);
+                    updateBefore.setRowKind(RowKind.UPDATE_BEFORE);
+                    emit(record, updateBefore, out);
+                }
                 GenericRowData updateAfter = extractRowData(fullDocument);
                 updateAfter.setRowKind(RowKind.UPDATE_AFTER);
                 emit(record, updateAfter, out);
                 break;
             case REPLACE:
+                // there might be FullDocBeforeChange field
+                // if fullDocumentPreImage feature is on
+                // convert it to UB row data
+                if (fullDocumentBeforeChange != null) {
+                    GenericRowData updateBefore = extractRowData(fullDocumentBeforeChange);
+                    updateBefore.setRowKind(RowKind.UPDATE_BEFORE);
+                    emit(record, updateBefore, out);
+                }
                 GenericRowData replaceAfter = extractRowData(fullDocument);
                 replaceAfter.setRowKind(RowKind.UPDATE_AFTER);
                 emit(record, replaceAfter, out);
@@ -215,12 +246,16 @@ public class MongoDBConnectorDeserializationSchema
         Object convert(BsonValue docObj) throws Exception;
     }
 
-    /** Creates a runtime converter which is null safe. */
+    /**
+     * Creates a runtime converter which is null safe.
+     */
     private DeserializationRuntimeConverter createConverter(LogicalType type) {
         return wrapIntoNullableConverter(createNotNullConverter(type));
     }
 
-    /** Creates a runtime converter which assuming input object is not null. */
+    /**
+     * Creates a runtime converter which assuming input object is not null.
+     */
     private DeserializationRuntimeConverter createNotNullConverter(LogicalType type) {
         switch (type.getTypeRoot()) {
             case NULL:

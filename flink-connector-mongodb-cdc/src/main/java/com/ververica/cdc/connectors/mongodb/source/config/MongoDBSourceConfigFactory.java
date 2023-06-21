@@ -37,7 +37,9 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/** A factory to construct {@link MongoDBSourceConfig}. */
+/**
+ * A factory to construct {@link MongoDBSourceConfig}.
+ */
 @Internal
 public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> {
 
@@ -59,8 +61,11 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private Integer splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private Integer splitSizeMB = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
     private boolean closeIdleReaders = false;
+    private boolean enableFullDocPreimage = false;
 
-    /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
+    /**
+     * The protocol connected to MongoDB. For example mongodb or mongodb+srv.
+     */
     public MongoDBSourceConfigFactory scheme(String scheme) {
         checkArgument(
                 MONGODB_SCHEME.equals(scheme) || MONGODB_SRV_SCHEME.equals(scheme),
@@ -71,7 +76,9 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
-    /** The comma-separated list of hostname and port pairs of mongodb servers. */
+    /**
+     * The comma-separated list of hostname and port pairs of mongodb servers.
+     */
     public MongoDBSourceConfigFactory hosts(String hosts) {
         this.hosts = hosts;
         return this;
@@ -87,19 +94,25 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
-    /** Name of the database user to be used when connecting to MongoDB. */
+    /**
+     * Name of the database user to be used when connecting to MongoDB.
+     */
     public MongoDBSourceConfigFactory username(String username) {
         this.username = username;
         return this;
     }
 
-    /** Password to be used when connecting to MongoDB. */
+    /**
+     * Password to be used when connecting to MongoDB.
+     */
     public MongoDBSourceConfigFactory password(String password) {
         this.password = password;
         return this;
     }
 
-    /** Regular expressions list that match database names to be monitored. */
+    /**
+     * Regular expressions list that match database names to be monitored.
+     */
     public MongoDBSourceConfigFactory databaseList(String... databases) {
         this.databaseList = Arrays.asList(databases);
         return this;
@@ -219,7 +232,21 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
-    /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
+    /**
+     * full.document.preimage
+     *
+     * <p>Whether to generate update before row data based on MongoDB 6.0 Full Document Preimage feature.
+     * <code>'scan.incremental.close-idle-reader.enabled'</code> needs to be set to
+     * true.
+     */
+    public MongoDBSourceConfigFactory enableFullDocPreimage(boolean enableFullDocPreimage) {
+        this.enableFullDocPreimage = enableFullDocPreimage;
+        return this;
+    }
+
+    /**
+     * Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}.
+     */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
@@ -239,6 +266,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
                 splitSizeMB,
-                closeIdleReaders);
+                closeIdleReaders,
+                enableFullDocPreimage);
     }
 }
