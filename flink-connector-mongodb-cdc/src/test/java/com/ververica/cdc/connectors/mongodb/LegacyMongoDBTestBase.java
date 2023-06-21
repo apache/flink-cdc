@@ -23,7 +23,6 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
-import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.slf4j.Logger;
@@ -34,8 +33,8 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_PASSWORD;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_USER;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.MONGO_SUPER_PASSWORD;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.MONGO_SUPER_USER;
 
 /**
  * Basic class for testing MongoDB source, this contains a MongoDB container which enables change
@@ -47,8 +46,8 @@ public class LegacyMongoDBTestBase extends AbstractTestBase {
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
-    protected static final MongoDBContainer MONGODB_CONTAINER =
-            new MongoDBContainer(NETWORK).withLogConsumer(new Slf4jLogConsumer(LOG));
+    protected static final LegacyMongoDBContainer MONGODB_CONTAINER =
+            new LegacyMongoDBContainer(NETWORK).withLogConsumer(new Slf4jLogConsumer(LOG));
 
     protected static MongoClient mongodbClient;
 

@@ -34,11 +34,11 @@ public class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testMongoDBExampleSource() throws Exception {
-        String database = ROUTER.executeCommandFileInSeparateDatabase("inventory");
+        String database = CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         MongoDBSource<String> mongoSource =
                 MongoDBSource.<String>builder()
-                        .hosts(ROUTER.getHostAndPort())
+                        .hosts(CONTAINER.getHostAndPort())
                         .databaseList(database)
                         .collectionList(database + ".products")
                         .username(FLINK_USER)
