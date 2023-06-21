@@ -19,32 +19,27 @@ package com.ververica.cdc.connectors.mongodb.source;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
-import org.apache.flink.util.TestLogger;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
 import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_PASSWORD;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_USER;
+/** MongoDBSourceTestBase for MongoDB >= 5.0.3. */
+public class MongoDBSourceTestBase {
 
-/** Basic class for testing {@link MongoDBSource}. */
-public abstract class MongoDBSourceTestBase extends TestLogger {
+    protected static MongoClient mongodbClient;
 
-    protected static final Logger LOG = LoggerFactory.getLogger(MongoDBSourceTestBase.class);
     protected static final int DEFAULT_PARALLELISM = 4;
 
     @Rule
@@ -57,61 +52,26 @@ public abstract class MongoDBSourceTestBase extends TestLogger {
                             .withHaLeadershipControl()
                             .build());
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
-
-    @ClassRule
-    public static final MongoDBContainer CONFIG =
-            new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.CONFIG)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @ClassRule
-    public static final MongoDBContainer SHARD =
-            new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.SHARD)
-                    .dependsOn(CONFIG)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @ClassRule
-    public static final MongoDBContainer ROUTER =
-            new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.ROUTER)
-                    .dependsOn(SHARD)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    protected static MongoClient mongodbClient;
-
     @BeforeClass
     public static void startContainers() {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(CONFIG)).join();
-        Startables.deepStart(Stream.of(SHARD)).join();
-        Startables.deepStart(Stream.of(ROUTER)).join();
-        initialClient();
-        LOG.info("Containers are started.");
-    }
+        Startables.deepStart(Stream.of(CONTAINER)).join();
 
-    @AfterClass
-    public static void closeContainers() {
-        if (mongodbClient != null) {
-            mongodbClient.close();
-        }
-        if (ROUTER != null) {
-            ROUTER.close();
-        }
-        if (SHARD != null) {
-            SHARD.close();
-        }
-        if (CONFIG != null) {
-            CONFIG.close();
-        }
-    }
-
-    private static void initialClient() {
         MongoClientSettings settings =
                 MongoClientSettings.builder()
                         .applyConnectionString(
-                                new ConnectionString(
-                                        ROUTER.getConnectionString(
-                                                MONGO_SUPER_USER, MONGO_SUPER_PASSWORD)))
+                                new ConnectionString(CONTAINER.getConnectionString()))
                         .build();
         mongodbClient = MongoClients.create(settings);
+
+        LOG.info("Containers are started.");
     }
+
+    private static final Logger LOG = LoggerFactory.getLogger(MongoDBSourceTestBase.class);
+
+    @ClassRule
+    public static final MongoDBContainer CONTAINER =
+            new MongoDBContainer("mongo:6.0.6")
+                    .withSharding()
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 }

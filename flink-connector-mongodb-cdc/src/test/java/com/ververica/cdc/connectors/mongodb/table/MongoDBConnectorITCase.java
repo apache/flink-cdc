@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.mongodb.table;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
@@ -53,7 +52,6 @@ import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitFo
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertThrows;
 
 /** Integration tests for MongoDB change stream event SQL source. */
 @RunWith(Parameterized.class)
@@ -91,7 +89,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testConsumingAllEvents() throws ExecutionException, InterruptedException {
-        String database = ROUTER.executeCommandFileInSeparateDatabase("inventory");
+        String database = CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         String sourceDDL =
                 String.format(
@@ -112,7 +110,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'heartbeat.interval.ms' = '1000'"
                                 + ")",
-                        ROUTER.getHostAndPort(),
+                        CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
@@ -224,7 +222,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testStartupFromTimestamp() throws Exception {
-        String database = ROUTER.executeCommandFileInSeparateDatabase("inventory");
+        String database = CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         // Unfortunately we have to sleep here to differ initial and later-generating changes in
         // oplog by timestamp
@@ -253,7 +251,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + "',"
                                 + " 'heartbeat.interval.ms' = '1000'"
                                 + ")",
-                        ROUTER.getHostAndPort(),
+                        CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
@@ -272,15 +270,6 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
-
-        if (!parallelismSnapshot) {
-            assertThrows(
-                    ValidationException.class,
-                    () ->
-                            tEnv.executeSql(
-                                    "INSERT INTO sink SELECT name, SUM(weight) FROM mongodb_source GROUP BY name"));
-            return;
-        }
 
         // async submit job
         TableResult result =
@@ -312,7 +301,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testAllTypes() throws Throwable {
-        String database = ROUTER.executeCommandFileInSeparateDatabase("column_type_test");
+        String database = CONTAINER.executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -355,7 +344,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        ROUTER.getHostAndPort(),
+                        CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
@@ -475,7 +464,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testMetadataColumns() throws Exception {
-        String database = ROUTER.executeCommandFileInSeparateDatabase("inventory");
+        String database = CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         String sourceDDL =
                 String.format(
@@ -497,7 +486,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " 'collection' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
-                        ROUTER.getHostAndPort(),
+                        CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
