@@ -35,6 +35,9 @@ import java.util.Properties;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.COLLECTION_INCLUDE_LIST;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.DATABASE_INCLUDE_LIST;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.STARTUP_MODE_COPY_EXISTING_MAX_THREADS_CONFIG;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.STARTUP_MODE_COPY_EXISTING_PIPELINE_CONFIG;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.STARTUP_MODE_COPY_EXISTING_QUEUE_SIZE_CONFIG;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.HEARTBEAT_TOPIC_NAME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
@@ -340,18 +343,18 @@ public class MongoDBSource {
 
             if (copyExistingMaxThreads != null) {
                 props.setProperty(
-                        "startup.mode.copy.existing.max.threads",
+                        STARTUP_MODE_COPY_EXISTING_MAX_THREADS_CONFIG,
                         String.valueOf(copyExistingMaxThreads));
             }
 
             if (copyExistingQueueSize != null) {
                 props.setProperty(
-                        "startup.mode.copy.existing.queue.size",
+                        STARTUP_MODE_COPY_EXISTING_QUEUE_SIZE_CONFIG,
                         String.valueOf(copyExistingQueueSize));
             }
 
             if (copyExistingPipeline != null) {
-                props.setProperty("startup.mode.copy.existing.pipeline", copyExistingPipeline);
+                props.setProperty(STARTUP_MODE_COPY_EXISTING_PIPELINE_CONFIG, copyExistingPipeline);
             }
 
             if (heartbeatIntervalMillis != null) {

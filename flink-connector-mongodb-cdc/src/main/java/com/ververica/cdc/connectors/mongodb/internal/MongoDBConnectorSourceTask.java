@@ -70,6 +70,13 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     public static final String COLLECTION_INCLUDE_LIST = "collection.include.list";
 
+    public static final String STARTUP_MODE_COPY_EXISTING_MAX_THREADS_CONFIG =
+            "startup.mode.copy.existing.max.threads";
+    public static final String STARTUP_MODE_COPY_EXISTING_QUEUE_SIZE_CONFIG =
+            "startup.mode.copy.existing.queue.size";
+    public static final String STARTUP_MODE_COPY_EXISTING_PIPELINE_CONFIG =
+            "startup.mode.copy.existing.pipeline";
+
     private final MongoSourceTask target;
 
     private final Field startedTaskField;
