@@ -108,7 +108,7 @@ public class UniqueDatabase {
 
     private void createDatabase(String databaseName) throws SQLException {
         try (Connection connection =
-                PostgresTestBase.getJdbcConnection(PostgresTestBase.DEFAULT_DB)) {
+                PostgresTestBase.getJdbcConnection(container, PostgresTestBase.DEFAULT_DB)) {
             try (Statement statement = connection.createStatement()) {
                 statement.execute("CREATE DATABASE " + databaseName);
             }
@@ -123,7 +123,8 @@ public class UniqueDatabase {
 
         try {
             createDatabase(databaseName);
-            try (Connection connection = PostgresTestBase.getJdbcConnection(databaseName);
+            try (Connection connection =
+                            PostgresTestBase.getJdbcConnection(container, databaseName);
                     Statement statement = connection.createStatement()) {
                 final List<String> statements =
                         Arrays.stream(
