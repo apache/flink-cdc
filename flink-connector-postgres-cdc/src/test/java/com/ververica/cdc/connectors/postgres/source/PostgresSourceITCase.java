@@ -46,7 +46,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -86,11 +85,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
-                    POSTGERS_CONTAINER,
+                    POSTGRES_CONTAINER,
                     DB_NAME_PREFIX,
                     SCHEMA_NAME,
-                    POSTGERS_CONTAINER.getUsername(),
-                    POSTGERS_CONTAINER.getPassword());
+                    POSTGRES_CONTAINER.getUsername(),
+                    POSTGRES_CONTAINER.getPassword());
 
     /** First part stream events, which is made by {@link #makeFirstPartStreamEvents}. */
     private final List<String> firstPartStreamEvents =
@@ -365,15 +364,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
             expectedStreamData.addAll(firstPartStreamEvents);
             expectedStreamData.addAll(secondPartStreamEvents);
         }
+        // wait for the stream reading
+        Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
         assertTrue(!hasNextData(iterator));
-    }
-
-    private String getSlotName() {
-        final Random random = new Random();
-        int id = random.nextInt(10000);
-        return "flink_" + id;
     }
 
     private void sleepMs(long millis) {

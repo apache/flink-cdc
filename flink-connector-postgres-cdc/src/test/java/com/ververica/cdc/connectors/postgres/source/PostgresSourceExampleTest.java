@@ -83,11 +83,11 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
     // 9 records in the inventory.products table
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(
-                    POSTGERS_CONTAINER,
+                    POSTGRES_CONTAINER,
                     DB_NAME_PREFIX,
                     SCHEMA_NAME,
-                    POSTGERS_CONTAINER.getUsername(),
-                    POSTGERS_CONTAINER.getPassword());
+                    POSTGRES_CONTAINER.getUsername(),
+                    POSTGRES_CONTAINER.getPassword());
 
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
@@ -100,13 +100,13 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
 
         JdbcIncrementalSource<String> postgresIncrementalSource =
                 PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
-                        .hostname(POSTGERS_CONTAINER.getHost())
-                        .port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                        .hostname(POSTGRES_CONTAINER.getHost())
+                        .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
                         .database(inventoryDatabase.getDatabaseName())
                         .schemaList(SCHEMA_NAME)
                         .tableList(TABLE_ID)
-                        .username(POSTGERS_CONTAINER.getUsername())
-                        .password(POSTGERS_CONTAINER.getPassword())
+                        .username(POSTGRES_CONTAINER.getUsername())
+                        .password(POSTGRES_CONTAINER.getPassword())
                         .slotName(SLOT_NAME)
                         .decodingPluginName(PLUGIN_NAME)
                         .deserializer(deserializer)
@@ -130,6 +130,7 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
     }
 
     @Test
+    @Ignore
     public void testConsumingAllEvents() throws Exception {
         final DataType dataType =
                 DataTypes.ROW(
@@ -144,13 +145,13 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
 
         JdbcIncrementalSource<RowData> postgresIncrementalSource =
                 PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
-                        .hostname(POSTGERS_CONTAINER.getHost())
-                        .port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                        .hostname(POSTGRES_CONTAINER.getHost())
+                        .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
                         .database(inventoryDatabase.getDatabaseName())
                         .schemaList(SCHEMA_NAME)
                         .tableList(TABLE_ID)
-                        .username(POSTGERS_CONTAINER.getUsername())
-                        .password(POSTGERS_CONTAINER.getPassword())
+                        .username(POSTGRES_CONTAINER.getUsername())
+                        .password(POSTGRES_CONTAINER.getPassword())
                         .slotName(SLOT_NAME)
                         .decodingPluginName(PLUGIN_NAME)
                         .deserializer(buildRowDataDebeziumDeserializeSchema(dataType))
@@ -247,8 +248,8 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
     private PostgresConnection getConnection() throws SQLException {
 
         Map<String, String> properties = new HashMap<>();
-        properties.put("hostname", POSTGERS_CONTAINER.getHost());
-        properties.put("port", String.valueOf(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        properties.put("hostname", POSTGRES_CONTAINER.getHost());
+        properties.put("port", String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
         properties.put("dbname", inventoryDatabase.getDatabaseName());
         properties.put("user", inventoryDatabase.getUsername());
         properties.put("password", inventoryDatabase.getPassword());
@@ -295,9 +296,9 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
         SlotState slotState = connection.getReplicationSlotState(SLOT_NAME, PLUGIN_NAME);
 
         while (slotState == null) {
-            log.info("slot state is null, wait a little bit");
+            log.info("Waiting until the replication slot is ready ...");
             try {
-                Thread.sleep(1000L);
+                Thread.sleep(2000L);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

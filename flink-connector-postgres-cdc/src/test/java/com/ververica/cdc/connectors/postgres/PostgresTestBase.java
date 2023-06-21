@@ -39,6 +39,7 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -58,9 +59,9 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     // use newer version of postgresql image to support pgoutput plugin
     // when testing postgres 13, only 13-alpine supports both amd64 and arm64
     protected static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:13").asCompatibleSubstituteFor("postgres");
+            DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
 
-    public static final PostgreSQLContainer<?> POSTGERS_CONTAINER =
+    public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
                     .withDatabaseName(DEFAULT_DB)
                     .withUsername("postgres")
@@ -72,41 +73,43 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                             // default
                             "fsync=off",
                             "-c",
-                            // to ensure that the slot becomes inactive during the failover
-                            "wal_sender_timeout=1000",
-                            "-c",
                             "max_replication_slots=20");
 
     @BeforeClass
     public static void startContainers() {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(POSTGERS_CONTAINER)).join();
+        Startables.deepStart(Stream.of(POSTGRES_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    protected Connection getJdbcConnection() throws SQLException {
+    protected Connection getJdbcConnection(PostgreSQLContainer container) throws SQLException {
         return DriverManager.getConnection(
-                POSTGERS_CONTAINER.getJdbcUrl(),
-                POSTGERS_CONTAINER.getUsername(),
-                POSTGERS_CONTAINER.getPassword());
+                container.getJdbcUrl(), container.getUsername(), container.getPassword());
     }
 
-    public static Connection getJdbcConnection(String databaseName) throws SQLException {
+    public static Connection getJdbcConnection(PostgreSQLContainer container, String databaseName)
+            throws SQLException {
         return DriverManager.getConnection(
-                POSTGERS_CONTAINER.withDatabaseName(databaseName).getJdbcUrl(),
-                POSTGERS_CONTAINER.getUsername(),
-                POSTGERS_CONTAINER.getPassword());
+                container.withDatabaseName(databaseName).getJdbcUrl(),
+                container.getUsername(),
+                container.getPassword());
+    }
+
+    public static String getSlotName() {
+        final Random random = new Random();
+        int id = random.nextInt(10000);
+        return "flink_" + id;
     }
 
     /**
      * Executes a JDBC statement using the default jdbc config without autocommitting the
      * connection.
      */
-    protected void initializePostgresTable(String sqlFile) {
+    protected void initializePostgresTable(PostgreSQLContainer container, String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = PostgresTestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnection(container);
                 Statement statement = connection.createStatement()) {
             final List<String> statements =
                     Arrays.stream(
