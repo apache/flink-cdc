@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,6 +81,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     public void testOracleCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
+                        "SET 'execution.checkpointing.interval' = '3s';",
                         "CREATE TABLE products_source (",
                         " ID INT NOT NULL,",
                         " NAME STRING,",
@@ -168,11 +169,12 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "108,jacket,water resistent black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
                         "111,jacket,new water resistent white wind breaker,0.5");
+        // Oracle cdc's backfill task will cost much time, increase the timeout here
         proxy.checkResultWithTimeout(
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                150000L);
+                300000L);
     }
 
     private Connection getOracleJdbcConnection() throws SQLException {

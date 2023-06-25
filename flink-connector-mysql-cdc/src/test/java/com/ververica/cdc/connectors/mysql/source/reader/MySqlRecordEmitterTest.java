@@ -1,7 +1,7 @@
 package com.ververica.cdc.connectors.mysql.source.reader;
 
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,13 +27,21 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import io.debezium.config.Configuration;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.heartbeat.Heartbeat;
+import io.debezium.heartbeat.HeartbeatFactory;
+import io.debezium.jdbc.JdbcConfiguration;
+import io.debezium.relational.TableId;
+import io.debezium.schema.TopicSelector;
+import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
-import java.time.Duration;
 import java.util.Collections;
 
+import static io.debezium.config.CommonConnectorConfig.TRANSACTION_TOPIC;
+import static io.debezium.connector.mysql.MySqlConnectorConfig.SERVER_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -42,7 +50,21 @@ public class MySqlRecordEmitterTest {
 
     @Test
     public void testHeartbeatEventHandling() throws Exception {
-        Heartbeat heartbeat = Heartbeat.create(Duration.ofMillis(100), "fake-topic", "fake-key");
+        Configuration dezConf =
+                JdbcConfiguration.create()
+                        .with(Heartbeat.HEARTBEAT_INTERVAL, 100)
+                        .with(TRANSACTION_TOPIC, "fake-topic")
+                        .with(SERVER_NAME, "mysql_binlog_source")
+                        .build();
+
+        MySqlConnectorConfig mySqlConfig = new MySqlConnectorConfig(dezConf);
+        HeartbeatFactory<TableId> heartbeatFactory =
+                new HeartbeatFactory<>(
+                        new MySqlConnectorConfig(dezConf),
+                        TopicSelector.defaultSelector(
+                                mySqlConfig, (id, prefix, delimiter) -> "fake-topic"),
+                        SchemaNameAdjuster.create());
+        Heartbeat heartbeat = heartbeatFactory.createHeartbeat();
         BinlogOffset fakeOffset = BinlogOffset.ofBinlogFilePosition("fake-file", 15213L);
         MySqlRecordEmitter<Void> recordEmitter = createRecordEmitter();
         MySqlBinlogSplitState splitState = createBinlogSplitState();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
 import io.debezium.connector.sqlserver.SqlServerOffsetContext;
+import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
@@ -66,7 +67,9 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         RedoLogSplitChangeEventSourceContext changeEventSourceContext =
                 new RedoLogSplitChangeEventSourceContext();
         redoLogSplitReadTask.execute(
-                changeEventSourceContext, sourceFetchContext.getOffsetContext());
+                changeEventSourceContext,
+                sourceFetchContext.getPartition(),
+                sourceFetchContext.getOffsetContext());
     }
 
     @Override
@@ -79,6 +82,11 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         return split;
     }
 
+    @Override
+    public void close() {
+        taskRunning = false;
+    }
+
     /**
      * A wrapped task to read all binlog for table and also supports read bounded (from lowWatermark
      * to highWatermark) binlog.
@@ -87,7 +95,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private static final Logger LOG = LoggerFactory.getLogger(LsnSplitReadTask.class);
         private final StreamSplit lsnSplit;
-        private final JdbcSourceEventDispatcher dispatcher;
+        private final JdbcSourceEventDispatcher<SqlServerPartition> dispatcher;
         private final ErrorHandler errorHandler;
         private ChangeEventSourceContext context;
 
@@ -95,7 +103,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                 SqlServerConnectorConfig connectorConfig,
                 SqlServerConnection connection,
                 SqlServerConnection metadataConnection,
-                JdbcSourceEventDispatcher dispatcher,
+                JdbcSourceEventDispatcher<SqlServerPartition> dispatcher,
                 ErrorHandler errorHandler,
                 SqlServerDatabaseSchema schema,
                 StreamSplit lsnSplit) {
@@ -113,7 +121,8 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public void afterHandleLsn(SqlServerOffsetContext offsetContext) {
+        public void afterHandleLsn(
+                SqlServerPartition partition, SqlServerOffsetContext offsetContext) {
             // check do we need to stop for fetch binlog for snapshot split.
             if (isBoundedRead()) {
                 final LsnOffset currentRedoLogOffset = getLsnPosition(offsetContext.getOffset());
@@ -122,7 +131,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                     // send binlog end event
                     try {
                         dispatcher.dispatchWatermarkEvent(
-                                offsetContext.getPartition(),
+                                partition.getSourcePartition(),
                                 lsnSplit,
                                 currentRedoLogOffset,
                                 WatermarkKind.END);
@@ -143,10 +152,13 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public void execute(ChangeEventSourceContext context, SqlServerOffsetContext offsetContext)
+        public void execute(
+                ChangeEventSourceContext context,
+                SqlServerPartition partition,
+                SqlServerOffsetContext offsetContext)
                 throws InterruptedException {
             this.context = context;
-            super.execute(context, offsetContext);
+            super.execute(context, partition, offsetContext);
         }
     }
 

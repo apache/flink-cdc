@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,11 @@ public class BinlogOffsetFactory extends OffsetFactory {
     @Override
     public Offset newOffset(Long position) {
         throw new FlinkRuntimeException("not supported create new Offset by Long position.");
+    }
+
+    @Override
+    public Offset createTimestampOffset(long timestampMillis) {
+        return new BinlogOffset(timestampMillis / 1000);
     }
 
     @Override

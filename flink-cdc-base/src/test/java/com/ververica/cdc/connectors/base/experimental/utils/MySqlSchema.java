@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -76,9 +77,15 @@ public class MySqlSchema {
                             final String ddl = rs.getString(2);
                             final MySqlOffsetContext offsetContext =
                                     MySqlOffsetContext.initial(connectorConfig);
+                            final MySqlPartition partition =
+                                    new MySqlPartition(connectorConfig.getLogicalName());
                             List<SchemaChangeEvent> schemaChangeEvents =
                                     databaseSchema.parseSnapshotDdl(
-                                            ddl, tableId.catalog(), offsetContext, Instant.now());
+                                            partition,
+                                            ddl,
+                                            tableId.catalog(),
+                                            offsetContext,
+                                            Instant.now());
                             for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
                                 for (TableChanges.TableChange tableChange :
                                         schemaChangeEvent.getTableChanges()) {

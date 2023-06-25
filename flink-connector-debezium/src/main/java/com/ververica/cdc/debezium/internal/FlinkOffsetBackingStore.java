@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
     protected Map<ByteBuffer, ByteBuffer> data = new HashMap<>();
     protected ExecutorService executor;
 
+    @SuppressWarnings("unchecked")
     @Override
     public void configure(WorkerConfig config) {
         // eagerly initialize the executor, because OffsetStorageWriter will use it later
@@ -100,7 +101,9 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                         keyConverter,
                         valueConverter);
 
-        offsetWriter.offset(debeziumOffset.sourcePartition, debeziumOffset.sourceOffset);
+        offsetWriter.offset(
+                (Map<String, Object>) debeziumOffset.sourcePartition,
+                (Map<String, Object>) debeziumOffset.sourceOffset);
 
         // flush immediately
         if (!offsetWriter.beginFlush()) {

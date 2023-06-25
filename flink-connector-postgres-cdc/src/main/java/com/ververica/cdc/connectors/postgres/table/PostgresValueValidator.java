@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ public final class PostgresValueValidator
             "The \"before\" field of UPDATE/DELETE message is null, "
                     + "please check the Postgres table has been set REPLICA IDENTITY to FULL level. "
                     + "You can update the setting by running the command in Postgres 'ALTER TABLE %s REPLICA IDENTITY FULL'. "
-                    + "Please see more in Debezium documentation: https://debezium.io/documentation/reference/1.5/connectors/postgresql.html#postgresql-replica-identity";
+                    + "Please see more in Debezium documentation: https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-replica-identity";
 
     private final String schemaTable;
 

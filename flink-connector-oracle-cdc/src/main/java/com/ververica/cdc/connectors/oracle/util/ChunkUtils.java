@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@
 package com.ververica.cdc.connectors.oracle.util;
 
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.connectors.oracle.source.utils.OracleTypeUtils;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import oracle.sql.ROWID;
@@ -29,10 +31,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.table.api.DataTypes.FIELD;
+import static org.apache.flink.table.api.DataTypes.ROW;
+
 /** Utilities to split chunks of table. */
 public class ChunkUtils {
 
     private ChunkUtils() {}
+
+    public static RowType getSplitType(Column splitColumn) {
+        return (RowType)
+                ROW(FIELD(splitColumn.name(), OracleTypeUtils.fromDbzColumn(splitColumn)))
+                        .getLogicalType();
+    }
 
     public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();

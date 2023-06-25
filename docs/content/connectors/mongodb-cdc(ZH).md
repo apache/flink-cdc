@@ -201,30 +201,32 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>电流和分离 <a href="https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options">连接选项</a> of MongoDB. eg. <br>
+      <td><a href="https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options">MongoDB连接选项</a>。 例如: <br>
           <code>replicaSet=test&connectTimeoutMS=300000</code>
       </td>
     </tr>
     <tr>
-      <td>copy.existing</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>是否从源集合复制现有数据。</td>
+        <td>scan.startup.mode</td>
+        <td>optional</td>
+        <td style="word-wrap: break-word;">initial</td>
+        <td>String</td>
+        <td> MongoDB CDC 消费者可选的启动模式，
+         合法的模式为 "initial"，"latest-offset" 和 "timestamp"。
+           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
-      <td>copy.existing.queue.size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">10240</td>
-      <td>Integer</td>
-      <td>复制数据时要使用的队列的最大大小。</td>
+        <td>scan.startup.timestamp-millis</td>
+        <td>optional</td>
+        <td style="word-wrap: break-word;">(none)</td>
+        <td>Long</td>
+        <td>起始毫秒数, 仅适用于 <code>'timestamp'</code> 启动模式.</td>
     </tr>
     <tr>
       <td>batch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
       <td>Integer</td>
-      <td>光标批次大小。</td>
+      <td>Cursor 批次大小。</td>
     </tr>
     <tr>
       <td>poll.max.batch.size</td>
@@ -245,7 +247,7 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>optional</td>
       <td style="word-wrap: break-word;">0</td>
       <td>Integer</td>
-      <td>发送检测信号消息之间的时间长度（以毫秒为单位）。使用 0 禁用。</td>
+      <td>心跳间隔（毫秒）。使用 0 禁用。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.enabled</td>
@@ -337,20 +339,38 @@ CREATE TABLE products (
 
 MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后在处理**甚至失败时继续读取带有**的更改流事件。
 
-### Snapshot When Startup Or Not
+### 启动模式<a name="启动模式" id="002" ></a>
 
-配置选项 `copy.existing` 指定在 MongoDB CDC 消费者启动时是否执行快照。 <br>默认是 `true`.
+配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
 
-### 快照数据筛选器
+- `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 oplog。
+- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 oplog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
+- `timestamp`：跳过快照阶段，从指定的时间戳开始读取 oplog 事件。
 
-配置选项 `copy.existing.pipeline` 描述复制现有数据时的筛选器。<br>
-这可以只过滤所需的数据，并改进复制管理器对索引的使用。
-
-在下面的示例中，`$match` 聚合运算符确保只复制关闭字段设置为 false 的文档。
-
+例如使用 DataStream API:
+```java
+MongoDBSource.builder()
+    .startupOptions(StartupOptions.latest()) // Start from latest offset
+    .startupOptions(StartupOptions.timestamp(1667232000000L) // Start from timestamp
+    .build()
 ```
-'copy.existing.pipeline' = '[ { "$match": { "closed": "false" } } ]'
+
+and with SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.startup.mode' = 'latest-offset', -- 从最晚位点启动
+    ...
+    'scan.incremental.snapshot.enabled' = 'true', -- 指定时间戳启动，需要开启增量快照读
+    'scan.startup.mode' = 'timestamp', -- 指定时间戳启动模式
+    'scan.startup.timestamp-millis' = '1667232000000' -- 启动毫秒时间
+    ...
+)
 ```
+
+**Notes:**
+- 'timestamp' 指定时间戳启动模式，需要开启增量快照读。
 
 ### 更改流
 

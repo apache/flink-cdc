@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,12 +29,14 @@ import com.ververica.cdc.connectors.base.experimental.fetch.MySqlSourceFetchTask
 import com.ververica.cdc.connectors.base.experimental.fetch.MySqlStreamFetchTask;
 import com.ververica.cdc.connectors.base.experimental.utils.MySqlSchema;
 import com.ververica.cdc.connectors.base.experimental.utils.TableDiscoveryUtils;
+import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -54,6 +56,8 @@ import static com.ververica.cdc.connectors.base.experimental.utils.MySqlConnecti
 @Experimental
 public class MySqlDialect implements JdbcDataSourceDialect {
 
+    private static final String QUOTED_CHARACTER = "`";
+
     private static final long serialVersionUID = 1L;
     private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
@@ -67,6 +71,21 @@ public class MySqlDialect implements JdbcDataSourceDialect {
     @Override
     public String getName() {
         return "MySQL";
+    }
+
+    public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
+        JdbcConnection jdbc =
+                new JdbcConnection(
+                        JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
+                        new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()),
+                        QUOTED_CHARACTER,
+                        QUOTED_CHARACTER);
+        try {
+            jdbc.connect();
+        } catch (Exception e) {
+            throw new FlinkRuntimeException(e);
+        }
+        return jdbc;
     }
 
     @Override

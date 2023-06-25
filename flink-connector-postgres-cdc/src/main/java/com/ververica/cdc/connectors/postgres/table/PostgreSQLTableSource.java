@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,18 +22,25 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
+import com.ververica.cdc.connectors.postgres.source.PostgresSourceBuilder;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import javax.annotation.Nullable;
+
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +69,18 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final String slotName;
     private final DebeziumChangelogMode changelogMode;
     private final Properties dbzProperties;
+    private final boolean enableParallelRead;
+    private final int splitSize;
+    private final int splitMetaGroupSize;
+    private final int fetchSize;
+    private final Duration connectTimeout;
+    private final int connectionPoolSize;
+    private final int connectMaxRetries;
+    private final double distributionFactorUpper;
+    private final double distributionFactorLower;
+    private final Duration heartbeatInterval;
+    private final StartupOptions startupOptions;
+    private final String chunkKeyColumn;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -85,7 +104,19 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             String pluginName,
             String slotName,
             DebeziumChangelogMode changelogMode,
-            Properties dbzProperties) {
+            Properties dbzProperties,
+            boolean enableParallelRead,
+            int splitSize,
+            int splitMetaGroupSize,
+            int fetchSize,
+            Duration connectTimeout,
+            int connectMaxRetries,
+            int connectionPoolSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            Duration heartbeatInterval,
+            StartupOptions startupOptions,
+            @Nullable String chunkKeyColumn) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -98,6 +129,19 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.slotName = slotName;
         this.changelogMode = changelogMode;
         this.dbzProperties = dbzProperties;
+        this.enableParallelRead = enableParallelRead;
+        this.splitSize = splitSize;
+        this.splitMetaGroupSize = splitMetaGroupSize;
+        this.fetchSize = fetchSize;
+        this.connectTimeout = connectTimeout;
+        this.connectMaxRetries = connectMaxRetries;
+        this.connectionPoolSize = connectionPoolSize;
+        this.distributionFactorUpper = distributionFactorUpper;
+        this.distributionFactorLower = distributionFactorLower;
+        this.heartbeatInterval = heartbeatInterval;
+        this.startupOptions = startupOptions;
+        this.chunkKeyColumn = chunkKeyColumn;
+        // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
     }
@@ -132,21 +176,51 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         .setValueValidator(new PostgresValueValidator(schemaName, tableName))
                         .setChangelogMode(changelogMode)
                         .build();
-        DebeziumSourceFunction<RowData> sourceFunction =
-                PostgreSQLSource.<RowData>builder()
-                        .hostname(hostname)
-                        .port(port)
-                        .database(database)
-                        .schemaList(schemaName)
-                        .tableList(schemaName + "." + tableName)
-                        .username(username)
-                        .password(password)
-                        .decodingPluginName(pluginName)
-                        .slotName(slotName)
-                        .debeziumProperties(dbzProperties)
-                        .deserializer(deserializer)
-                        .build();
-        return SourceFunctionProvider.of(sourceFunction, false);
+
+        if (enableParallelRead) {
+            JdbcIncrementalSource<RowData> parallelSource =
+                    PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .database(database)
+                            .schemaList(schemaName)
+                            .tableList(schemaName + "." + tableName)
+                            .username(username)
+                            .password(password)
+                            .decodingPluginName(pluginName)
+                            .slotName(slotName)
+                            .debeziumProperties(dbzProperties)
+                            .deserializer(deserializer)
+                            .splitSize(splitSize)
+                            .splitMetaGroupSize(splitMetaGroupSize)
+                            .distributionFactorUpper(distributionFactorUpper)
+                            .distributionFactorLower(distributionFactorLower)
+                            .fetchSize(fetchSize)
+                            .connectTimeout(connectTimeout)
+                            .connectMaxRetries(connectMaxRetries)
+                            .connectionPoolSize(connectionPoolSize)
+                            .startupOptions(startupOptions)
+                            .chunkKeyColumn(chunkKeyColumn)
+                            .heartbeatInterval(heartbeatInterval)
+                            .build();
+            return SourceProvider.of(parallelSource);
+        } else {
+            DebeziumSourceFunction<RowData> sourceFunction =
+                    PostgreSQLSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .database(database)
+                            .schemaList(schemaName)
+                            .tableList(schemaName + "." + tableName)
+                            .username(username)
+                            .password(password)
+                            .decodingPluginName(pluginName)
+                            .slotName(slotName)
+                            .debeziumProperties(dbzProperties)
+                            .deserializer(deserializer)
+                            .build();
+            return SourceFunctionProvider.of(sourceFunction, false);
+        }
     }
 
     private MetadataConverter[] getMetadataConverters() {
@@ -180,7 +254,19 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         pluginName,
                         slotName,
                         changelogMode,
-                        dbzProperties);
+                        dbzProperties,
+                        enableParallelRead,
+                        splitSize,
+                        splitMetaGroupSize,
+                        fetchSize,
+                        connectTimeout,
+                        connectMaxRetries,
+                        connectionPoolSize,
+                        distributionFactorUpper,
+                        distributionFactorLower,
+                        heartbeatInterval,
+                        startupOptions,
+                        chunkKeyColumn);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -208,7 +294,19 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(dbzProperties, that.dbzProperties)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
-                && Objects.equals(changelogMode, that.changelogMode);
+                && Objects.equals(changelogMode, that.changelogMode)
+                && Objects.equals(enableParallelRead, that.enableParallelRead)
+                && Objects.equals(splitSize, that.splitSize)
+                && Objects.equals(splitMetaGroupSize, that.splitMetaGroupSize)
+                && Objects.equals(fetchSize, that.fetchSize)
+                && Objects.equals(connectTimeout, that.connectTimeout)
+                && Objects.equals(connectMaxRetries, that.connectMaxRetries)
+                && Objects.equals(connectionPoolSize, that.connectionPoolSize)
+                && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
+                && Objects.equals(distributionFactorLower, that.distributionFactorLower)
+                && Objects.equals(heartbeatInterval, that.heartbeatInterval)
+                && Objects.equals(startupOptions, that.startupOptions)
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
     }
 
     @Override
@@ -227,7 +325,19 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 dbzProperties,
                 producedDataType,
                 metadataKeys,
-                changelogMode);
+                changelogMode,
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                heartbeatInterval,
+                startupOptions,
+                chunkKeyColumn);
     }
 
     @Override

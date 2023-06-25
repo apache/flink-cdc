@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,6 +106,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         this.reachEnd = new AtomicBoolean(false);
     }
 
+    @Override
     public void submitSplit(MySqlSplit mySqlSplit) {
         this.currentSnapshotSplit = mySqlSplit.asSnapshotSplit();
         statefulTaskContext.configure(currentSnapshotSplit);
@@ -131,9 +132,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         // execute snapshot read task
                         final SnapshotSplitChangeEventSourceContextImpl sourceContext =
                                 new SnapshotSplitChangeEventSourceContextImpl();
-                        SnapshotResult snapshotResult =
+                        SnapshotResult<MySqlOffsetContext> snapshotResult =
                                 splitSnapshotReadTask.execute(
-                                        sourceContext, statefulTaskContext.getOffsetContext());
+                                        sourceContext,
+                                        statefulTaskContext.getMySqlPartition(),
+                                        statefulTaskContext.getOffsetContext());
 
                         final MySqlBinlogSplit backfillBinlogSplit =
                                 createBackfillBinlogSplit(sourceContext);
@@ -162,6 +165,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
                             backfillBinlogReadTask.execute(
                                     new SnapshotBinlogSplitChangeEventSourceContextImpl(),
+                                    statefulTaskContext.getMySqlPartition(),
                                     mySqlOffsetContext);
                         } else {
                             setReadException(
@@ -219,7 +223,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             throws InterruptedException {
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
-                        statefulTaskContext.getOffsetContext().getPartition(),
+                        statefulTaskContext.getOffsetContext().getOffset(),
                         statefulTaskContext.getTopicSelector().getPrimaryTopic(),
                         statefulTaskContext.getDispatcher().getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
@@ -355,6 +359,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
+            if (statefulTaskContext.getDatabaseSchema() != null) {
+                statefulTaskContext.getDatabaseSchema().close();
+            }
             if (executorService != null) {
                 executorService.shutdown();
                 if (!executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
@@ -377,7 +384,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
      * {@link ChangeEventSource.ChangeEventSourceContext} implementation that keeps low/high
      * watermark for each {@link MySqlSnapshotSplit}.
      */
-    public class SnapshotSplitChangeEventSourceContextImpl
+    public static class SnapshotSplitChangeEventSourceContextImpl
             implements ChangeEventSource.ChangeEventSourceContext {
 
         private BinlogOffset lowWatermark;

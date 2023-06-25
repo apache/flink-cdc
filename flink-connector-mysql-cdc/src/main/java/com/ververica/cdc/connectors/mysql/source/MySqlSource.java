@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,6 +96,8 @@ public class MySqlSource<T>
 
     private static final long serialVersionUID = 1L;
 
+    private static final String ENUMERATOR_SERVER_NAME = "mysql_source_split_enumerator";
+
     private final MySqlSourceConfigFactory configFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
 
@@ -164,7 +166,7 @@ public class MySqlSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> createEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext) {
-        MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+        MySqlSourceConfig sourceConfig = configFactory.createConfig(0, ENUMERATOR_SERVER_NAME);
 
         final MySqlValidator validator = new MySqlValidator(sourceConfig);
         validator.validate();
@@ -193,7 +195,8 @@ public class MySqlSource<T>
     @Override
     public SplitEnumerator<MySqlSplit, PendingSplitsState> restoreEnumerator(
             SplitEnumeratorContext<MySqlSplit> enumContext, PendingSplitsState checkpoint) {
-        MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+
+        MySqlSourceConfig sourceConfig = configFactory.createConfig(0, ENUMERATOR_SERVER_NAME);
 
         final MySqlSplitAssigner splitAssigner;
         if (checkpoint instanceof HybridPendingSplitsState) {

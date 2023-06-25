@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -125,6 +125,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     try {
                         binlogSplitReadTask.execute(
                                 new BinlogSplitChangeEventSourceContextImpl(),
+                                statefulTaskContext.getMySqlPartition(),
                                 statefulTaskContext.getOffsetContext());
                     } catch (Exception e) {
                         currentTaskRunning = false;
@@ -201,6 +202,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                             READER_CLOSE_TIMEOUT);
                 }
             }
+            statefulTaskContext.getDatabaseSchema().close();
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
         }

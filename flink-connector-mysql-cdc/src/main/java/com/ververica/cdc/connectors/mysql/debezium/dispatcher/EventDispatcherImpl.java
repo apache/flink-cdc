@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,11 @@ package com.ververica.cdc.connectors.mysql.debezium.dispatcher;
 
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
@@ -57,7 +59,8 @@ import static com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulT
  *     this is useful for downstream to deserialize the {@link HistoryRecord} back.
  * </pre>
  */
-public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispatcher<T> {
+public class EventDispatcherImpl<T extends DataCollectionId>
+        extends EventDispatcher<MySqlPartition, T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(EventDispatcherImpl.class);
 
@@ -127,7 +130,9 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
 
     @Override
     public void dispatchSchemaChangeEvent(
-            T dataCollectionId, SchemaChangeEventEmitter schemaChangeEventEmitter)
+            MySqlPartition partition,
+            T dataCollectionId,
+            SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
         if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
             if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
@@ -136,6 +141,11 @@ public class EventDispatcherImpl<T extends DataCollectionId> extends EventDispat
             }
         }
         schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
+        IncrementalSnapshotChangeEventSource<MySqlPartition, T> incrementalEventSource =
+                getIncrementalSnapshotChangeEventSource();
+        if (incrementalEventSource != null) {
+            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+        }
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,10 @@ public class BinlogOffset extends Offset {
 
     public BinlogOffset(String filename, long position) {
         this(filename, position, 0L, 0L, 0L, null, null);
+    }
+
+    public BinlogOffset(long binlogEpochSecs) {
+        this(null, 0L, 0L, 0L, binlogEpochSecs, null, null);
     }
 
     public BinlogOffset(

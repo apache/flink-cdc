@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -139,7 +139,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
      * TIMESTAMP type in MYSQL converted to STRING. See more
-     * https://debezium.io/documentation/reference/1.5/connectors/mysql.html#mysql-temporal-types
+     * https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types
      */
     public MySqlSourceConfigFactory serverTimeZone(String timeZone) {
         this.serverTimeZone = timeZone;
@@ -279,15 +279,20 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
-        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
-        Properties props = new Properties();
         // hard code server name, because we don't need to distinguish it, docs:
         // Logical name that identifies and provides a namespace for the particular
         // MySQL database server/cluster being monitored. The logical name should be
         // unique across all other connectors, since it is used as a prefix for all
         // Kafka topic names emanating from this connector.
         // Only alphanumeric characters and underscores should be used.
-        props.setProperty("database.server.name", "mysql_binlog_source");
+        return createConfig(subtaskId, "mysql_binlog_source");
+    }
+
+    /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
+    public MySqlSourceConfig createConfig(int subtaskId, String serverName) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
+        Properties props = new Properties();
+        props.setProperty("database.server.name", serverName);
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));

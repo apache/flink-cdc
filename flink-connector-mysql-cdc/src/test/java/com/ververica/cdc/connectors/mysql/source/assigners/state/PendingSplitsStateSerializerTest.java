@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -253,6 +253,11 @@ public class PendingSplitsStateSerializerTest {
         @Override
         public String defaultCharsetName() {
             return "UTF-8";
+        }
+
+        @Override
+        public String comment() {
+            return "";
         }
 
         @Override

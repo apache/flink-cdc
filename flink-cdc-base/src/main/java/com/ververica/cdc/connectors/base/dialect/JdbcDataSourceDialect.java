@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,9 @@
 package com.ververica.cdc.connectors.base.dialect;
 
 import org.apache.flink.annotation.Experimental;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
-import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
@@ -51,18 +49,7 @@ public interface JdbcDataSourceDialect extends DataSourceDialect<JdbcSourceConfi
      * @param sourceConfig a basic source configuration.
      * @return a utility that simplifies using a JDBC connection.
      */
-    default JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        JdbcConnection jdbc =
-                new JdbcConnection(
-                        sourceConfig.getDbzConfiguration(),
-                        new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()));
-        try {
-            jdbc.connect();
-        } catch (Exception e) {
-            throw new FlinkRuntimeException(e);
-        }
-        return jdbc;
-    }
+    JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig);
 
     /** Get a connection pool factory to create connection pool. */
     JdbcConnectionPoolFactory getPooledDataSourceFactory();

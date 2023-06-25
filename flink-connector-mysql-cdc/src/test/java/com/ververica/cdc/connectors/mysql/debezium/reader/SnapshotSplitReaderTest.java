@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.EventDispatcher;
@@ -523,8 +524,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     private boolean executeSql(MySqlSourceConfig sourceConfig, String[] sqlStatements) {
-        JdbcConnection connection = DebeziumUtils.openJdbcConnection(sourceConfig);
-        try {
+        try (JdbcConnection connection = DebeziumUtils.openJdbcConnection(sourceConfig)) {
             connection.setAutoCommit(false);
             connection.execute(sqlStatements);
             connection.commit();
@@ -535,7 +535,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         return true;
     }
 
-    class MakeBinlogEventTaskContext extends StatefulTaskContext {
+    static class MakeBinlogEventTaskContext extends StatefulTaskContext {
 
         private final Supplier<Boolean> makeBinlogFunction;
 
@@ -549,12 +549,14 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         }
 
         @Override
-        public EventDispatcher.SnapshotReceiver getSnapshotReceiver() {
-            EventDispatcher.SnapshotReceiver snapshotReceiver = super.getSnapshotReceiver();
-            return new EventDispatcher.SnapshotReceiver() {
+        public EventDispatcher.SnapshotReceiver<MySqlPartition> getSnapshotReceiver() {
+            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver =
+                    super.getSnapshotReceiver();
+            return new EventDispatcher.SnapshotReceiver<MySqlPartition>() {
 
                 @Override
                 public void changeRecord(
+                        MySqlPartition partition,
                         DataCollectionSchema schema,
                         Envelope.Operation operation,
                         Object key,
@@ -562,7 +564,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         OffsetContext offset,
                         ConnectHeaders headers)
                         throws InterruptedException {
-                    snapshotReceiver.changeRecord(schema, operation, key, value, offset, headers);
+                    snapshotReceiver.changeRecord(
+                            partition, schema, operation, key, value, offset, headers);
                 }
 
                 @Override

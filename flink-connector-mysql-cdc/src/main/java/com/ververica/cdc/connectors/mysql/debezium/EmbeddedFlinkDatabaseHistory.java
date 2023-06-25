@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.debezium;
 
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import io.debezium.config.Configuration;
+import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.ddl.DdlParser;
@@ -98,8 +99,17 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     }
 
     @Override
+    public void recover(Offsets<?, ?> offsets, Tables schema, DdlParser ddlParser) {
+        listener.recoveryStarted();
+        for (TableChange tableChange : tableSchemas.values()) {
+            schema.overwriteTable(tableChange.getTable());
+        }
+        listener.recoveryStopped();
+    }
+
+    @Override
     public void recover(
-            Map<String, ?> source, Map<String, ?> position, Tables schema, DdlParser ddlParser) {
+            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
         listener.recoveryStarted();
         for (TableChange tableChange : tableSchemas.values()) {
             schema.overwriteTable(tableChange.getTable());

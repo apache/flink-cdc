@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.ververica.cdc.connectors.oceanbase.source;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.debezium.config.Configuration;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 
 import java.sql.DatabaseMetaData;
@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 /** {@link JdbcConnection} extension to be used with OceanBase server. */
 public class OceanBaseConnection extends JdbcConnection {
 
+    private static final String QUOTED_CHARACTER = "`";
     private static final Properties DEFAULT_JDBC_PROPERTIES = initializeDefaultJdbcProperties();
     private static final String MYSQL_URL_PATTERN =
             "jdbc:mysql://${hostname}:${port}/?connectTimeout=${connectTimeout}";
@@ -54,13 +55,15 @@ public class OceanBaseConnection extends JdbcConnection {
             ClassLoader classLoader) {
         super(
                 config(hostname, port, user, password, timeout),
-                factory(jdbcDriver, jdbcProperties, classLoader));
+                factory(jdbcDriver, jdbcProperties, classLoader),
+                QUOTED_CHARACTER,
+                QUOTED_CHARACTER);
         this.compatibleMode = compatibleMode;
     }
 
-    private static Configuration config(
+    private static JdbcConfiguration config(
             String hostname, Integer port, String user, String password, Duration timeout) {
-        return Configuration.create()
+        return JdbcConfiguration.create()
                 .with("hostname", hostname)
                 .with("port", port)
                 .with("user", user)

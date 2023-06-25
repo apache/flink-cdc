@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlValueConverters;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
@@ -60,7 +61,7 @@ import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentB
 
 /** Task to read snapshot split of table. */
 public class MySqlSnapshotSplitReadTask
-        extends AbstractSnapshotChangeEventSource<MySqlOffsetContext> {
+        extends AbstractSnapshotChangeEventSource<MySqlPartition, MySqlOffsetContext> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSnapshotSplitReadTask.class);
 
@@ -74,17 +75,17 @@ public class MySqlSnapshotSplitReadTask
     private final Clock clock;
     private final MySqlSnapshotSplit snapshotSplit;
     private final TopicSelector<TableId> topicSelector;
-    private final EventDispatcher.SnapshotReceiver snapshotReceiver;
-    private final SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics;
+    private final EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
+    private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
 
     public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
-            SnapshotChangeEventSourceMetrics snapshotChangeEventSourceMetrics,
+            SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics,
             MySqlDatabaseSchema databaseSchema,
             MySqlConnection jdbcConnection,
             EventDispatcherImpl<TableId> dispatcher,
             TopicSelector<TableId> topicSelector,
-            EventDispatcher.SnapshotReceiver snapshotReceiver,
+            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
             MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
@@ -101,12 +102,14 @@ public class MySqlSnapshotSplitReadTask
 
     @Override
     public SnapshotResult<MySqlOffsetContext> execute(
-            ChangeEventSourceContext context, MySqlOffsetContext previousOffset)
+            ChangeEventSourceContext context,
+            MySqlPartition partition,
+            MySqlOffsetContext previousOffset)
             throws InterruptedException {
-        SnapshottingTask snapshottingTask = getSnapshottingTask(previousOffset);
-        final SnapshotContext<MySqlOffsetContext> ctx;
+        SnapshottingTask snapshottingTask = getSnapshottingTask(partition, previousOffset);
+        final SnapshotContext<MySqlPartition, MySqlOffsetContext> ctx;
         try {
-            ctx = prepare(context);
+            ctx = prepare(partition);
         } catch (Exception e) {
             LOG.error("Failed to initialize snapshot context.", e);
             throw new RuntimeException(e);
@@ -125,18 +128,14 @@ public class MySqlSnapshotSplitReadTask
     protected SnapshotResult<MySqlOffsetContext> doExecute(
             ChangeEventSourceContext context,
             MySqlOffsetContext previousOffset,
-            SnapshotContext<MySqlOffsetContext> snapshotContext,
+            SnapshotContext<MySqlPartition, MySqlOffsetContext> snapshotContext,
             SnapshottingTask snapshottingTask)
             throws Exception {
-        final RelationalSnapshotChangeEventSource.RelationalSnapshotContext<MySqlOffsetContext>
-                ctx =
-                        (RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
-                                        MySqlOffsetContext>)
-                                snapshotContext;
+        final MySqlSnapshotContext ctx = (MySqlSnapshotContext) snapshotContext;
         ctx.offset = previousOffset;
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
-                        previousOffset.getPartition(),
+                        previousOffset.getOffset(),
                         topicSelector.topicNameFor(snapshotSplit.getTableId()),
                         dispatcher.getQueue());
 
@@ -167,27 +166,26 @@ public class MySqlSnapshotSplitReadTask
     }
 
     @Override
-    protected SnapshottingTask getSnapshottingTask(MySqlOffsetContext offsetContext) {
+    protected SnapshottingTask getSnapshottingTask(
+            MySqlPartition partition, MySqlOffsetContext previousOffset) {
         return new SnapshottingTask(false, true);
     }
 
     @Override
-    protected SnapshotContext prepare(ChangeEventSourceContext changeEventSourceContext)
-            throws Exception {
-        return new MySqlSnapshotContext();
+    protected MySqlSnapshotContext prepare(MySqlPartition partition) throws Exception {
+        return new MySqlSnapshotContext(partition);
     }
 
     private static class MySqlSnapshotContext
-            extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext {
+            extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
+                    MySqlPartition, MySqlOffsetContext> {
 
-        public MySqlSnapshotContext() throws SQLException {
-            super("");
+        public MySqlSnapshotContext(MySqlPartition partition) throws SQLException {
+            super(partition, "");
         }
     }
 
-    private void createDataEvents(
-            RelationalSnapshotChangeEventSource.RelationalSnapshotContext snapshotContext,
-            TableId tableId)
+    private void createDataEvents(MySqlSnapshotContext snapshotContext, TableId tableId)
             throws Exception {
         LOG.debug("Snapshotting table {}", tableId);
         createDataEventsForTable(
@@ -197,8 +195,8 @@ public class MySqlSnapshotSplitReadTask
 
     /** Dispatches the data change events for the records of a single table. */
     private void createDataEventsForTable(
-            RelationalSnapshotChangeEventSource.RelationalSnapshotContext snapshotContext,
-            EventDispatcher.SnapshotReceiver snapshotReceiver,
+            MySqlSnapshotContext snapshotContext,
+            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Table table)
             throws InterruptedException {
 
@@ -248,10 +246,12 @@ public class MySqlSnapshotSplitReadTask
                             rows,
                             snapshotSplit.splitId(),
                             Strings.duration(stop - exportStart));
-                    snapshotChangeEventSourceMetrics.rowsScanned(table.id(), rows);
+                    snapshotChangeEventSourceMetrics.rowsScanned(
+                            snapshotContext.partition, table.id(), rows);
                     logTimer = getTableScanLogTimer();
                 }
                 dispatcher.dispatchSnapshotEvent(
+                        (MySqlPartition) snapshotContext.partition,
                         table.id(),
                         getChangeRecordEmitter(snapshotContext, table.id(), row),
                         snapshotReceiver);
@@ -266,10 +266,11 @@ public class MySqlSnapshotSplitReadTask
         }
     }
 
-    protected ChangeRecordEmitter getChangeRecordEmitter(
-            SnapshotContext snapshotContext, TableId tableId, Object[] row) {
+    protected ChangeRecordEmitter<MySqlPartition> getChangeRecordEmitter(
+            MySqlSnapshotContext snapshotContext, TableId tableId, Object[] row) {
         snapshotContext.offset.event(tableId, clock.currentTime());
-        return new SnapshotChangeRecordEmitter(snapshotContext.offset, row, clock);
+        return new SnapshotChangeRecordEmitter<>(
+                snapshotContext.partition, snapshotContext.offset, row, clock);
     }
 
     private Threads.Timer getTableScanLogTimer() {

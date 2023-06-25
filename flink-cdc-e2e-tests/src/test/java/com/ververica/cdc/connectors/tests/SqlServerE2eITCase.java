@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,6 +104,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     public void testSqlServerCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
+                        "SET 'execution.checkpointing.interval' = '3s';",
                         "CREATE TABLE products_source (",
                         " `id` INT NOT NULL,",
                         " name STRING,",

@@ -1,11 +1,9 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Copyright 2023 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -83,7 +81,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
 
     @Override
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        return createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+        return createSqlServerConnection(sourceConfig.getDbzConnectorConfig());
     }
 
     @Override
@@ -112,7 +110,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
         try (SqlServerConnection jdbc =
-                createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig())) {
+                createSqlServerConnection(sourceConfig.getDbzConnectorConfig())) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {
@@ -138,9 +136,9 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
     public SqlServerSourceFetchTaskContext createFetchTaskContext(
             SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
         final SqlServerConnection jdbcConnection =
-                createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+                createSqlServerConnection(sourceConfig.getDbzConnectorConfig());
         final SqlServerConnection metaDataConnection =
-                createSqlServerConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+                createSqlServerConnection(sourceConfig.getDbzConnectorConfig());
         return new SqlServerSourceFetchTaskContext(
                 taskSourceConfig, this, jdbcConnection, metaDataConnection);
     }

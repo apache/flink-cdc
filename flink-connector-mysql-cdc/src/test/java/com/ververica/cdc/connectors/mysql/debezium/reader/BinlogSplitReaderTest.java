@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
@@ -396,6 +397,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -428,6 +432,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 assertThrows(Throwable.class, () -> readBinlogSplits(dataType, reader, 1));
         Optional<SchemaOutOfSyncException> schemaOutOfSyncException =
                 ExceptionUtils.findThrowable(throwable, SchemaOutOfSyncException.class);
+
+        reader.close();
+
         assertTrue(schemaOutOfSyncException.isPresent());
         assertEquals(
                 "Internal schema representation is probably out of sync with real database schema. "
@@ -485,6 +492,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -538,6 +548,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+U[109, user_4, Pittsburgh, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -589,6 +602,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -642,6 +658,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -700,6 +719,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Shanghai, 123567891234, 15213]",
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -751,6 +773,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 },
                 DEFAULT_TIMEOUT,
                 "Timeout waiting for heartbeat event");
+        binlogReader.close();
     }
 
     @Test
@@ -829,7 +852,11 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         binlogSplitAssigner.open();
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             Map<TableId, TableChanges.TableChange> tableSchemas =
-                    TableDiscoveryUtils.discoverSchemaForCapturedTables(sourceConfig, jdbc);
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                            sourceConfig,
+                            jdbc);
             return MySqlBinlogSplit.fillTableSchemas(
                     binlogSplitAssigner.getNext().get().asBinlogSplit(), tableSchemas);
         }

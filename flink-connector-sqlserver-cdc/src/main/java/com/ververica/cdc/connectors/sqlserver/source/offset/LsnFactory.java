@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,11 @@ public class LsnFactory extends OffsetFactory {
     public Offset newOffset(Long position) {
         throw new UnsupportedOperationException(
                 "not supported create new Offset by filename and position.");
+    }
+
+    @Override
+    public Offset createTimestampOffset(long timestampMillis) {
+        throw new UnsupportedOperationException("not supported create new Offset by timestamp.");
     }
 
     @Override

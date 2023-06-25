@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
@@ -48,7 +49,6 @@ import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
-import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
@@ -93,7 +93,6 @@ public class MongoDBTableFactoryTest {
     private static final String MY_DATABASE = "myDB";
     private static final String MY_TABLE = "myTable";
     private static final ZoneId LOCAL_TIME_ZONE = ZoneId.systemDefault();
-    private static final Boolean COPY_EXISTING_DEFAULT = COPY_EXISTING.defaultValue();
     private static final int BATCH_SIZE_DEFAULT = BATCH_SIZE.defaultValue();
     private static final int POLL_MAX_BATCH_SIZE_DEFAULT = POLL_MAX_BATCH_SIZE.defaultValue();
     private static final int POLL_AWAIT_TIME_MILLIS_DEFAULT = POLL_AWAIT_TIME_MILLIS.defaultValue();
@@ -123,7 +122,7 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         null,
-                        COPY_EXISTING_DEFAULT,
+                        StartupOptions.initial(),
                         null,
                         BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
@@ -142,7 +141,8 @@ public class MongoDBTableFactoryTest {
         Map<String, String> options = getAllOptions();
         options.put("scheme", MONGODB_SRV_SCHEME);
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
-        options.put("copy.existing", "false");
+        options.put("scan.startup.mode", "timestamp");
+        options.put("scan.startup.timestamp-millis", "1667232000000");
         options.put("copy.existing.queue.size", "100");
         options.put("batch.size", "101");
         options.put("poll.max.batch.size", "102");
@@ -164,7 +164,7 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         "replicaSet=test&connectTimeoutMS=300000",
-                        false,
+                        StartupOptions.timestamp(1667232000000L),
                         100,
                         101,
                         102,
@@ -200,7 +200,7 @@ public class MongoDBTableFactoryTest {
                         MY_DATABASE,
                         MY_TABLE,
                         null,
-                        COPY_EXISTING_DEFAULT,
+                        StartupOptions.initial(),
                         null,
                         BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,

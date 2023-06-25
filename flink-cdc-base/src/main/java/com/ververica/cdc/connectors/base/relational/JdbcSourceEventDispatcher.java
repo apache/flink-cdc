@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,10 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
+import io.debezium.pipeline.spi.Partition;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
@@ -57,7 +59,7 @@ import java.util.Map;
  *     this is useful for downstream to deserialize the {@link HistoryRecord} back.
  * </pre>
  */
-public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
+public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatcher<P, TableId> {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceEventDispatcher.class);
 
     public static final String HISTORY_RECORD_FIELD = "historyRecord";
@@ -132,7 +134,9 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
 
     @Override
     public void dispatchSchemaChangeEvent(
-            TableId dataCollectionId, SchemaChangeEventEmitter schemaChangeEventEmitter)
+            P partition,
+            TableId dataCollectionId,
+            SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
         if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
             if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
@@ -141,6 +145,11 @@ public class JdbcSourceEventDispatcher extends EventDispatcher<TableId> {
             }
         }
         schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
+        IncrementalSnapshotChangeEventSource<P, TableId> incrementalEventSource =
+                getIncrementalSnapshotChangeEventSource();
+        if (incrementalEventSource != null) {
+            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+        }
     }
 
     @Override

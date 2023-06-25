@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -138,6 +138,19 @@ public class FlinkDatabaseSchemaHistory implements DatabaseHistory {
     @Override
     public void recover(
             Map<String, ?> source, Map<String, ?> position, Tables schema, DdlParser ddlParser) {
+        listener.recoveryStarted();
+        for (SchemaRecord record : latestTables.values()) {
+            TableChange tableChange =
+                    FlinkJsonTableChangeSerializer.fromDocument(
+                            record.getTableChangeDoc(), useCatalogBeforeSchema);
+            schema.overwriteTable(tableChange.getTable());
+        }
+        listener.recoveryStopped();
+    }
+
+    @Override
+    public void recover(
+            Map<Map<String, ?>, Map<String, ?>> offsets, Tables schema, DdlParser ddlParser) {
         listener.recoveryStarted();
         for (SchemaRecord record : latestTables.values()) {
             TableChange tableChange =

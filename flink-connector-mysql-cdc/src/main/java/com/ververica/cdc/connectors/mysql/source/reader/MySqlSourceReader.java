@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;
@@ -81,6 +82,7 @@ public class MySqlSourceReader<T>
     private final Map<String, MySqlBinlogSplit> uncompletedBinlogSplits;
     private final int subtaskId;
     private final MySqlSourceReaderContext mySqlSourceReaderContext;
+    private final MySqlPartition partition;
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
 
     public MySqlSourceReader(
@@ -102,6 +104,8 @@ public class MySqlSourceReader<T>
         this.subtaskId = context.getSourceReaderContext().getIndexOfSubtask();
         this.mySqlSourceReaderContext = context;
         this.suspendedBinlogSplit = null;
+        this.partition =
+                new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
     }
 
     @Override
@@ -400,7 +404,8 @@ public class MySqlSourceReader<T>
                 Map<TableId, TableChanges.TableChange> tableSchemas;
                 if (split.getTableSchemas().isEmpty()) {
                     tableSchemas =
-                            TableDiscoveryUtils.discoverSchemaForCapturedTables(sourceConfig, jdbc);
+                            TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                                    partition, sourceConfig, jdbc);
                     LOG.info(
                             "Source reader {} discovers table schema for binlog split {} success",
                             subtaskId,
@@ -408,7 +413,8 @@ public class MySqlSourceReader<T>
                 } else {
                     List<TableId> existedTables = new ArrayList<>(split.getTableSchemas().keySet());
                     tableSchemas =
-                            discoverSchemaForNewAddedTables(existedTables, sourceConfig, jdbc);
+                            discoverSchemaForNewAddedTables(
+                                    partition, existedTables, sourceConfig, jdbc);
                     LOG.info(
                             "Source reader {} discovers table schema for new added tables of binlog split {} success",
                             subtaskId,

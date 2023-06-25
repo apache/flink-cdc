@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -805,6 +805,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         if (useLegacyImplementation) {
             // should fail because user specifies to use the legacy implementation
             try {
+                source.close();
                 runThread.sync();
                 fail("Should fail.");
             } catch (Exception e) {
@@ -906,6 +907,9 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                                                     "Retrieve schema history failed, the schema records for engine %s has been removed,"
                                                             + " this might because the debezium engine has been shutdown due to other errors.",
                                                     engineInstanceName)));
+                } finally {
+                    source.close();
+                    runThread.sync();
                 }
             }
         }
@@ -1115,6 +1119,11 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         private static final Table INSTANCE = new MockedTable();
 
         private MockedTable() {}
+
+        @Override
+        public String comment() {
+            return "";
+        }
 
         @Override
         public TableId id() {

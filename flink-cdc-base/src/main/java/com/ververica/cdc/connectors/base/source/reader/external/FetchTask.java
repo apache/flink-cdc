@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,9 @@ public interface FetchTask<Split> {
     /** Returns the split that the task used. */
     Split getSplit();
 
+    /** Close current task. * */
+    void close();
+
     /** Base context used in the execution of fetch task. */
     interface Context {
         void configure(SourceSplitBase sourceSplitBase);
@@ -63,5 +66,7 @@ public interface FetchTask<Split> {
         void rewriteOutputBuffer(Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord);
 
         List<SourceRecord> formatMessageTimestamp(Collection<SourceRecord> snapshotRecords);
+
+        void close() throws Exception;
     }
 }

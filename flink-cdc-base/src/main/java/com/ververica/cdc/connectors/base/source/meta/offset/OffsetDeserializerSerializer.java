@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ public interface OffsetDeserializerSerializer extends Serializable {
                         : null;
             case 2:
             case 3:
+            case 4:
                 return readOffsetPosition(in);
             default:
                 throw new IOException("Unknown version: " + offsetVersion);
@@ -82,12 +83,17 @@ public interface OffsetDeserializerSerializer extends Serializable {
     default FinishedSnapshotSplitInfo deserialize(byte[] serialized) {
         try {
             final DataInputDeserializer in = new DataInputDeserializer(serialized);
-            TableId tableId = TableId.parse(in.readUTF());
+            String tableIdStr = in.readUTF();
             String splitId = in.readUTF();
             Object[] splitStart = serializedStringToRow(in.readUTF());
             Object[] splitEnd = serializedStringToRow(in.readUTF());
             OffsetFactory offsetFactory = (OffsetFactory) serializedStringToObject(in.readUTF());
             Offset highWatermark = readOffsetPosition(in);
+            boolean useCatalogBeforeSchema = true;
+            if (in.available() > 0) {
+                useCatalogBeforeSchema = in.readBoolean();
+            }
+            TableId tableId = TableId.parse(tableIdStr, useCatalogBeforeSchema);
             in.releaseArrays();
 
             return new FinishedSnapshotSplitInfo(

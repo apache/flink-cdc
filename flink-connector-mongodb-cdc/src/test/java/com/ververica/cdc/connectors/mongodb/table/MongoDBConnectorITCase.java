@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mongodb.table;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
@@ -52,6 +53,7 @@ import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitFo
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 
 /** Integration tests for MongoDB change stream event SQL source. */
 @RunWith(Parameterized.class)
@@ -213,6 +215,94 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                     "jacket,0.600",
                     "spare tire,22.200"
                 };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertThat(actual, containsInAnyOrder(expected));
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testStartupFromTimestamp() throws Exception {
+        String database = ROUTER.executeCommandFileInSeparateDatabase("inventory");
+
+        // Unfortunately we have to sleep here to differ initial and later-generating changes in
+        // oplog by timestamp
+        Thread.sleep(5000L);
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE mongodb_source ("
+                                + " _id STRING NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (_id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'mongodb-cdc',"
+                                + " 'connection.options' = 'connectTimeoutMS=12000&socketTimeoutMS=13000',"
+                                + " 'hosts' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database' = '%s',"
+                                + " 'collection' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.startup.mode' = 'timestamp',"
+                                + " 'scan.startup.timestamp-millis' = '"
+                                + System.currentTimeMillis()
+                                + "',"
+                                + " 'heartbeat.interval.ms' = '1000'"
+                                + ")",
+                        ROUTER.getHostAndPort(),
+                        FLINK_USER,
+                        FLINK_USER_PASSWORD,
+                        database,
+                        "products",
+                        parallelismSnapshot);
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " weightSum DECIMAL(10,3),"
+                        + " PRIMARY KEY (name) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        if (!parallelismSnapshot) {
+            assertThrows(
+                    ValidationException.class,
+                    () ->
+                            tEnv.executeSql(
+                                    "INSERT INTO sink SELECT name, SUM(weight) FROM mongodb_source GROUP BY name"));
+            return;
+        }
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT name, SUM(weight) FROM mongodb_source GROUP BY name");
+
+        MongoCollection<Document> products =
+                mongodbClient.getDatabase(database).getCollection("products");
+
+        products.insertOne(
+                productDocOf(
+                        "100000000000000000000110",
+                        "jacket",
+                        "water resistent white wind breaker",
+                        0.2));
+
+        products.insertOne(
+                productDocOf("100000000000000000000111", "scooter", "Big 2-wheel scooter", 5.18));
+
+        waitForSinkSize("sink", 2);
+
+        String[] expected = new String[] {"jacket,0.200", "scooter,5.180"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertThat(actual, containsInAnyOrder(expected));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.dialect;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.api.common.state.CheckpointListener;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
@@ -36,7 +37,8 @@ import java.util.Map;
  * @param <C> The source config of data source.
  */
 @Experimental
-public interface DataSourceDialect<C extends SourceConfig> extends Serializable {
+public interface DataSourceDialect<C extends SourceConfig>
+        extends Serializable, CheckpointListener {
 
     /** Get the name of dialect. */
     String getName();
@@ -68,4 +70,13 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable 
 
     /** The task context used for fetch task to fetch data from external systems. */
     FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase, C sourceConfig);
+
+    /**
+     * We have an empty default implementation here because most dialects do not have to implement
+     * the method.
+     *
+     * @see CheckpointListener#notifyCheckpointComplete(long)
+     */
+    @Override
+    default void notifyCheckpointComplete(long checkpointId) throws Exception {}
 }

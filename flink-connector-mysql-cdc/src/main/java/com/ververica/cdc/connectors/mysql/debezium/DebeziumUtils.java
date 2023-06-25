@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
@@ -51,6 +52,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtil
 
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
+    private static final String QUOTED_CHARACTER = "`";
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
@@ -58,8 +60,10 @@ public class DebeziumUtils {
     public static JdbcConnection openJdbcConnection(MySqlSourceConfig sourceConfig) {
         JdbcConnection jdbc =
                 new JdbcConnection(
-                        sourceConfig.getDbzConfiguration(),
-                        new JdbcConnectionFactory(sourceConfig));
+                        JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
+                        new JdbcConnectionFactory(sourceConfig),
+                        QUOTED_CHARACTER,
+                        QUOTED_CHARACTER);
         try {
             jdbc.connect();
         } catch (Exception e) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -81,6 +82,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private final int currentParallelism;
     private final List<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
+
+    private final MySqlPartition partition;
     private final Object lock = new Object();
 
     private volatile Throwable uncaughtSplitterException;
@@ -156,6 +159,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.chunkSplitter =
                 createChunkSplitter(sourceConfig, isTableIdCaseSensitive, chunkSplitterState);
+        this.partition =
+                new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
     }
 
     @Override
@@ -275,7 +280,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             synchronized (lock) {
                 List<MySqlSnapshotSplit> splits;
                 try {
-                    splits = chunkSplitter.splitChunks(nextTable);
+                    splits = chunkSplitter.splitChunks(partition, nextTable);
                 } catch (Exception e) {
                     throw new IllegalStateException(
                             "Error when splitting chunks for " + nextTable, e);

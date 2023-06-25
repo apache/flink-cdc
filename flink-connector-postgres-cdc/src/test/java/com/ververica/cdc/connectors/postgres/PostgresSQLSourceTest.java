@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,14 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -57,6 +64,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
@@ -69,12 +77,29 @@ import static org.junit.Assert.fail;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Tests for {@link PostgreSQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class PostgreSQLSourceTest extends PostgresTestBase {
+public class PostgresSQLSourceTest extends PostgresTestBase {
+    private static final Logger LOG = LoggerFactory.getLogger(PostgresSQLSourceTest.class);
     private static final String SLOT_NAME = "flink";
+    // These tests only passes at the docker postgres:9.6
+    private static final PostgreSQLContainer<?> POSTGRES_CONTAINER_OLD =
+            new PostgreSQLContainer<>(
+                            DockerImageName.parse("debezium/postgres:9.6")
+                                    .asCompatibleSubstituteFor("postgres"))
+                    .withDatabaseName(DEFAULT_DB)
+                    .withUsername("postgres")
+                    .withPassword("postgres")
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    @BeforeClass
+    public static void startAll() {
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(POSTGRES_CONTAINER_OLD)).join();
+        LOG.info("Containers are started.");
+    }
 
     @Before
     public void before() {
-        initializePostgresTable("inventory");
+        initializePostgresTable(POSTGRES_CONTAINER_OLD, "inventory");
     }
 
     @Test
@@ -84,7 +109,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
         setupSource(source);
 
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                 Statement statement = connection.createStatement()) {
             // start the source
             final CheckedThread runThread =
@@ -237,7 +262,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-            try (Connection connection = getJdbcConnection();
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
@@ -305,7 +330,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
 
             // can continue to receive new events
-            try (Connection connection = getJdbcConnection();
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                     Statement statement = connection.createStatement()) {
                 statement.execute("DELETE FROM inventory.products WHERE id=1001");
             }
@@ -396,7 +421,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                     };
             runThread5.start();
 
-            try (Connection connection = getJdbcConnection();
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
@@ -446,7 +471,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                         }
                     };
             runThread6.start();
-            try (Connection connection = getJdbcConnection();
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
@@ -546,7 +571,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertTrue(flushLsn.add(getConfirmedFlushLsn()));
 
             // verify LSN is advanced even if there is no changes on the table
-            try (Connection connection = getJdbcConnection();
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                     Statement statement = connection.createStatement()) {
                 // we have to do some transactions which is not related to the monitored table
                 statement.execute("CREATE TABLE dummy (a int)");
@@ -581,7 +606,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             TestSourceContext<SourceRecord> sourceContext,
             long checkpointId)
             throws Exception {
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                 Statement statement = connection.createStatement()) {
             for (int i = 0; i < num; i++) {
                 statement.execute(
@@ -612,11 +637,11 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
         Properties properties = new Properties();
         properties.setProperty("heartbeat.interval.ms", String.valueOf(heartbeatInterval));
         return PostgreSQLSource.<SourceRecord>builder()
-                .hostname(POSTGERS_CONTAINER.getHost())
-                .port(POSTGERS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
-                .database(POSTGERS_CONTAINER.getDatabaseName())
-                .username(POSTGERS_CONTAINER.getUsername())
-                .password(POSTGERS_CONTAINER.getPassword())
+                .hostname(POSTGRES_CONTAINER_OLD.getHost())
+                .port(POSTGRES_CONTAINER_OLD.getMappedPort(POSTGRESQL_PORT))
+                .database(POSTGRES_CONTAINER_OLD.getDatabaseName())
+                .username(POSTGRES_CONTAINER_OLD.getUsername())
+                .password(POSTGRES_CONTAINER_OLD.getPassword())
                 .schemaList("inventory")
                 .tableList("inventory.products")
                 .deserializer(new ForwardDeserializeSchema())
@@ -626,14 +651,14 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
     }
 
     private String getConfirmedFlushLsn() throws SQLException {
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
                 Statement statement = connection.createStatement()) {
             ResultSet rs =
                     statement.executeQuery(
                             String.format(
                                     "select * from pg_replication_slots where slot_name = '%s' and database = '%s' and plugin = '%s'",
                                     SLOT_NAME,
-                                    POSTGERS_CONTAINER.getDatabaseName(),
+                                    POSTGRES_CONTAINER_OLD.getDatabaseName(),
                                     "decoderbufs"));
             if (rs.next()) {
                 return rs.getString("confirmed_flush_lsn");
