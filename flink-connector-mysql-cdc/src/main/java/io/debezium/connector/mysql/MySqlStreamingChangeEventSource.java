@@ -87,10 +87,10 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * Copied from Debezium project to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1944.
  *
- * <p>Line 1428-1434 : Adjust GTID merging logic to support recovering from job which previously
+ * <p>Line 1427-1433 : Adjust GTID merging logic to support recovering from job which previously
  * specifying starting offset on start.
  *
- * <p>Line 1486 : Add more error details for some exceptions.
+ * <p>Line 1485 : Add more error details for some exceptions.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -123,7 +123,6 @@ public class MySqlStreamingChangeEventSource
     private final MySqlConnection connection;
     private final EventDispatcher<MySqlPartition, TableId> eventDispatcher;
     private final ErrorHandler errorHandler;
-    private boolean isRestoredFromCheckpoint = false;
 
     @SingleThreadAccess("binlog client thread")
     private Instant eventTimestamp;
@@ -1561,10 +1560,6 @@ public class MySqlStreamingChangeEventSource
                 logStreamingSourceState(Level.DEBUG);
             }
         }
-    }
-
-    protected void setRestoredFromCheckpoint() {
-        this.isRestoredFromCheckpoint = true;
     }
 
     @FunctionalInterface
