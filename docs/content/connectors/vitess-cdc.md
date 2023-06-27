@@ -14,13 +14,13 @@ In order to setup the Vitess CDC connector, the following table provides depende
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-vitess-cdc</artifactId>
-  <version>2.4-SNAPSHOT</version>
+  <version>2.4.0</version>
 </dependency>
 ```
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-vitess-cdc-2.0.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-vitess-cdc/2.0.0/flink-sql-connector-vitess-cdc-2.0.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-vitess-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-vitess-cdc/2.4.0/flink-sql-connector-vitess-cdc-2.4.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 Setup Vitess server
 ----------------
