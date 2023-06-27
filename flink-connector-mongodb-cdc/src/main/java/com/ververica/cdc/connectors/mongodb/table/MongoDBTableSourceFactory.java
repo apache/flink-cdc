@@ -43,7 +43,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.CONNECTION_OPTIONS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING_QUEUE_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.DATABASE;
-import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.FULL_DOCUMENT_PREIMAGE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.FULL_DOCUMENT_PRE_POST_IMAGE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HOSTS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
@@ -103,8 +103,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         int splitSizeMB = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
 
-        boolean enableFullDocumentPreImage =
-                config.getOptional(FULL_DOCUMENT_PREIMAGE).orElse(false);
+        boolean enableFullDocumentPrePostImage =
+                config.getOptional(FULL_DOCUMENT_PRE_POST_IMAGE).orElse(false);
 
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
@@ -133,7 +133,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 splitMetaGroupSize,
                 splitSizeMB,
                 enableCloseIdleReaders,
-                enableFullDocumentPreImage);
+                enableFullDocumentPrePostImage);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -205,7 +205,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
-        options.add(FULL_DOCUMENT_PREIMAGE);
+        options.add(FULL_DOCUMENT_PRE_POST_IMAGE);
         return options;
     }
 }

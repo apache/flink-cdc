@@ -135,10 +135,10 @@ public class MongoDBSourceOptions {
                             "The chunk size mb of incremental snapshot. Defaults to 64mb.");
 
     @Experimental
-    public static final ConfigOption<Boolean> FULL_DOCUMENT_PREIMAGE =
-            ConfigOptions.key("full.document.preimage")
+    public static final ConfigOption<Boolean> FULL_DOCUMENT_PRE_POST_IMAGE =
+            ConfigOptions.key("full.document.pre.post.image")
                     .booleanType()
                     .defaultValue(false)
                     .withDescription(
-                            "Enable full document preimage to avoid ChangelogNormalize. Only available when MongoDB >= 6.0. Defaults to false.");
+                            "Enable full document pre and post image feature. Only available when MongoDB >= 6.0. Defaults to false.");
 }

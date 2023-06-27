@@ -140,7 +140,7 @@ public class MongoDBConnectorDeserializationSchema
                 break;
             case DELETE:
                 // there might be FullDocBeforeChange field
-                // if fullDocumentPreImage feature is on
+                // if fullDocumentPrePostImage feature is on
                 // convert it to Delete row data with full document
                 if (fullDocumentBeforeChange != null) {
                     GenericRowData updateBefore = extractRowData(fullDocumentBeforeChange);
@@ -159,7 +159,7 @@ public class MongoDBConnectorDeserializationSchema
                     break;
                 }
                 // there might be FullDocBeforeChange field
-                // if fullDocumentPreImage feature is on
+                // if fullDocumentPrePostImage feature is on
                 // convert it to UB row data
                 if (fullDocumentBeforeChange != null) {
                     GenericRowData updateBefore = extractRowData(fullDocumentBeforeChange);
@@ -172,7 +172,7 @@ public class MongoDBConnectorDeserializationSchema
                 break;
             case REPLACE:
                 // there might be FullDocBeforeChange field
-                // if fullDocumentPreImage feature is on
+                // if fullDocumentPrePostImage feature is on
                 // convert it to UB row data
                 if (fullDocumentBeforeChange != null) {
                     GenericRowData updateBefore = extractRowData(fullDocumentBeforeChange);

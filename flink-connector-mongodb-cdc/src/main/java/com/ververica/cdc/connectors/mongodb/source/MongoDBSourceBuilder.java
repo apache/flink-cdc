@@ -196,13 +196,13 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
-     * full.document.preimage
+     * full.document.pre.post.image
      *
-     * <p>Whether to generate update before row data based on MongoDB 6.0 Full Document Preimage
+     * <p>Whether to generate update before row data based on MongoDB 6.0 Full Document PrePostImage
      * feature. <code>'scan.incremental.close-idle-reader.enabled'</code> needs to be set to true.
      */
-    public MongoDBSourceBuilder<T> enableFullDocPreimage(boolean enableFullDocPreimage) {
-        this.configFactory.enableFullDocPreimage(enableFullDocPreimage);
+    public MongoDBSourceBuilder<T> enableFullDocPrePostImage(boolean enableFullDocPrePostImage) {
+        this.configFactory.enableFullDocPrePostImage(enableFullDocPrePostImage);
         return this;
     }
 

@@ -59,7 +59,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private Integer splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private Integer splitSizeMB = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
     private boolean closeIdleReaders = false;
-    private boolean enableFullDocPreimage = false;
+    private boolean enableFullDocPrePostImage = false;
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -221,13 +221,14 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     }
 
     /**
-     * full.document.preimage
+     * full.document.pre.post.image
      *
-     * <p>Whether to generate update before row data based on MongoDB 6.0 Full Document Preimage
-     * feature. <code>'scan.incremental.close-idle-reader.enabled'</code> needs to be set to true.
+     * <p>Whether to generate update before row data based on MongoDB 6.0 Full Document Pre Post
+     * Image feature. <code>'scan.incremental.close-idle-reader.enabled'</code> needs to be set to
+     * true.
      */
-    public MongoDBSourceConfigFactory enableFullDocPreimage(boolean enableFullDocPreimage) {
-        this.enableFullDocPreimage = enableFullDocPreimage;
+    public MongoDBSourceConfigFactory enableFullDocPrePostImage(boolean enableFullDocPrePostImage) {
+        this.enableFullDocPrePostImage = enableFullDocPrePostImage;
         return this;
     }
 
@@ -252,6 +253,6 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 splitMetaGroupSize,
                 splitSizeMB,
                 closeIdleReaders,
-                enableFullDocPreimage);
+                enableFullDocPrePostImage);
     }
 }

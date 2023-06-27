@@ -133,7 +133,7 @@ public class MongoUtils {
                 descriptor.getNamespaceRegex(),
                 sourceConfig.getBatchSize(),
                 sourceConfig.isUpdateLookup(),
-                sourceConfig.isFullDocPreimageEnabled());
+                sourceConfig.isFullDocPrePostImageEnabled());
     }
 
     public static ChangeStreamIterable<Document> getChangeStreamIterable(
@@ -141,7 +141,7 @@ public class MongoUtils {
             ChangeStreamDescriptor descriptor,
             int batchSize,
             boolean updateLookup,
-            boolean fullDocPreimage) {
+            boolean fullDocPrePostImage) {
         return getChangeStreamIterable(
                 mongoClient,
                 descriptor.getDatabase(),
@@ -150,7 +150,7 @@ public class MongoUtils {
                 descriptor.getNamespaceRegex(),
                 batchSize,
                 updateLookup,
-                fullDocPreimage);
+                fullDocPrePostImage);
     }
 
     public static ChangeStreamIterable<Document> getChangeStreamIterable(
@@ -161,7 +161,7 @@ public class MongoUtils {
             @Nullable Pattern namespaceRegex,
             int batchSize,
             boolean updateLookup,
-            boolean fullDocPreimage) {
+            boolean fullDocPrePostImage) {
         ChangeStreamIterable<Document> changeStream;
         if (StringUtils.isNotEmpty(database) && StringUtils.isNotEmpty(collection)) {
             MongoCollection<Document> coll =
@@ -221,12 +221,12 @@ public class MongoUtils {
             changeStream.batchSize(batchSize);
         }
 
-        if (updateLookup) {
-            changeStream.fullDocument(FullDocument.UPDATE_LOOKUP);
-        }
-
-        if (fullDocPreimage) {
+        if (fullDocPrePostImage) {
+            // require both pre-image and post-image
+            changeStream.fullDocument(FullDocument.REQUIRED);
             changeStream.fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
+        } else if (updateLookup) {
+            changeStream.fullDocument(FullDocument.UPDATE_LOOKUP);
         }
 
         return changeStream;
@@ -359,11 +359,11 @@ public class MongoUtils {
 
     public static MongoClient clientFor(MongoDBSourceConfig sourceConfig) {
         MongoClient client = MongoClientPool.getInstance().getOrCreateMongoClient(sourceConfig);
-        if (sourceConfig.isFullDocPreimageEnabled()) {
+        if (sourceConfig.isFullDocPrePostImageEnabled()) {
             String mongoVersion = getMongoVersion(sourceConfig);
             if (mongoVersion.charAt(0) < '6') {
                 throw new RuntimeException(
-                        "Full Document PreImage feature requires MongoDB version >= 6.0.");
+                        "Full Document pre and post image feature requires MongoDB version >= 6.0.");
             }
         }
         return client;

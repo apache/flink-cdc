@@ -170,7 +170,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
 
         String customerDatabase = CONTAINER.executeCommandFileInSeparateDatabase("customer");
 
-        // A - enable system-level fulldoc preimage feature
+        // A - enable system-level fulldoc pre & post image feature
         CONTAINER.executeCommand(
                 "use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -196,13 +196,13 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s',"
                                 + " 'heartbeat.interval.ms' = '500',"
-                                + " 'full.document.preimage' = 'true'"
+                                + " 'full.document.pre.post.image' = 'true'"
                                 + ")",
                         CONTAINER.getHostAndPort(),
                         customerDatabase,
                         getCollectionNameRegex(customerDatabase, captureCustomerCollections));
 
-        // B - enable collection-level fulldoc preimage for change capture collection
+        // B - enable collection-level fulldoc pre & post image for change capture collection
         for (String collectionName : captureCustomerCollections) {
             CONTAINER.executeCommandInDatabase(
                     String.format(

@@ -82,7 +82,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final Integer splitMetaGroupSize;
     private final Integer splitSizeMB;
     private final boolean closeIdlerReaders;
-    private final boolean enableFullDocPreimage;
+    private final boolean enableFullDocPrePostImage;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -114,7 +114,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable Integer splitMetaGroupSize,
             @Nullable Integer splitSizeMB,
             boolean closeIdlerReaders,
-            boolean enableFullDocPreimage) {
+            boolean enableFullDocPrePostImage) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -136,13 +136,13 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
         this.closeIdlerReaders = closeIdlerReaders;
-        this.enableFullDocPreimage = enableFullDocPreimage;
+        this.enableFullDocPrePostImage = enableFullDocPrePostImage;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        if (this.enableFullDocPreimage) {
-            // with FullDocPreimage feature
+        if (this.enableFullDocPrePostImage) {
+            // with FullDocPrePostImage feature
             // U- row data can be emitted
             return ChangelogMode.newBuilder()
                     .addContainedKind(RowKind.INSERT)
@@ -211,7 +211,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     .ifPresent(builder::heartbeatIntervalMillis);
             Optional.ofNullable(splitMetaGroupSize).ifPresent(builder::splitMetaGroupSize);
             Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
-            Optional.of(enableFullDocPreimage).ifPresent(builder::enableFullDocPreimage);
+            Optional.of(enableFullDocPrePostImage).ifPresent(builder::enableFullDocPrePostImage);
             return SourceProvider.of(builder.build());
         } else {
             com.ververica.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
@@ -233,9 +233,9 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                                     + " is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
             }
 
-            if (enableFullDocPreimage) {
+            if (enableFullDocPrePostImage) {
                 throw new ValidationException(
-                        "Full Document Preimage is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
+                        "Full Document pre and post image is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
             }
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
@@ -308,7 +308,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         splitMetaGroupSize,
                         splitSizeMB,
                         closeIdlerReaders,
-                        enableFullDocPreimage);
+                        enableFullDocPrePostImage);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

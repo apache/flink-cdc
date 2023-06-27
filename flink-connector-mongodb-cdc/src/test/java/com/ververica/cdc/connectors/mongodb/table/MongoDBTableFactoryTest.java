@@ -49,7 +49,7 @@ import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
-import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.FULL_DOCUMENT_PREIMAGE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.FULL_DOCUMENT_PRE_POST_IMAGE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
@@ -107,8 +107,8 @@ public class MongoDBTableFactoryTest {
     private static final boolean SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT =
             SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue();
 
-    private static final boolean FULL_DOCUMENT_PREIMAGE_ENABLED_DEFAULT =
-            FULL_DOCUMENT_PREIMAGE.defaultValue();
+    private static final boolean FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT =
+            FULL_DOCUMENT_PRE_POST_IMAGE.defaultValue();
 
     @Test
     public void testCommonProperties() {
@@ -137,7 +137,7 @@ public class MongoDBTableFactoryTest {
                         CHUNK_META_GROUP_SIZE_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        FULL_DOCUMENT_PREIMAGE_ENABLED_DEFAULT);
+                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -157,7 +157,7 @@ public class MongoDBTableFactoryTest {
         options.put("chunk-meta.group.size", "1001");
         options.put("scan.incremental.snapshot.chunk.size.mb", "10");
         options.put("scan.incremental.close-idle-reader.enabled", "true");
-        options.put("full.document.preimage", "true");
+        options.put("full.document.pre.post.image", "true");
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =
@@ -218,7 +218,7 @@ public class MongoDBTableFactoryTest {
                         CHUNK_META_GROUP_SIZE_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        FULL_DOCUMENT_PREIMAGE_ENABLED_DEFAULT);
+                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
