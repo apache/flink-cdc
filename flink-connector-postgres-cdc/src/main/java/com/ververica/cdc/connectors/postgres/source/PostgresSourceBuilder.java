@@ -49,7 +49,7 @@ public class PostgresSourceBuilder<T> {
     private final PostgresSourceConfigFactory configFactory = new PostgresSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
 
-    private PostgresSourceBuilder() {}
+    public PostgresSourceBuilder() {}
 
     /**
      * The name of the Postgres logical decoding plug-in installed on the server. Supported values
