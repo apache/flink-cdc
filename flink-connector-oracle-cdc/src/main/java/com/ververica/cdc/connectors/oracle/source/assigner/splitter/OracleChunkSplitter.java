@@ -107,18 +107,18 @@ public class OracleChunkSplitter extends AbstractJdbcSourceChunkSplitter {
     @Override
     protected List<ChunkRange> splitTableIntoChunks(
             JdbcConnection jdbc, TableId tableId, Column splitColumn) throws SQLException {
-        final String splitColumnName = splitColumn.name();
-        final Object[] minMax = queryMinMax(jdbc, tableId, splitColumnName);
-        final Object min = minMax[0];
-        final Object max = minMax[1];
-        if (min == null || max == null || min.equals(max)) {
-            // empty table, or only one row, return full table scan as a chunk
-            return Collections.singletonList(ChunkRange.all());
-        }
-
-        final int chunkSize = sourceConfig.getSplitSize();
         // use ROWID get splitUnevenlySizedChunks by default
         if (splitColumn.name().equals(ROWID.class.getSimpleName())) {
+            final String splitColumnName = splitColumn.name();
+            final Object[] minMax = queryMinMax(jdbc, tableId, splitColumnName);
+            final Object min = minMax[0];
+            final Object max = minMax[1];
+            if (min == null || max == null || min.equals(max)) {
+                // empty table, or only one row, return full table scan as a chunk
+                return Collections.singletonList(ChunkRange.all());
+            }
+
+            final int chunkSize = sourceConfig.getSplitSize();
             return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
         }
 
