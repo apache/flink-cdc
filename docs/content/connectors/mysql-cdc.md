@@ -711,7 +711,7 @@ In version 2.4.0, MySQL CDC support tables that do not have a primary key. To us
 
 There are two places that need to be taken care of.
 
-1. Please try to use a column which is contained in some index in `scan.incremental.snapshot.chunk.key-column`. If use a column which is not contained in the index, cdc connector will use the table lock in the snapshot phase.
+1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
 2. The processing semantics of a MySQL CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
   * If no update operation is performed on the specified column, the exactly-once semantics is ensured.
   * If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
