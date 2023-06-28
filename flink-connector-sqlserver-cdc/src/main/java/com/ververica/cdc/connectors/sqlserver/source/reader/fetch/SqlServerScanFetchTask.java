@@ -25,8 +25,8 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.base.source.reader.external.JdbcSnapshotSplitChangeEventSourceContext;
 import com.ververica.cdc.connectors.base.source.reader.external.SnapshotSplitReadTask;
-import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerStreamFetchTask.LsnSplitReadTask;
 import com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerUtils;
 import io.debezium.config.Configuration;
@@ -271,32 +271,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
      * watermark for each {@link SnapshotSplit}.
      */
     public static class SnapshotSplitChangeEventSourceContext
-            implements ChangeEventSource.ChangeEventSourceContext {
-
-        private LsnOffset lowWatermark;
-        private LsnOffset highWatermark;
-
-        public LsnOffset getLowWatermark() {
-            return lowWatermark;
-        }
-
-        public void setLowWatermark(LsnOffset lowWatermark) {
-            this.lowWatermark = lowWatermark;
-        }
-
-        public LsnOffset getHighWatermark() {
-            return highWatermark;
-        }
-
-        public void setHighWatermark(LsnOffset highWatermark) {
-            this.highWatermark = highWatermark;
-        }
-
-        @Override
-        public boolean isRunning() {
-            return lowWatermark != null && highWatermark != null;
-        }
-    }
+            extends JdbcSnapshotSplitChangeEventSourceContext {}
 
     /**
      * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded stream task

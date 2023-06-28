@@ -25,8 +25,8 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.base.source.reader.external.JdbcSnapshotSplitChangeEventSourceContext;
 import com.ververica.cdc.connectors.base.source.reader.external.SnapshotSplitReadTask;
-import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
@@ -261,32 +261,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
      * watermark for each {@link SnapshotSplit}.
      */
     public static class SnapshotSplitChangeEventSourceContext
-            implements ChangeEventSource.ChangeEventSourceContext {
-
-        private RedoLogOffset lowWatermark;
-        private RedoLogOffset highWatermark;
-
-        public RedoLogOffset getLowWatermark() {
-            return lowWatermark;
-        }
-
-        public void setLowWatermark(RedoLogOffset lowWatermark) {
-            this.lowWatermark = lowWatermark;
-        }
-
-        public RedoLogOffset getHighWatermark() {
-            return highWatermark;
-        }
-
-        public void setHighWatermark(RedoLogOffset highWatermark) {
-            this.highWatermark = highWatermark;
-        }
-
-        @Override
-        public boolean isRunning() {
-            return lowWatermark != null && highWatermark != null;
-        }
-    }
+            extends JdbcSnapshotSplitChangeEventSourceContext {}
 
     /**
      * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded binlog task

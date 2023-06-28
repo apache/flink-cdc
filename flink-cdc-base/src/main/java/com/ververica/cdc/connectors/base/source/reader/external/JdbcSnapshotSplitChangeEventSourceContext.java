@@ -27,8 +27,8 @@ import io.debezium.pipeline.source.spi.ChangeEventSource;
 public class JdbcSnapshotSplitChangeEventSourceContext
         implements ChangeEventSource.ChangeEventSourceContext {
 
-    private Offset lowWatermark;
-    private Offset highWatermark;
+    protected Offset lowWatermark;
+    protected Offset highWatermark;
 
     public Offset getLowWatermark() {
         return lowWatermark;
