@@ -703,7 +703,7 @@ $ ./bin/flink run \
 
 在使用无主键表时，需要注意以下两种情况。
 
-1. 配置 `scan.incremental.snapshot.chunk.key-column` 时，请尽量使用索引中的列。如果切分列不是索引中的列，CDC 连接器将会在全量阶段使用表锁。
+1. 配置 `scan.incremental.snapshot.chunk.key-column` 时，如果表中存在索引，请尽量使用索引中的列来加快 select 速度。
 2. 无主键表的处理语义由 `scan.incremental.snapshot.chunk.key-column` 指定的列的行为决定：
   * 如果指定的列不存在更新操作，此时可以保证 Exactly once 语义。
   * 如果指定的列存在更新操作，此时只能保证 At least once 语义。但可以结合下游，通过指定下游主键，结合幂等性操作来保证数据的正确性。
