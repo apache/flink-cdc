@@ -44,6 +44,7 @@ import java.util.Objects;
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static java.math.BigDecimal.ROUND_CEILING;
 
+/** The used to split table into a set of chunks for JDBC data source. */
 public abstract class AbstractJdbcSourceChunkSplitter implements JdbcSourceChunkSplitter {
 
     private static final Logger LOG =
