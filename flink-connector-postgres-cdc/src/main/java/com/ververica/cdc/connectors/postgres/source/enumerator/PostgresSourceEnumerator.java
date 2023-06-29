@@ -24,7 +24,11 @@ import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnum
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.postgres.source.PostgresDialect;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
+import io.debezium.connector.postgresql.spi.SlotState;
+
+import java.sql.SQLException;
 
 /**
  * The Postgres source enumerator that enumerates receive the split request and assign the split to
@@ -56,6 +60,24 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
      * reading the globalStreamSplit to catch all data changes.
      */
     private void createSlotForGlobalStreamSplit() {
+        SlotState slotInfo = null;
+        try (PostgresConnection connection = postgresDialect.openJdbcConnection()) {
+            slotInfo =
+                    connection.getReplicationSlotState(
+                            postgresDialect.getSlotName(), postgresDialect.getPluginName());
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    String.format(
+                            "Fail to get the replication slot info, the slot name is %s.",
+                            postgresDialect.getSlotName()),
+                    e);
+        }
+
+        // skip creating the replication slot when the slot exists.
+        if (slotInfo != null) {
+            return;
+        }
+
         try {
             PostgresReplicationConnection replicationConnection =
                     postgresDialect.openPostgresReplicationConnection();

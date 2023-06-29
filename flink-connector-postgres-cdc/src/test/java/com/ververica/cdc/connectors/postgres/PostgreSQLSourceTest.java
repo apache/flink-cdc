@@ -77,8 +77,8 @@ import static org.junit.Assert.fail;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Tests for {@link PostgreSQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class PostgresSQLSourceTest extends PostgresTestBase {
-    private static final Logger LOG = LoggerFactory.getLogger(PostgresSQLSourceTest.class);
+public class PostgreSQLSourceTest extends PostgresTestBase {
+    private static final Logger LOG = LoggerFactory.getLogger(PostgreSQLSourceTest.class);
     private static final String SLOT_NAME = "flink";
     // These tests only passes at the docker postgres:9.6
     private static final PostgreSQLContainer<?> POSTGRES_CONTAINER_OLD =
