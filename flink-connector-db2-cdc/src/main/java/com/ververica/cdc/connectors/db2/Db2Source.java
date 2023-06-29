@@ -63,7 +63,7 @@ public class Db2Source {
             props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
 
             if (tableList != null) {
-                props.setProperty("table.whitelist", String.join(",", tableList));
+                props.setProperty("table.include.list", String.join(",", tableList));
             }
             if (dbzProperties != null) {
                 props.putAll(dbzProperties);

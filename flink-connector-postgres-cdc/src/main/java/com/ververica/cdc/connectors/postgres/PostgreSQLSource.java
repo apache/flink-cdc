@@ -166,10 +166,10 @@ public class PostgreSQLSource {
             props.setProperty("heartbeat.interval.ms", String.valueOf(DEFAULT_HEARTBEAT_MS));
 
             if (schemaList != null) {
-                props.setProperty("schema.whitelist", String.join(",", schemaList));
+                props.setProperty("schema.include.list", String.join(",", schemaList));
             }
             if (tableList != null) {
-                props.setProperty("table.whitelist", String.join(",", tableList));
+                props.setProperty("table.include.list", String.join(",", tableList));
             }
 
             if (dbzProperties != null) {
