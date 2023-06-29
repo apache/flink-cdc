@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.mongodb;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -29,12 +28,12 @@ import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_
 import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBTestBase.MONGODB_CONTAINER;
 
 /** Example Tests for {@link MongoDBSource}. */
-public class LegacyMongoDBSourceExampleTest extends MongoDBSourceTestBase {
+public class LegacyMongoDBSourceExampleTest extends LegacyMongoDBSourceTestBase {
 
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingAllEvents() throws Exception {
-        String inventory = CONTAINER.executeCommandFileInSeparateDatabase("inventory");
+        String inventory = SHARD.executeCommandFileInSeparateDatabase("inventory");
 
         SourceFunction<String> sourceFunction =
                 MongoDBSource.<String>builder()
