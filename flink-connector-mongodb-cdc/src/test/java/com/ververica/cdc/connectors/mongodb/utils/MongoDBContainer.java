@@ -71,7 +71,14 @@ public class MongoDBContainer extends org.testcontainers.containers.MongoDBConta
                                     })
                             .collect(Collectors.joining(" "));
             ExecResult execResult =
-                    execInContainer("mongosh", "--eval", "use admin", "--eval", createUserCommand);
+                    execInContainer(
+                            "mongosh",
+                            "--eval",
+                            "use admin",
+                            "--eval",
+                            createUserCommand,
+                            "--eval",
+                            "console.log('Flink test user created.\\n');");
             LOG.info(execResult.getStdout());
             if (execResult.getExitCode() != 0) {
                 throw new IllegalStateException(
