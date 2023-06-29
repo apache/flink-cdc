@@ -20,99 +20,83 @@ import com.github.dockerjava.api.command.InspectContainerResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
+import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.containers.wait.strategy.WaitStrategy;
-import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertNotNull;
 
-/** Mongodb test container. */
-public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
+/** Container for testing MongoDB >= 5.0.3. */
+public class MongoDBContainer extends org.testcontainers.containers.MongoDBContainer {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBContainer.class);
 
-    private static final String DOCKER_IMAGE_NAME = "mongo:5.0.2";
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)//.*$");
 
     public static final int MONGODB_PORT = 27017;
-
-    public static final String MONGO_SUPER_USER = "superuser";
-
-    public static final String MONGO_SUPER_PASSWORD = "superpw";
 
     public static final String FLINK_USER = "flinkuser";
 
     public static final String FLINK_USER_PASSWORD = "a1?~!@#$%^&*(){}[]<>.,+_-=/|:;";
 
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)//.*$");
-
-    private final ShardingClusterRole clusterRole;
-
-    public MongoDBContainer(Network network) {
-        this(network, ShardingClusterRole.NONE);
+    public MongoDBContainer(String imageName) {
+        super(imageName);
     }
 
-    public MongoDBContainer(Network network, ShardingClusterRole clusterRole) {
-        super(
-                new ImageFromDockerfile()
-                        .withFileFromClasspath("random.key", "docker/mongodb/random.key")
-                        .withFileFromClasspath("setup.js", "docker/mongodb/setup.js")
-                        .withDockerfileFromBuilder(
-                                builder ->
-                                        builder.from(DOCKER_IMAGE_NAME)
-                                                .copy(
-                                                        "setup.js",
-                                                        "/docker-entrypoint-initdb.d/setup.js")
-                                                .copy("random.key", "/data/keyfile/random.key")
-                                                .run("chown mongodb /data/keyfile/random.key")
-                                                .run("chmod 400 /data/keyfile/random.key")
-                                                .env("MONGO_INITDB_ROOT_USERNAME", MONGO_SUPER_USER)
-                                                .env(
-                                                        "MONGO_INITDB_ROOT_PASSWORD",
-                                                        MONGO_SUPER_PASSWORD)
-                                                .env("MONGO_INITDB_DATABASE", "admin")
-                                                .build()));
-        this.clusterRole = clusterRole;
+    @Override
+    protected void containerIsStarted(InspectContainerResponse containerInfo, boolean reused) {
+        super.containerIsStarted(containerInfo, reused);
 
-        withNetwork(network);
-        withNetworkAliases(clusterRole.hostname);
-        withExposedPorts(MONGODB_PORT);
-        withCommand(ShardingClusterRole.startupCommand(clusterRole));
-        waitingFor(clusterRole.waitStrategy);
+        final String setupFilePath = "docker/mongodb/setup.js";
+        final URL setupFile = MongoDBContainer.class.getClassLoader().getResource(setupFilePath);
+
+        assertNotNull("Cannot locate " + setupFilePath, setupFile);
+        try {
+            String createUserCommand =
+                    Files.readAllLines(Paths.get(setupFile.toURI())).stream()
+                            .filter(x -> StringUtils.isNotBlank(x) && !x.trim().startsWith("//"))
+                            .map(
+                                    x -> {
+                                        final Matcher m = COMMENT_PATTERN.matcher(x);
+                                        return m.matches() ? m.group(1) : x;
+                                    })
+                            .collect(Collectors.joining(" "));
+            ExecResult execResult =
+                    execInContainer("mongosh", "--eval", "use admin", "--eval", createUserCommand);
+            LOG.info(execResult.getStdout());
+            if (execResult.getExitCode() != 0) {
+                throw new IllegalStateException(
+                        "Execute mongo command failed " + execResult.getStderr());
+            }
+            this.waitingFor(Wait.forLogMessage("Flink test user created.\\s", 1));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public String getConnectionString(String username, String password) {
-        return String.format(
-                "mongodb://%s:%s@%s:%d",
-                username, password, getContainerIpAddress(), getMappedPort(MONGODB_PORT));
+    @Override
+    public MongoDBContainer withSharding() {
+        return (MongoDBContainer) super.withSharding();
     }
 
-    public String getHostAndPort() {
-        return String.format("%s:%s", getContainerIpAddress(), getMappedPort(MONGODB_PORT));
+    @Override
+    public MongoDBContainer withLogConsumer(Consumer<OutputFrame> consumer) {
+        return (MongoDBContainer) super.withLogConsumer(consumer);
     }
 
     public void executeCommand(String command) {
         try {
             LOG.info("Executing mongo command: {}", command);
-            ExecResult execResult =
-                    execInContainer(
-                            "mongo",
-                            "-u",
-                            MONGO_SUPER_USER,
-                            "-p",
-                            MONGO_SUPER_PASSWORD,
-                            "--eval",
-                            command);
+            ExecResult execResult = execInContainer("mongosh", "--eval", command);
             LOG.info(execResult.getStdout());
             if (execResult.getExitCode() != 0) {
                 throw new IllegalStateException(
@@ -123,61 +107,13 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
         }
     }
 
-    @Override
-    protected void containerIsStarted(InspectContainerResponse containerInfo) {
-        LOG.info("Preparing a MongoDB Container with sharding cluster role {}...", clusterRole);
-        if (clusterRole != ShardingClusterRole.ROUTER) {
-            initReplicaSet();
-        } else {
-            initShard();
+    public String executeCommandInDatabase(String command, String databaseName) {
+        try {
+            executeCommand(String.format("db = db.getSiblingDB('%s');\n", databaseName) + command);
+            return databaseName;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-    }
-
-    protected void initReplicaSet() {
-        LOG.info("Initializing a single node replica set...");
-        executeCommand(
-                String.format(
-                        "rs.initiate({ _id : '%s', configsvr: %s, members: [{ _id: 0, host: '%s:%d'}]})",
-                        clusterRole.replicaSetName,
-                        clusterRole == ShardingClusterRole.CONFIG,
-                        clusterRole.hostname,
-                        MONGODB_PORT));
-
-        LOG.info("Waiting for single node replica set initialized...");
-        executeCommand(
-                String.format(
-                        "var attempt = 0; "
-                                + "while"
-                                + "(%s) "
-                                + "{ "
-                                + "if (attempt > %d) {quit(1);} "
-                                + "print('%s ' + attempt); sleep(100);  attempt++; "
-                                + " }",
-                        "db.runCommand( { isMaster: 1 } ).ismaster==false",
-                        60,
-                        "An attempt to await for a single node replica set initialization:"));
-    }
-
-    protected void initShard() {
-        LOG.info("Initializing a sharded cluster...");
-        // decrease chunk size from default 64mb to 1mb to make splitter test easier.
-        executeCommand(
-                "db.getSiblingDB('config').settings.updateOne(\n"
-                        + "   { _id: \"chunksize\" },\n"
-                        + "   { $set: { _id: \"chunksize\", value: 1 } },\n"
-                        + "   { upsert: true }\n"
-                        + ");");
-        executeCommand(
-                String.format(
-                        "sh.addShard('%s/%s:%d')",
-                        ShardingClusterRole.SHARD.replicaSetName,
-                        ShardingClusterRole.SHARD.hostname,
-                        MONGODB_PORT));
-    }
-
-    /** Executes a mongo command file. */
-    public String executeCommandFile(String fileNameIgnoreSuffix) {
-        return executeCommandFileInDatabase(fileNameIgnoreSuffix, fileNameIgnoreSuffix);
     }
 
     /** Executes a mongo command file in separate database. */
@@ -215,52 +151,12 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
         }
     }
 
-    /** A MongoDB sharded cluster roles. */
-    public enum ShardingClusterRole {
-        // Config servers store metadata and configuration settings for the cluster.
-        CONFIG("config0", "rs0-config", Wait.forLogMessage(".*[Ww]aiting for connections.*", 2)),
+    public String getConnectionString() {
+        return String.format(
+                "mongodb://%s:%d", getContainerIpAddress(), getMappedPort(MONGODB_PORT));
+    }
 
-        // Each shard contains a subset of the sharded data. Each shard can be deployed as a replica
-        // set.
-        SHARD("shard0", "rs0-shard", Wait.forLogMessage(".*[Ww]aiting for connections.*", 2)),
-
-        // The mongos acts as a query router, providing an interface between client applications and
-        // the sharded cluster.
-        ROUTER("router0", null, Wait.forLogMessage(".*[Ww]aiting for connections.*", 1)),
-
-        // None sharded cluster.
-        NONE("mongo0", "rs0", Wait.forLogMessage(".*Replication has not yet been configured.*", 1));
-
-        private final String hostname;
-        private final String replicaSetName;
-        private final WaitStrategy waitStrategy;
-
-        ShardingClusterRole(String hostname, String replicaSetName, WaitStrategy waitStrategy) {
-            this.hostname = hostname;
-            this.replicaSetName = replicaSetName;
-            this.waitStrategy = waitStrategy;
-        }
-
-        public static String startupCommand(ShardingClusterRole clusterRole) {
-            switch (clusterRole) {
-                case CONFIG:
-                    return String.format(
-                            "mongod --configsvr --port %d --replSet %s --keyFile /data/keyfile/random.key",
-                            MONGODB_PORT, clusterRole.replicaSetName);
-                case SHARD:
-                    return String.format(
-                            "mongod --shardsvr --port %d --replSet %s --keyFile /data/keyfile/random.key",
-                            MONGODB_PORT, clusterRole.replicaSetName);
-                case ROUTER:
-                    return String.format(
-                            "mongos --configdb %s/%s:%d --bind_ip_all --keyFile /data/keyfile/random.key",
-                            CONFIG.replicaSetName, CONFIG.hostname, MONGODB_PORT);
-                case NONE:
-                default:
-                    return String.format(
-                            "mongod --port %d --replSet %s --keyFile /data/keyfile/random.key",
-                            MONGODB_PORT, NONE.replicaSetName);
-            }
-        }
+    public String getHostAndPort() {
+        return String.format("%s:%s", getContainerIpAddress(), getMappedPort(MONGODB_PORT));
     }
 }

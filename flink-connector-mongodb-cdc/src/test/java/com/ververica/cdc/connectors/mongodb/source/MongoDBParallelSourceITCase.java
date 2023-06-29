@@ -45,7 +45,6 @@ import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.fetchRows;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.triggerFailover;
-import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests for {@link MongoDBSource}. */
@@ -136,7 +135,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
             String[] captureCustomerCollections)
             throws Exception {
 
-        String customerDatabase = ROUTER.executeCommandFileInSeparateDatabase("customer");
+        String customerDatabase = CONTAINER.executeCommandFileInSeparateDatabase("customer");
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -145,7 +144,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
         env.enableCheckpointing(200L);
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
         String sourceDDL =
-                format(
+                String.format(
                         "CREATE TABLE customers ("
                                 + " _id STRING NOT NULL,"
                                 + " cid BIGINT NOT NULL,"
@@ -163,7 +162,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                                 + " 'collection' = '%s',"
                                 + " 'heartbeat.interval.ms' = '500'"
                                 + ")",
-                        ROUTER.getHostAndPort(),
+                        CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         customerDatabase,

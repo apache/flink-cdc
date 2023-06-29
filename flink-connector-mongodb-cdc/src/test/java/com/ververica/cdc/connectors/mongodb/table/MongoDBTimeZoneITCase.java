@@ -86,7 +86,7 @@ public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
     public void testTemporalTypesWithTimeZone() throws Exception {
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(localTimeZone));
 
-        String database = ROUTER.executeCommandFileInSeparateDatabase("column_type_test");
+        String database = CONTAINER.executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -107,7 +107,7 @@ public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        ROUTER.getHostAndPort(),
+                        CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
@@ -159,7 +159,7 @@ public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
     public void testDateAndTimestampToStringWithTimeZone() throws Exception {
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(localTimeZone));
 
-        String database = ROUTER.executeCommandFileInSeparateDatabase("column_type_test");
+        String database = CONTAINER.executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -176,7 +176,7 @@ public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        ROUTER.getHostAndPort(),
+                        CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,

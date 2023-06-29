@@ -42,3 +42,5 @@ db.createUser(
    ]
  }
 );
+
+console.log('Flink test user created.\n');

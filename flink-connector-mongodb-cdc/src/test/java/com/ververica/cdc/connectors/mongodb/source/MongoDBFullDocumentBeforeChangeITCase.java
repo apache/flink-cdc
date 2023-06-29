@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mongodb.mongo6;
+package com.ververica.cdc.connectors.mongodb.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
@@ -43,13 +43,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertEqualsInAnyOrder;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.fetchRows;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.triggerFailover;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
 
 /** Integration tests for MongoDB full document before change info. */
-public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBase {
+public class MongoDBFullDocumentBeforeChangeITCase extends MongoDBSourceTestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
@@ -193,12 +195,16 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDB6SourceTestBas
                                 + " 'connector' = 'mongodb-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'hosts' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s',"
                                 + " 'heartbeat.interval.ms' = '500',"
                                 + " 'full.document.pre.post.image' = 'true'"
                                 + ")",
                         CONTAINER.getHostAndPort(),
+                        FLINK_USER,
+                        FLINK_USER_PASSWORD,
                         customerDatabase,
                         getCollectionNameRegex(customerDatabase, captureCustomerCollections));
 
