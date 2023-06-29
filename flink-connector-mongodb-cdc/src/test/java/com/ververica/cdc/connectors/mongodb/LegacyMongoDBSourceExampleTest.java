@@ -24,9 +24,9 @@ import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBTestBase.MONGODB_CONTAINER;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 
 /** Example Tests for {@link MongoDBSource}. */
 public class LegacyMongoDBSourceExampleTest extends MongoDBSourceTestBase {
@@ -34,7 +34,7 @@ public class LegacyMongoDBSourceExampleTest extends MongoDBSourceTestBase {
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingAllEvents() throws Exception {
-        String inventory = SHARD.executeCommandFileInSeparateDatabase("inventory");
+        String inventory = CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         SourceFunction<String> sourceFunction =
                 MongoDBSource.<String>builder()

@@ -23,7 +23,7 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer;
+import com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
@@ -47,11 +47,11 @@ import java.util.Random;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.supportCheckpointsAfterTasksFinished;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGODB_PORT;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_PASSWORD;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_USER;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER_PASSWORD;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.MONGODB_PORT;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.MONGO_SUPER_PASSWORD;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.MONGO_SUPER_USER;
 
 /** End-to-end tests for mongodb-cdc connector uber jar. */
 public class MongoE2eITCase extends FlinkContainerTestEnvironment {
@@ -62,11 +62,11 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path mongoCdcJar = TestUtils.getResource("mongodb-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    private MongoDBContainer config;
+    private LegacyMongoDBContainer config;
 
-    private MongoDBContainer shard;
+    private LegacyMongoDBContainer shard;
 
-    private MongoDBContainer router;
+    private LegacyMongoDBContainer router;
 
     private MongoClient mongoClient;
 
@@ -88,16 +88,19 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     public void before() {
         super.before();
         config =
-                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.CONFIG)
+                new LegacyMongoDBContainer(
+                                NETWORK, LegacyMongoDBContainer.ShardingClusterRole.CONFIG)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
 
         shard =
-                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.SHARD)
+                new LegacyMongoDBContainer(
+                                NETWORK, LegacyMongoDBContainer.ShardingClusterRole.SHARD)
                         .dependsOn(config)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
 
         router =
-                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.ROUTER)
+                new LegacyMongoDBContainer(
+                                NETWORK, LegacyMongoDBContainer.ShardingClusterRole.ROUTER)
                         .dependsOn(shard)
                         .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
