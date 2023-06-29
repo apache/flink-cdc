@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.postgres.source.fetch;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
@@ -34,6 +35,8 @@ import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
+import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
@@ -57,6 +60,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Objects;
 
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.DROP_SLOT_ON_STOP;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
+import static io.debezium.connector.postgresql.PostgresObjectUtils.waitForReplicationSlotReady;
 import static io.debezium.connector.postgresql.Utils.currentOffset;
 import static io.debezium.connector.postgresql.Utils.refreshSchema;
 
@@ -96,12 +102,15 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
         PostgresSnapshotSplitReadTask snapshotSplitReadTask =
                 new PostgresSnapshotSplitReadTask(
                         ctx.getConnection(),
+                        (PostgresReplicationConnection) ctx.getReplicationConnection(),
                         ctx.getDbzConnectorConfig(),
                         ctx.getDatabaseSchema(),
                         ctx.getOffsetContext(),
                         ctx.getDispatcher(),
                         ctx.getSnapshotChangeEventSourceMetrics(),
-                        split);
+                        split,
+                        ctx.getSlotName(),
+                        ctx.getPluginName());
 
         SnapshotSplitChangeEventSourceContext changeEventSourceContext =
                 new SnapshotSplitChangeEventSourceContext();
@@ -132,9 +141,8 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                         0);
 
         // optimization that skip the WAL read when the low watermark >=  high watermark
-        final boolean backfillRequired =
-                backfillSplit.getEndingOffset().isAfter(backfillSplit.getStartingOffset());
-        if (!backfillRequired) {
+        if (!isBackFillRequired(
+                backfillSplit.getStartingOffset(), backfillSplit.getEndingOffset())) {
             LOG.info(
                     "Skip the backfill {} for split {}: low watermark >= high watermark",
                     backfillSplit,
@@ -158,17 +166,15 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
 
         // we should only capture events for the current table,
         // otherwise, we may not find corresponding schema
-        PostgresSourceConfig pgSourceConfig = (PostgresSourceConfig) ctx.getSourceConfig();
+        PostgresSourceConfig config = (PostgresSourceConfig) ctx.getSourceConfig();
         Configuration dbzConf =
                 ctx.getDbzConnectorConfig()
                         .getConfig()
                         .edit()
                         .with("table.include.list", split.getTableId().toString())
-                        .with(
-                                "slot.name",
-                                pgSourceConfig.getDbzProperties().getProperty("slot.name")
-                                        + "_"
-                                        + pgSourceConfig.getSubtaskId())
+                        .with(SLOT_NAME.name(), config.getSlotNameForBackfillTask())
+                        // drop slot for backfill stream split
+                        .with(DROP_SLOT_ON_STOP.name(), true)
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
@@ -186,10 +192,16 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                         ctx.getTaskContext(),
                         ctx.getReplicationConnection(),
                         backfillSplit);
-        LOG.info("Execute backfillReadTask for split {}", split);
-        LOG.info("Slot name {}", dbzConf.getString("slot.name"));
+        LOG.info(
+                "Execute backfillReadTask for split {} with slot name {}",
+                split,
+                dbzConf.getString(SLOT_NAME.name()));
         backfillReadTask.execute(
                 new PostgresChangeEventSourceContext(), ctx.getPartition(), postgresOffsetContext);
+    }
+
+    private static boolean isBackFillRequired(Offset lowWatermark, Offset highWatermark) {
+        return highWatermark.isAfter(lowWatermark);
     }
 
     static class SnapshotSplitChangeEventSourceContext
@@ -239,6 +251,7 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                 LoggerFactory.getLogger(PostgresSnapshotSplitReadTask.class);
 
         private final PostgresConnection jdbcConnection;
+        private final PostgresReplicationConnection replicationConnection;
         private final PostgresConnectorConfig connectorConfig;
         private final JdbcSourceEventDispatcher<PostgresPartition> dispatcher;
         private final SnapshotSplit snapshotSplit;
@@ -246,17 +259,23 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
         private final PostgresSchema databaseSchema;
         private final SnapshotProgressListener<PostgresPartition> snapshotProgressListener;
         private final Clock clock;
+        private final String slotName;
+        private final String pluginName;
 
         public PostgresSnapshotSplitReadTask(
                 PostgresConnection jdbcConnection,
+                PostgresReplicationConnection replicationConnection,
                 PostgresConnectorConfig connectorConfig,
                 PostgresSchema databaseSchema,
                 PostgresOffsetContext previousOffset,
-                JdbcSourceEventDispatcher<PostgresPartition> dispatcher,
-                SnapshotProgressListener<PostgresPartition> snapshotProgressListener,
-                SnapshotSplit snapshotSplit) {
+                JdbcSourceEventDispatcher dispatcher,
+                SnapshotProgressListener snapshotProgressListener,
+                SnapshotSplit snapshotSplit,
+                String slotName,
+                String pluginName) {
             super(connectorConfig, snapshotProgressListener);
             this.jdbcConnection = jdbcConnection;
+            this.replicationConnection = replicationConnection;
             this.connectorConfig = connectorConfig;
             this.snapshotProgressListener = snapshotProgressListener;
             this.databaseSchema = databaseSchema;
@@ -264,6 +283,8 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
             this.snapshotSplit = snapshotSplit;
             this.offsetContext = previousOffset;
             this.clock = Clock.SYSTEM;
+            this.slotName = slotName;
+            this.pluginName = pluginName;
         }
 
         @Override
@@ -275,8 +296,8 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                 throws Exception {
             final PostgresSnapshotContext ctx = (PostgresSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
-            refreshSchema(databaseSchema, jdbcConnection, false);
-
+            createSlotForBackFillReadTask();
+            refreshSchema(databaseSchema, jdbcConnection, true);
             final PostgresOffset lowWatermark = currentOffset(jdbcConnection);
             LOG.info(
                     "Snapshot step 1 - Determining low watermark {} for split {}",
@@ -303,6 +324,10 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                     snapshotSplit,
                     highWatermark,
                     WatermarkKind.HIGH);
+            // release slot timely
+            if (!isBackFillRequired(lowWatermark, highWatermark)) {
+                dropSlotForBackFillReadTask();
+            }
             return SnapshotResult.completed(ctx.offset);
         }
 
@@ -391,6 +416,46 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
             } catch (SQLException e) {
                 throw new FlinkRuntimeException(
                         "Snapshotting of table " + table.id() + " failed", e);
+            }
+        }
+
+        /**
+         * Create a slot before snapshot reading so that the slot can track the WAL log during the
+         * snapshot reading phase.
+         */
+        private void createSlotForBackFillReadTask() {
+            try {
+                SlotState slotInfo = null;
+                try {
+                    slotInfo = jdbcConnection.getReplicationSlotState(slotName, pluginName);
+                } catch (SQLException e) {
+                    LOG.info(
+                            "Unable to load info of replication slot, will try to create the slot");
+                }
+                if (slotInfo == null) {
+                    try {
+                        replicationConnection.createReplicationSlot().orElse(null);
+                    } catch (SQLException ex) {
+                        String message = "Creation of replication slot failed";
+                        if (ex.getMessage().contains("already exists")) {
+                            message +=
+                                    "; when setting up multiple connectors for the same database host, please make sure to use a distinct replication slot name for each.";
+                        }
+                        throw new FlinkRuntimeException(message, ex);
+                    }
+                }
+                waitForReplicationSlotReady(30, jdbcConnection, slotName, pluginName);
+            } catch (Throwable t) {
+                throw new FlinkRuntimeException(t);
+            }
+        }
+
+        /** Drop slot for backfill task and close replication connection. */
+        private void dropSlotForBackFillReadTask() {
+            try {
+                replicationConnection.close(true);
+            } catch (Throwable t) {
+                throw new FlinkRuntimeException(t);
             }
         }
 

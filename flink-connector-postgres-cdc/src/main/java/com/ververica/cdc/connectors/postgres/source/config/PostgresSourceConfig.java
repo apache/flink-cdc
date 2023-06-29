@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
+
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
 
 /** The configuration for Postgres CDC source. */
 public class PostgresSourceConfig extends JdbcSourceConfig {
@@ -89,6 +91,10 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     public int getSubtaskId() {
         return subtaskId;
+    }
+
+    public String getSlotNameForBackfillTask() {
+        return getDbzProperties().getProperty(SLOT_NAME.name()) + "_" + subtaskId;
     }
 
     @Override
