@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.mongodb.table;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
@@ -53,7 +52,6 @@ import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitFo
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertThrows;
 
 /** Integration tests for MongoDB change stream event SQL source. */
 @RunWith(Parameterized.class)
@@ -272,15 +270,6 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
-
-        if (!parallelismSnapshot) {
-            assertThrows(
-                    ValidationException.class,
-                    () ->
-                            tEnv.executeSql(
-                                    "INSERT INTO sink SELECT name, SUM(weight) FROM mongodb_source GROUP BY name"));
-            return;
-        }
 
         // async submit job
         TableResult result =
