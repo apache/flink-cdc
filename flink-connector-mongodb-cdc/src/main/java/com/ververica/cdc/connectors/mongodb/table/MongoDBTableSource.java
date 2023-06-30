@@ -28,7 +28,6 @@ import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
@@ -142,20 +141,12 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     @Override
     public ChangelogMode getChangelogMode() {
         if (this.enableFullDocPrePostImage) {
-            // with FullDocPrePostImage feature
-            // U- row data can be emitted
-            return ChangelogMode.newBuilder()
-                    .addContainedKind(RowKind.INSERT)
-                    .addContainedKind(RowKind.UPDATE_BEFORE)
-                    .addContainedKind(RowKind.UPDATE_AFTER)
-                    .addContainedKind(RowKind.DELETE)
-                    .build();
+            // generate full-mode changelog with FullDocPrePostImage
+            return ChangelogMode.all();
+        } else {
+            // upsert changelog only
+            return ChangelogMode.upsert();
         }
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
     }
 
     @Override
@@ -196,6 +187,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .scheme(scheme)
                             .hosts(hosts)
                             .closeIdleReaders(closeIdlerReaders)
+                            .enableFullDocPrePostImage(enableFullDocPrePostImage)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer);
 
@@ -211,13 +203,13 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     .ifPresent(builder::heartbeatIntervalMillis);
             Optional.ofNullable(splitMetaGroupSize).ifPresent(builder::splitMetaGroupSize);
             Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
-            Optional.of(enableFullDocPrePostImage).ifPresent(builder::enableFullDocPrePostImage);
             return SourceProvider.of(builder.build());
         } else {
             com.ververica.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
                     com.ververica.cdc.connectors.mongodb.MongoDBSource.<RowData>builder()
                             .scheme(scheme)
                             .hosts(hosts)
+                            .fullDocumentBeforeChange(enableFullDocPrePostImage)
                             .deserializer(deserializer);
 
             switch (startupOptions.startupMode) {
@@ -231,11 +223,6 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     throw new ValidationException(
                             startupOptions.startupMode
                                     + " is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
-            }
-
-            if (enableFullDocPrePostImage) {
-                throw new ValidationException(
-                        "Full Document pre and post image is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
             }
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);

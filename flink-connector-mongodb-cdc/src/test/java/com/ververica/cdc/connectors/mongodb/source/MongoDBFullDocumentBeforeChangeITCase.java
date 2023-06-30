@@ -56,7 +56,7 @@ public class MongoDBFullDocumentBeforeChangeITCase extends MongoDBSourceTestBase
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     @Test
-    public void testGetMongoDBVersion() throws Exception {
+    public void testGetMongoDBVersion() {
         MongoDBSourceConfig config =
                 new MongoDBSourceConfigFactory()
                         .hosts(CONTAINER.getHostAndPort())
