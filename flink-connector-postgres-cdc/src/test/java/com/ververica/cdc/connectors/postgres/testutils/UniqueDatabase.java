@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ public class UniqueDatabase {
 
     private void createDatabase(String databaseName) throws SQLException {
         try (Connection connection =
-                PostgresTestBase.getJdbcConnection(PostgresTestBase.DEFAULT_DB)) {
+                PostgresTestBase.getJdbcConnection(container, PostgresTestBase.DEFAULT_DB)) {
             try (Statement statement = connection.createStatement()) {
                 statement.execute("CREATE DATABASE " + databaseName);
             }
@@ -123,7 +123,8 @@ public class UniqueDatabase {
 
         try {
             createDatabase(databaseName);
-            try (Connection connection = PostgresTestBase.getJdbcConnection(databaseName);
+            try (Connection connection =
+                            PostgresTestBase.getJdbcConnection(container, databaseName);
                     Statement statement = connection.createStatement()) {
                 final List<String> statements =
                         Arrays.stream(

@@ -14,7 +14,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -22,7 +22,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.4-SNAPSHOT/flink-sql-connector-postgres-cdc-2.4-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.5-SNAPSHOT/flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
 
@@ -144,7 +144,6 @@ Connector Options
       <td>The name of the Postgres logical decoding plug-in installed on the server.
           Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and pgoutput.</td>
     </tr>
-    
     <tr>
       <td>changelog-mode</td>
       <td>optional</td>
@@ -167,7 +166,7 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Postgres server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td>
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td>
     </tr>
     <tr>
       <td>debezium.snapshot.select.statement.overrides</td>
@@ -211,7 +210,7 @@ Connector Options
 </div>
 <div>
 
-Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#postgresql-property-slot-name).
+Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-property-slot-name).
 
 ### Incremental Snapshot Options
 
@@ -401,7 +400,7 @@ and then PostgreSQL CDC Source assigns the chunks to multiple readers to read th
 
 ### Exactly-Once Processing
 
-The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.6/connectors/postgresql.html#how-the-postgresql-connector-works).
+The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#how-the-postgresql-connector-works).
 
 ### DataStream Source
 

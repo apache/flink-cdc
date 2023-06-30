@@ -84,7 +84,7 @@ Include following Maven dependency (available through Maven Central):
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
-  <version>2.4-SNAPSHOT</version>
+  <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -143,7 +143,7 @@ The following JSON data show the change event in JSON format.
   "transaction": null
 }
 ```
-**Note:** Please refer [Debezium documentation](https://debezium.io/documentation/reference/1.6/connectors/mysql.html#mysql-events
+**Note:** Please refer [Debezium documentation](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-events
 )  to know the meaning of each field.
 
 In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Constructor to enabled include schema in the message. Then the Debezium JSON message may look like this:
