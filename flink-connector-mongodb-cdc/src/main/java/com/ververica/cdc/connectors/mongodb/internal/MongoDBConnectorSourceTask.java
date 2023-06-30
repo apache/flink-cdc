@@ -77,6 +77,9 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     public static final String STARTUP_MODE_COPY_EXISTING_PIPELINE_CONFIG =
             "startup.mode.copy.existing.pipeline";
 
+    public static final String STARTUP_MODE_TIMESTAMP_START_AT_OPERATION_TIME_CONFIG =
+            "startup.mode.timestamp.start.at.operation.time";
+
     private final MongoSourceTask target;
 
     private final Field startedTaskField;

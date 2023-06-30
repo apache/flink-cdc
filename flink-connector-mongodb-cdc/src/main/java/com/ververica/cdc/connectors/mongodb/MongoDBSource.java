@@ -22,6 +22,7 @@ import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.OutputFormat;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceConnector;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -38,6 +39,7 @@ import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSour
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.STARTUP_MODE_COPY_EXISTING_MAX_THREADS_CONFIG;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.STARTUP_MODE_COPY_EXISTING_PIPELINE_CONFIG;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.STARTUP_MODE_COPY_EXISTING_QUEUE_SIZE_CONFIG;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceTask.STARTUP_MODE_TIMESTAMP_START_AT_OPERATION_TIME_CONFIG;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.HEARTBEAT_TOPIC_NAME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
@@ -81,6 +83,7 @@ public class MongoDBSource {
         private Boolean updateLookup = true;
         private Boolean fullDocumentBeforeChange = false;
         private Boolean copyExisting = true;
+        private StartupOptions startupOptions;
         private Integer copyExistingMaxThreads;
         private Integer copyExistingQueueSize;
         private String copyExistingPipeline;
@@ -212,9 +215,23 @@ public class MongoDBSource {
          * <p>Copy existing data from source collections and convert them to Change Stream events on
          * their respective topics. Any changes to the data that occur during the copy process are
          * applied once the copy is completed.
+         *
+         * @deprecated please use startupOptions instead.
          */
+        @Deprecated
         public Builder<T> copyExisting(boolean copyExisting) {
             this.copyExisting = copyExisting;
+            return this;
+        }
+
+        /**
+         * scan.startup.mode
+         *
+         * <p>Optional startup mode for MongoDB CDC consumer, valid enumerations are initial,
+         * latest-offset, timestamp. Default: initial
+         */
+        public Builder<T> startupOptions(StartupOptions startupOptions) {
+            this.startupOptions = startupOptions;
             return this;
         }
 
@@ -335,10 +352,31 @@ public class MongoDBSource {
                         String.valueOf(pollMaxBatchSize));
             }
 
-            if (copyExisting != null) {
+            if (startupOptions != null) {
+                switch (startupOptions.startupMode) {
+                    case INITIAL:
+                        props.setProperty(MongoSourceConfig.STARTUP_MODE_CONFIG, "copy_existing");
+                        break;
+                    case LATEST_OFFSET:
+                        props.setProperty(MongoSourceConfig.STARTUP_MODE_CONFIG, "latest");
+                        break;
+                    case TIMESTAMP:
+                        props.setProperty(MongoSourceConfig.STARTUP_MODE_CONFIG, "timestamp");
+
+                        // mongodb-kafka requires an integer number of seconds since the Epoch
+                        props.setProperty(
+                                STARTUP_MODE_TIMESTAMP_START_AT_OPERATION_TIME_CONFIG,
+                                String.valueOf(startupOptions.startupTimestampMillis / 1000));
+                        break;
+                }
+            } else if (copyExisting != null) {
                 props.setProperty(
                         MongoSourceConfig.STARTUP_MODE_CONFIG,
                         copyExisting ? "copy_existing" : "latest");
+            } else {
+                // explicitly fallback to initial mode
+                // since mongodb-kafka's default option is latest
+                props.setProperty(MongoSourceConfig.STARTUP_MODE_CONFIG, "copy_existing");
             }
 
             if (copyExistingMaxThreads != null) {

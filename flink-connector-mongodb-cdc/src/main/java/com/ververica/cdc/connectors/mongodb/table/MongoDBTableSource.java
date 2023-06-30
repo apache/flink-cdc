@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.mongodb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -210,20 +209,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .scheme(scheme)
                             .hosts(hosts)
                             .fullDocumentBeforeChange(enableFullDocPrePostImage)
+                            .startupOptions(startupOptions)
                             .deserializer(deserializer);
-
-            switch (startupOptions.startupMode) {
-                case INITIAL:
-                    builder.copyExisting(true);
-                    break;
-                case LATEST_OFFSET:
-                    builder.copyExisting(false);
-                    break;
-                default:
-                    throw new ValidationException(
-                            startupOptions.startupMode
-                                    + " is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
-            }
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
