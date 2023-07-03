@@ -41,7 +41,6 @@ import java.util.stream.Stream;
 
 import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.GRPC_PORT;
 import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.MYSQL_PORT;
-import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.VTCTLD_GRPC_PORT;
 import static org.junit.Assert.assertNotNull;
 
 /** Basic class for testing Vitess source, this contains a Vitess container. */
@@ -56,7 +55,7 @@ public abstract class VitessTestBase extends AbstractTestBase {
                             .withKeyspace("test")
                             .withUsername("flinkuser")
                             .withPassword("flinkpwd")
-                            .withExposedPorts(MYSQL_PORT, GRPC_PORT, VTCTLD_GRPC_PORT)
+                            .withExposedPorts(MYSQL_PORT, GRPC_PORT)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass
