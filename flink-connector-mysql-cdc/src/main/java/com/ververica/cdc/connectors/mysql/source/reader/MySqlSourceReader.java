@@ -28,6 +28,7 @@ import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitAssignedEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
@@ -270,6 +271,7 @@ public class MySqlSourceReader<T>
                                     binlogSplit, sourceConfig, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(mySqlBinlogSplit);
                 }
+                context.sendSourceEventToCoordinator(new BinlogSplitAssignedEvent());
             }
         }
         // notify split enumerator again about the finished unacked snapshot splits
