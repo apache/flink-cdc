@@ -37,7 +37,6 @@ import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
-import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
@@ -59,7 +58,6 @@ import java.util.ArrayList;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask.RedoLogSplitReadTask;
-import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
 import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.currentRedoLogOffset;
 import static com.ververica.cdc.connectors.oracle.source.utils.OracleUtils.buildSplitScanQuery;
 import static com.ververica.cdc.connectors.oracle.source.utils.OracleUtils.readTableSplitDataStatement;
@@ -163,10 +161,6 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
 
     private RedoLogSplitReadTask createBackfillRedoLogReadTask(
             StreamSplit backfillBinlogSplit, OracleSourceFetchTaskContext context) {
-        OracleConnectorConfig oracleConnectorConfig =
-                context.getSourceConfig().getDbzConnectorConfig();
-        final OffsetContext.Loader<OracleOffsetContext> loader =
-                new LogMinerOracleOffsetContextLoader(oracleConnectorConfig);
         // we should only capture events for the current table,
         // otherwise, we may can't find corresponding schema
         Configuration dezConf =
@@ -180,7 +174,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         // task to read binlog and backfill for current split
         return new RedoLogSplitReadTask(
                 new OracleConnectorConfig(dezConf),
-                createOracleConnection(context.getSourceConfig().getDbzConfiguration()),
+                context.getConnection(),
                 context.getDispatcher(),
                 context.getErrorHandler(),
                 context.getDatabaseSchema(),
