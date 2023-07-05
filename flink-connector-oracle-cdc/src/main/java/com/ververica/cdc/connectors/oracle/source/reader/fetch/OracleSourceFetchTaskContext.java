@@ -67,7 +67,6 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
 
-
 import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
 import static com.ververica.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
 

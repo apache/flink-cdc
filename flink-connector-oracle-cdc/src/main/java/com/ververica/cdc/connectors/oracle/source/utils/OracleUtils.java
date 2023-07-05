@@ -26,7 +26,6 @@ import io.debezium.connector.oracle.OracleDefaultValueConverter;
 import io.debezium.connector.oracle.OracleTopicSelector;
 import io.debezium.connector.oracle.OracleValueConverters;
 import io.debezium.connector.oracle.StreamingAdapter;
-import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
