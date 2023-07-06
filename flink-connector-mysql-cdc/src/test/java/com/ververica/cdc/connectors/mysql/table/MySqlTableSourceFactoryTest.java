@@ -388,7 +388,6 @@ public class MySqlTableSourceFactoryTest {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.startup.mode", "earliest-offset");
         createTableSource(properties);
-        createTableSource(properties);
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
         MySqlTableSource expectedSource =
@@ -732,6 +731,24 @@ public class MySqlTableSourceFactoryTest {
                     String.format(
                             "The table-name '%s' is not a valid regular expression",
                             "*_invalid_table");
+            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
+        }
+        // validate invalid startup parameter
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.startup.mode", "latest-offset");
+            properties.put("scan.startup.timestamp-millis", "0");
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            String msg =
+                    String.format(
+                            "Options '%s', '%s', '%s' and '%s' must not be used for the %s startup mode.",
+                            "scan.startup.specific-offset.gtid-set",
+                            "scan.startup.timestamp-millis",
+                            "scan.startup.specific-offset.file",
+                            "scan.startup.specific-offset.pos",
+                            "Optional[latest-offset]");
             assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
         }
     }
