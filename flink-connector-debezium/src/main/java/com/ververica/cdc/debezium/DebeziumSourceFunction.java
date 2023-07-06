@@ -396,7 +396,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                         Heartbeat.HEARTBEAT_TOPICS_PREFIX.name(),
                         Heartbeat.HEARTBEAT_TOPICS_PREFIX.defaultValueAsString());
         this.debeziumChangeFetcher =
-                new DebeziumChangeFetcher<>(
+                createChangeFetcher(
                         sourceContext,
                         deserializer,
                         restoredOffsetState == null, // DB snapshot phase if restore state is null
@@ -526,6 +526,20 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
 
         super.close();
+    }
+
+    protected DebeziumChangeFetcher<T> createChangeFetcher(
+            SourceContext<T> sourceContext,
+            DebeziumDeserializationSchema<T> deserialization,
+            boolean isInDbSnapshotPhase,
+            String heartbeatTopicPrefix,
+            Handover handover) {
+        return new DebeziumChangeFetcher<>(
+                sourceContext,
+                deserialization,
+                isInDbSnapshotPhase,
+                heartbeatTopicPrefix,
+                handover);
     }
 
     /** Safely and gracefully stop the Debezium engine. */

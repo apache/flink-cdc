@@ -121,9 +121,6 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
     // Failover tests
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
@@ -132,9 +129,6 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testTaskManagerFailoverInStreamPhase() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.STREAM,
@@ -143,9 +137,6 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
@@ -154,9 +145,6 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testJobManagerFailoverInStreamPhase() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.STREAM,
@@ -165,9 +153,6 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testTaskManagerFailoverSingleParallelism() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
         testMongoDBParallelSource(
                 1,
                 MongoDBTestUtils.FailoverType.TM,
@@ -177,9 +162,6 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
         testMongoDBParallelSource(
                 1,
                 MongoDBTestUtils.FailoverType.JM,

@@ -233,7 +233,7 @@ public class DebeziumChangeFetcher<T> {
                 continue;
             }
 
-            deserialization.deserialize(record, debeziumCollector);
+            deserializeRecord(record);
 
             if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");
@@ -244,6 +244,10 @@ public class DebeziumChangeFetcher<T> {
             emitRecordsUnderCheckpointLock(
                     debeziumCollector.records, record.sourcePartition(), record.sourceOffset());
         }
+    }
+
+    protected void deserializeRecord(SourceRecord record) throws Exception {
+        deserialization.deserialize(record, debeziumCollector);
     }
 
     private void emitRecordsUnderCheckpointLock(

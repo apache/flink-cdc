@@ -22,8 +22,10 @@ import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.OutputFormat;
+import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceConnector;
+import com.ververica.cdc.connectors.mongodb.source.deduplicate.DebeziumDeduplicateSourceFunction;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.Validator;
@@ -61,7 +63,6 @@ public class MongoDBSource {
 
     public static final String FULL_DOCUMENT_UPDATE_LOOKUP = FullDocument.UPDATE_LOOKUP.getValue();
     public static final String FULL_DOCUMENT_REQUIRED = FullDocument.REQUIRED.getValue();
-
     public static final String OUTPUT_FORMAT_SCHEMA =
             OutputFormat.SCHEMA.name().toLowerCase(Locale.ROOT);
 
@@ -459,8 +460,16 @@ public class MongoDBSource {
             props.setProperty(
                     MongoSourceConfig.ERRORS_TOLERANCE_CONFIG, ErrorTolerance.NONE.value());
 
-            return new DebeziumSourceFunction<>(
-                    deserializer, props, null, Validator.getDefaultValidator());
+            if (fullDocumentBeforeChange
+                    && (startupOptions.startupMode == StartupMode.INITIAL || copyExisting)) {
+                // need to use special deduplicate source function
+                // when full changelog is enabled & snapshot is required
+                return new DebeziumDeduplicateSourceFunction<>(
+                        deserializer, props, null, Validator.getDefaultValidator());
+            } else {
+                return new DebeziumSourceFunction<>(
+                        deserializer, props, null, Validator.getDefaultValidator());
+            }
         }
     }
 }
