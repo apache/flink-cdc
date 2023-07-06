@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.experimental.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.Tables;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -39,7 +40,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
     public MySqlSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
-            List<String> tableList,
+            Tables tables,
             int splitSize,
             int splitMetaGroupSize,
             double distributionFactorUpper,
@@ -62,7 +63,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 startupOptions,
                 databaseList,
                 null,
-                tableList,
+                tables,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,

@@ -267,7 +267,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
             SqlServerSourceConfig sourceConfig, JdbcDataSourceDialect sourceDialect) {
         String databaseName = sourceConfig.getDatabaseList().get(0);
         List<TableId> tableIdList =
-                sourceConfig.getTableList().stream()
+                sourceConfig.getTables().getTableList().stream()
                         .map(tableId -> TableId.parse(databaseName + "." + tableId))
                         .collect(Collectors.toList());
         final ChunkSplitter chunkSplitter = sourceDialect.createChunkSplitter(sourceConfig);

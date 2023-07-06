@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.postgres.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.Tables;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
@@ -42,7 +43,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             StartupOptions startupOptions,
             List<String> databaseList,
             List<String> schemaList,
-            List<String> tableList,
+            Tables tables,
             int splitSize,
             int splitMetaGroupSize,
             double distributionFactorUpper,
@@ -66,7 +67,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 startupOptions,
                 databaseList,
                 schemaList,
-                tableList,
+                tables,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,

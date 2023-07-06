@@ -86,8 +86,9 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
             props.setProperty("schema.include.list", String.join(",", schemaList));
         }
 
-        if (tableList != null) {
-            props.setProperty("table.include.list", String.join(",", tableList));
+        if (tables != null) {
+            String type = tables.isToInclude() ? "table.include.list" : "table.exclude.list";
+            props.setProperty(type, String.join(",", tables.getTableList()));
         }
 
         // override the user-defined debezium properties
@@ -105,7 +106,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 startupOptions,
                 Collections.singletonList(database),
                 schemaList,
-                tableList,
+                tables,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,
