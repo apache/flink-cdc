@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.postgres;
 
+import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import io.debezium.config.Configuration;
@@ -136,5 +137,41 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected PostgresConnection createConnection(Map<String, String> properties) {
         Configuration config = Configuration.from(properties);
         return new PostgresConnection(JdbcConfiguration.adapt(config), "test-connection");
+    }
+
+    protected void waitForSnapshotStarted(String sinkName) throws InterruptedException {
+        while (sinkSize(sinkName) == 0) {
+            Thread.sleep(300);
+        }
+    }
+
+    protected void waitForSinkResult(String sinkName, List<String> expected)
+            throws InterruptedException {
+        List<String> actual = TestValuesTableFactory.getResults(sinkName);
+        actual = actual.stream().sorted().collect(Collectors.toList());
+        while (actual.size() != expected.size() || !actual.equals(expected)) {
+            actual =
+                    TestValuesTableFactory.getResults(sinkName).stream()
+                            .sorted()
+                            .collect(Collectors.toList());
+            Thread.sleep(1000);
+        }
+    }
+
+    protected void waitForSinkSize(String sinkName, int expectedSize) throws InterruptedException {
+        while (sinkSize(sinkName) < expectedSize) {
+            Thread.sleep(100);
+        }
+    }
+
+    protected int sinkSize(String sinkName) {
+        synchronized (TestValuesTableFactory.class) {
+            try {
+                return TestValuesTableFactory.getRawResults(sinkName).size();
+            } catch (IllegalArgumentException e) {
+                // job is not started yet
+                return 0;
+            }
+        }
     }
 }

@@ -39,7 +39,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
@@ -227,36 +226,5 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
             }
         }
         return null;
-    }
-
-    private static void waitForSinkResult(String sinkName, List<String> expected)
-            throws InterruptedException {
-        List<String> actual = TestValuesTableFactory.getResults(sinkName);
-        actual = actual.stream().sorted().collect(Collectors.toList());
-        while (actual.size() != expected.size() || !actual.equals(expected)) {
-            actual =
-                    TestValuesTableFactory.getResults(sinkName).stream()
-                            .sorted()
-                            .collect(Collectors.toList());
-            Thread.sleep(1000);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 }
