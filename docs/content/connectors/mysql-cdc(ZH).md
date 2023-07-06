@@ -699,7 +699,7 @@ $ ./bin/flink run \
 
 ### 关于无主键表
 
-2.4.0 版本支持使用无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
+从2.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
 
 在使用无主键表时，需要注意以下两种情况。
 

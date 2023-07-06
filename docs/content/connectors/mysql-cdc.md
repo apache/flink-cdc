@@ -707,7 +707,7 @@ $ ./bin/flink run \
 
 ### Tables Without primary keys
 
-In version 2.4.0, MySQL CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field. 
+Starting from version 2.4.0, MySQL CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field. 
 
 There are two places that need to be taken care of.
 
