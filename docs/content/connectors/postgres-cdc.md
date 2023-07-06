@@ -382,7 +382,8 @@ CREATE TABLE products (
   'password' = 'postgres',
   'database-name' = 'postgres',
   'schema-name' = 'public',
-  'table-name' = 'shipments'
+  'table-name' = 'shipments',
+  'slot.name' = 'flink'
 );
 ```
 
