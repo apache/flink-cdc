@@ -1307,7 +1307,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testReadingTable() throws Exception {
+    public void testReadingWithRegexPattern() throws Exception {
         if (!incrementalSnapshot) {
             return;
         }

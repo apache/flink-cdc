@@ -46,7 +46,7 @@ VALUES (101,"user_1","Shanghai","123567891234"),
        (1019,"user_20","Shanghai","123567891234"),
        (2000,"user_21","Shanghai","123567891234");
 
--- Create and populate our users using a single insert with many rows
+-- Create a table will not be read
 CREATE TABLE prefix_customers (
   id INTEGER NOT NULL PRIMARY KEY,
   name VARCHAR(255) NOT NULL DEFAULT 'flink',
