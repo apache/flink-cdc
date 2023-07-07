@@ -162,7 +162,7 @@ Flink SQL> SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>要监视的 MySQL 数据库的表名。表名还支持正则表达式，以监视多个表与正则表达式匹配。</td>
+      <td>要监视的 MySQL 数据库的表名。表名还支持正则表达式，以监视多个表与正则表达式匹配。注意：MySQL CDC 连接器会连接 database-name，字符串 `\\.` 和 table-name 的作为正则表达式和 MySQL表的全限定名做匹配。</td>
     </tr>
     <tr>
       <td>port</td>
@@ -433,7 +433,8 @@ CREATE TABLE products (
     </tr>
   </tbody>
 </table>
-进行库表匹配时,使用的模式是database-name.table-name，所以该例子使用(^(test).*|^(tpc).*|txc|.*[p$]|t{2}).(t[5-8]|tt)，匹配txc.tt、test2.test5。
+
+进行库表匹配时，会使用正则表达式 `database-name\\.table-name` 来与MySQL表的全限定名做匹配，所以该例子使用 `(^(test).*|^(tpc).*|txc|.*[p$]|t{2})\\.(t[5-8]|tt)`，可以匹配到表 txc.tt、test2.test5。
 
 支持的特性
 --------

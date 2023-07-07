@@ -46,6 +46,20 @@ VALUES (101,"user_1","Shanghai","123567891234"),
        (1019,"user_20","Shanghai","123567891234"),
        (2000,"user_21","Shanghai","123567891234");
 
+-- Create and populate our users using a single insert with many rows
+CREATE TABLE prefix_customers (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  address VARCHAR(1024),
+  phone_number VARCHAR(512)
+);
+
+INSERT INTO prefix_customers
+VALUES (101,"user_1","Shanghai","123567891234"),
+       (102,"user_2","Shanghai","123567891234"),
+       (103,"user_3","Shanghai","123567891234"),
+       (109,"user_4","Shanghai","123567891234");
+
 -- table has same name prefix with 'customers.*'
 CREATE TABLE customers_1 (
   id INTEGER NOT NULL PRIMARY KEY,
