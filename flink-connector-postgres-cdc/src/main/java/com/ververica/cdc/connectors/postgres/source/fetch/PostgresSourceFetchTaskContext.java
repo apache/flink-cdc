@@ -22,8 +22,8 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
+import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
-import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.postgres.source.PostgresDialect;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
@@ -121,6 +121,22 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     public void configure(SourceSplitBase sourceSplitBase) {
         LOG.debug("Configuring PostgresSourceFetchTaskContext for split: {}", sourceSplitBase);
         PostgresConnectorConfig dbzConfig = getDbzConnectorConfig();
+        if (sourceSplitBase instanceof SnapshotSplit) {
+            dbzConfig =
+                    new PostgresConnectorConfig(
+                            dbzConfig
+                                    .getConfig()
+                                    .edit()
+                                    .with(
+                                            SLOT_NAME.name(),
+                                            ((PostgresSourceConfig) sourceConfig)
+                                                    .getSlotNameForBackfillTask())
+                                    // drop slot for backfill stream split
+                                    .with(DROP_SLOT_ON_STOP.name(), true)
+                                    // Disable heartbeat event in snapshot split fetcher
+                                    .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
+                                    .build());
+        }
 
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(
@@ -164,21 +180,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         this.taskContext,
                         jdbcConnection,
                         this.snapShotter.shouldSnapshot(),
-                        sourceSplitBase instanceof StreamSplit
-                                ? dbzConfig
-                                : new PostgresConnectorConfig(
-                                        dbzConfig
-                                                .getConfig()
-                                                .edit()
-                                                .with(
-                                                        SLOT_NAME.name(),
-                                                        ((PostgresSourceConfig) sourceConfig)
-                                                                .getSlotNameForBackfillTask())
-                                                // drop slot for backfill stream split
-                                                .with(DROP_SLOT_ON_STOP.name(), true)
-                                                // Disable heartbeat event in snapshot split fetcher
-                                                .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
-                                                .build())));
+                        dbzConfig));
 
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
