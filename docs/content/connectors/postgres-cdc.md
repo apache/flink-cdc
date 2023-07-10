@@ -48,6 +48,7 @@ CREATE TABLE shipments (
   'database-name' = 'postgres',
   'schema-name' = 'public',
   'table-name' = 'shipments',
+  'slot.name' = 'flink',
    -- experimental feature: incremental snapshot (default off)
   'scan.incremental.snapshot.enabled' = 'true'
 );
@@ -381,7 +382,8 @@ CREATE TABLE products (
   'password' = 'postgres',
   'database-name' = 'postgres',
   'schema-name' = 'public',
-  'table-name' = 'shipments'
+  'table-name' = 'shipments',
+  'slot.name' = 'flink'
 );
 ```
 
