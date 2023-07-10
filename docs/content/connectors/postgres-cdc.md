@@ -437,7 +437,7 @@ public class PostgresParallelSourceExample {
                         .tableList("inventory.products")
                         .username("postgres")
                         .password("postgres")
-                        .slotName("flink2") // use a differnt slot.name for incremental snapshot
+                        .slotName("flink2") // use a different slot.name for each source to connect the same cluster
                         .decodingPluginName("decoderbufs") // use pgoutput for PostgreSQL 10+
                         .deserializer(deserializer)
                         .includeSchemaChanges(true) // output the schema changes as well
