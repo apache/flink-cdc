@@ -53,6 +53,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.PLUGIN_NAME;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.createReplicationConnection;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresValueConverterBuilder;
 import static io.debezium.connector.postgresql.Utils.currentOffset;
@@ -92,6 +94,10 @@ public class PostgresDialect implements JdbcDataSourceDialect {
             throw new FlinkRuntimeException(e);
         }
         return jdbc;
+    }
+
+    public PostgresConnection openJdbcConnection() {
+        return (PostgresConnection) openJdbcConnection(sourceConfig);
     }
 
     public PostgresReplicationConnection openPostgresReplicationConnection() {
@@ -214,5 +220,13 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         if (streamFetchTask != null) {
             streamFetchTask.commitCurrentOffset();
         }
+    }
+
+    public String getSlotName() {
+        return sourceConfig.getDbzProperties().getProperty(SLOT_NAME.name());
+    }
+
+    public String getPluginName() {
+        return sourceConfig.getDbzProperties().getProperty(PLUGIN_NAME.name());
     }
 }

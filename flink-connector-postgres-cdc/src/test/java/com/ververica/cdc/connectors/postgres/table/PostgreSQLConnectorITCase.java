@@ -674,28 +674,4 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         result.getJobClient().get().cancel().get();
     }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(300);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
 }
