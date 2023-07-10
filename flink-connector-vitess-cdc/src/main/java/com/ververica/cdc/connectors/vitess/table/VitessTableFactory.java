@@ -143,9 +143,9 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
         int port = config.get(PORT);
         String keyspace = config.get(KEYSPACE);
         String tableName = config.get(TABLE_NAME);
-        String username = config.get(USERNAME);
-        String password = config.get(PASSWORD);
-        String shard = config.get(SHARD);
+        String username = config.getOptional(USERNAME).orElse(null);
+        String password = config.getOptional(PASSWORD).orElse(null);
+        String shard = config.getOptional(SHARD).orElse(null);
         String gtid = config.get(GTID);
         Boolean stopOnReshard = config.get(STOP_ON_RESHARD);
         Boolean tombstonesOnDelete = config.get(TOMBSTONES_ON_DELETE);

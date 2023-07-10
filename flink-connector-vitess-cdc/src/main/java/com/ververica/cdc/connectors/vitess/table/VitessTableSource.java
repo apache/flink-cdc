@@ -33,6 +33,8 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
+import javax.annotation.Nullable;
+
 import java.time.ZoneId;
 import java.util.Objects;
 import java.util.Properties;
@@ -51,10 +53,10 @@ public class VitessTableSource implements ScanTableSource {
     private final int port;
     private final String hostname;
     private final String keyspace;
-    private final String username;
-    private final String password;
+    @Nullable private final String username;
+    @Nullable private final String password;
     private final String tableName;
-    private String shard;
+    @Nullable private String shard;
     private String gtid;
     private Boolean stopOnReshard;
     private Boolean tombstonesOnDelete;
@@ -68,9 +70,9 @@ public class VitessTableSource implements ScanTableSource {
             String hostname,
             String keyspace,
             String tableName,
-            String username,
-            String password,
-            String shard,
+            @Nullable String username,
+            @Nullable String password,
+            @Nullable String shard,
             String gtid,
             Boolean stopOnReshard,
             Boolean tombstonesOnDelete,
@@ -232,16 +234,16 @@ public class VitessTableSource implements ScanTableSource {
                 + keyspace
                 + '\''
                 + ", username='"
-                + username
+                + String.valueOf(username)
                 + '\''
                 + ", password='"
-                + password
+                + String.valueOf(password)
                 + '\''
                 + ", tableName='"
                 + tableName
                 + '\''
                 + ", shard='"
-                + shard
+                + String.valueOf(shard)
                 + '\''
                 + ", gtid='"
                 + gtid

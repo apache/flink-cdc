@@ -29,7 +29,6 @@ You can follow the Local Install via [Docker guide](https://vitess.io/docs/get-s
 
 ### Checklist
 * Make sure that the VTGate host and its gRPC port (default is 15991) is accessible from the machine where the Vitess connector is installed
-* Make sure that the VTCtld host and its gRPC port (default is 15999) is accessible from the machine where the Vitess connector is installed
 
 ### gRPC authentication
 Because Vitess connector reads change events from the VTGate VStream gRPC server, it does not need to connect directly to MySQL instances.
@@ -58,7 +57,6 @@ Flink SQL> CREATE TABLE orders (
      'hostname' = 'localhost',
      'port' = '3306',
      'keyspace' = 'mydb',
-     'vtctl.hostname' = 'localhost',
      'table-name' = 'orders');
 
 -- read snapshot and binlogs from orders table
@@ -117,46 +115,53 @@ Connector Options
                 <td>An optional password of the Vitess database server (VTGate). If not configured, unauthenticated VTGate gRPC is used.</td>
             </tr>
             <tr>
+                <td>shard</td>
+                <td>optional</td>
+                <td>(none)</td>
+                <td>String</td>
+                <td>An optional name of the shard from which to stream the changes. If not configured, in case of unsharded keyspace, the connector streams changes from the only shard, in case of sharded keyspace, the connector streams changes from all shards in the keyspace.</td>
+            </tr>
+            <tr>
+                <td>gtid</td>
+                <td>optional</td>
+                <td>current</td>
+                <td>String</td>
+                <td>An optional GTID position for a shard to stream from.</td>
+            </tr>
+            <tr>
+                <td>stopOnReshard</td>
+                <td>optional</td>
+                <td>false</td>
+                <td>Boolean</td>
+                <td>Controls Vitess flag stop_on_reshard.</td>
+            </tr>
+            <tr>
+                <td>tombstonesOnDelete</td>
+                <td>optional</td>
+                <td>true</td>
+                <td>Boolean</td>
+                <td>Controls whether a delete event is followed by a tombstone event.</td>
+            </tr>
+            <tr>
+                <td>tombstonesOnDelete</td>
+                <td>optional</td>
+                <td>true</td>
+                <td>Boolean</td>
+                <td>Controls whether a delete event is followed by a tombstone event.</td>
+            </tr>
+            <tr>
+                <td>schemaNameAdjustmentMode</td>
+                <td>optional</td>
+                <td>avro</td>
+                <td>String</td>
+                <td>Specifies how schema names should be adjusted for compatibility with the message converter used by the connector.</td>
+            </tr>
+            <tr>
                 <td>table-name</td>
                 <td>required</td>
                 <td>(none)</td>
                 <td>String</td>
                 <td>Table name of the MySQL database to monitor.</td>
-            </tr>
-            <tr>
-                <td>port</td>
-                <td>optional</td>
-                <td>15991</td>
-                <td>Integer</td>
-                <td>Integer port number of the VTCtld server.</td>
-            </tr>
-            <tr>
-                <td>vtctld.host</td>
-                <td>required</td>
-                <td>(none)</td>
-                <td>String&nbsp;</td>
-                <td>IP address or hostname of the VTCtld server.</td>
-            </tr>
-            <tr>
-                <td>vtctld.port</td>
-                <td>optional</td>
-                <td>15999</td>
-                <td>Integer&nbsp;</td>
-                <td>Integer port number of the VTCtld server.</td>
-            </tr>
-            <tr>
-                <td>vtctld.user</td>
-                <td>optional</td>
-                <td>(none)&nbsp;</td>
-                <td>String&nbsp;</td>
-                <td>An optional username of the VTCtld server. If not configured, unauthenticated VTCtld gRPC is used.</td>
-            </tr>
-            <tr>
-                <td>vtctld.password</td>
-                <td>optional</td>
-                <td>(none)&nbsp;</td>
-                <td>String&nbsp;</td>
-                <td>An optional password of the VTCtld server. If not configured, unauthenticated VTCtld gRPC is used.</td>
             </tr>
             <tr>
                 <td>tablet.type</td>
@@ -180,7 +185,7 @@ The VGTID in Vitess is the equivalent of GTID in MySQL, it describes the positio
 
 When subscribing to a VStream service, the connector needs to provide a VGTID and a Tablet Type (e.g. MASTER, REPLICA). The VGTID describes the position from which VStream should starts sending change events; the Tablet type describes which underlying MySQL instance (master or replica) in each shard do we read change events from.
 
-The first time the connector connects to a Vitess cluster, it gets the current VGTID from a Vitess component called VTCtld and provides the current VGTID to VStream.
+The first time the connector connects to a Vitess cluster, it gets and provides the current VGTID to VStream.
 
 The Debezium Vitess connector acts as a gRPC client of VStream. When the connector receives changes it transforms the events into Debezium create, update, or delete events that include the VGTID of the event. The Vitess connector forwards these change events in records to the Kafka Connect framework, which is running in the same process. The Kafka Connect process asynchronously writes the change event records in the same order in which they were generated to the appropriate Kafka topic.
 
@@ -211,11 +216,6 @@ public class VitessSourceExample {
       .keyspace("inventory")
       .username("flinkuser")
       .password("flinkpw")
-      .vtctldConfig(VtctldConfig
-            .builder()
-            .hostname("localhost")
-            .port(15999)
-            .build())
       .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
       .build();
 
