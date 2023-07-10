@@ -429,7 +429,7 @@ public class PostgresParallelSourceExample {
                 new JsonDebeziumDeserializationSchema();
 
         JdbcIncrementalSource<String> postgresIncrementalSource =
-                new PostgresSourceBuilder<String>()
+                PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
                         .hostname("localhost")
                         .port(5432)
                         .database("postgres")
@@ -437,7 +437,7 @@ public class PostgresParallelSourceExample {
                         .tableList("inventory.products")
                         .username("postgres")
                         .password("postgres")
-                        .slotName("flink")
+                        .slotName("flink2") // use a differnt slot.name for incremental snapshot
                         .decodingPluginName("decoderbufs") // use pgoutput for PostgreSQL 10+
                         .deserializer(deserializer)
                         .includeSchemaChanges(true) // output the schema changes as well
