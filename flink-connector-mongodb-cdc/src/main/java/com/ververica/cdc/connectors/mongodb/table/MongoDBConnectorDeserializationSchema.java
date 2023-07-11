@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-present MongoDB, Inc.
+ * Copyright 2023 Ververica Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -166,12 +166,12 @@ public class MongoDBConnectorDeserializationSchema
         }
     }
 
-    private GenericRowData extractRowData(BsonDocument document) throws Exception {
+    protected GenericRowData extractRowData(BsonDocument document) throws Exception {
         checkNotNull(document);
         return (GenericRowData) physicalConverter.convert(document);
     }
 
-    private BsonDocument extractBsonDocument(Struct value, Schema valueSchema, String fieldName) {
+    protected BsonDocument extractBsonDocument(Struct value, Schema valueSchema, String fieldName) {
         if (valueSchema.field(fieldName) != null) {
             String docString = value.getString(fieldName);
             if (docString != null) {
@@ -186,12 +186,12 @@ public class MongoDBConnectorDeserializationSchema
         return resultTypeInfo;
     }
 
-    private OperationType operationTypeFor(SourceRecord record) {
+    protected OperationType operationTypeFor(SourceRecord record) {
         Struct value = (Struct) record.value();
         return OperationType.fromString(value.getString(MongoDBEnvelope.OPERATION_TYPE_FIELD));
     }
 
-    private void emit(SourceRecord inRecord, RowData physicalRow, Collector<RowData> collector) {
+    protected void emit(SourceRecord inRecord, RowData physicalRow, Collector<RowData> collector) {
         if (!hasMetadata) {
             collector.collect(physicalRow);
             return;

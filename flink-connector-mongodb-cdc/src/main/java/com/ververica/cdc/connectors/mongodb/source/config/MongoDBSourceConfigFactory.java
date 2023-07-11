@@ -59,6 +59,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private Integer splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private Integer splitSizeMB = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
     private boolean closeIdleReaders = false;
+    private boolean enableFullDocPrePostImage = false;
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -219,6 +220,17 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    /**
+     * scan.full-changelog
+     *
+     * <p>Whether to generate full mode row data by looking up full document pre- and post-image
+     * collections. Requires MongoDB >= 6.0.
+     */
+    public MongoDBSourceConfigFactory scanFullChangelog(boolean enableFullDocPrePostImage) {
+        this.enableFullDocPrePostImage = enableFullDocPrePostImage;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -239,6 +251,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
                 splitSizeMB,
-                closeIdleReaders);
+                closeIdleReaders,
+                enableFullDocPrePostImage);
     }
 }

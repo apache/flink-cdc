@@ -41,10 +41,11 @@ import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_START
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COLLECTION;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.CONNECTION_OPTIONS;
-import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.COPY_EXISTING_QUEUE_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.DATABASE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.FULL_DOCUMENT_PRE_POST_IMAGE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HOSTS;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.INITIAL_SNAPSHOTTING_QUEUE_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
@@ -88,7 +89,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         Integer heartbeatIntervalMillis = config.get(HEARTBEAT_INTERVAL_MILLIS);
 
         StartupOptions startupOptions = getStartupOptions(config);
-        Integer copyExistingQueueSize = config.getOptional(COPY_EXISTING_QUEUE_SIZE).orElse(null);
+        Integer initialSnapshottingQueueSize =
+                config.getOptional(INITIAL_SNAPSHOTTING_QUEUE_SIZE).orElse(null);
 
         String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
         ZoneId localTimeZone =
@@ -101,6 +103,9 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         int splitSizeMB = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
+
+        boolean enableFullDocumentPrePostImage =
+                config.getOptional(FULL_DOCUMENT_PRE_POST_IMAGE).orElse(false);
 
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
@@ -119,7 +124,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 collection,
                 connectionOptions,
                 startupOptions,
-                copyExistingQueueSize,
+                initialSnapshottingQueueSize,
                 batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
@@ -128,7 +133,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 enableParallelRead,
                 splitMetaGroupSize,
                 splitSizeMB,
-                enableCloseIdleReaders);
+                enableCloseIdleReaders,
+                enableFullDocumentPrePostImage);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -191,7 +197,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(COLLECTION);
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
-        options.add(COPY_EXISTING_QUEUE_SIZE);
+        options.add(INITIAL_SNAPSHOTTING_QUEUE_SIZE);
         options.add(BATCH_SIZE);
         options.add(POLL_MAX_BATCH_SIZE);
         options.add(POLL_AWAIT_TIME_MILLIS);
@@ -200,6 +206,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(FULL_DOCUMENT_PRE_POST_IMAGE);
         return options;
     }
 }

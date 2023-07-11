@@ -78,8 +78,8 @@ public class MongoDBSourceOptions {
                             "The ampersand-separated MongoDB connection options. "
                                     + "eg. replicaSet=test&connectTimeoutMS=300000");
 
-    public static final ConfigOption<Integer> COPY_EXISTING_QUEUE_SIZE =
-            ConfigOptions.key("copy.existing.queue.size")
+    public static final ConfigOption<Integer> INITIAL_SNAPSHOTTING_QUEUE_SIZE =
+            ConfigOptions.key("initial.snapshotting.queue.size")
                     .intType()
                     .defaultValue(10240)
                     .withDescription(
@@ -133,4 +133,12 @@ public class MongoDBSourceOptions {
                     .defaultValue(64)
                     .withDescription(
                             "The chunk size mb of incremental snapshot. Defaults to 64mb.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> FULL_DOCUMENT_PRE_POST_IMAGE =
+            ConfigOptions.key("scan.full-changelog")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Scan full mode changelog. Only available when MongoDB >= 6.0. Defaults to false.");
 }

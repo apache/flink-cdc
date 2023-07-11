@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.mongodb.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -28,7 +27,6 @@ import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
@@ -72,7 +70,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String database;
     private final String collection;
     private final StartupOptions startupOptions;
-    private final Integer copyExistingQueueSize;
+    private final Integer initialSnapshottingQueueSize;
     private final Integer batchSize;
     private final Integer pollMaxBatchSize;
     private final Integer pollAwaitTimeMillis;
@@ -82,6 +80,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final Integer splitMetaGroupSize;
     private final Integer splitSizeMB;
     private final boolean closeIdlerReaders;
+    private final boolean enableFullDocPrePostImage;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -103,7 +102,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String collection,
             @Nullable String connectionOptions,
             StartupOptions startupOptions,
-            @Nullable Integer copyExistingQueueSize,
+            @Nullable Integer initialSnapshottingQueueSize,
             @Nullable Integer batchSize,
             @Nullable Integer pollMaxBatchSize,
             @Nullable Integer pollAwaitTimeMillis,
@@ -112,7 +111,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean enableParallelRead,
             @Nullable Integer splitMetaGroupSize,
             @Nullable Integer splitSizeMB,
-            boolean closeIdlerReaders) {
+            boolean closeIdlerReaders,
+            boolean enableFullDocPrePostImage) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -122,7 +122,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.collection = collection;
         this.connectionOptions = connectionOptions;
         this.startupOptions = checkNotNull(startupOptions);
-        this.copyExistingQueueSize = copyExistingQueueSize;
+        this.initialSnapshottingQueueSize = initialSnapshottingQueueSize;
         this.batchSize = batchSize;
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
@@ -134,15 +134,18 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
         this.closeIdlerReaders = closeIdlerReaders;
+        this.enableFullDocPrePostImage = enableFullDocPrePostImage;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.newBuilder()
-                .addContainedKind(RowKind.INSERT)
-                .addContainedKind(RowKind.UPDATE_AFTER)
-                .addContainedKind(RowKind.DELETE)
-                .build();
+        if (this.enableFullDocPrePostImage) {
+            // generate full-mode changelog with FullDocPrePostImage
+            return ChangelogMode.all();
+        } else {
+            // upsert changelog only
+            return ChangelogMode.upsert();
+        }
     }
 
     @Override
@@ -153,8 +156,11 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
 
         DebeziumDeserializationSchema<RowData> deserializer =
-                new MongoDBConnectorDeserializationSchema(
-                        physicalDataType, metadataConverters, typeInfo, localTimeZone);
+                enableFullDocPrePostImage
+                        ? new MongoDBConnectorFullChangelogDeserializationSchema(
+                                physicalDataType, metadataConverters, typeInfo, localTimeZone)
+                        : new MongoDBConnectorDeserializationSchema(
+                                physicalDataType, metadataConverters, typeInfo, localTimeZone);
 
         String databaseList = null;
         String collectionList = null;
@@ -183,6 +189,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .scheme(scheme)
                             .hosts(hosts)
                             .closeIdleReaders(closeIdlerReaders)
+                            .scanFullChangelog(enableFullDocPrePostImage)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer);
 
@@ -198,34 +205,23 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     .ifPresent(builder::heartbeatIntervalMillis);
             Optional.ofNullable(splitMetaGroupSize).ifPresent(builder::splitMetaGroupSize);
             Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
-
             return SourceProvider.of(builder.build());
         } else {
             com.ververica.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
                     com.ververica.cdc.connectors.mongodb.MongoDBSource.<RowData>builder()
                             .scheme(scheme)
                             .hosts(hosts)
+                            .scanFullChangelog(enableFullDocPrePostImage)
+                            .startupOptions(startupOptions)
                             .deserializer(deserializer);
-
-            switch (startupOptions.startupMode) {
-                case INITIAL:
-                    builder.copyExisting(true);
-                    break;
-                case LATEST_OFFSET:
-                    builder.copyExisting(false);
-                    break;
-                default:
-                    throw new ValidationException(
-                            startupOptions.startupMode
-                                    + " is not supported by legacy source. To use this feature, 'scan.incremental.snapshot.enabled' needs to be set to true.");
-            }
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
             Optional.ofNullable(username).ifPresent(builder::username);
             Optional.ofNullable(password).ifPresent(builder::password);
             Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
-            Optional.ofNullable(copyExistingQueueSize).ifPresent(builder::copyExistingQueueSize);
+            Optional.ofNullable(initialSnapshottingQueueSize)
+                    .ifPresent(builder::initialSnapshottingQueueSize);
             Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
             Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
             Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
@@ -280,7 +276,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         collection,
                         connectionOptions,
                         startupOptions,
-                        copyExistingQueueSize,
+                        initialSnapshottingQueueSize,
                         batchSize,
                         pollMaxBatchSize,
                         pollAwaitTimeMillis,
@@ -289,7 +285,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         enableParallelRead,
                         splitMetaGroupSize,
                         splitSizeMB,
-                        closeIdlerReaders);
+                        closeIdlerReaders,
+                        enableFullDocPrePostImage);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -313,7 +310,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(collection, that.collection)
                 && Objects.equals(connectionOptions, that.connectionOptions)
                 && Objects.equals(startupOptions, that.startupOptions)
-                && Objects.equals(copyExistingQueueSize, that.copyExistingQueueSize)
+                && Objects.equals(initialSnapshottingQueueSize, that.initialSnapshottingQueueSize)
                 && Objects.equals(batchSize, that.batchSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
@@ -339,7 +336,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 collection,
                 connectionOptions,
                 startupOptions,
-                copyExistingQueueSize,
+                initialSnapshottingQueueSize,
                 batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
