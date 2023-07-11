@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.source.split;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import javax.annotation.Nullable;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** The split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplit extends MySqlSplit {
@@ -167,6 +169,24 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 splitInfos,
                 binlogSplit.getTableSchemas(),
                 binlogSplit.getTotalFinishedSplitSize(),
+                binlogSplit.isSuspended());
+    }
+
+    public static MySqlBinlogSplit filterFinishedSplitInfos(
+            MySqlBinlogSplit binlogSplit, Tables.TableFilter tableFilter) {
+        List<FinishedSnapshotSplitInfo> newFinishedSnapshotSplitInfos =
+                binlogSplit.getFinishedSnapshotSplitInfos().stream()
+                        .filter(i -> tableFilter.isIncluded(i.getTableId()))
+                        .collect(Collectors.toList());
+        return new MySqlBinlogSplit(
+                binlogSplit.splitId,
+                binlogSplit.getStartingOffset(),
+                binlogSplit.getEndingOffset(),
+                newFinishedSnapshotSplitInfos,
+                binlogSplit.getTableSchemas(),
+                binlogSplit.getTotalFinishedSplitSize()
+                        - (binlogSplit.getFinishedSnapshotSplitInfos().size()
+                                - newFinishedSnapshotSplitInfos.size()),
                 binlogSplit.isSuspended());
     }
 
