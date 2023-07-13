@@ -182,6 +182,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .distributionFactorUpper(distributionFactorUpper)
                             .distributionFactorLower(distributionFactorLower)
                             .closeIdleReaders(closeIdleReaders)
+                            .chunkKeyColumn(chunkKeyColumn)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
