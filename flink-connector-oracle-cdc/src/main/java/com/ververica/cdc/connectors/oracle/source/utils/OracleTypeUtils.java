@@ -67,7 +67,9 @@ public class OracleTypeUtils {
                 return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return DataTypes.DECIMAL(column.length()==0?ORACLE_NUMBER_P_DEFAULT:column.length(), column.scale().orElse(0));
+                return DataTypes.DECIMAL(
+                        column.length() == 0 ? ORACLE_NUMBER_P_DEFAULT : column.length(),
+                        column.scale().orElse(0));
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
