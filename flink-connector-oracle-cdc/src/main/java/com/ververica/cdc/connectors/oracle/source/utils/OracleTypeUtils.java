@@ -27,6 +27,9 @@ import java.sql.Types;
 /** Utilities for converting from oracle types to Flink types. */
 public class OracleTypeUtils {
 
+    //the length of the default oracle field type number attribute p  , number(p,s)
+    private static final int ORACLE_NUMBER_P_DEFAULT = 38;
+
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
         DataType dataType = convertFromColumn(column);
@@ -65,7 +68,9 @@ public class OracleTypeUtils {
                 return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
+                return DataTypes.DECIMAL(
+                        column.length() == 0 ? ORACLE_NUMBER_P_DEFAULT : column.length(),
+                        column.scale().orElse(0));
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
