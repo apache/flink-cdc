@@ -77,6 +77,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final String chunkKeyColumn;
+    private final boolean closeIdleReaders;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -108,7 +109,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
             int connectionPoolSize,
             double distributionFactorUpper,
             double distributionFactorLower,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            boolean closeIdleReaders) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -131,6 +133,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.closeIdleReaders = closeIdleReaders;
     }
 
     @Override
@@ -162,6 +165,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .port(port)
                             .databaseList(database)
                             .tableList(tableName)
+                            .serverTimeZone(serverTimeZone.toString())
                             .username(username)
                             .password(password)
                             .startupOptions(startupOptions)
@@ -175,6 +179,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .connectMaxRetries(connectMaxRetries)
                             .distributionFactorUpper(distributionFactorUpper)
                             .distributionFactorLower(distributionFactorLower)
+                            .chunkKeyColumn(chunkKeyColumn)
+                            .closeIdleReaders(closeIdleReaders)
                             .build();
             return SourceProvider.of(sqlServerChangeEventSource);
         } else {
@@ -233,7 +239,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         connectMaxRetries,
                         distributionFactorUpper,
                         distributionFactorLower,
-                        chunkKeyColumn);
+                        chunkKeyColumn,
+                        closeIdleReaders);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
