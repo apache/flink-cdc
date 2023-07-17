@@ -62,24 +62,30 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
     protected void processElement(
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
-        if (isWatermarkEvent(element)) {
-            Offset watermark = getOffsetPosition(element);
-            if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
-                splitState.asSnapshotSplitState().setHighWatermark(watermark);
+        try {
+            if (isWatermarkEvent(element)) {
+                Offset watermark = getOffsetPosition(element);
+                if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+                    splitState.asSnapshotSplitState().setHighWatermark(watermark);
+                }
+            } else if (isHeartbeatEvent(element)) {
+                if (splitState.isStreamSplitState()) {
+                    updatePositionForStreamSplit(element, splitState);
+                }
+            } else if (isDataChangeRecord(element)) {
+                if (splitState.isStreamSplitState()) {
+                    updatePositionForStreamSplit(element, splitState);
+                }
+                reportMetrics(element);
+                emitElement(element, output);
+            } else {
+                // unknown element
+                LOG.info("Meet unknown element {}, just skip.", element);
+                sourceReaderMetrics.addNumRecordsInErrors(1L);
             }
-        } else if (isHeartbeatEvent(element)) {
-            if (splitState.isStreamSplitState()) {
-                updatePositionForStreamSplit(element, splitState);
-            }
-        } else if (isDataChangeRecord(element)) {
-            if (splitState.isStreamSplitState()) {
-                updatePositionForStreamSplit(element, splitState);
-            }
-            reportMetrics(element);
-            emitElement(element, output);
-        } else {
-            // unknown element
-            LOG.info("Meet unknown element {}, just skip.", element);
+        } catch (Throwable t) {
+            LOG.error("Failed to process Source Record {}, due to", element, t);
+            sourceReaderMetrics.addNumRecordsInErrors(1L);
         }
     }
 

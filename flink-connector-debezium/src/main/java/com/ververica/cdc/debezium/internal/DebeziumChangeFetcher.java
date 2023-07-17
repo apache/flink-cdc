@@ -36,7 +36,9 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A Handler that convert change messages from {@link DebeziumEngine} to data in Flink. Considering
@@ -99,6 +101,15 @@ public class DebeziumChangeFetcher<T> {
      * source operator.
      */
     private volatile long emitDelay = 0L;
+
+    /**
+     * The number of records that have not been fetched by the source. e.g. the available records
+     * after the consumer offset in a Kafka partition.
+     */
+    private volatile long pendingRecordsCount = 0L;
+
+    /** The number of records that failed to parse or deserialize. */
+    private volatile AtomicLong numRecordInErrors = new AtomicLong(0);
 
     // ------------------------------------------------------------------------
 
@@ -207,6 +218,14 @@ public class DebeziumChangeFetcher<T> {
         return System.currentTimeMillis() - processTime;
     }
 
+    public long getPendingRecords() {
+        return pendingRecordsCount;
+    }
+
+    public long getNumRecordInErrors() {
+        return numRecordInErrors.get();
+    }
+
     // ---------------------------------------------------------------------------------------
     // Helper
     // ---------------------------------------------------------------------------------------
@@ -220,6 +239,13 @@ public class DebeziumChangeFetcher<T> {
 
         for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
             SourceRecord record = event.value();
+            if (record instanceof MetricRecord) {
+                Object extractValue = extractMetricValue((MetricRecord) record, "pendingRecords");
+                if (extractValue != null) {
+                    pendingRecordsCount = (long) extractValue;
+                }
+                continue;
+            }
             updateMessageTimestamp(record);
             fetchDelay = isInDbSnapshotPhase ? 0L : processTime - messageTimestamp;
 
@@ -232,8 +258,12 @@ public class DebeziumChangeFetcher<T> {
                 // drop heartbeat events
                 continue;
             }
-
-            deserialization.deserialize(record, debeziumCollector);
+            try {
+                deserialization.deserialize(record, debeziumCollector);
+            } catch (Exception e) {
+                numRecordInErrors.incrementAndGet();
+                throw e;
+            }
 
             if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");
@@ -298,6 +328,13 @@ public class DebeziumChangeFetcher<T> {
             return SnapshotRecord.TRUE == snapshotRecord;
         }
         return false;
+    }
+
+    private Object extractMetricValue(MetricRecord record, String key) {
+        if (Objects.equals(record.getMetricKey(), key)) {
+            return record.getMetricValue();
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------------------------------

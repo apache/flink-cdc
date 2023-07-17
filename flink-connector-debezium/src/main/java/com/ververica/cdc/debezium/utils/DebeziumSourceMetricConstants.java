@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.source.metrics;
+package com.ververica.cdc.debezium.utils;
 
-/** A collection of Source Reader metrics related constant strings. */
-public class SourceReaderMetricConstants {
-
+/** A collection of Source metrics related constant strings. */
+public class DebeziumSourceMetricConstants {
     public static final String SOURCE_IDLE_TIME = "sourceIdleTime";
     public static final String CURRENT_FETCH_EVENT_TIME_LAG = "currentFetchEventTimeLag";
     public static final String CURRENT_EMIT_EVENT_TIME_LAG = "currentEmitEventTimeLag";

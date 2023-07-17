@@ -47,6 +47,7 @@ import com.ververica.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
 import com.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import com.ververica.cdc.debezium.internal.Handover;
 import com.ververica.cdc.debezium.internal.SchemaRecord;
+import com.ververica.cdc.debezium.utils.DebeziumSourceMetricConstants;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
@@ -433,14 +434,20 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 (MetricGroup) getMetricGroupMethod.invoke(getRuntimeContext());
 
         metricGroup.gauge(
-                "currentFetchEventTimeLag",
+                DebeziumSourceMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getFetchDelay());
         metricGroup.gauge(
-                "currentEmitEventTimeLag",
+                DebeziumSourceMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getEmitDelay());
         metricGroup.gauge(
-                "sourceIdleTime", (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
-
+                DebeziumSourceMetricConstants.SOURCE_IDLE_TIME,
+                (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
+        metricGroup.gauge(
+                DebeziumSourceMetricConstants.PENDING_RECORDS,
+                (Gauge<Long>) () -> debeziumChangeFetcher.getPendingRecords());
+        metricGroup.gauge(
+                DebeziumSourceMetricConstants.NUM_RECORDS_IN_ERRORS,
+                (Gauge<Long>) () -> debeziumChangeFetcher.getNumRecordInErrors());
         // start the real debezium consumer
         try {
             debeziumChangeFetcher.runFetchLoop();
