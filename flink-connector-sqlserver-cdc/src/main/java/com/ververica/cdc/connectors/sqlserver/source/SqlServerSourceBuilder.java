@@ -197,6 +197,22 @@ public class SqlServerSourceBuilder<T> {
     }
 
     /**
+     * Whether to close idle readers at the end of the snapshot phase. This feature depends on
+     * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
+     * greater than or equal to 1.14, and the configuration <code>
+     * 'execution.checkpointing.checkpoints-after-tasks-finish.enabled'</code> needs to be set to
+     * true.
+     *
+     * <p>See more <a
+     * href="https://cwiki.apache.org/confluence/display/FLINK/FLIP-147%3A+Support+Checkpoints+After+Tasks+Finished">FLIP-147:
+     * Support Checkpoints After Tasks Finished</a>.
+     */
+    public SqlServerSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
+        this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
+    /**
      * Build the {@link SqlServerIncrementalSource}.
      *
      * @return a SqlSeverParallelSource with the settings made for this builder.
