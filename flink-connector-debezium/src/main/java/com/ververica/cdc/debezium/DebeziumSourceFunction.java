@@ -440,6 +440,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 (Gauge<Long>) () -> debeziumChangeFetcher.getEmitDelay());
         metricGroup.gauge(
                 "sourceIdleTime", (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
+        metricGroup.gauge(
+                "pendingRecords", (Gauge<Long>) () -> debeziumChangeFetcher.getPendingRecords());
 
         // start the real debezium consumer
         try {

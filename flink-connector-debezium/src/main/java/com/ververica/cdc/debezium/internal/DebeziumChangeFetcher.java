@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 
 /**
@@ -99,6 +100,12 @@ public class DebeziumChangeFetcher<T> {
      * source operator.
      */
     private volatile long emitDelay = 0L;
+
+    /**
+     * The number of records that have not been fetched by the source. e.g. the available records
+     * after the consumer offset in a Kafka partition.
+     */
+    private volatile long pendingRecordsCount = 0L;
 
     // ------------------------------------------------------------------------
 
@@ -207,6 +214,10 @@ public class DebeziumChangeFetcher<T> {
         return System.currentTimeMillis() - processTime;
     }
 
+    public long getPendingRecords() {
+        return pendingRecordsCount;
+    }
+
     // ---------------------------------------------------------------------------------------
     // Helper
     // ---------------------------------------------------------------------------------------
@@ -220,6 +231,13 @@ public class DebeziumChangeFetcher<T> {
 
         for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
             SourceRecord record = event.value();
+            if (record instanceof MetricRecord) {
+                Object extractValue = extractMetricValue((MetricRecord) record, "pendingRecords");
+                if (extractValue != null) {
+                    pendingRecordsCount = (long) extractValue;
+                }
+                continue;
+            }
             updateMessageTimestamp(record);
             fetchDelay = isInDbSnapshotPhase ? 0L : processTime - messageTimestamp;
 
@@ -298,6 +316,13 @@ public class DebeziumChangeFetcher<T> {
             return SnapshotRecord.TRUE == snapshotRecord;
         }
         return false;
+    }
+
+    private Object extractMetricValue(MetricRecord record, String key) {
+        if (Objects.equals(record.getMetricKey(), key)) {
+            return record.getMetricValue();
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------------------------------

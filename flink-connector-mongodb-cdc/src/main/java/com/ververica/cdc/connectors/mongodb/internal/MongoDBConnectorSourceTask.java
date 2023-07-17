@@ -16,12 +16,18 @@
 
 package com.ververica.cdc.connectors.mongodb.internal;
 
+import com.esotericsoftware.minlog.Log;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoNamespace;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceTask;
+import com.mongodb.kafka.connect.source.statistics.StatisticsManager;
+import com.mongodb.kafka.connect.util.jmx.SourceTaskStatistics;
+import com.mongodb.kafka.connect.util.jmx.internal.Metric;
+import com.mongodb.kafka.connect.util.jmx.internal.TotalMetric;
+import com.ververica.cdc.debezium.internal.MetricRecord;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -40,6 +46,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -84,6 +91,10 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     private final Field startedTaskField;
 
+    private final Field metricValueField;
+
+    private StatisticsManager manager;
+
     private SourceRecord currentLastSnapshotRecord;
 
     private boolean isInSnapshotPhase = false;
@@ -92,6 +103,43 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         this.target = new MongoSourceTask();
         this.startedTaskField = MongoSourceTask.class.getDeclaredField("startedTask");
         startedTaskField.setAccessible(true);
+
+        this.metricValueField = TotalMetric.class.getDeclaredField("value");
+        metricValueField.setAccessible(true);
+    }
+
+    private long extractMetricsValue(Metric metric) throws IllegalAccessException {
+        TotalMetric totalMetric = (TotalMetric) metric;
+        return ((AtomicLong) metricValueField.get(totalMetric)).get();
+    }
+
+    private void initializeStatistics() {
+        try {
+            Object startedTask = startedTaskField.get(target);
+            Field statisticsManagerField =
+                    startedTask.getClass().getDeclaredField("statisticsManager");
+            statisticsManagerField.setAccessible(true);
+            manager = (StatisticsManager) statisticsManagerField.get(startedTask);
+        } catch (IllegalAccessException | NoSuchFieldException ignored) {
+            Log.warn(
+                    "Failed to initialize MongoDB statistics manager. PendingRecords metrics won't be available.");
+        }
+    }
+
+    private Long getPendingRecordsCount() {
+        if (manager == null) {
+            return null;
+        }
+        try {
+            SourceTaskStatistics statistics = manager.currentStatistics();
+            long recordsCount = extractMetricsValue(statistics.getRecords());
+            long acknowledgedRecordsCount =
+                    extractMetricsValue(statistics.getRecordsAcknowledged());
+            long filteredRecordsCount = extractMetricsValue(statistics.getRecordsFiltered());
+            return recordsCount - (acknowledgedRecordsCount + filteredRecordsCount);
+        } catch (IllegalAccessException ignored) {
+            return null;
+        }
     }
 
     @Override
@@ -110,6 +158,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
         initCapturedCollections(props);
         target.start(props);
         isInSnapshotPhase = isCopying();
+        initializeStatistics();
     }
 
     @Override
@@ -132,6 +181,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
     public List<SourceRecord> poll() throws InterruptedException {
         List<SourceRecord> sourceRecords = target.poll();
         List<SourceRecord> outSourceRecords = new LinkedList<>();
+        Long pendingRecordCount = getPendingRecordsCount();
         if (isInSnapshotPhase) {
             // Step1. Snapshot Phase
             if (sourceRecords != null && !sourceRecords.isEmpty()) {
@@ -179,6 +229,7 @@ public class MongoDBConnectorSourceTask extends SourceTask {
                 }
             }
         }
+        outSourceRecords.add(new MetricRecord("pendingRecords", getPendingRecordsCount()));
         return outSourceRecords;
     }
 
