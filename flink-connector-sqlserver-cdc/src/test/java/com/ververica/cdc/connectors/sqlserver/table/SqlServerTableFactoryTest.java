@@ -110,7 +110,7 @@ public class SqlServerTableFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        true);
+                        false);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -125,6 +125,7 @@ public class SqlServerTableFactoryTest {
         properties.put("scan.snapshot.fetch.size", "100");
         properties.put("connect.timeout", "45s");
         properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+        properties.put("scan.incremental.close-idle-reader.enabled", "true");
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
@@ -156,14 +157,14 @@ public class SqlServerTableFactoryTest {
 
     @Test
     public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
-        options.put("port", "1433");
-        options.put("debezium.snapshot.mode", "initial");
-        options.put("server-time-zone", "Asia/Shanghai");
-        options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
-        options.put("scan.incremental.close-idle-reader.enabled", "true");
+        Map<String, String> properties = getAllOptions();
+        properties.put("port", "1433");
+        properties.put("debezium.snapshot.mode", "initial");
+        properties.put("server-time-zone", "Asia/Shanghai");
+        properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+        properties.put("scan.incremental.close-idle-reader.enabled", "true");
 
-        DynamicTableSource actualSource = createTableSource(options);
+        DynamicTableSource actualSource = createTableSource(properties);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "initial");
         SqlServerTableSource expectedSource =
@@ -229,7 +230,7 @@ public class SqlServerTableFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        true);
+                        false);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
