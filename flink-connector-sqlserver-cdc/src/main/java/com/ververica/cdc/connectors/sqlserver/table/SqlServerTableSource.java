@@ -276,7 +276,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
                 && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
-                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(closeIdleReaders, that.closeIdleReaders);
     }
 
     @Override
@@ -303,7 +304,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 connectionPoolSize,
                 distributionFactorUpper,
                 distributionFactorLower,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                closeIdleReaders);
     }
 
     @Override
