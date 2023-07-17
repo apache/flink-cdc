@@ -27,7 +27,7 @@ import java.sql.Types;
 /** Utilities for converting from oracle types to Flink types. */
 public class OracleTypeUtils {
 
-    //the length of the default oracle field type number attribute p  , number(p,s)
+    // the length of the default oracle field type number attribute p  , number(p,s)
     private static final int ORACLE_NUMBER_P_DEFAULT = 38;
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
