@@ -346,7 +346,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         String finishedSavePointPath = null;
         CollectResultIterator<RowData> iterator = null;
         for (int i = 0; i < 2; i++) {
-            String tableInThisRound = i == 0 ? tableId1 : "customers_1";
+            String changedTable = i == 0 ? tableId1 : "customers_1";
             StreamExecutionEnvironment env =
                     getStreamExecutionEnvironment(finishedSavePointPath, 4);
 
@@ -433,86 +433,35 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                             "+I[110, user_10, Shanghai, 123567891234, customers_even_dist]");
             List<String> expectedCustomersResult =
                     Arrays.asList(
-                            String.format(
-                                    "+I[1011, user_12, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1012, user_13, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1009, user_10, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1010, user_11, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1015, user_16, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1016, user_17, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1013, user_14, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[118, user_7, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1014, user_15, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[111, user_6, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[2000, user_21, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[109, user_4, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[110, user_5, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[103, user_3, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[101, user_1, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[102, user_2, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[123, user_9, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1019, user_20, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[121, user_8, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1017, user_18, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[1018, user_19, Shanghai, 123567891234, %s]",
-                                    tableInThisRound));
+                            format("+I[1011, user_12, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1012, user_13, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1009, user_10, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1010, user_11, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1015, user_16, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1016, user_17, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1013, user_14, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[118, user_7, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1014, user_15, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[111, user_6, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[2000, user_21, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[109, user_4, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[110, user_5, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[103, user_3, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[101, user_1, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[102, user_2, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[123, user_9, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1019, user_20, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[121, user_8, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1017, user_18, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[1018, user_19, Shanghai, 123567891234, %s]", changedTable));
             List<String> expectedBinlogResult =
                     Arrays.asList(
-                            String.format(
-                                    "-U[103, user_3, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+U[103, user_3, Update1, 123567891234, %s]", tableInThisRound),
-                            String.format(
-                                    "-D[102, user_2, Shanghai, 123567891234, %s]",
-                                    tableInThisRound),
-                            String.format(
-                                    "+I[102, user_2, Insert1, 123567891234, %s]", tableInThisRound),
-                            String.format(
-                                    "-U[103, user_3, Update1, 123567891234, %s]", tableInThisRound),
-                            String.format(
-                                    "+U[103, user_3, Update2, 123567891234, %s]",
-                                    tableInThisRound));
+                            format("-U[103, user_3, Shanghai, 123567891234, %s]", changedTable),
+                            format("+U[103, user_3, Update1, 123567891234, %s]", changedTable),
+                            format("-D[102, user_2, Shanghai, 123567891234, %s]", changedTable),
+                            format("+I[102, user_2, Insert1, 123567891234, %s]", changedTable),
+                            format("-U[103, user_3, Update1, 123567891234, %s]", changedTable),
+                            format("+U[103, user_3, Update2, 123567891234, %s]", changedTable));
 
             List<String> expectedSnapshotResult =
                     i == 0
@@ -527,7 +476,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             // make binlog events
             try (MySqlConnection connection = getConnection()) {
                 connection.setAutoCommit(false);
-                String tableId = customDatabase.getDatabaseName() + "." + tableInThisRound;
+                String tableId = customDatabase.getDatabaseName() + "." + changedTable;
                 connection.execute(
                         "UPDATE " + tableId + " SET address = 'Update1' where id = 103",
                         "DELETE FROM " + tableId + " where id = 102",
@@ -564,7 +513,6 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         serializer,
                         accumulatorName,
                         stream.getExecutionEnvironment().getCheckpointConfig());
-        //        iterator.setJobClient(jobClient);
         return iterator;
     }
 

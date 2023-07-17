@@ -66,7 +66,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner.BINLOG_SPLIT_ID;
-import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.filterFinishedSplitInfos;
+import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.filterOutdatedSplitInfos;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toNormalBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
 import static com.ververica.cdc.connectors.mysql.source.utils.ChunkUtils.getNextMetaGroupId;
@@ -207,7 +207,14 @@ public class MySqlSourceReader<T>
         addSplits(splits, false);
     }
 
-    private void addSplits(List<MySqlSplit> splits, boolean selfUpdate) {
+    /**
+     * Adds a list of splits for this reader to read.
+     *
+     * @param splits the splits to add.
+     * @param checkTableChangeForBinlogSplit to check the captured table list change or not, it
+     *     should be true for reader which is during restoration from a checkpoint or savepoint.
+     */
+    private void addSplits(List<MySqlSplit> splits, boolean checkTableChangeForBinlogSplit) {
         // restore for finishedUnackedSplits
         List<MySqlSplit> unfinishedSplits = new ArrayList<>();
         for (MySqlSplit split : splits) {
@@ -233,9 +240,9 @@ public class MySqlSourceReader<T>
                 // for the deleted tables.
                 // We need to remove these splits for the deleted tables at the finished split
                 // infos.
-                if (!selfUpdate) {
+                if (!checkTableChangeForBinlogSplit) {
                     binlogSplit =
-                            filterFinishedSplitInfos(
+                            filterOutdatedSplitInfos(
                                     binlogSplit,
                                     sourceConfig
                                             .getMySqlConnectorConfig()

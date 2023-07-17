@@ -172,21 +172,28 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 binlogSplit.isSuspended());
     }
 
-    public static MySqlBinlogSplit filterFinishedSplitInfos(
-            MySqlBinlogSplit binlogSplit, Tables.TableFilter tableFilter) {
-        List<FinishedSnapshotSplitInfo> newFinishedSnapshotSplitInfos =
+    /**
+     * Filter out the outdated finished splits in {@link MySqlBinlogSplit}.
+     *
+     * <p>When restore from a checkpoint, the finished split infos may contain some splits from the
+     * deleted tables. We need to remove these splits from the total finished split infos and update
+     * the size.
+     */
+    public static MySqlBinlogSplit filterOutdatedSplitInfos(
+            MySqlBinlogSplit binlogSplit, Tables.TableFilter currentTableFilter) {
+        List<FinishedSnapshotSplitInfo> allFinishedSnapshotSplitInfos =
                 binlogSplit.getFinishedSnapshotSplitInfos().stream()
-                        .filter(i -> tableFilter.isIncluded(i.getTableId()))
+                        .filter(i -> currentTableFilter.isIncluded(i.getTableId()))
                         .collect(Collectors.toList());
         return new MySqlBinlogSplit(
                 binlogSplit.splitId,
                 binlogSplit.getStartingOffset(),
                 binlogSplit.getEndingOffset(),
-                newFinishedSnapshotSplitInfos,
+                allFinishedSnapshotSplitInfos,
                 binlogSplit.getTableSchemas(),
                 binlogSplit.getTotalFinishedSplitSize()
                         - (binlogSplit.getFinishedSnapshotSplitInfos().size()
-                                - newFinishedSnapshotSplitInfos.size()),
+                                - allFinishedSnapshotSplitInfos.size()),
                 binlogSplit.isSuspended());
     }
 
