@@ -44,8 +44,10 @@ public class SourceRecordUtils {
 
     private SourceRecordUtils() {}
 
-    public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
+    public static final String MYSQL_SCHEMA_CHANGE_EVENT_KEY_NAME =
             "io.debezium.connector.mysql.SchemaChangeKey";
+    public static final String ORACLE_SCHEMA_CHANGE_EVENT_KEY_NAME =
+            "io.debezium.connector.oracle.SchemaChangeKey";
     public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
             "io.debezium.connector.common.Heartbeat";
 
@@ -99,7 +101,9 @@ public class SourceRecordUtils {
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
-        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
+        return keySchema != null
+                && (MYSQL_SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name())
+                        || ORACLE_SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name()));
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {
