@@ -75,7 +75,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     private final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
 
-    private Integer binlogSplitTaskId;
+    @Nullable private Integer binlogSplitTaskId;
 
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
@@ -112,6 +112,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     @Override
     public void addSplitsBack(List<MySqlSplit> splits, int subtaskId) {
         LOG.debug("The enumerator adds splits back: {}", splits);
+        if (splits.stream().anyMatch(MySqlSplit::isBinlogSplit)) {
+            this.binlogSplitTaskId = null;
+        }
         splitAssigner.addSplits(splits);
     }
 
