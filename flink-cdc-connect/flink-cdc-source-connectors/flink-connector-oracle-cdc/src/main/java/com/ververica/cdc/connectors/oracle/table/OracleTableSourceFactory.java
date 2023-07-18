@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.oracle.table;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
@@ -56,6 +57,7 @@ import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOpti
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.SCHEMA_NAME;
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.URL;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link OracleTableSource}. */
@@ -75,6 +77,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
+        checkNotNull(databaseName);
+        databaseName = databaseName.toUpperCase();
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
         int port = config.get(PORT);
