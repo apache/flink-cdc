@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.oracle.table;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
