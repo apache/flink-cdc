@@ -204,7 +204,7 @@ public class MySqlSourceReader<T>
 
     @Override
     public void addSplits(List<MySqlSplit> splits) {
-        addSplits(splits, false);
+        addSplits(splits, true);
     }
 
     /**
@@ -240,7 +240,7 @@ public class MySqlSourceReader<T>
                 // for the deleted tables.
                 // We need to remove these splits for the deleted tables at the finished split
                 // infos.
-                if (!checkTableChangeForBinlogSplit) {
+                if (checkTableChangeForBinlogSplit) {
                     binlogSplit =
                             filterOutdatedSplitInfos(
                                     binlogSplit,
@@ -326,7 +326,7 @@ public class MySqlSourceReader<T>
             final MySqlBinlogSplit binlogSplit =
                     toNormalBinlogSplit(suspendedBinlogSplit, finishedSplitsSize);
             suspendedBinlogSplit = null;
-            this.addSplits(Collections.singletonList(binlogSplit), true);
+            this.addSplits(Collections.singletonList(binlogSplit), false);
 
             context.sendSourceEventToCoordinator(new BinlogSplitUpdateAckEvent());
             LOG.info(
