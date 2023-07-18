@@ -96,7 +96,7 @@ public class StatementUtils {
                 });
     }
 
-    public static Object queryNextChunkMax(
+    public static Object[] queryNextChunkMaxAndCount(
             JdbcConnection jdbc,
             TableId tableId,
             String splitColumnName,
@@ -106,7 +106,7 @@ public class StatementUtils {
         String quotedColumn = quote(splitColumnName);
         String query =
                 String.format(
-                        "SELECT MAX(%s) FROM ("
+                        "SELECT MAX(%s),COUNT(1) FROM ("
                                 + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC LIMIT %s"
                                 + ") AS T",
                         quotedColumn,
@@ -125,7 +125,10 @@ public class StatementUtils {
                                 String.format(
                                         "No result returned after running query [%s]", query));
                     }
-                    return rs.getObject(1);
+                    Object[] chunkEndAndCount = new Object[2];
+                    chunkEndAndCount[0] = rs.getObject(1);
+                    chunkEndAndCount[1] = rs.getObject(2);
+                    return chunkEndAndCount;
                 });
     }
 
