@@ -44,11 +44,13 @@ public class SourceRecordUtils {
 
     private SourceRecordUtils() {}
 
-    public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
-            "io.debezium.connector.mysql.SchemaChangeKey";
     public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
             "io.debezium.connector.common.Heartbeat";
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
+    public static final String MYSQL_SCHEMA_CHANGE_EVENT_KEY_NAME = "io.debezium.connector.mysql.SchemaChangeKey";
+    public static final String ORACLE_SCHEMA_CHANGE_EVENT_KEY_NAME = "io.debezium.connector.oracle.SchemaChangeKey";
+    public static final String CONNECTOR = "connector";
+    public static final String MYSQL_CONNECTOR = "mysql";
 
     /** Converts a {@link ResultSet} row to an array of Objects. */
     public static Object[] rowToArray(ResultSet rs, int size) throws SQLException {
@@ -95,7 +97,8 @@ public class SourceRecordUtils {
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
-        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
+        return keySchema != null && (MYSQL_SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name())
+                || ORACLE_SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name()));
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {
@@ -198,5 +201,15 @@ public class SourceRecordUtils {
         Struct value = (Struct) schemaRecord.value();
         String historyRecordStr = value.getString(HISTORY_RECORD_FIELD);
         return new HistoryRecord(DOCUMENT_READER.read(historyRecordStr));
+    }
+
+    /**
+     * Whether the source belong Mysql Connector
+     * @param source
+     * @return true if the source belong Mysql Connector
+     */
+    public static boolean isMysqlConnector(Struct source) {
+        String connector = source.getString(CONNECTOR);
+        return MYSQL_CONNECTOR.equalsIgnoreCase(connector);
     }
 }
