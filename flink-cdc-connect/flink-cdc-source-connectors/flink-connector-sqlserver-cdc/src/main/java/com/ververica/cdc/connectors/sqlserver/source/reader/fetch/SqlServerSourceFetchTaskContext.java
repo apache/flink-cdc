@@ -158,7 +158,6 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
                         DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster,
-                        // https://debezium.io/documentation/reference/stable/connectors/oracle.html#oracle-schema-change-topic
                         event -> {
                             Map<String, Object> source = new HashMap<>();
                             Struct sourceInfo = event.getSource();
