@@ -28,16 +28,21 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.FailoverPhase;
-import com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.FailoverType;
+import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
+import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfigFactory;
+import com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils;
+import com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils;
 import org.bson.Document;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertEqualsInAnyOrder;
@@ -46,30 +51,61 @@ import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.fetchRows;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBTestUtils.triggerFailover;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.junit.Assert.assertEquals;
 
-/** IT tests for {@link MongoDBSource}. */
-public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
+/** Integration tests for MongoDB full document before change info. */
+@RunWith(Parameterized.class)
+public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
+
+    private final boolean parallelismSnapshot;
+
+    public MongoDBFullChangelogITCase(boolean parallelismSnapshot) {
+        this.parallelismSnapshot = parallelismSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {false}, new Object[] {true}};
+    }
+
+    @Test
+    public void testGetMongoDBVersion() {
+        MongoDBSourceConfig config =
+                new MongoDBSourceConfigFactory()
+                        .hosts(CONTAINER.getHostAndPort())
+                        .splitSizeMB(1)
+                        .pollAwaitTimeMillis(500)
+                        .create(0);
+
+        assertEquals(MongoUtils.getMongoVersion(config), "6.0.6");
+    }
 
     @Test
     public void testReadSingleCollectionWithSingleParallelism() throws Exception {
         testMongoDBParallelSource(
-                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                1,
+                MongoDBTestUtils.FailoverType.NONE,
+                MongoDBTestUtils.FailoverPhase.NEVER,
+                new String[] {"customers"});
     }
 
     @Test
     public void testReadSingleCollectionWithMultipleParallelism() throws Exception {
         testMongoDBParallelSource(
-                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                4,
+                MongoDBTestUtils.FailoverType.NONE,
+                MongoDBTestUtils.FailoverPhase.NEVER,
+                new String[] {"customers"});
     }
 
     @Test
     public void testReadMultipleCollectionWithSingleParallelism() throws Exception {
         testMongoDBParallelSource(
                 1,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
+                MongoDBTestUtils.FailoverType.NONE,
+                MongoDBTestUtils.FailoverPhase.NEVER,
                 new String[] {"customers", "customers_1"});
     }
 
@@ -77,51 +113,83 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     public void testReadMultipleCollectionWithMultipleParallelism() throws Exception {
         testMongoDBParallelSource(
                 4,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
+                MongoDBTestUtils.FailoverType.NONE,
+                MongoDBTestUtils.FailoverPhase.NEVER,
                 new String[] {"customers", "customers_1"});
     }
 
     // Failover tests
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
         testMongoDBParallelSource(
-                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                MongoDBTestUtils.FailoverType.TM,
+                MongoDBTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testTaskManagerFailoverInStreamPhase() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
         testMongoDBParallelSource(
-                FailoverType.TM, FailoverPhase.STREAM, new String[] {"customers", "customers_1"});
+                MongoDBTestUtils.FailoverType.TM,
+                MongoDBTestUtils.FailoverPhase.STREAM,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
         testMongoDBParallelSource(
-                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                MongoDBTestUtils.FailoverType.JM,
+                MongoDBTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testJobManagerFailoverInStreamPhase() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
         testMongoDBParallelSource(
-                FailoverType.JM, FailoverPhase.STREAM, new String[] {"customers", "customers_1"});
+                MongoDBTestUtils.FailoverType.JM,
+                MongoDBTestUtils.FailoverPhase.STREAM,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testTaskManagerFailoverSingleParallelism() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
         testMongoDBParallelSource(
-                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
+                1,
+                MongoDBTestUtils.FailoverType.TM,
+                MongoDBTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers"});
     }
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
         testMongoDBParallelSource(
-                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
+                1,
+                MongoDBTestUtils.FailoverType.JM,
+                MongoDBTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers"});
     }
 
     private void testMongoDBParallelSource(
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            MongoDBTestUtils.FailoverType failoverType,
+            MongoDBTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerCollections)
             throws Exception {
         testMongoDBParallelSource(
@@ -130,12 +198,26 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
 
     private void testMongoDBParallelSource(
             int parallelism,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            MongoDBTestUtils.FailoverType failoverType,
+            MongoDBTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerCollections)
             throws Exception {
 
-        String customerDatabase = CONTAINER.executeCommandFileInSeparateDatabase("customer");
+        String customerDatabase =
+                "customer_" + Integer.toUnsignedString(new Random().nextInt(), 36);
+
+        // A - enable system-level fulldoc pre & post image feature
+        CONTAINER.executeCommand(
+                "use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
+
+        // B - enable collection-level fulldoc pre & post image for change capture collection
+        for (String collectionName : captureCustomerCollections) {
+            CONTAINER.executeCommandInDatabase(
+                    String.format(
+                            "db.createCollection('%s'); db.runCommand({ collMod: '%s', changeStreamPreAndPostImages: { enabled: true } })",
+                            collectionName, collectionName),
+                    customerDatabase);
+        }
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -143,6 +225,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
         String sourceDDL =
                 String.format(
                         "CREATE TABLE customers ("
@@ -154,19 +237,24 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                                 + " primary key (_id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
-                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'hosts' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s',"
-                                + " 'heartbeat.interval.ms' = '500'"
+                                + " 'heartbeat.interval.ms' = '500',"
+                                + " 'scan.full-changelog' = 'true'"
                                 + ")",
+                        parallelismSnapshot ? "true" : "false",
                         CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         customerDatabase,
                         getCollectionNameRegex(customerDatabase, captureCustomerCollections));
+
+        CONTAINER.executeCommandFileInDatabase("customer", customerDatabase);
+
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
                 new String[] {
@@ -203,7 +291,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
         }
 
         // trigger failover after some snapshot splits read finished
-        if (failoverPhase == FailoverPhase.SNAPSHOT && iterator.hasNext()) {
+        if (failoverPhase == MongoDBTestUtils.FailoverPhase.SNAPSHOT && iterator.hasNext()) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(100));
         }
@@ -216,7 +304,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
             makeFirstPartChangeStreamEvents(
                     mongodbClient.getDatabase(customerDatabase), collectionName);
         }
-        if (failoverPhase == FailoverPhase.STREAM) {
+        if (failoverPhase == MongoDBTestUtils.FailoverPhase.STREAM) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
         }

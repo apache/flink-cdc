@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.source.split;
 
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import javax.annotation.Nullable;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** The split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplit extends MySqlSplit {
@@ -167,6 +169,31 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 splitInfos,
                 binlogSplit.getTableSchemas(),
                 binlogSplit.getTotalFinishedSplitSize(),
+                binlogSplit.isSuspended());
+    }
+
+    /**
+     * Filter out the outdated finished splits in {@link MySqlBinlogSplit}.
+     *
+     * <p>When restore from a checkpoint, the finished split infos may contain some splits from the
+     * deleted tables. We need to remove these splits from the total finished split infos and update
+     * the size.
+     */
+    public static MySqlBinlogSplit filterOutdatedSplitInfos(
+            MySqlBinlogSplit binlogSplit, Tables.TableFilter currentTableFilter) {
+        List<FinishedSnapshotSplitInfo> allFinishedSnapshotSplitInfos =
+                binlogSplit.getFinishedSnapshotSplitInfos().stream()
+                        .filter(i -> currentTableFilter.isIncluded(i.getTableId()))
+                        .collect(Collectors.toList());
+        return new MySqlBinlogSplit(
+                binlogSplit.splitId,
+                binlogSplit.getStartingOffset(),
+                binlogSplit.getEndingOffset(),
+                allFinishedSnapshotSplitInfos,
+                binlogSplit.getTableSchemas(),
+                binlogSplit.getTotalFinishedSplitSize()
+                        - (binlogSplit.getFinishedSnapshotSplitInfos().size()
+                                - allFinishedSnapshotSplitInfos.size()),
                 binlogSplit.isSuspended());
     }
 

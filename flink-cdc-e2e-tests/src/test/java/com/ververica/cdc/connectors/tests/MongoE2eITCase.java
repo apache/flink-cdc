@@ -47,11 +47,9 @@ import java.util.Random;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.supportCheckpointsAfterTasksFinished;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER;
+import static com.ververica.cdc.connectors.mongodb.LegacyMongoDBContainer.FLINK_USER_PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGODB_PORT;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_PASSWORD;
-import static com.ververica.cdc.connectors.mongodb.utils.MongoDBContainer.MONGO_SUPER_USER;
 
 /** End-to-end tests for mongodb-cdc connector uber jar. */
 public class MongoE2eITCase extends FlinkContainerTestEnvironment {
@@ -62,24 +60,26 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path mongoCdcJar = TestUtils.getResource("mongodb-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    private MongoDBContainer config;
-
-    private MongoDBContainer shard;
-
-    private MongoDBContainer router;
+    private MongoDBContainer container;
 
     private MongoClient mongoClient;
 
     @Parameterized.Parameter(1)
     public boolean parallelismSnapshot;
 
-    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
+    @Parameterized.Parameter(2)
+    public boolean scanFullChangelog;
+
+    @Parameterized.Parameters(
+            name = "flinkVersion: {0}, parallelismSnapshot: {1}, scanFullChangelog: {2}")
     public static List<Object[]> parameters() {
         final List<String> flinkVersions = getFlinkVersion();
         List<Object[]> params = new ArrayList<>();
         for (String flinkVersion : flinkVersions) {
-            params.add(new Object[] {flinkVersion, true});
-            params.add(new Object[] {flinkVersion, false});
+            params.add(new Object[] {flinkVersion, true, true});
+            params.add(new Object[] {flinkVersion, true, false});
+            params.add(new Object[] {flinkVersion, false, true});
+            params.add(new Object[] {flinkVersion, false, false});
         }
         return params;
     }
@@ -87,31 +87,25 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     @Before
     public void before() {
         super.before();
-        config =
-                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.CONFIG)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-        shard =
-                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.SHARD)
-                        .dependsOn(config)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-        router =
-                new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.ROUTER)
-                        .dependsOn(shard)
+        container =
+                new MongoDBContainer("mongo:6.0.6")
+                        .withSharding()
+                        .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-        Startables.deepStart(Stream.of(config)).join();
-        Startables.deepStart(Stream.of(shard)).join();
-        Startables.deepStart(Stream.of(router)).join();
+        Startables.deepStart(Stream.of(container)).join();
+
+        if (scanFullChangelog) {
+            container.executeCommand(
+                    "use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
+        }
 
         MongoClientSettings settings =
                 MongoClientSettings.builder()
                         .applyConnectionString(
-                                new ConnectionString(
-                                        router.getConnectionString(
-                                                MONGO_SUPER_USER, MONGO_SUPER_PASSWORD)))
+                                new ConnectionString(container.getConnectionString()))
                         .build();
         mongoClient = MongoClients.create(settings);
     }
@@ -122,23 +116,21 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         if (mongoClient != null) {
             mongoClient.close();
         }
-        if (router != null) {
-            router.stop();
-        }
-        if (shard != null) {
-            shard.stop();
-        }
-        if (config != null) {
-            config.stop();
+        if (container != null) {
+            container.stop();
         }
     }
 
     @Test
     public void testMongoDbCDC() throws Exception {
         String dbName =
-                router.executeCommandFileInDatabase(
+                container.executeCommandFileInDatabase(
                         "mongo_inventory",
                         "inventory" + Integer.toUnsignedString(new Random().nextInt(), 36));
+
+        container.executeCommandInDatabase(
+                "db.runCommand({ collMod: 'products', changeStreamPreAndPostImages: { enabled: true } })",
+                dbName);
         List<String> sqlLines =
                 Arrays.asList(
                         "SET 'execution.checkpointing.interval' = '3s';",
@@ -159,6 +151,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                         " 'collection' = 'products',",
                         " 'heartbeat.interval.ms' = '1000',",
                         " 'scan.incremental.snapshot.enabled' = '" + parallelismSnapshot + "',",
+                        " 'scan.full-changelog' = '" + scanFullChangelog + "',",
                         " 'scan.incremental.close-idle-reader.enabled' = '"
                                 + supportCheckpointsAfterTasksFinished()
                                 + "'",

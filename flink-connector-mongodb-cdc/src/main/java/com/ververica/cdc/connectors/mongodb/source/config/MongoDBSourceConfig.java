@@ -49,6 +49,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final int splitMetaGroupSize;
     private final int splitSizeMB;
     private final boolean closeIdleReaders;
+    private final boolean enableFullDocPrePostImage;
 
     MongoDBSourceConfig(
             String scheme,
@@ -66,7 +67,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             int heartbeatIntervalMillis,
             int splitMetaGroupSize,
             int splitSizeMB,
-            boolean closeIdleReaders) {
+            boolean closeIdleReaders,
+            boolean enableFullDocPrePostImage) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -84,6 +86,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
         this.closeIdleReaders = closeIdleReaders;
+        this.enableFullDocPrePostImage = enableFullDocPrePostImage;
     }
 
     public String getScheme() {
@@ -161,6 +164,10 @@ public class MongoDBSourceConfig implements SourceConfig {
     @Override
     public boolean isCloseIdleReaders() {
         return closeIdleReaders;
+    }
+
+    public boolean isFullDocPrePostImageEnabled() {
+        return enableFullDocPrePostImage;
     }
 
     @Override

@@ -34,6 +34,7 @@ import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.junit.Test;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -108,17 +109,62 @@ public class SqlServerTableFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        false);
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testEnableParallelReadSource() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
+        properties.put("chunk-meta.group.size", "3000");
+        properties.put("chunk-key.even-distribution.factor.upper-bound", "40.5");
+        properties.put("chunk-key.even-distribution.factor.lower-bound", "0.01");
+        properties.put("scan.snapshot.fetch.size", "100");
+        properties.put("connect.timeout", "45s");
+        properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+        properties.put("scan.incremental.close-idle-reader.enabled", "true");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        SqlServerTableSource expectedSource =
+                new SqlServerTableSource(
+                        SCHEMA,
+                        1433,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        ZoneId.of("UTC"),
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        PROPERTIES,
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        8000,
+                        3000,
+                        100,
+                        Duration.ofSeconds(45),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        40.5d,
+                        0.01d,
+                        "testCol",
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
     @Test
     public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
-        options.put("port", "1433");
-        options.put("debezium.snapshot.mode", "initial");
+        Map<String, String> properties = getAllOptions();
+        properties.put("port", "1433");
+        properties.put("debezium.snapshot.mode", "initial");
+        properties.put("server-time-zone", "Asia/Shanghai");
+        properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+        properties.put("scan.incremental.close-idle-reader.enabled", "true");
 
-        DynamicTableSource actualSource = createTableSource(options);
+        DynamicTableSource actualSource = createTableSource(properties);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "initial");
         SqlServerTableSource expectedSource =
@@ -128,7 +174,7 @@ public class SqlServerTableFactoryTest {
                         MY_LOCALHOST,
                         MY_DATABASE,
                         MY_TABLE,
-                        ZoneId.of("UTC"),
+                        ZoneId.of("Asia/Shanghai"),
                         MY_USERNAME,
                         MY_PASSWORD,
                         dbzProperties,
@@ -144,7 +190,8 @@ public class SqlServerTableFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        "testCol",
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -182,7 +229,8 @@ public class SqlServerTableFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
-                        null);
+                        null,
+                        false);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");

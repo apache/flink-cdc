@@ -250,6 +250,13 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>心跳间隔（毫秒）。使用 0 禁用。</td>
     </tr>
     <tr>
+      <td>scan.full-changelog</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否尝试使用 MongoDB 前像/后像产生完整事件流。请查阅 <a href="#a-name-id-003-a">完整事件流</a> 章节了解更多详细信息。该功能仅支持 MongoDB 6.0 之后的版本。</td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
@@ -362,15 +369,11 @@ CREATE TABLE mongodb_source (...) WITH (
     'connector' = 'mongodb-cdc',
     'scan.startup.mode' = 'latest-offset', -- 从最晚位点启动
     ...
-    'scan.incremental.snapshot.enabled' = 'true', -- 指定时间戳启动，需要开启增量快照读
     'scan.startup.mode' = 'timestamp', -- 指定时间戳启动模式
     'scan.startup.timestamp-millis' = '1667232000000' -- 启动毫秒时间
     ...
 )
 ```
-
-**Notes:**
-- 'timestamp' 指定时间戳启动模式，需要开启增量快照读。
 
 ### 更改流
 
@@ -461,6 +464,59 @@ public class MongoDBIncrementalSourceExample {
 **注意:**
 - 如果使用数据库正则表达式，则需要 `readAnyDatabase` 角色。
 - 增量快照功能仅支持 MongoDB 4.0 之后的版本。
+
+### 完整事件流<a name="完整事件流" id="003" ></a>
+
+MongoDB 6.0 及以上版本支持在输出的更改流事件中携带对应更改前及更改后的文档版本（分别称为前像和后像）。
+
+- 前像（Pre-image）是被该变更替换、更新或删除的文档。插入事件不存在对应的前像。
+
+- 后像（Post-image）是该变更插入、替换或更新的文档。删除事件不存在对应的后像。
+
+MongoDB CDC 能够借助上述前像和后像信息，产生完整的、包含 Insert、Update Before、Update After、Delete 数据行的事件流，从而避免下游 Flink 增加额外的 `ChangelogNormalize` 节点。
+
+为了启用这一功能，您需要确保：
+
+- MongoDB 数据库版本不低于 6.0；
+- 在数据库层面启用前像/后像记录功能：
+```javascript
+db.runCommand({
+  setClusterParameter: {
+    changeStreamOptions: {
+      preAndPostImages: {
+        expireAfterSeconds: 'off' // 自定义前像后像的过期时间
+      }
+    }
+  }
+})
+```
+- 为需要监控的集合开启前像/后像记录功能：
+```javascript
+db.runCommand({
+  collMod: "<< 集合名称 >>", 
+  changeStreamPreAndPostImages: {
+    enabled: true 
+  } 
+})
+```
+- 打开 MongoDB CDC 的 `scan.full-changelog` 开关：
+
+```java
+MongoDBSource.builder()
+    .scanFullChangelog(true)
+    ...
+    .build()
+```
+
+或者使用 Flink SQL：
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.full-changelog' = 'true',
+    ...
+)
+```
 
 数据类型映射
 ----------------
@@ -585,6 +641,7 @@ public class MongoDBIncrementalSourceExample {
 - [WiredTiger](https://docs.mongodb.com/manual/core/wiredtiger/#std-label-storage-wiredtiger)
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
+- [Document Pre- and Post-Images](https://www.mongodb.com/docs/v6.0/changeStreams/#change-streams-with-document-pre--and-post-images)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
 - [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/)
 
