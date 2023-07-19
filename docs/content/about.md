@@ -41,6 +41,20 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Con
 2. CDC connectors for DataStream API, users can consume changes on multiple databases and tables in a single job without Debezium and Kafka deployed.
 3. CDC connectors for Table/SQL API, users can use SQL DDL to create a CDC source to monitor changes on a single table.
 
+The following table shows the current features of the connector:
+
+| Connector                                    |     No-lock Read    |  Parallel Read   | Exactly-once Read | Incremental Snapshot Read  |
+|----------------------------------------------|---------------------|------------------|-------------------|----------------------------|
+| [mongodb-cdc](connectors/mongodb-cdc.md)     | ✅                  | ✅               | ✅                 | ✅                         |
+| [mysql-cdc](connectors/mysql-cdc.md)         | ✅                  | ✅               | ✅                 | ✅                         |
+| [oracle-cdc](connectors/oracle-cdc.md)       | ✅                  | ✅               | ✅                 | ✅                         |
+| [postgres-cdc](connectors/postgres-cdc.md)   | ✅                  | ✅               | ✅                 | ✅                         |
+| [sqlserver-cdc](connectors/sqlserver-cdc.md) | ✅                  | ✅               | ✅                 | ✅                         |
+| [oceanbase-cdc](connectors/oceanbase-cdc.md) | ❌                  | ❌               | ❌                 | ❌                         |
+| [tidb-cdc](connectors/tidb-cdc.md)           | ✅                  | ❌               | ✅                 | ❌                         |
+| [db2-cdc](connectors/db2-cdc.md)             | ❌                  | ❌               | ✅                 | ❌                         |
+| [vitess-cdc](connectors/vitess-cdc.md)       | ✅                  | ❌               | ✅                 | ❌                         |
+
 ## Usage for Table/SQL API
 
 We need several steps to setup a Flink cluster with the provided connector.
