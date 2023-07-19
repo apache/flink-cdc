@@ -43,17 +43,17 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Con
 
 The following table shows the current features of the connector:
 
-| Connector                                    |     No-lock Read    |  Parallel Read   | Exactly-once Read | Incremental Snapshot Read  |
-|----------------------------------------------|---------------------|------------------|-------------------|----------------------------|
-| [mongodb-cdc](connectors/mongodb-cdc.md)     | ✅                  | ✅               | ✅                 | ✅                         |
-| [mysql-cdc](connectors/mysql-cdc.md)         | ✅                  | ✅               | ✅                 | ✅                         |
-| [oracle-cdc](connectors/oracle-cdc.md)       | ✅                  | ✅               | ✅                 | ✅                         |
-| [postgres-cdc](connectors/postgres-cdc.md)   | ✅                  | ✅               | ✅                 | ✅                         |
-| [sqlserver-cdc](connectors/sqlserver-cdc.md) | ✅                  | ✅               | ✅                 | ✅                         |
-| [oceanbase-cdc](connectors/oceanbase-cdc.md) | ❌                  | ❌               | ❌                 | ❌                         |
-| [tidb-cdc](connectors/tidb-cdc.md)           | ✅                  | ❌               | ✅                 | ❌                         |
-| [db2-cdc](connectors/db2-cdc.md)             | ❌                  | ❌               | ✅                 | ❌                         |
-| [vitess-cdc](connectors/vitess-cdc.md)       | ✅                  | ❌               | ✅                 | ❌                         |
+| Connector                                    | No-lock Read | Parallel Read | Exactly-once Read | Incremental Snapshot Read |
+|----------------------------------------------|--------------|---------------|-------------------|---------------------------|
+| [mongodb-cdc](connectors/mongodb-cdc.md)     | ✅            | ✅             | ✅                 | ✅                         |
+| [mysql-cdc](connectors/mysql-cdc.md)         | ✅            | ✅             | ✅                 | ✅                         |
+| [oracle-cdc](connectors/oracle-cdc.md)       | ✅            | ✅             | ✅                 | ✅                         |
+| [postgres-cdc](connectors/postgres-cdc.md)   | ✅            | ✅             | ✅                 | ✅                         |
+| [sqlserver-cdc](connectors/sqlserver-cdc.md) | ✅            | ✅             | ✅                 | ✅                         |
+| [oceanbase-cdc](connectors/oceanbase-cdc.md) | ❌            | ❌             | ❌                 | ❌                         |
+| [tidb-cdc](connectors/tidb-cdc.md)           | ✅            | ❌             | ✅                 | ❌                         |
+| [db2-cdc](connectors/db2-cdc.md)             | ❌            | ❌             | ✅                 | ❌                         |
+| [vitess-cdc](connectors/vitess-cdc.md)       | ✅            | ❌             | ✅                 | ❌                         |
 
 ## Usage for Table/SQL API
 
