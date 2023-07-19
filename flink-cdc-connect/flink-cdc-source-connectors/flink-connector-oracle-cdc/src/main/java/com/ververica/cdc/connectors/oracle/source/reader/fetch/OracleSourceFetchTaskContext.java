@@ -65,10 +65,12 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
 import static com.ververica.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
+import static io.debezium.connector.oracle.SourceInfo.SCN_KEY;
 
 /** The context for fetch task that fetching data of snapshot split from Oracle data source. */
 public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
@@ -142,7 +144,14 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         connectorConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
-                        schemaNameAdjuster);
+                        schemaNameAdjuster,
+                        event -> {
+                            Map<String, Object> source = new HashMap<>();
+                            Struct sourceInfo = event.getSource();
+                            String scn = sourceInfo.getString(SCN_KEY);
+                            source.put(SCN_KEY, scn);
+                            return source;
+                        });
 
         final OracleChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new OracleChangeEventSourceMetricsFactory(
@@ -298,8 +307,8 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             if (source == null) {
                 return null;
             }
-            final String scn = sourceInfo.getString(SourceInfo.SCN_KEY);
-            return Collect.hashMapOf(SourceInfo.SCN_KEY, scn == null ? "null" : scn);
+            final String scn = sourceInfo.getString(SCN_KEY);
+            return Collect.hashMapOf(SCN_KEY, scn == null ? "null" : scn);
         }
 
         @Override
