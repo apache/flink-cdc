@@ -40,10 +40,14 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 
 /** Assigner for snapshot split. */
@@ -59,7 +63,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     private final C sourceConfig;
     private final int currentParallelism;
-    private final LinkedList<TableId> remainingTables;
+    private final List<TableId> remainingTables;
     private final boolean isRemainingTablesCheckpointed;
 
     private ChunkSplitter chunkSplitter;
@@ -68,6 +72,13 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     @Nullable private Long checkpointIdToFinish;
     private final DataSourceDialect<C> dialect;
     private final OffsetFactory offsetFactory;
+
+    private final Object lock = new Object();
+    private ExecutorService executor;
+    private volatile Throwable uncaughtSplitterException;
+
+    // Avoid having too many splits waiting to be assigned
+    private final Semaphore semaphore = new Semaphore(3);
 
     public SnapshotSplitAssigner(
             C sourceConfig,
@@ -131,12 +142,12 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
-        this.remainingSplits = remainingSplits;
+        this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
         this.assignedSplits = assignedSplits;
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerFinished = assignerFinished;
-        this.remainingTables = new LinkedList<>(remainingTables);
+        this.remainingTables = new CopyOnWriteArrayList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.dialect = dialect;
@@ -159,36 +170,33 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         "Failed to discover remaining tables to capture", e);
             }
         }
+
+        startAsyncSplit();
     }
 
     @Override
     public Optional<SourceSplitBase> getNext() {
-        if (!remainingSplits.isEmpty()) {
-            // return remaining splits firstly
-            Iterator<SchemalessSnapshotSplit> iterator = remainingSplits.iterator();
-            SchemalessSnapshotSplit split = iterator.next();
-            iterator.remove();
-            assignedSplits.put(split.splitId(), split);
-            return Optional.of(split.toSnapshotSplit(tableSchemas.get(split.getTableId())));
-        } else {
-            // it's turn for new table
-            TableId nextTable = remainingTables.pollFirst();
-            if (nextTable != null) {
-                // split the given table into chunks (snapshot splits)
-                Collection<SnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
-                final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
-                if (!splits.isEmpty()) {
-                    tableSchema.putAll(splits.iterator().next().getTableSchemas());
+        synchronized (lock) {
+            checkSplitterErrors();
+            if (!remainingSplits.isEmpty()) {
+                // return remaining splits firstly
+                Iterator<SchemalessSnapshotSplit> iterator = remainingSplits.iterator();
+                SchemalessSnapshotSplit split = iterator.next();
+                remainingSplits.remove(split);
+                assignedSplits.put(split.splitId(), split);
+                return Optional.of(split.toSnapshotSplit(tableSchemas.get(split.getTableId())));
+            } else if (!remainingTables.isEmpty()) {
+                try {
+                    // wait for the asynchronous split to complete
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    throw new FlinkRuntimeException(
+                            "InterruptedException while waiting for asynchronously snapshot split");
                 }
-                final List<SchemalessSnapshotSplit> schemalessSnapshotSplits =
-                        splits.stream()
-                                .map(SnapshotSplit::toSchemalessSnapshotSplit)
-                                .collect(Collectors.toList());
-                remainingSplits.addAll(schemalessSnapshotSplits);
-                tableSchemas.putAll(tableSchema);
-                alreadyProcessedTables.add(nextTable);
+                semaphore.release();
                 return getNext();
             } else {
+                closeExecutorService();
                 return Optional.empty();
             }
         }
@@ -288,7 +296,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     }
 
     @Override
-    public void close() {}
+    public void close() {
+        closeExecutorService();
+    }
 
     /** Indicates there is no more splits available in this assigner. */
     public boolean noMoreSplits() {
@@ -323,5 +333,73 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
      */
     private boolean allSplitsFinished() {
         return noMoreSplits() && assignedSplits.size() == splitFinishedOffsets.size();
+    }
+
+    private void startAsyncSplit() {
+        if (executor == null) {
+            ThreadFactory threadFactory =
+                    new org.apache.flink.shaded.guava30.com.google.common.util.concurrent
+                                    .ThreadFactoryBuilder()
+                            .setNameFormat("snapshot-splitting")
+                            .build();
+            this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        }
+        this.executor.submit(this::splitForRemainingTables);
+    }
+
+    private void splitForRemainingTables() {
+        try {
+            for (TableId nextTable : remainingTables) {
+                splitTable(nextTable);
+            }
+        } catch (Throwable t) {
+            synchronized (lock) {
+                if (uncaughtSplitterException == null) {
+                    uncaughtSplitterException = t;
+                } else {
+                    uncaughtSplitterException.addSuppressed(t);
+                }
+                lock.notify();
+            }
+        }
+    }
+
+    private void splitTable(TableId nextTable) throws InterruptedException {
+        semaphore.acquire();
+        LOG.info("Start splitting table {} into chunks...", nextTable);
+        long start = System.currentTimeMillis();
+        synchronized (lock) {
+            // split the given table into chunks (snapshot splits)
+            Collection<SnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
+            final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
+            if (!splits.isEmpty()) {
+                tableSchema.putAll(splits.iterator().next().getTableSchemas());
+            }
+            final List<SchemalessSnapshotSplit> schemalessSnapshotSplits =
+                    splits.stream()
+                            .map(SnapshotSplit::toSchemalessSnapshotSplit)
+                            .collect(Collectors.toList());
+            remainingSplits.addAll(schemalessSnapshotSplits);
+            tableSchemas.putAll(tableSchema);
+            remainingTables.remove(nextTable);
+            alreadyProcessedTables.add(nextTable);
+            lock.notify();
+        }
+
+        long end = System.currentTimeMillis();
+        LOG.info("Split table {} time cost: {}ms.", nextTable, end - start);
+    }
+
+    private void checkSplitterErrors() {
+        if (uncaughtSplitterException != null) {
+            throw new FlinkRuntimeException(
+                    "Chunk splitting has encountered exception", uncaughtSplitterException);
+        }
+    }
+
+    private void closeExecutorService() {
+        if (executor != null) {
+            executor.shutdown();
+        }
     }
 }
