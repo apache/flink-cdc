@@ -348,7 +348,7 @@ MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据
 
 ### 启动模式<a name="启动模式" id="002" ></a>
 
-配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
+配置选项```scan.startup.mode```指定 MongoDB CDC 使用者的启动模式。有效枚举包括：
 
 - `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 oplog。
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 oplog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
