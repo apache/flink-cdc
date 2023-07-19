@@ -67,15 +67,15 @@ Connector Options
 ----------------
 
 
-<div class="&ldquo;highlight&rdquo;">
-    <table class="&ldquo;colwidths-auto">
+<div class="highlight;">
+    <table class="colwidths-auto">
         <thead>
             <tr>
-                <th class="&ldquo;text-left&rdquo;">Option</th>
-                <th class="&ldquo;text-left&rdquo;">Required</th>
-                <th class="&ldquo;text-left&rdquo;">Default</th>
-                <th class="&ldquo;text-left&rdquo;">Type</th>
-                <th class="&ldquo;text-left&rdquo;">Description</th>
+                <th class="text-left">Option</th>
+                <th class="text-left">Required</th>
+                <th class="text-left">Default</th>
+                <th class="text-left">Type</th>
+                <th class="text-left">Description</th>
             </tr>
         </thead>
         <tbody>
