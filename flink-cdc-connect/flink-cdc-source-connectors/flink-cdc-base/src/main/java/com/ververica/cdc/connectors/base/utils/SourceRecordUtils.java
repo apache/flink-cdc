@@ -50,9 +50,6 @@ public class SourceRecordUtils {
     public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
             "io.debezium.connector.common.Heartbeat";
 
-    public static final String CONNECTOR = "connector";
-
-    public static final String MYSQL_CONNECTOR = "mysql";
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
 
     /** Converts a {@link ResultSet} row to an array of Objects. */
