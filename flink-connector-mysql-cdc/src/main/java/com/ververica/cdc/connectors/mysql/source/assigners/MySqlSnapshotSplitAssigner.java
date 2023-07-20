@@ -208,21 +208,24 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (sourceConfig.isScanNewlyAddedTableEnabled()) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-                final List<TableId> newlyAddedTables = discoverCapturedTables(jdbc, sourceConfig);
-
-                // Get the removed tables with the new table filter
-                Set<TableId> tablesToRemove = new HashSet<>(alreadyProcessedTables);
+                final List<TableId> currentCapturedTables =
+                        discoverCapturedTables(jdbc, sourceConfig);
+                final Set<TableId> previousCapturedTables = new HashSet<>();
                 List<TableId> tablesInRemainingSplits =
                         remainingSplits.stream()
                                 .map(MySqlSnapshotSplit::getTableId)
                                 .collect(Collectors.toList());
-                tablesToRemove.addAll(tablesInRemainingSplits);
-                tablesToRemove.addAll(remainingTables);
-                tablesToRemove.removeAll(newlyAddedTables);
+                previousCapturedTables.addAll(tablesInRemainingSplits);
+                previousCapturedTables.addAll(alreadyProcessedTables);
+                previousCapturedTables.addAll(remainingTables);
 
-                newlyAddedTables.removeAll(alreadyProcessedTables);
-                newlyAddedTables.removeAll(tablesInRemainingSplits);
-                newlyAddedTables.removeAll(remainingTables);
+                // Get the removed tables with the new table filter
+                Set<TableId> tablesToRemove = new HashSet<>(previousCapturedTables);
+                tablesToRemove.removeAll(currentCapturedTables);
+
+                // Get the newly added tables
+                currentCapturedTables.removeAll(previousCapturedTables);
+                List<TableId> newlyAddedTables = currentCapturedTables;
 
                 // case 1: there are old tables to remove from state
                 if (!tablesToRemove.isEmpty()) {
