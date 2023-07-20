@@ -163,7 +163,9 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the MySQL database to monitor. The table-name also supports regular expressions to monitor multiple tables matches the regular expression.</td>
+      <td>
+         Table name of the MySQL database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions. Note: When the MySQL CDC connector regularly matches the table name, it will concat the database-name and table-name filled in by the user through the string `\\.` to form a full-path regular expression, and then use the regular expression to match the fully qualified name of the table in the MySQL database.
+      </td>
     </tr>
     <tr>
       <td>port</td>
@@ -436,7 +438,9 @@ CREATE TABLE products (
     </tr>
   </tbody>
 </table>
-It will use database.table as a pattern to match tables, as above examples using (^(test).*|^(tpc).*|txc|.*[p$]|t{2}).(t[5-8]|tt) matches txc.tt、test2.test5.
+
+It will use `database-name\\.table-name` as a pattern to match tables, as above examples using pattern `(^(test).*|^(tpc).*|txc|.*[p$]|t{2})\\.(t[5-8]|tt)` matches txc.tt、test2.test5.
+
 
 Features
 --------
