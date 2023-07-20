@@ -162,7 +162,7 @@ Flink SQL> SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>要监视的 MySQL 数据库的表名。表名还支持正则表达式，以监视多个表与正则表达式匹配。注意：MySQL CDC 连接器会连接 database-name，字符串 `\\.` 和 table-name 的作为正则表达式和 MySQL表的全限定名做匹配。</td>
+      <td>需要监视的 MySQL 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。注意：MySQL CDC 连接器在正则匹配表名时，会把用户填写的 database-name， table-name 通过字符串 `\\.` 连接成一个全路径的正则表达式，然后使用该正则表达式和 MySQL 数据库中表的全限定名进行正则匹配。</td>
     </tr>
     <tr>
       <td>port</td>

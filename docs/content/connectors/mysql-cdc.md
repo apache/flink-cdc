@@ -164,9 +164,7 @@ Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
-         Table name of the MySQL database to monitor. The table-name also supports regular expressions to monitor multiple tables matches the regular expression.
-         Note: In the MySQL cdc connector, we will connect the `database-name`, the string '\\.' and `table-name` as the regular expressions to match
-         the fully-qualified table identifiers of tables.
+         Table name of the MySQL database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions. Note: When the MySQL CDC connector regularly matches the table name, it will concat the database-name and table-name filled in by the user through the string `\\.` to form a full-path regular expression, and then use the regular expression to match the fully qualified name of the table in the MySQL database.
       </td>
     </tr>
     <tr>

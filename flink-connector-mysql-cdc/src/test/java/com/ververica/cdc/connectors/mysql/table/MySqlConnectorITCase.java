@@ -1308,9 +1308,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     @Test
     public void testReadingWithRegexPattern() throws Exception {
-        if (!incrementalSnapshot) {
-            return;
-        }
         env.setRestartStrategy(RestartStrategies.noRestart());
         customerDatabase.createAndInitialize();
         String sourceDDL =
@@ -1329,7 +1326,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
@@ -1338,8 +1335,12 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         MYSQL_CONTAINER.getDatabasePort(),
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
+                        // The database-name and table-name should only contain the
+                        // customer.customers table. And the customer.prefix_customers
+                        // table must not be contained.
                         "^(customer_).*",
                         "customers",
+                        incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
         tEnv.executeSql(sourceDDL);
