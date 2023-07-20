@@ -219,11 +219,8 @@ public class Handover implements Closeable {
         }
 
         public static boolean isGentlyClosedException(Throwable cause) {
-            if (cause instanceof ClosedException
-                    && GENTLY_CLOSED_MESSAGE.equals(((ClosedException) cause).getMessage())) {
-                return true;
-            }
-            return false;
+            return cause instanceof ClosedException
+                    && GENTLY_CLOSED_MESSAGE.equals(((ClosedException) cause).getMessage());
         }
     }
 }
