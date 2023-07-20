@@ -300,7 +300,6 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 remainingSplits.addAll(schemaLessSnapshotSplits);
                 if (!chunkSplitter.hasNextChunk()) {
                     remainingTables.remove(nextTable);
-                    addAlreadyProcessedTablesIfNotExists(nextTable);
                 }
                 lock.notify();
             }
@@ -324,6 +323,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 MySqlSchemalessSnapshotSplit split = iterator.next();
                 remainingSplits.remove(split);
                 assignedSplits.put(split.splitId(), split);
+                addAlreadyProcessedTablesIfNotExists(split.getTableId());
                 return Optional.of(
                         split.toMySqlSnapshotSplit(tableSchemas.get(split.getTableId())));
             } else if (!remainingTables.isEmpty()) {
