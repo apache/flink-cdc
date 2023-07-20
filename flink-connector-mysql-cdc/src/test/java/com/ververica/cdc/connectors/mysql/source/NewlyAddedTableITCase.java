@@ -175,9 +175,11 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     @Test
     public void testNewlyAddedTableForExistsPipelineTwiceWithAheadBinlogAndAutoCloseReader()
             throws Exception {
+        Map<String, String> otherOptions = new HashMap<>();
+        otherOptions.put("scan.incremental.close-idle-reader.enabled", "true");
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
-                ", 'scan.incremental.close-idle-reader.enabled'='true'",
+                otherOptions,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 true,
@@ -602,7 +604,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                     getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
             StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-            String createTableStatement = getCreateTableStatement("", captureAddressTables);
+            String createTableStatement =
+                    getCreateTableStatement(new HashMap<>(), captureAddressTables);
             tEnv.executeSql(createTableStatement);
             tEnv.executeSql(
                     "CREATE TABLE sink ("
@@ -644,7 +647,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                     getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
             StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-            String createTableStatement = getCreateTableStatement("", captureTablesThisRound);
+            String createTableStatement =
+                    getCreateTableStatement(new HashMap<>(), captureTablesThisRound);
             tEnv.executeSql(createTableStatement);
             tEnv.executeSql(
                     "CREATE TABLE sink ("
@@ -719,7 +723,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             throws Exception {
         testNewlyAddedTableOneByOne(
                 parallelism,
-                "",
+                new HashMap<>(),
                 failoverType,
                 failoverPhase,
                 makeBinlogBeforeCapture,
@@ -728,7 +732,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private void testNewlyAddedTableOneByOne(
             int parallelism,
-            String sourceOptions,
+            Map<String, String> sourceOptions,
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             boolean makeBinlogBeforeCapture,
@@ -868,7 +872,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    private String getCreateTableStatement(String otherOptions, String... captureTableNames) {
+    private String getCreateTableStatement(
+            Map<String, String> otherOptions, String... captureTableNames) {
         return format(
                 "CREATE TABLE address ("
                         + " table_name STRING METADATA VIRTUAL,"
@@ -899,7 +904,16 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 customDatabase.getDatabaseName(),
                 getTableNameRegex(captureTableNames),
                 getServerId(),
-                otherOptions);
+                otherOptions.isEmpty()
+                        ? ""
+                        : ","
+                                + otherOptions.entrySet().stream()
+                                        .map(
+                                                e ->
+                                                        String.format(
+                                                                "'%s'='%s'",
+                                                                e.getKey(), e.getValue()))
+                                        .collect(Collectors.joining(",")));
     }
 
     private StreamExecutionEnvironment getStreamExecutionEnvironment(

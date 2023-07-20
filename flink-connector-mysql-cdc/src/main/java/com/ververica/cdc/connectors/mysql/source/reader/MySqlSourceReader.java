@@ -271,6 +271,8 @@ public class MySqlSourceReader<T>
                                     binlogSplit, sourceConfig, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(mySqlBinlogSplit);
                 }
+                LOG.info(
+                        "Source reader {} received the binlog split : {}.", subtaskId, binlogSplit);
                 context.sendSourceEventToCoordinator(new BinlogSplitAssignedEvent());
             }
         }
