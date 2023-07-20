@@ -176,7 +176,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)
-                            .tableList(database + "." + tableName)
+                            // MySQL debezium connector will use the regular expressions to match
+                            // the fully-qualified table identifiers of tables.
+                            // We need use "\\." insteadof "." .
+                            .tableList(database + "\\." + tableName)
                             .username(username)
                             .password(password)
                             .serverTimeZone(serverTimeZone.toString())
@@ -205,7 +208,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .hostname(hostname)
                             .port(port)
                             .databaseList(database)
-                            .tableList(database + "." + tableName)
+                            .tableList(database + "\\." + tableName)
                             .username(username)
                             .password(password)
                             .serverTimeZone(serverTimeZone.toString())

@@ -1307,6 +1307,79 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testReadingWithRegexPattern() throws Exception {
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE customers ("
+                                + " `id` INTEGER NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        // The regular regex from database-name and table-name will be
+                        // e.g. 'customer_c2dsd.*\\.customers'. This should only contain the
+                        // customer_c2dsd.customers table. And the customer_c2dsd.prefix_customers
+                        // table must not be contained.
+                        String.format("%s.*", customerDatabase.getDatabaseName()),
+                        "customers",
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM customers");
+
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
     public void testDdlWithDefaultStringValue() throws Exception {
         if (!incrementalSnapshot) {
             return;
