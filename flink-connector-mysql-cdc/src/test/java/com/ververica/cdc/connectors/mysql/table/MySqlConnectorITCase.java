@@ -1335,10 +1335,11 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         MYSQL_CONTAINER.getDatabasePort(),
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
-                        // The database-name and table-name should only contain the
+                        // The regular regex from database-name and table-name will be
+                        // 'customer.*\\.customers'. This should only contain the
                         // customer.customers table. And the customer.prefix_customers
                         // table must not be contained.
-                        "^(customer_).*",
+                        "customer.*",
                         "customers",
                         incrementalSnapshot,
                         getServerId(),
