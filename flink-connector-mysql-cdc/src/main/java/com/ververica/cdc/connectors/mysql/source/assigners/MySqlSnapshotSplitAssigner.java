@@ -45,11 +45,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -209,11 +211,17 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 final List<TableId> newlyAddedTables = discoverCapturedTables(jdbc, sourceConfig);
 
                 // Get the removed tables with the new table filter
-                List<TableId> tablesToRemove = new LinkedList<>(alreadyProcessedTables);
+                Set<TableId> tablesToRemove = new HashSet<>(alreadyProcessedTables);
+                List<TableId> tablesInRemainingSplits =
+                        remainingSplits.stream()
+                                .map(MySqlSnapshotSplit::getTableId)
+                                .collect(Collectors.toList());
+                tablesToRemove.addAll(tablesInRemainingSplits);
                 tablesToRemove.addAll(remainingTables);
                 tablesToRemove.removeAll(newlyAddedTables);
 
                 newlyAddedTables.removeAll(alreadyProcessedTables);
+                newlyAddedTables.removeAll(tablesInRemainingSplits);
                 newlyAddedTables.removeAll(remainingTables);
 
                 // case 1: there are old tables to remove from state
