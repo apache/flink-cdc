@@ -24,6 +24,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
+import com.ververica.cdc.connectors.base.source.assigner.SnapshotSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.StreamSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
@@ -31,6 +32,7 @@ import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import com.ververica.cdc.connectors.postgres.source.enumerator.PostgresSnapshotSourceEnumerator;
 import com.ververica.cdc.connectors.postgres.source.enumerator.PostgresSourceEnumerator;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -258,6 +260,28 @@ public class PostgresSourceBuilder<T> {
                 SplitEnumeratorContext<SourceSplitBase> enumContext) {
             final SplitAssigner splitAssigner;
             PostgresSourceConfig sourceConfig = (PostgresSourceConfig) configFactory.create(0);
+            if (sourceConfig.getStartupOptions().startupMode == StartupMode.SNAPSHOT_ONLY) {
+                try {
+                    final List<TableId> remainingTables =
+                            dataSourceDialect.discoverDataCollections(sourceConfig);
+                    boolean isTableIdCaseSensitive =
+                            dataSourceDialect.isDataCollectionIdCaseSensitive(sourceConfig);
+                    splitAssigner =
+                            new SnapshotSplitAssigner<>(
+                                    sourceConfig,
+                                    enumContext.currentParallelism(),
+                                    remainingTables,
+                                    isTableIdCaseSensitive,
+                                    dataSourceDialect,
+                                    offsetFactory);
+                    return new PostgresSnapshotSourceEnumerator(
+                            enumContext, splitAssigner, (PostgresDialect) dataSourceDialect);
+                } catch (Exception e) {
+                    throw new FlinkRuntimeException(
+                            "Failed to discover captured tables for enumerator", e);
+                }
+            }
+
             if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
                 try {
                     final List<TableId> remainingTables =

@@ -82,6 +82,9 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
             case LATEST_OFFSET:
                 props.setProperty("snapshot.mode", "schema_only");
                 break;
+            case SNAPSHOT_ONLY:
+                props.setProperty("snapshot.mode", "snapshot-only");
+                break;
             default:
                 throw new UnsupportedOperationException();
         }

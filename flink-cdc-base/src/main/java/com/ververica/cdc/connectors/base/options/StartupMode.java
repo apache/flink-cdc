@@ -30,5 +30,7 @@ public enum StartupMode {
 
     SPECIFIC_OFFSETS,
 
-    TIMESTAMP
+    TIMESTAMP,
+
+    SNAPSHOT_ONLY
 }

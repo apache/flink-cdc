@@ -28,6 +28,7 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
@@ -148,11 +149,14 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
 
     @Override
     public ChangelogMode getChangelogMode() {
+        if (startupOptions.startupMode.equals(StartupMode.SNAPSHOT_ONLY)) {
+            return ChangelogMode.insertOnly();
+        }
         switch (changelogMode) {
             case UPSERT:
-                return org.apache.flink.table.connector.ChangelogMode.upsert();
+                return ChangelogMode.upsert();
             case ALL:
-                return org.apache.flink.table.connector.ChangelogMode.all();
+                return ChangelogMode.all();
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported changelog mode: " + changelogMode);

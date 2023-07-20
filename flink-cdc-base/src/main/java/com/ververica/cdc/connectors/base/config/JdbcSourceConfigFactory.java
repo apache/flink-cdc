@@ -201,6 +201,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
         switch (startupOptions.startupMode) {
             case INITIAL:
             case LATEST_OFFSET:
+            case SNAPSHOT_ONLY:
                 break;
             default:
                 throw new UnsupportedOperationException(

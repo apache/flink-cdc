@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
@@ -35,6 +36,7 @@ import com.ververica.cdc.connectors.postgres.testutils.UniqueDatabase;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -110,6 +112,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]",
                     "+U[1010, user_11, Hangzhou, 123567891234]");
 
+    @Before
+    public void init() {
+        customDatabase.createAndInitialize();
+    }
+
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
         testPostgresParallelSource(
@@ -137,6 +144,54 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 4,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
+                new String[] {"customers", "customers_1"});
+    }
+
+    @Test
+    public void testReadSingleTableSnapshotWithSingleParallelism() throws Exception {
+        testPostgresSnapshotParallelSource(
+                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+    }
+
+    @Test
+    public void testReadSingleTableSnapshotWithMultipleParallelism() throws Exception {
+        testPostgresSnapshotParallelSource(
+                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+    }
+
+    @Test
+    public void testReadMultipleTableSnapshotWithSingleParallelism() throws Exception {
+        testPostgresSnapshotParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"customers", "customers_1"});
+    }
+
+    @Test
+    public void testReadMultipleTableSnapshotWithMultipleParallelism() throws Exception {
+        testPostgresSnapshotParallelSource(
+                4,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"customers", "customers_1"});
+    }
+
+    @Test
+    public void testTaskManagerFailoverForSnapshotOnly() throws Exception {
+        testPostgresSnapshotParallelSource(
+                1,
+                FailoverType.TM,
+                FailoverPhase.SNAPSHOT,
+                new String[] {"customers", "customers_1"});
+    }
+
+    @Test
+    public void testJobManagerFailoverForSnapshotOnly() throws Exception {
+        testPostgresParallelSource(
+                1,
+                FailoverType.JM,
+                FailoverPhase.SNAPSHOT,
                 new String[] {"customers", "customers_1"});
     }
 
@@ -228,7 +283,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
             String[] captureCustomerTables,
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration)
             throws Exception {
-        customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
@@ -276,8 +330,76 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
         // second step: check the stream data
         checkStreamData(tableResult, failoverType, failoverPhase, captureCustomerTables);
-
         tableResult.getJobClient().get().cancel().get();
+    }
+
+    private void testPostgresSnapshotParallelSource(
+            int parallelism,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        testPostgresSnapshotOnlyParallelSource(
+                parallelism,
+                "snapshot-only",
+                failoverType,
+                failoverPhase,
+                captureCustomerTables,
+                RestartStrategies.fixedDelayRestart(1, 0));
+    }
+
+    private void testPostgresSnapshotOnlyParallelSource(
+            int parallelism,
+            String scanStartupMode,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables,
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration)
+            throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(restartStrategyConfiguration);
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        customDatabase.getHost(),
+                        customDatabase.getDatabasePort(),
+                        customDatabase.getUsername(),
+                        customDatabase.getPassword(),
+                        customDatabase.getDatabaseName(),
+                        SCHEMA_NAME,
+                        getTableNameRegex(captureCustomerTables),
+                        scanStartupMode,
+                        getSlotName());
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
+
+        checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
+
+        tableResult.getJobClient().get().getJobStatus().get();
     }
 
     private void checkSnapshotData(
@@ -318,7 +440,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
         CloseableIterator<Row> iterator = tableResult.collect();
         JobID jobId = tableResult.getJobClient().get().getJobID();
-
         // trigger failover after some snapshot splits read finished
         if (failoverPhase == FailoverPhase.SNAPSHOT && iterator.hasNext()) {
             triggerFailover(

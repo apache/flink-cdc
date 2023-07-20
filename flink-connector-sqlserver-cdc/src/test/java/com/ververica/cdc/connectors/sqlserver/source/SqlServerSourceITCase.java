@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
@@ -25,6 +26,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -46,6 +48,13 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerSourceITCase.class);
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
+
+    private final String databaseName = "customer";
+
+    @Before
+    public void init() {
+        initializeSqlServerTable(databaseName);
+    }
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
@@ -103,10 +112,6 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
-
-        String databaseName = "customer";
-
-        initializeSqlServerTable(databaseName);
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
@@ -216,6 +221,125 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
         }
         assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
         tableResult.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testReadSingleTableSnapshotOnlyWithSingleParallelism() throws Exception {
+        testSqlServerSnapshotOnlyParallelSource(
+                1, FailoverType.NONE, new String[] {"dbo.customers"});
+    }
+
+    @Test
+    public void testReadSingleTableSnapshotOnlyWithMultipleParallelism() throws Exception {
+        testSqlServerSnapshotOnlyParallelSource(
+                4, FailoverType.NONE, new String[] {"dbo.customers"});
+    }
+
+    // Failover tests
+    @Test
+    public void testSnapshotOnlyTaskManagerFailover() throws Exception {
+        testSqlServerSnapshotOnlyParallelSource(4, FailoverType.TM, new String[] {"dbo.customers"});
+    }
+
+    @Test
+    public void testSnapshotOnlyJobManagerFailover() throws Exception {
+        testSqlServerSnapshotOnlyParallelSource(4, FailoverType.JM, new String[] {"dbo.customers"});
+    }
+
+    @Test
+    public void testSnapshotOnlyTaskManagerFailoverSingleParallelism() throws Exception {
+        testSqlServerSnapshotOnlyParallelSource(1, FailoverType.TM, new String[] {"dbo.customers"});
+    }
+
+    @Test
+    public void testSnapshotOnlyJobManagerFailoverSingleParallelism() throws Exception {
+        testSqlServerSnapshotOnlyParallelSource(1, FailoverType.JM, new String[] {"dbo.customers"});
+    }
+
+    private void testSqlServerSnapshotOnlyParallelSource(
+            int parallelism, FailoverType failoverType, String[] captureCustomerTables)
+            throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'sqlserver-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2'"
+                                + ")",
+                        MSSQL_SERVER_CONTAINER.getHost(),
+                        MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
+                        MSSQL_SERVER_CONTAINER.getUsername(),
+                        MSSQL_SERVER_CONTAINER.getPassword(),
+                        databaseName,
+                        getTableNameRegex(captureCustomerTables),
+                        "snapshot-only");
+
+        // first step: check the snapshot data
+        String[] snapshotForSingleTable =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
+        CloseableIterator<Row> iterator = tableResult.collect();
+        JobID jobId = tableResult.getJobClient().get().getJobID();
+        List<String> expectedSnapshotData = new ArrayList<>();
+        for (int i = 0; i < captureCustomerTables.length; i++) {
+            expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
+        }
+
+        // trigger failover after some snapshot splits read finished
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(100));
+        }
+
+        LOG.info("snapshot data start");
+        assertEqualsInAnyOrder(
+                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+
+        tableResult.getJobClient().get().getJobStatus().get();
     }
 
     private void makeFirstPartChangeStreamEvents(String tableId) {
