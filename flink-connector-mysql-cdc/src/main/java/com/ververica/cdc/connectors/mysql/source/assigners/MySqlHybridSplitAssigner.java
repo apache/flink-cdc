@@ -189,6 +189,10 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         snapshotSplitAssigner.close();
     }
 
+    public boolean noMoreSnapshotSplits() {
+        return snapshotSplitAssigner.noMoreSnapshotSplits();
+    }
+
     // --------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {
