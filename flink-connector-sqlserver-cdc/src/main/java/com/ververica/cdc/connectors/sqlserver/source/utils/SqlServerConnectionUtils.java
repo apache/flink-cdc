@@ -54,7 +54,8 @@ public class SqlServerConnectionUtils {
                 false);
     }
 
-    public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)
+    public static List<TableId> listTables(
+            JdbcConnection jdbc, RelationalTableFilters tableFilters, List<String> databaseList)
             throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
         // -------------------
@@ -68,7 +69,12 @@ public class SqlServerConnectionUtils {
                 "SELECT name, database_id, create_date  \n" + "FROM sys.databases;  ",
                 rs -> {
                     while (rs.next()) {
-                        databaseNames.add(rs.getString(1));
+                        // Because sqlserver table filter cannot filter by database name, we need to
+                        // filter here
+                        String databaseName = rs.getString(1);
+                        if (databaseList.contains(databaseName)) {
+                            databaseNames.add(databaseName);
+                        }
                     }
                 });
         LOG.info("\t list of available databases is: {}", databaseNames);
