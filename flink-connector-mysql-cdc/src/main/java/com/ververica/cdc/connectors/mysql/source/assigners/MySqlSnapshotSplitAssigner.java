@@ -45,11 +45,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -206,15 +208,24 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (sourceConfig.isScanNewlyAddedTableEnabled()) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-                final List<TableId> newlyAddedTables = discoverCapturedTables(jdbc, sourceConfig);
+                final List<TableId> currentCapturedTables =
+                        discoverCapturedTables(jdbc, sourceConfig);
+                final Set<TableId> previousCapturedTables = new HashSet<>();
+                List<TableId> tablesInRemainingSplits =
+                        remainingSplits.stream()
+                                .map(MySqlSnapshotSplit::getTableId)
+                                .collect(Collectors.toList());
+                previousCapturedTables.addAll(tablesInRemainingSplits);
+                previousCapturedTables.addAll(alreadyProcessedTables);
+                previousCapturedTables.addAll(remainingTables);
 
                 // Get the removed tables with the new table filter
-                List<TableId> tablesToRemove = new LinkedList<>(alreadyProcessedTables);
-                tablesToRemove.addAll(remainingTables);
-                tablesToRemove.removeAll(newlyAddedTables);
+                Set<TableId> tablesToRemove = new HashSet<>(previousCapturedTables);
+                tablesToRemove.removeAll(currentCapturedTables);
 
-                newlyAddedTables.removeAll(alreadyProcessedTables);
-                newlyAddedTables.removeAll(remainingTables);
+                // Get the newly added tables
+                currentCapturedTables.removeAll(previousCapturedTables);
+                List<TableId> newlyAddedTables = currentCapturedTables;
 
                 // case 1: there are old tables to remove from state
                 if (!tablesToRemove.isEmpty()) {
