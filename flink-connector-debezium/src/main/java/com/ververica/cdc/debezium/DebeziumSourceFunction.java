@@ -71,6 +71,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import static com.ververica.cdc.debezium.internal.Handover.ClosedException.isGentlyClosedException;
 import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
 import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
 
@@ -304,9 +305,11 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
         if (handover.hasError()) {
             LOG.debug("snapshotState() called on closed source");
-            throw new FlinkRuntimeException(
-                    "Call snapshotState() on closed source, checkpoint failed.",
-                    handover.getError());
+            if (!isGentlyClosedException(handover.getError())) {
+                throw new FlinkRuntimeException(
+                        "Call snapshotState() on failed source, checkpoint failed.",
+                        handover.getError());
+            }
         } else {
             snapshotOffsetState(functionSnapshotContext.getCheckpointId());
             snapshotHistoryRecordsState();
@@ -590,5 +593,10 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     @VisibleForTesting
     public String getEngineInstanceName() {
         return engineInstanceName;
+    }
+
+    @VisibleForTesting
+    public Handover getHandover() {
+        return handover;
     }
 }
