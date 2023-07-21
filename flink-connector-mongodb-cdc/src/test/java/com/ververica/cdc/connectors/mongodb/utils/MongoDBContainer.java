@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Random;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -109,6 +110,11 @@ public class MongoDBContainer extends org.testcontainers.containers.MongoDBConta
     @Override
     public MongoDBContainer withNetworkAliases(String... aliases) {
         return (MongoDBContainer) super.withNetworkAliases(aliases);
+    }
+
+    @Override
+    public MongoDBContainer withStartupTimeout(Duration timeout) {
+        return (MongoDBContainer) super.withStartupTimeout(timeout);
     }
 
     public void executeCommand(String command) {
