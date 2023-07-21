@@ -99,7 +99,9 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         SqlServerSourceConfig sqlserverSourceConfig = (SqlServerSourceConfig) sourceConfig;
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
             return SqlServerConnectionUtils.listTables(
-                    jdbcConnection, sqlserverSourceConfig.getTableFilters());
+                    jdbcConnection,
+                    sqlserverSourceConfig.getTableFilters(),
+                    sqlserverSourceConfig.getDatabaseList());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
         }

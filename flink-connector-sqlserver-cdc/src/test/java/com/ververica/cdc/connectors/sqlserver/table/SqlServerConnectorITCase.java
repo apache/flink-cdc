@@ -84,6 +84,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
     public void testConsumingAllEvents()
             throws SQLException, ExecutionException, InterruptedException {
         initializeSqlServerTable("inventory");
+        initializeSqlServerTable("product");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -142,6 +143,9 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "UPDATE inventory.dbo.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.dbo.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.dbo.products WHERE id=111;");
+
+            statement.execute(
+                    "INSERT INTO product.dbo.products (name,description,weight) VALUES ('scooter','Big 2-wheel scooter ',5.18);");
         }
 
         waitForSinkSize("sink", 20);
