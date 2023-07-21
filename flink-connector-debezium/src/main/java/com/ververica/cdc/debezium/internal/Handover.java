@@ -191,6 +191,8 @@ public class Handover implements Closeable {
 
             if (error == null) {
                 error = new ClosedException();
+            } else if (!(error instanceof ClosedException)) {
+                error = new ClosedException("Close handover with error.", error);
             }
             lock.notifyAll();
         }
@@ -205,5 +207,20 @@ public class Handover implements Closeable {
     public static final class ClosedException extends Exception {
 
         private static final long serialVersionUID = 1L;
+
+        private static final String GENTLY_CLOSED_MESSAGE = "Close handover gently.";
+
+        public ClosedException() {
+            super(GENTLY_CLOSED_MESSAGE);
+        }
+
+        public ClosedException(String message, Throwable cause) {
+            super(message, cause);
+        }
+
+        public static boolean isGentlyClosedException(Throwable cause) {
+            return cause instanceof ClosedException
+                    && GENTLY_CLOSED_MESSAGE.equals(((ClosedException) cause).getMessage());
+        }
     }
 }
