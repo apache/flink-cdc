@@ -67,7 +67,7 @@ Connector Options
 ----------------
 
 
-<div class="highlight;">
+<div class="highlight">
     <table class="colwidths-auto">
         <thead>
             <tr>
@@ -96,8 +96,8 @@ Connector Options
             <tr>
                 <td>keyspace</td>
                 <td>required</td>
-                <td>(none)&nbsp;</td>
-                <td>&nbsp;String</td>
+                <td>(none)</td>
+                <td>String</td>
                 <td>The name of the keyspace from which to stream the changes.</td>
             </tr>
             <tr>
@@ -166,8 +166,8 @@ Connector Options
             <tr>
                 <td>tablet.type</td>
                 <td>optional</td>
-                <td>RDONLY&nbsp;</td>
-                <td>String&nbsp;</td>
+                <td>RDONLY</td>
+                <td>String</td>
                 <td>The type of Tablet (hence MySQL) from which to stream the changes: MASTER represents streaming from the master MySQL instance REPLICA represents streaming from the replica slave MySQL instance RDONLY represents streaming from the read-only slave MySQL instance.</td>
             </tr>
         </tbody>
