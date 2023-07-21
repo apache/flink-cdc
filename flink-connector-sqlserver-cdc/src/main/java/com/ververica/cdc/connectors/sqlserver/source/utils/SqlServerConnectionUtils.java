@@ -68,7 +68,10 @@ public class SqlServerConnectionUtils {
                 "SELECT name, database_id, create_date  \n" + "FROM sys.databases;  ",
                 rs -> {
                     while (rs.next()) {
-                        databaseNames.add(rs.getString(1));
+                        String databaseName = rs.getString(1);
+                        if (jdbc.config().getDatabase().equals(databaseName)) {
+                            databaseNames.add(databaseName);
+                        }
                     }
                 });
         LOG.info("\t list of available databases is: {}", databaseNames);
