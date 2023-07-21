@@ -81,6 +81,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final Integer splitSizeMB;
     private final boolean closeIdlerReaders;
     private final boolean enableFullDocPrePostImage;
+    private final boolean noCursorTimeout;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -112,7 +113,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable Integer splitMetaGroupSize,
             @Nullable Integer splitSizeMB,
             boolean closeIdlerReaders,
-            boolean enableFullDocPrePostImage) {
+            boolean enableFullDocPrePostImage,
+            boolean noCursorTimeout) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -135,6 +137,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.splitSizeMB = splitSizeMB;
         this.closeIdlerReaders = closeIdlerReaders;
         this.enableFullDocPrePostImage = enableFullDocPrePostImage;
+        this.noCursorTimeout = noCursorTimeout;
     }
 
     @Override
@@ -191,7 +194,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .closeIdleReaders(closeIdlerReaders)
                             .scanFullChangelog(enableFullDocPrePostImage)
                             .startupOptions(startupOptions)
-                            .deserializer(deserializer);
+                            .deserializer(deserializer)
+                            .disableCursorTimeout(noCursorTimeout);
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
@@ -286,7 +290,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         splitMetaGroupSize,
                         splitSizeMB,
                         closeIdlerReaders,
-                        enableFullDocPrePostImage);
+                        enableFullDocPrePostImage,
+                        noCursorTimeout);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -321,7 +326,9 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(splitSizeMB, that.splitSizeMB)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
-                && Objects.equals(closeIdlerReaders, that.closeIdlerReaders);
+                && Objects.equals(closeIdlerReaders, that.closeIdlerReaders)
+                && Objects.equals(enableFullDocPrePostImage, that.enableFullDocPrePostImage)
+                && Objects.equals(noCursorTimeout, that.noCursorTimeout);
     }
 
     @Override
@@ -347,7 +354,9 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 splitSizeMB,
                 producedDataType,
                 metadataKeys,
-                closeIdlerReaders);
+                closeIdlerReaders,
+                enableFullDocPrePostImage,
+                noCursorTimeout);
     }
 
     @Override

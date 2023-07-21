@@ -113,7 +113,7 @@ public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
                             .max((BsonDocument) snapshotSplit.getSplitEnd()[1])
                             .hint((BsonDocument) snapshotSplit.getSplitStart()[0])
                             .batchSize(sourceConfig.getBatchSize())
-                            .noCursorTimeout(true)
+                            .noCursorTimeout(sourceConfig.disableCursorTimeout())
                             .cursor();
 
             BsonDocument keyDocument, valueDocument;

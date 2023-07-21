@@ -51,6 +51,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.USERNAME;
 import static com.ververica.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
@@ -107,6 +108,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         boolean enableFullDocumentPrePostImage =
                 config.getOptional(FULL_DOCUMENT_PRE_POST_IMAGE).orElse(false);
 
+        boolean noCursorTimeout = config.getOptional(SCAN_NO_CURSOR_TIMEOUT).orElse(true);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
@@ -134,7 +136,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 splitMetaGroupSize,
                 splitSizeMB,
                 enableCloseIdleReaders,
-                enableFullDocumentPrePostImage);
+                enableFullDocumentPrePostImage,
+                noCursorTimeout);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -207,6 +210,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(FULL_DOCUMENT_PRE_POST_IMAGE);
+        options.add(SCAN_NO_CURSOR_TIMEOUT);
         return options;
     }
 }
