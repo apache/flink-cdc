@@ -73,15 +73,11 @@ public class VitessConnectorITCase extends VitessTestBase {
                                 + " 'tablet-type' = 'MASTER',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
-                                + " 'vtctl.hostname' = '%s',"
-                                + " 'vtctl.port' = '%s',"
                                 + " 'keyspace' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         VITESS_CONTAINER.getHost(),
                         VITESS_CONTAINER.getGrpcPort(),
-                        VITESS_CONTAINER.getHost(),
-                        VITESS_CONTAINER.getVtctldGrpcPort(),
                         VITESS_CONTAINER.getKeyspace(),
                         "test.products");
         String sinkDDL =
@@ -177,15 +173,11 @@ public class VitessConnectorITCase extends VitessTestBase {
                                 + " 'tablet-type' = 'MASTER',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
-                                + " 'vtctl.hostname' = '%s',"
-                                + " 'vtctl.port' = '%s',"
                                 + " 'keyspace' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         VITESS_CONTAINER.getHost(),
                         VITESS_CONTAINER.getGrpcPort(),
-                        VITESS_CONTAINER.getHost(),
-                        VITESS_CONTAINER.getVtctldGrpcPort(),
                         VITESS_CONTAINER.getKeyspace(),
                         "test.full_types");
         tEnv.executeSql(sourceDDL);

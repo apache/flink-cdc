@@ -33,7 +33,6 @@ import org.apache.flink.util.Collector;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.connectors.vitess.VitessSource;
 import com.ververica.cdc.connectors.vitess.config.TabletType;
-import com.ververica.cdc.connectors.vitess.config.VtctldConfig;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -147,11 +146,6 @@ public class VitessSourceTest extends VitessTestBase {
                 .keyspace(VITESS_CONTAINER.getKeyspace())
                 .tabletType(TabletType.MASTER)
                 .tableIncludeList("test.products")
-                .vtctldConfig(
-                        VtctldConfig.builder()
-                                .hostname(VITESS_CONTAINER.getHost())
-                                .port(VITESS_CONTAINER.getVtctldGrpcPort())
-                                .build())
                 .deserializer(new ForwardDeserializeSchema())
                 .debeziumProperties(properties)
                 .build();
