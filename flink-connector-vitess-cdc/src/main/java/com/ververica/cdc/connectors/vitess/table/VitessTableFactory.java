@@ -25,8 +25,8 @@ import org.apache.flink.table.factories.DynamicTableFactory;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
+import com.ververica.cdc.connectors.vitess.config.SchemaAdjustmentMode;
 import com.ververica.cdc.connectors.vitess.config.TabletType;
-import com.ververica.cdc.connectors.vitess.config.VtctldConfig;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -70,29 +70,38 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("The password of the Vitess database server (VTGate gRPC).");
 
-    private static final ConfigOption<String> VTCTL_HOSTNAME =
-            ConfigOptions.key("vtctl.hostname")
+    private static final ConfigOption<String> SHARD =
+            ConfigOptions.key("vitess.shard")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("IP address or hostname of the VTCtld server.");
+                    .withDescription(
+                            "An optional name of the shard from which to stream the changes.");
 
-    private static final ConfigOption<Integer> VTCTL_PORT =
-            ConfigOptions.key("vtctl.port")
-                    .intType()
-                    .defaultValue(15999)
-                    .withDescription("Integer port number of the VTCtld server.");
-
-    private static final ConfigOption<String> VTCTL_USERNAME =
-            ConfigOptions.key("vtctl.username")
+    private static final ConfigOption<String> GTID =
+            ConfigOptions.key("vitess.gtid")
                     .stringType()
-                    .noDefaultValue()
-                    .withDescription("The username of the Vitess VTCtld server.");
+                    .defaultValue("current")
+                    .withDescription("An optional GTID position for a shard to stream from.");
 
-    private static final ConfigOption<String> VTCTL_PASSWORD =
-            ConfigOptions.key("vtctl.password")
+    private static final ConfigOption<Boolean> STOP_ON_RESHARD =
+            ConfigOptions.key("vitess.stop_on_reshard")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Controls Vitess flag stop_on_reshard.");
+
+    private static final ConfigOption<Boolean> TOMBSTONES_ON_DELETE =
+            ConfigOptions.key("tombstones.on.delete")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Controls whether a delete event is followed by a tombstone event.");
+
+    private static final ConfigOption<String> SCHEMA_NAME_ADJUSTMENT_MODE =
+            ConfigOptions.key("schema.name.adjustment.mode")
                     .stringType()
-                    .noDefaultValue()
-                    .withDescription("The password of the Vitess VTCtld server.");
+                    .defaultValue("avro")
+                    .withDescription(
+                            "Specifies how schema names should be adjusted for compatibility with the message converter used by the connector.");
 
     private static final ConfigOption<String> TABLET_TYPE =
             ConfigOptions.key("tablet-type")
@@ -134,15 +143,14 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
         int port = config.get(PORT);
         String keyspace = config.get(KEYSPACE);
         String tableName = config.get(TABLE_NAME);
-        String username = config.get(USERNAME);
-        String password = config.get(PASSWORD);
-        VtctldConfig vtctldConfig =
-                new VtctldConfig.Builder()
-                        .hostname(config.get(VTCTL_HOSTNAME))
-                        .port(config.get(VTCTL_PORT))
-                        .username(config.get(VTCTL_USERNAME))
-                        .password(config.get(VTCTL_PASSWORD))
-                        .build();
+        String username = config.getOptional(USERNAME).orElse(null);
+        String password = config.getOptional(PASSWORD).orElse(null);
+        String shard = config.getOptional(SHARD).orElse(null);
+        String gtid = config.get(GTID);
+        Boolean stopOnReshard = config.get(STOP_ON_RESHARD);
+        Boolean tombstonesOnDelete = config.get(TOMBSTONES_ON_DELETE);
+        SchemaAdjustmentMode schemaNameAdjustmentMode =
+                SchemaAdjustmentMode.valueOf(config.get(SCHEMA_NAME_ADJUSTMENT_MODE).toUpperCase());
         TabletType tabletType = TabletType.valueOf(config.get(TABLET_TYPE));
         String pluginName = config.get(DECODING_PLUGIN_NAME);
         String name = config.get(NAME);
@@ -156,7 +164,11 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
                 tableName,
                 username,
                 password,
-                vtctldConfig,
+                shard,
+                gtid,
+                stopOnReshard,
+                tombstonesOnDelete,
+                schemaNameAdjustmentMode,
                 tabletType,
                 pluginName,
                 name,
@@ -173,7 +185,6 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(HOSTNAME);
         options.add(KEYSPACE);
-        options.add(VTCTL_HOSTNAME);
         options.add(TABLE_NAME);
         return options;
     }
@@ -182,7 +193,11 @@ public class VitessTableFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
-        options.add(VTCTL_PORT);
+        options.add(SHARD);
+        options.add(GTID);
+        options.add(STOP_ON_RESHARD);
+        options.add(TOMBSTONES_ON_DELETE);
+        options.add(SCHEMA_NAME_ADJUSTMENT_MODE);
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(TABLET_TYPE);

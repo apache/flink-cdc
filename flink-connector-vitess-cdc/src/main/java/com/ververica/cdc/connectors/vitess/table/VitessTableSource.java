@@ -27,11 +27,13 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
 import com.ververica.cdc.connectors.vitess.VitessSource;
+import com.ververica.cdc.connectors.vitess.config.SchemaAdjustmentMode;
 import com.ververica.cdc.connectors.vitess.config.TabletType;
-import com.ververica.cdc.connectors.vitess.config.VtctldConfig;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+
+import javax.annotation.Nullable;
 
 import java.time.ZoneId;
 import java.util.Objects;
@@ -51,10 +53,14 @@ public class VitessTableSource implements ScanTableSource {
     private final int port;
     private final String hostname;
     private final String keyspace;
-    private final String username;
-    private final String password;
+    @Nullable private final String username;
+    @Nullable private final String password;
     private final String tableName;
-    private final VtctldConfig vtctldConfig;
+    @Nullable private String shard;
+    private String gtid;
+    private Boolean stopOnReshard;
+    private Boolean tombstonesOnDelete;
+    private SchemaAdjustmentMode schemaNameAdjustmentMode;
     private final TabletType tabletType;
     private final Properties dbzProperties;
 
@@ -64,9 +70,13 @@ public class VitessTableSource implements ScanTableSource {
             String hostname,
             String keyspace,
             String tableName,
-            String username,
-            String password,
-            VtctldConfig vtctldConfig,
+            @Nullable String username,
+            @Nullable String password,
+            @Nullable String shard,
+            String gtid,
+            Boolean stopOnReshard,
+            Boolean tombstonesOnDelete,
+            SchemaAdjustmentMode schemaNameAdjustmentMode,
             TabletType tabletType,
             String pluginName,
             String name,
@@ -78,7 +88,11 @@ public class VitessTableSource implements ScanTableSource {
         this.tableName = checkNotNull(tableName);
         this.username = username;
         this.password = password;
-        this.vtctldConfig = checkNotNull(vtctldConfig);
+        this.shard = shard;
+        this.gtid = gtid;
+        this.stopOnReshard = stopOnReshard;
+        this.tombstonesOnDelete = tombstonesOnDelete;
+        this.schemaNameAdjustmentMode = checkNotNull(schemaNameAdjustmentMode);
         this.tabletType = checkNotNull(tabletType);
         this.pluginName = checkNotNull(pluginName);
         this.name = name;
@@ -119,7 +133,11 @@ public class VitessTableSource implements ScanTableSource {
                         .password(password)
                         .tabletType(tabletType)
                         .decodingPluginName(pluginName)
-                        .vtctldConfig(vtctldConfig)
+                        .shard(shard)
+                        .gtid(gtid)
+                        .stopOnReshard(stopOnReshard)
+                        .tombstonesOnDelete(tombstonesOnDelete)
+                        .schemaNameAdjustmentMode(schemaNameAdjustmentMode)
                         .name(name)
                         .debeziumProperties(dbzProperties)
                         .deserializer(deserializer)
@@ -137,7 +155,11 @@ public class VitessTableSource implements ScanTableSource {
                 tableName,
                 username,
                 password,
-                vtctldConfig,
+                shard,
+                gtid,
+                stopOnReshard,
+                tombstonesOnDelete,
+                schemaNameAdjustmentMode,
                 tabletType,
                 pluginName,
                 name,
@@ -162,7 +184,11 @@ public class VitessTableSource implements ScanTableSource {
                 && Objects.equals(username, that.username)
                 && Objects.equals(password, that.password)
                 && Objects.equals(tableName, that.tableName)
-                && Objects.equals(vtctldConfig, that.vtctldConfig)
+                && Objects.equals(shard, that.shard)
+                && Objects.equals(gtid, that.gtid)
+                && Objects.equals(stopOnReshard, that.stopOnReshard)
+                && Objects.equals(tombstonesOnDelete, that.tombstonesOnDelete)
+                && Objects.equals(schemaNameAdjustmentMode, that.schemaNameAdjustmentMode)
                 && tabletType == that.tabletType
                 && Objects.equals(dbzProperties, that.dbzProperties);
     }
@@ -179,7 +205,11 @@ public class VitessTableSource implements ScanTableSource {
                 username,
                 password,
                 tableName,
-                vtctldConfig,
+                shard,
+                gtid,
+                stopOnReshard,
+                tombstonesOnDelete,
+                schemaNameAdjustmentMode,
                 tabletType,
                 dbzProperties);
     }
@@ -204,16 +234,26 @@ public class VitessTableSource implements ScanTableSource {
                 + keyspace
                 + '\''
                 + ", username='"
-                + username
+                + String.valueOf(username)
                 + '\''
                 + ", password='"
-                + password
+                + String.valueOf(password)
                 + '\''
                 + ", tableName='"
                 + tableName
                 + '\''
-                + ", vtctldConfig="
-                + vtctldConfig
+                + ", shard='"
+                + String.valueOf(shard)
+                + '\''
+                + ", gtid='"
+                + gtid
+                + '\''
+                + ", stopOnReshard="
+                + stopOnReshard
+                + ", tombstonesOnDelete="
+                + tombstonesOnDelete
+                + ", schemaNameAdjustmentMode="
+                + schemaNameAdjustmentMode
                 + ", tabletType="
                 + tabletType
                 + ", dbzProperties="

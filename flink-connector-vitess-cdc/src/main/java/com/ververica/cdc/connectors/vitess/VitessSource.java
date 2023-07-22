@@ -16,8 +16,8 @@
 
 package com.ververica.cdc.connectors.vitess;
 
+import com.ververica.cdc.connectors.vitess.config.SchemaAdjustmentMode;
 import com.ververica.cdc.connectors.vitess.config.TabletType;
-import com.ververica.cdc.connectors.vitess.config.VtctldConfig;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import io.debezium.connector.vitess.VitessConnector;
@@ -47,8 +47,13 @@ public class VitessSource {
         private String keyspace;
         private String username;
         private String password;
-        private VtctldConfig vtctldConfig;
         private TabletType tabletType = TabletType.RDONLY;
+        private String shard;
+        private String gtid = "current";
+        private Boolean stopOnReshard = false;
+        private Boolean tombstonesOnDelete = true;
+        private String[] messageKeyColumns;
+        private SchemaAdjustmentMode schemaNameAdjustmentMode = SchemaAdjustmentMode.NONE;
         private String[] tableIncludeList;
         private String[] tableExcludeList;
         private String[] columnIncludeList;
@@ -86,9 +91,71 @@ public class VitessSource {
             return this;
         }
 
-        /** VTCtld server config. */
-        public Builder<T> vtctldConfig(VtctldConfig vtctldConfig) {
-            this.vtctldConfig = vtctldConfig;
+        /**
+         * An optional name of the shard from which to stream the changes. If not configured, in
+         * case of unsharded keyspace, the connector streams changes from the only shard, in case of
+         * sharded keyspace, the connector streams changes from all shards in the keyspace. We
+         * recommend not configuring it in order to stream from all shards in the keyspace because
+         * it has better support for reshard operation. If configured, for example, -80, the
+         * connector will stream changes from the -80 shard.
+         */
+        public Builder<T> shard(String shard) {
+            this.shard = shard;
+            return this;
+        }
+
+        /**
+         * An optional GTID position for a shard to stream from. This has to be set together with
+         * vitess.shard. If not configured, the connector streams changes from the latest position
+         * for the given shard.
+         */
+        public Builder<T> gtid(String gtid) {
+            this.gtid = gtid;
+            return this;
+        }
+
+        /**
+         * Controls Vitess flag stop_on_reshard. true - the stream will be stopped after a reshard
+         * operation. false - the stream will be automatically migrated for the new shards after a
+         * reshard operation. If set to true, you should also consider setting vitess.gtid in the
+         * configuration.
+         */
+        public Builder<T> stopOnReshard(Boolean stopOnReshard) {
+            this.stopOnReshard = stopOnReshard;
+            return this;
+        }
+
+        /**
+         * * Controls whether a delete event is followed by a tombstone event. true - a delete
+         * operation is represented by a delete event and a subsequent tombstone event. false - only
+         * a delete event is emitted.
+         */
+        public Builder<T> tombstonesOnDelete(Boolean tombstonesOnDelete) {
+            this.tombstonesOnDelete = tombstonesOnDelete;
+            return this;
+        }
+
+        /**
+         * A semicolon separated list of tables with regular expressions that match table column
+         * names. The connector maps values in matching columns to key fields in change event
+         * records that it sends to Kafka topics. This is useful when a table does not have a
+         * primary key, or when you want to order change event records in a Kafka topic according to
+         * a field that is not a primary key. Separate entries with semicolons. Insert a colon
+         * between the fully-qualified table name and its regular expression. The format is:
+         * keyspace-name.table-name:_regexp_;…​
+         */
+        public Builder<T> messageKeyColumns(String[] messageKeyColumns) {
+            this.messageKeyColumns = messageKeyColumns;
+            return this;
+        }
+
+        /**
+         * Specifies how schema names should be adjusted for compatibility with the message
+         * converter used by the connector. Possible settings: avro replaces the characters that
+         * cannot be used in the Avro type name with underscore. none does not apply any adjustment.
+         */
+        public Builder<T> schemaNameAdjustmentMode(SchemaAdjustmentMode schemaNameAdjustmentMode) {
+            this.schemaNameAdjustmentMode = schemaNameAdjustmentMode;
             return this;
         }
 
@@ -199,22 +266,27 @@ public class VitessSource {
             props.setProperty("database.port", String.valueOf(port));
             props.setProperty("vitess.keyspace", checkNotNull(keyspace));
             props.setProperty("vitess.tablet.type", tabletType.name());
-            props.setProperty("vitess.vtctld.host", checkNotNull(vtctldConfig.getHostname()));
-            props.setProperty("vitess.vtctld.port", String.valueOf(vtctldConfig.getPort()));
 
             if (username != null) {
-                props.setProperty("user", username);
+                props.setProperty("vitess.database.user", username);
             }
-            if (vtctldConfig.getPassword() != null) {
-                props.setProperty("password", password);
+            if (password != null) {
+                props.setProperty("vitess.database.password", password);
             }
 
-            if (vtctldConfig.getUsername() != null) {
-                props.setProperty("vitess.vtctld.user", vtctldConfig.getUsername());
+            if (shard != null) {
+                props.setProperty("vitess.shard", shard);
             }
-            if (vtctldConfig.getPassword() != null) {
-                props.setProperty("vitess.vtctld.password", vtctldConfig.getPassword());
+            props.setProperty("vitess.gtid", checkNotNull(gtid));
+
+            if (messageKeyColumns != null) {
+                props.setProperty("message.key.columns", String.join(",", messageKeyColumns));
             }
+
+            props.setProperty(
+                    "schema.name.adjustment.mode", schemaNameAdjustmentMode.name().toLowerCase());
+            props.setProperty("vitess.stop_on_reshard", stopOnReshard.toString());
+            props.setProperty("tombstones.on.delete", tombstonesOnDelete.toString());
 
             // The maximum number of tasks that should be created for this connector.
             // The Vitess connector always uses a single task and therefore does not use this value,

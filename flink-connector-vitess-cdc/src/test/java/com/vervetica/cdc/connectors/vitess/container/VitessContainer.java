@@ -25,7 +25,6 @@ public class VitessContainer extends JdbcDatabaseContainer {
     public static final String DEFAULT_TAG = "mysql80";
     private static final Integer VITESS_PORT = 15991;
     public static final Integer GRPC_PORT = VITESS_PORT + 1;
-    public static final Integer VTCTLD_GRPC_PORT = VITESS_PORT + 8;
     public static final Integer MYSQL_PORT = VITESS_PORT + 3;
 
     private String keyspaces = "test";
@@ -83,10 +82,6 @@ public class VitessContainer extends JdbcDatabaseContainer {
 
     public Integer getGrpcPort() {
         return this.getMappedPort(GRPC_PORT);
-    }
-
-    public Integer getVtctldGrpcPort() {
-        return this.getMappedPort(VTCTLD_GRPC_PORT);
     }
 
     @Override
