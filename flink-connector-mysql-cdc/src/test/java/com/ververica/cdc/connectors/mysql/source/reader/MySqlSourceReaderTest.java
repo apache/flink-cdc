@@ -338,7 +338,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         // make  SourceReaderContext#metricGroup compatible between Flink 1.13 and Flink 1.14
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
         metricGroupMethod.setAccessible(true);
-        final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
+        final MetricGroup metricGroup = ((MetricGroup) metricGroupMethod.invoke(readerContext)).addGroup("cdc");
         final RecordEmitter<SourceRecords, SourceRecord, MySqlSplitState> recordEmitter =
                 limit > 0
                         ? new MysqlLimitedRecordEmitter(
