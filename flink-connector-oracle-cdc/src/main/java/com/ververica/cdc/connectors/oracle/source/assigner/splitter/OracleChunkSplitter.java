@@ -268,7 +268,7 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
             chunkEndMaxCompare =
-                    ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes())
+                    rowidToDecimal(chunkEnd.toString()).compareTo(rowidToDecimal(max.toString()))
                             <= 0;
         } else {
             chunkEndMaxCompare = chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0;
@@ -281,12 +281,35 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
             chunkEndMaxCompare =
-                    ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes())
+                    rowidToDecimal(chunkEnd.toString()).compareTo(rowidToDecimal(max.toString()))
                             >= 0;
         } else {
             chunkEndMaxCompare = chunkEnd != null && ObjectUtils.compare(chunkEnd, max) >= 0;
         }
         return chunkEndMaxCompare;
+    }
+
+    /** ROWID is encoded with base64, converted to a number. */
+    private BigDecimal rowidToDecimal(String rowid) {
+        // copy from java.util.Base64.Encoder.toBase64
+        final char[] toBase64 = {
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+            'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+            'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'
+        };
+        Map<Character, Integer> charMap = new HashMap<>(64);
+        for (int i = 0; i < toBase64.length; i++) {
+            charMap.put(toBase64[i], i);
+        }
+        BigDecimal decimal = BigDecimal.valueOf(0L);
+        for (int i = 0; i < rowid.length(); i++) {
+            char c = rowid.charAt(i);
+            BigDecimal digit = BigDecimal.valueOf(charMap.get(c));
+            decimal = decimal.multiply(BigDecimal.valueOf(64L)).add(digit);
+        }
+        return decimal;
     }
 
     private Object nextChunkEnd(
