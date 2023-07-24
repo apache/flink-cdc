@@ -517,7 +517,7 @@ public class OracleParallelSourceExample {
                         oracleChangeEventSource,
                         WatermarkStrategy.noWatermarks(),
                         "OracleParallelSource")
-                .setParallelism(1)
+                .setParallelism(4)
                 .print()
                 .setParallelism(1);
         env.execute("Print Oracle Snapshot + RedoLog");
