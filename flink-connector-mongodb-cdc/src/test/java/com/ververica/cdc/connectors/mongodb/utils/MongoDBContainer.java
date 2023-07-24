@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -99,6 +100,11 @@ public class MongoDBContainer extends GenericContainer<MongoDBContainer> {
 
     public String getHostAndPort() {
         return String.format("%s:%s", getContainerIpAddress(), getMappedPort(MONGODB_PORT));
+    }
+
+    @Override
+    public MongoDBContainer withStartupTimeout(Duration timeout) {
+        return (MongoDBContainer) super.withStartupTimeout(timeout);
     }
 
     public void executeCommand(String command) {

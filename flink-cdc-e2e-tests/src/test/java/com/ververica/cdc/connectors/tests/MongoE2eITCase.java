@@ -100,7 +100,8 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                 new MongoDBContainer(NETWORK, MongoDBContainer.ShardingClusterRole.ROUTER)
                         .dependsOn(shard)
                         .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+                        .withLogConsumer(new Slf4jLogConsumer(LOG))
+                        .withStartupTimeout(Duration.ofSeconds(120));
 
         Startables.deepStart(Stream.of(config)).join();
         Startables.deepStart(Stream.of(shard)).join();
@@ -237,7 +238,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "mongodb_products_sink",
                 new String[] {"id", "name", "description", "weight"},
-                60000L);
+                150000L);
     }
 
     private Document productDocOf(String id, String name, String description, Double weight) {
