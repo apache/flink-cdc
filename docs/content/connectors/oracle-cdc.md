@@ -486,7 +486,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import java.util.Properties;
 
-public class PostgresParallelSourceExample {
+public class OracleParallelSourceExample {
 
     public static void main(String[] args) throws Exception {
         Properties debeziumProperties = new Properties();
