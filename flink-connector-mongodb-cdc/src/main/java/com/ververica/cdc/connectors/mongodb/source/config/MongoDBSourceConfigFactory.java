@@ -60,6 +60,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private Integer splitSizeMB = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
     private boolean closeIdleReaders = false;
     private boolean enableFullDocPrePostImage = false;
+    private boolean disableCursorTimeout = true;
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -231,6 +232,15 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    /**
+     * whether pass <code>noCursorTimeout</code> config when creating MongoDB cursor. Defaults to
+     * true.
+     */
+    public MongoDBSourceConfigFactory disableCursorTimeout(boolean disableCursorTimeout) {
+        this.disableCursorTimeout = disableCursorTimeout;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -252,6 +262,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 splitMetaGroupSize,
                 splitSizeMB,
                 closeIdleReaders,
-                enableFullDocPrePostImage);
+                enableFullDocPrePostImage,
+                disableCursorTimeout);
     }
 }

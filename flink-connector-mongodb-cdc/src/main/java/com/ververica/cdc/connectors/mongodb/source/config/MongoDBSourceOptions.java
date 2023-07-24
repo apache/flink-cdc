@@ -141,4 +141,11 @@ public class MongoDBSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Scan full mode changelog. Only available when MongoDB >= 6.0. Defaults to false.");
+
+    public static final ConfigOption<Boolean> SCAN_NO_CURSOR_TIMEOUT =
+            ConfigOptions.key("scan.cursor.no-timeout")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that.");
 }

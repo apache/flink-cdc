@@ -207,6 +207,15 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * Whether disable cursor timeout during snapshot phase. Defaults to true. Only enable this when
+     * MongoDB server doesn't support noCursorTimeout option.
+     */
+    public MongoDBSourceBuilder<T> disableCursorTimeout(boolean disableCursorTimeout) {
+        this.configFactory.disableCursorTimeout(disableCursorTimeout);
+        return this;
+    }
+
+    /**
      * The deserializer used to convert from consumed {@link
      * org.apache.kafka.connect.source.SourceRecord}.
      */

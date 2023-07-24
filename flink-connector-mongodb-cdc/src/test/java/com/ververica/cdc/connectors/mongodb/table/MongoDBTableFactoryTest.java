@@ -55,6 +55,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.junit.Assert.assertEquals;
@@ -110,6 +111,9 @@ public class MongoDBTableFactoryTest {
     private static final boolean FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT =
             FULL_DOCUMENT_PRE_POST_IMAGE.defaultValue();
 
+    private static final boolean SCAN_NO_CURSOR_TIMEOUT_DEFAULT =
+            SCAN_NO_CURSOR_TIMEOUT.defaultValue();
+
     @Test
     public void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
@@ -137,7 +141,8 @@ public class MongoDBTableFactoryTest {
                         CHUNK_META_GROUP_SIZE_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT);
+                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
+                        SCAN_NO_CURSOR_TIMEOUT_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -158,6 +163,7 @@ public class MongoDBTableFactoryTest {
         options.put("scan.incremental.snapshot.chunk.size.mb", "10");
         options.put("scan.incremental.close-idle-reader.enabled", "true");
         options.put("scan.full-changelog", "true");
+        options.put("scan.cursor.no-timeout", "false");
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =
@@ -181,7 +187,8 @@ public class MongoDBTableFactoryTest {
                         1001,
                         10,
                         true,
-                        true);
+                        true,
+                        false);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -218,7 +225,8 @@ public class MongoDBTableFactoryTest {
                         CHUNK_META_GROUP_SIZE_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT);
+                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
+                        SCAN_NO_CURSOR_TIMEOUT_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");

@@ -277,6 +277,13 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>Boolean</td>
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
     </tr>
+    <tr>
+      <td>scan.cursor.no-timeout</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>MongoDB 服务端通常会将空闲时间超过 10 分钟的 cursor 关闭，来节省内存开销。将这个参数设置为 true 可以防止 cursor 因为读取时间过长或者背压导致的空闲而关闭。仅在增量快照模式下生效。</td>
+    </tr>
     </tbody>
 </table>
 </div>
