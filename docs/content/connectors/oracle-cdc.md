@@ -494,7 +494,7 @@ public class OracleParallelSourceExample {
         debeziumProperties.setProperty("log.mining.continuous.mine", "true");
 
         JdbcIncrementalSource<String> oracleChangeEventSource =
-                new OracleSourceBuilder()
+                OracleSourceBuilder.OracleIncrementalSource.<String>builder()
                         .hostname("host")
                         .port(1521)
                         .databaseList("XE")

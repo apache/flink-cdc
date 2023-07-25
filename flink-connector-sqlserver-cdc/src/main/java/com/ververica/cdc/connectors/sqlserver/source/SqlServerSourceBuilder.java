@@ -45,8 +45,7 @@ public class SqlServerSourceBuilder<T> {
 
     private DebeziumDeserializationSchema<T> deserializer;
 
-    private SqlServerSourceBuilder() {
-    }
+    private SqlServerSourceBuilder() {}
 
     /** Hostname of the SQL Server database server. */
     public SqlServerSourceBuilder<T> hostname(String hostname) {
