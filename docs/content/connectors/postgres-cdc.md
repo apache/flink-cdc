@@ -429,7 +429,7 @@ public class PostgresParallelSourceExample {
                 new JsonDebeziumDeserializationSchema();
 
         JdbcIncrementalSource<String> postgresIncrementalSource =
-                new PostgresSourceBuilder<String>()
+                PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
                         .hostname("localhost")
                         .port(5432)
                         .database("postgres")
