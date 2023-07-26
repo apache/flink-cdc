@@ -260,9 +260,10 @@ public class DebeziumChangeFetcher<T> {
             }
             try {
                 deserialization.deserialize(record, debeziumCollector);
-            } catch (Exception e) {
+            } catch (Throwable t) {
                 numRecordInErrors.incrementAndGet();
-                throw e;
+                LOG.error("Failed to deserialize record {}", record, t);
+                throw t;
             }
 
             if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
