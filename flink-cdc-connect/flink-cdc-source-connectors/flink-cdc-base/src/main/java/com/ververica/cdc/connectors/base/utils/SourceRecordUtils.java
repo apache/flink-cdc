@@ -33,7 +33,6 @@ import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.List;
 
 import static com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher.HISTORY_RECORD_FIELD;
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
@@ -201,5 +200,4 @@ public class SourceRecordUtils {
         String historyRecordStr = value.getString(HISTORY_RECORD_FIELD);
         return new HistoryRecord(DOCUMENT_READER.read(historyRecordStr));
     }
-
 }
