@@ -132,7 +132,7 @@ public class MongoDBFetchTaskContext implements FetchTask.Context {
         BsonDocument splitKeys = (BsonDocument) splitStart[0];
         String firstKey = splitKeys.getFirstKey();
         BsonValue keyValue = documentKey.get(firstKey);
-        BsonValue lowerBound = ((BsonDocument) splitEnd[1]).get(firstKey);
+        BsonValue lowerBound = ((BsonDocument) splitStart[1]).get(firstKey);
         BsonValue upperBound = ((BsonDocument) splitEnd[1]).get(firstKey);
 
         // for all range
