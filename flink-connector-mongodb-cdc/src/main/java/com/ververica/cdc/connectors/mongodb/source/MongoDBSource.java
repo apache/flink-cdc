@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mongodb.source;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
@@ -58,8 +59,8 @@ import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
  *
  * @param <T> the output type of the source.
  */
+@Internal
 @Experimental
-@PublicEvolving
 public class MongoDBSource<T> extends IncrementalSource<T, MongoDBSourceConfig> {
 
     private static final long serialVersionUID = 1L;
