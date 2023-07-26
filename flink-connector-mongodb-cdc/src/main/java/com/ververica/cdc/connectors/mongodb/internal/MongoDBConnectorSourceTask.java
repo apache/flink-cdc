@@ -22,6 +22,8 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceTask;
+import com.ververica.cdc.debezium.internal.MetricRecord;
+import com.ververica.cdc.debezium.utils.DebeziumSourceMetricConstants;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -130,8 +132,13 @@ public class MongoDBConnectorSourceTask extends SourceTask {
 
     @Override
     public List<SourceRecord> poll() throws InterruptedException {
-        List<SourceRecord> sourceRecords = target.poll();
         List<SourceRecord> outSourceRecords = new LinkedList<>();
+        List<SourceRecord> sourceRecords = target.poll();
+        MetricRecord preMetricRecord =
+                new MetricRecord(
+                        DebeziumSourceMetricConstants.PENDING_RECORDS,
+                        sourceRecords != null ? (long) sourceRecords.size() : 0L);
+        outSourceRecords.add(preMetricRecord);
         if (isInSnapshotPhase) {
             // Step1. Snapshot Phase
             if (sourceRecords != null && !sourceRecords.isEmpty()) {

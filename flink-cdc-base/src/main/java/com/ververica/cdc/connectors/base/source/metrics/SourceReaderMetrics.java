@@ -21,6 +21,8 @@ import org.apache.flink.metrics.MetricGroup;
 
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /** A collection class for handling metrics in {@link IncrementalSourceReader}. */
 public class SourceReaderMetrics {
 
@@ -45,6 +47,15 @@ public class SourceReaderMetrics {
      */
     private volatile long emitDelay = 0L;
 
+    /**
+     * The number of records that have not been fetched by the source. e.g. the available records
+     * after the consumer offset in a Kafka partition.
+     */
+    private volatile long pendingRecords = 0L;
+
+    /** The total number of record that failed to consume, process or emit. */
+    private volatile AtomicLong numRecordsInErrors = new AtomicLong(0L);
+
     public SourceReaderMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
     }
@@ -58,6 +69,11 @@ public class SourceReaderMetrics {
                 (Gauge<Long>) this::getEmitDelay);
         metricGroup.gauge(
                 SourceReaderMetricConstants.SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
+        metricGroup.gauge(
+                SourceReaderMetricConstants.PENDING_RECORDS, (Gauge<Long>) this::getPendingRecords);
+        metricGroup.gauge(
+                SourceReaderMetricConstants.NUM_RECORDS_IN_ERRORS,
+                (Gauge<Long>) this::getNumRecordsInErrors);
     }
 
     public long getFetchDelay() {
@@ -76,6 +92,14 @@ public class SourceReaderMetrics {
         return System.currentTimeMillis() - processTime;
     }
 
+    public long getPendingRecords() {
+        return pendingRecords;
+    }
+
+    public long getNumRecordsInErrors() {
+        return numRecordsInErrors.get();
+    }
+
     public void recordProcessTime(long processTime) {
         this.processTime = processTime;
     }
@@ -86,5 +110,17 @@ public class SourceReaderMetrics {
 
     public void recordEmitDelay(long emitDelay) {
         this.emitDelay = emitDelay;
+    }
+
+    public void recordPendingRecords(long pendingRecords) {
+        this.pendingRecords = pendingRecords;
+    }
+
+    public void recordNumRecordsInErrors(long numRecordsInErrors) {
+        this.numRecordsInErrors.set(numRecordsInErrors);
+    }
+
+    public long addNumRecordsInErrors(long delta) {
+        return this.numRecordsInErrors.getAndAdd(delta);
     }
 }
