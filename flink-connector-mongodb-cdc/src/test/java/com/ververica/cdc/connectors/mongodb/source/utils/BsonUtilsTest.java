@@ -27,6 +27,7 @@ import org.bson.BsonNull;
 import org.bson.BsonRegularExpression;
 import org.bson.BsonString;
 import org.bson.BsonTimestamp;
+import org.bson.BsonUndefined;
 import org.bson.types.Decimal128;
 import org.junit.Test;
 
@@ -284,5 +285,7 @@ public class BsonUtilsTest {
 
         // test null comparison
         assertEquals(0, BsonUtils.compareBsonValue(new BsonNull(), new BsonNull()));
+        assertEquals(0, BsonUtils.compareBsonValue(new BsonUndefined(), new BsonUndefined()));
+        assertTrue(BsonUtils.compareBsonValue(new BsonUndefined(), new BsonNull()) < 0);
     }
 }
