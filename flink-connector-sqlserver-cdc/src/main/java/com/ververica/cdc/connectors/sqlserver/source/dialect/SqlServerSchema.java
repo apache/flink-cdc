@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.sqlserver.source.dialect;
 
-import com.ververica.cdc.connectors.sqlserver.table.SqlServerTableFilter;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.sqlserver.SqlServerConnection;
@@ -64,7 +63,7 @@ public class SqlServerSchema {
 
         try {
             sqlServerConnection.readSchema(
-                    tables, tableId.catalog(), tableId.schema(), new SqlServerTableFilter(tableId), null, false);
+                    tables, tableId.catalog(), tableId.schema(), null, null, false);
             Table table = tables.forTable(tableId);
             TableChange tableChange = new TableChange(TableChanges.TableChangeType.CREATE, table);
             tableChangeMap.put(tableId, tableChange);
