@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mongodb.table;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
@@ -37,6 +38,7 @@ import java.time.ZoneId;
  * Deserialization schema from Mongodb ChangeStreamDocument to Flink Table/SQL internal data that
  * produces full changelog mode structure {@link RowData}.
  */
+@PublicEvolving
 public class MongoDBConnectorFullChangelogDeserializationSchema
         extends MongoDBConnectorDeserializationSchema {
 

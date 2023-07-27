@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mongodb.table;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericArrayData;
@@ -80,6 +81,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * Deserialization schema from Mongodb ChangeStreamDocument to Flink Table/SQL internal data
  * structure {@link RowData}.
  */
+@PublicEvolving
 public class MongoDBConnectorDeserializationSchema
         implements DebeziumDeserializationSchema<RowData> {
 
