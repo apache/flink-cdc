@@ -119,8 +119,7 @@ public class MySqlChangeEventSourceExampleTest {
                         WatermarkStrategy.noWatermarks(),
                         "MySqlParallelSource")
                 .setParallelism(4)
-                .print()
-                .setParallelism(1);
+                .print();
 
         env.execute("Print MySQL Snapshot + Binlog");
     }
