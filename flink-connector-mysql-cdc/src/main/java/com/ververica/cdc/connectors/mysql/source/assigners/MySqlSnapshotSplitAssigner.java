@@ -90,7 +90,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     private volatile Throwable uncaughtSplitterException;
     private AssignerStatus assignerStatus;
-    private MySqlChunkSplitter chunkSplitter;
+    private final MySqlChunkSplitter chunkSplitter;
     private boolean isTableIdCaseSensitive;
     private ExecutorService executor;
 
@@ -221,11 +221,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
                 // Get the removed tables with the new table filter
                 Set<TableId> tablesToRemove = new HashSet<>(previousCapturedTables);
-                tablesToRemove.removeAll(currentCapturedTables);
+                currentCapturedTables.forEach(tablesToRemove::remove);
 
                 // Get the newly added tables
                 currentCapturedTables.removeAll(previousCapturedTables);
-                List<TableId> newlyAddedTables = currentCapturedTables;
 
                 // case 1: there are old tables to remove from state
                 if (!tablesToRemove.isEmpty()) {
@@ -245,17 +244,17 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                             .removeIf(schema -> tablesToRemove.contains(schema.getKey()));
                     remainingSplits.removeIf(split -> tablesToRemove.contains(split.getTableId()));
                     remainingTables.removeAll(tablesToRemove);
-                    alreadyProcessedTables.removeIf(tableId -> tablesToRemove.contains(tableId));
+                    alreadyProcessedTables.removeIf(tablesToRemove::contains);
                 }
 
                 // case 2: there are new tables to add
-                if (!newlyAddedTables.isEmpty()) {
+                if (!currentCapturedTables.isEmpty()) {
                     // if job is still in snapshot reading phase, directly add all newly added
                     // tables
                     LOG.info("Found newly added tables, start capture newly added tables process");
 
                     // add new tables
-                    remainingTables.addAll(newlyAddedTables);
+                    remainingTables.addAll(currentCapturedTables);
                     if (isAssigningFinished(assignerStatus)) {
                         // start the newly added tables process under binlog reading phase
                         LOG.info(
@@ -299,8 +298,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
                 if (!hasRecordSchema && !splits.isEmpty()) {
                     hasRecordSchema = true;
-                    final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
-                    tableSchema.putAll(splits.iterator().next().getTableSchemas());
+                    final Map<TableId, TableChanges.TableChange> tableSchema =
+                            new HashMap<>(splits.iterator().next().getTableSchemas());
                     tableSchemas.putAll(tableSchema);
                 }
                 final List<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits =
