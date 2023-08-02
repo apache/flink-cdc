@@ -59,7 +59,7 @@ under the License.
           We may need to upgrade our Oracle base image to "gvenzl/oracle-xe" which is the default image of 1.16 testcontainers.
           See more https://github.com/testcontainers/testcontainers-java/issues/4297. -->
         <testcontainers.version>1.15.3</testcontainers.version>
-        <java.version>1.8</java.version>
+        <java.version>1.11</java.version>
         <scala.binary.version>2.12</scala.binary.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
