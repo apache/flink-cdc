@@ -101,9 +101,6 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
 
     @Override
     protected void reportMetrics(SourceRecord element) {
-        long now = System.currentTimeMillis();
-        // record the latest process time
-        sourceReaderMetrics.recordProcessTime(now);
         Long messageTimestamp = getMessageTimestamp(element);
 
         if (messageTimestamp != null && messageTimestamp > 0L) {
@@ -112,8 +109,6 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
             if (fetchTimestamp != null && fetchTimestamp >= messageTimestamp) {
                 sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
             }
-            // report emit delay
-            sourceReaderMetrics.recordEmitDelay(now - messageTimestamp);
         }
     }
 }

@@ -29,23 +29,10 @@ public class SourceReaderMetrics {
     private final MetricGroup metricGroup;
 
     /**
-     * The last record processing time, which is updated after {@link IncrementalSourceReader}
-     * fetches a batch of data. It's mainly used to report metrics sourceIdleTime for sourceIdleTime
-     * = System.currentTimeMillis() - processTime.
-     */
-    private volatile long processTime = 0L;
-
-    /**
      * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
      * record fetched into the source operator.
      */
     private volatile long fetchDelay = 0L;
-
-    /**
-     * emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the
-     * source operator.
-     */
-    private volatile long emitDelay = 0L;
 
     /**
      * The number of records that have not been fetched by the source. e.g. the available records
@@ -65,11 +52,6 @@ public class SourceReaderMetrics {
                 SourceReaderMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
                 (Gauge<Long>) this::getFetchDelay);
         metricGroup.gauge(
-                SourceReaderMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
-                (Gauge<Long>) this::getEmitDelay);
-        metricGroup.gauge(
-                SourceReaderMetricConstants.SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
-        metricGroup.gauge(
                 SourceReaderMetricConstants.PENDING_RECORDS, (Gauge<Long>) this::getPendingRecords);
         metricGroup.gauge(
                 SourceReaderMetricConstants.NUM_RECORDS_IN_ERRORS,
@@ -80,18 +62,6 @@ public class SourceReaderMetrics {
         return fetchDelay;
     }
 
-    public long getEmitDelay() {
-        return emitDelay;
-    }
-
-    public long getIdleTime() {
-        // no previous process time at the beginning, return 0 as idle time
-        if (processTime == 0) {
-            return 0;
-        }
-        return System.currentTimeMillis() - processTime;
-    }
-
     public long getPendingRecords() {
         return pendingRecords;
     }
@@ -100,16 +70,8 @@ public class SourceReaderMetrics {
         return numRecordsInErrors.get();
     }
 
-    public void recordProcessTime(long processTime) {
-        this.processTime = processTime;
-    }
-
     public void recordFetchDelay(long fetchDelay) {
         this.fetchDelay = fetchDelay;
-    }
-
-    public void recordEmitDelay(long emitDelay) {
-        this.emitDelay = emitDelay;
     }
 
     public void recordPendingRecords(long pendingRecords) {
