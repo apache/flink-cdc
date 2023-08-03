@@ -62,6 +62,15 @@ public class Db2ConnectorITCase extends Db2TestBase {
         env.setParallelism(1);
     }
 
+    private void cancelJobIfRunning(TableResult result)
+            throws InterruptedException, ExecutionException {
+        try {
+            result.getJobClient().get().cancel().get();
+        } catch (IllegalStateException ignored) {
+            // job isn't running, ignore it
+        }
+    }
+
     @Test
     public void testConsumingAllEvents()
             throws SQLException, InterruptedException, ExecutionException {
@@ -163,7 +172,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
-        result.getJobClient().get().cancel().get();
+        cancelJobIfRunning(result);
     }
 
     @Test
@@ -254,7 +263,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
 
-        result.getJobClient().get().cancel().get();
+        cancelJobIfRunning(result);
     }
 
     @Test
@@ -322,7 +331,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
-        result.getJobClient().get().cancel().get();
+        cancelJobIfRunning(result);
     }
 
     @Test
@@ -419,7 +428,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
         Collections.sort(expected);
         Collections.sort(actual);
         assertEquals(expected, actual);
-        result.getJobClient().get().cancel().get();
+        cancelJobIfRunning(result);
     }
 
     private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
