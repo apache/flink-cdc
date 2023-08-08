@@ -159,16 +159,22 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
         // we should only capture events for the current table,
         // otherwise, we may can't find corresponding schema
         Configuration dezConf =
-                context.getSourceConfig()
-                        .getDbzConfiguration()
+                context.getDbzConnectorConfig()
+                        .getConfig()
                         .edit()
-                        .with("table.include.list", split.getTableId().toString())
+                        // table.include.list is schema.table format
+                        .with(
+                                "table.include.list",
+                                new TableId(
+                                        null,
+                                        split.getTableId().schema(),
+                                        split.getTableId().table()))
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
         // task to read binlog and backfill for current split
         return new LsnSplitReadTask(
-                context.getDbzConnectorConfig(),
+                new SqlServerConnectorConfig(dezConf),
                 context.getConnection(),
                 context.getMetaDataConnection(),
                 context.getDispatcher(),

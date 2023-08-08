@@ -17,12 +17,14 @@
 package com.ververica.cdc.connectors.sqlserver.source.reader.fetch;
 
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import io.debezium.DebeziumException;
+import io.debezium.connector.sqlserver.Lsn;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
@@ -36,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset.NO_STOPPING_OFFSET;
-import static com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerUtils.getLsnPosition;
 
 /** The task to work for fetching data of SqlServer table stream split . */
 public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
@@ -121,19 +122,17 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public void afterHandleLsn(
-                SqlServerPartition partition, SqlServerOffsetContext offsetContext) {
+        public void afterHandleLsn(SqlServerPartition partition, Lsn toLsn) {
             // check do we need to stop for fetch binlog for snapshot split.
             if (isBoundedRead()) {
-                final LsnOffset currentRedoLogOffset = getLsnPosition(offsetContext.getOffset());
-                // reach the high watermark, the binlog fetcher should be finished
-                if (currentRedoLogOffset.isAtOrAfter(lsnSplit.getEndingOffset())) {
+                Offset endingOffset = lsnSplit.getEndingOffset();
+                if (toLsn.compareTo(((LsnOffset) endingOffset).getLcn()) >= 0) {
                     // send binlog end event
                     try {
                         dispatcher.dispatchWatermarkEvent(
                                 partition.getSourcePartition(),
                                 lsnSplit,
-                                currentRedoLogOffset,
+                                endingOffset,
                                 WatermarkKind.END);
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
