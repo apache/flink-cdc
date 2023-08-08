@@ -60,11 +60,6 @@ public class TableDiscoveryUtils {
                         String databaseName = rs.getString(1);
                         if (tableFilters.databaseFilter().test(databaseName)) {
                             databaseNames.add(databaseName);
-                            LOG.info(
-                                    "\t including database '{}' for further processing",
-                                    databaseName);
-                        } else {
-                            LOG.info("\t '{}' is filtered out of database capturing", databaseName);
                         }
                     }
                 });
