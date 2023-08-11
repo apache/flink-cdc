@@ -1028,15 +1028,20 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
-                // Step-3: mock the engine stop due to underlying debezium exception, trigger a
-                // checkpoint on failed source
                 final Handover handover = source.getHandover();
-                handover.reportError(new DebeziumException("Mocked debezium exception"));
-                handover.close();
                 try {
-                    synchronized (sourceContext.getCheckpointLock()) {
-                        // trigger checkpoint-2
-                        source.snapshotState(new StateSnapshotContextSynchronousImpl(102, 102));
+                    // Here need handover's lock to make sure the error will not be sent by method pollNext()
+                    // before the method snapshotState() is invoked
+                    synchronized (handover.getLock()) {
+                        // Step-3: mock the engine stop due to underlying debezium exception, trigger a
+                        // checkpoint on failed source
+                        handover.reportError(new DebeziumException("Mocked debezium exception"));
+                        handover.close();
+                        synchronized (sourceContext.getCheckpointLock()) {
+                            // trigger checkpoint-2
+                            source.snapshotState(new StateSnapshotContextSynchronousImpl(102, 102));
+                        }
+                        handover.getLock().notifyAll();
                     }
                     fail("Should fail.");
                 } catch (Exception e) {
