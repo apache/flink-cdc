@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
 import com.ververica.cdc.connectors.postgres.source.utils.ChunkUtils;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.postgresql.PostgresChangeRecordEmitter;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
 import io.debezium.connector.postgresql.PostgresEventDispatcher;
@@ -217,6 +218,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         queue,
                         dbzConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
+                        PostgresChangeRecordEmitter::updateSchema,
                         metadataProvider,
                         schemaNameAdjuster);
 
