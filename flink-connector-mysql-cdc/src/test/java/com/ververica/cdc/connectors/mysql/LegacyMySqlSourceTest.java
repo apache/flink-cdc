@@ -1030,10 +1030,12 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
                 final Handover handover = source.getHandover();
                 try {
-                    // Here need handover's lock to make sure the error will not be sent by method pollNext()
+                    // Here need handover's lock to make sure the error will not be sent by method
+                    // pollNext()
                     // before the method snapshotState() is invoked
                     synchronized (handover.getLock()) {
-                        // Step-3: mock the engine stop due to underlying debezium exception, trigger a
+                        // Step-3: mock the engine stop due to underlying debezium exception,
+                        // trigger a
                         // checkpoint on failed source
                         handover.reportError(new DebeziumException("Mocked debezium exception"));
                         handover.close();
