@@ -252,9 +252,9 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
-    /** Set watchtower id to notify phase switch from snapshot to binlog stream. */
-    public MySqlSourceBuilder<T> notifySnapshotToBinlogSwitch(int watchTowerId) {
-        this.configFactory.notifySnapshotToBinlogSwitch(watchTowerId);
+    /** Enable to notify phase switch from snapshot to binlog stream. */
+    public MySqlSourceBuilder<T> notifySnapshotToBinlogSwitch() {
+        this.configFactory.notifySnapshotToBinlogSwitch();
         return this;
     }
 

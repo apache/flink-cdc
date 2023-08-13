@@ -23,14 +23,14 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/** Send notification to watchtower. */
-public class WatchtowerUtils {
-    private static final Logger LOG = LoggerFactory.getLogger(WatchtowerUtils.class);
+/** Send notification to slack. */
+public class SlackWebhookUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(SlackWebhookUtils.class);
 
-    public static void notify(int watchTowerId, String tableName) {
-        LOG.info("Send Notification to Watchtower {}", watchTowerId);
+    public static void notify(String tableName) {
+        LOG.info("Send Snapshot Finish Notification ");
         try {
-            URL url = new URL("");
+            URL url = new URL("https://hooks.slack.com/services/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");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
@@ -38,9 +38,7 @@ public class WatchtowerUtils {
             conn.setConnectTimeout(5000);
             conn.setRequestProperty("Content-Type", "application/json");
             String jsonInputString =
-                    "{\"to\":\""
-                            + watchTowerId
-                            + "\",\"msg\":\""
+                    "{\"text\":\""
                             + "[SNAPSHOT FINISHED]"
                             + "\\nDatabase: "
                             + tableName.split("\\.")[0]
@@ -54,7 +52,7 @@ public class WatchtowerUtils {
             conn.getResponseCode();
             conn.disconnect();
         } catch (Exception e) {
-            LOG.info("Fail to Send Notification to Watchtower {}", watchTowerId);
+            LOG.info("Fail to Send Notification");
             LOG.info(e.getMessage());
         }
     }

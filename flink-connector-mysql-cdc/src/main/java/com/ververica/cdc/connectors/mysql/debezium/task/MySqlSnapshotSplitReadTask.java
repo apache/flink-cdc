@@ -21,8 +21,8 @@ import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatc
 import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.SlackWebhookUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.StatementUtils;
-import com.ververica.cdc.connectors.mysql.source.utils.WatchtowerUtils;
 import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -78,7 +78,6 @@ public class MySqlSnapshotSplitReadTask
     private final TopicSelector<TableId> topicSelector;
     private final EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
     private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
-    private final int watchTowerId;
     private final String tableName;
 
     public MySqlSnapshotSplitReadTask(
@@ -90,7 +89,6 @@ public class MySqlSnapshotSplitReadTask
             TopicSelector<TableId> topicSelector,
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
-            int watchTowerId,
             String tableName,
             MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
@@ -103,7 +101,6 @@ public class MySqlSnapshotSplitReadTask
         this.topicSelector = topicSelector;
         this.snapshotReceiver = snapshotReceiver;
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
-        this.watchTowerId = watchTowerId;
         this.tableName = tableName;
     }
 
@@ -170,7 +167,7 @@ public class MySqlSnapshotSplitReadTask
                 .setHighWatermark(highWatermark);
 
         if (snapshotSplit.getSplitEnd() == null) {
-            WatchtowerUtils.notify(this.watchTowerId, this.tableName);
+            SlackWebhookUtils.notify(this.tableName);
         }
         return SnapshotResult.completed(ctx.offset);
     }

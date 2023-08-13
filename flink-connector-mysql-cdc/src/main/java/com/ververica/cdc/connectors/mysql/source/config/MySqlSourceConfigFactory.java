@@ -74,7 +74,6 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean scanNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
     private boolean notifySnapshotToBinlogSwitch = false;
-    private int watchTowerId = 0;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
@@ -279,12 +278,9 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
-    /**
-     * Enable notify and set watchtower id to notify phase switch from snapshot to binlog stream.
-     */
-    public MySqlSourceConfigFactory notifySnapshotToBinlogSwitch(int watchTowerId) {
+    /** Enable to notify phase switch from snapshot to binlog stream. */
+    public MySqlSourceConfigFactory notifySnapshotToBinlogSwitch() {
         this.notifySnapshotToBinlogSwitch = true;
-        this.watchTowerId = watchTowerId;
         return this;
     }
 
@@ -378,7 +374,6 @@ public class MySqlSourceConfigFactory implements Serializable {
                 scanNewlyAddedTableEnabled,
                 closeIdleReaders,
                 notifySnapshotToBinlogSwitch,
-                watchTowerId,
                 props,
                 jdbcProperties,
                 chunkKeyColumns);

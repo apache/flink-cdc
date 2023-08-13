@@ -59,7 +59,6 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean closeIdleReaders;
     private final boolean notifySnapshotToBinlogSwitch;
-    private final int watchTowerId;
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
 
@@ -92,7 +91,6 @@ public class MySqlSourceConfig implements Serializable {
             boolean scanNewlyAddedTableEnabled,
             boolean closeIdleReaders,
             boolean notifySnapshotToBinlogSwitch,
-            int watchTowerId,
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns) {
@@ -117,7 +115,6 @@ public class MySqlSourceConfig implements Serializable {
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
         this.notifySnapshotToBinlogSwitch = notifySnapshotToBinlogSwitch;
-        this.watchTowerId = watchTowerId;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
@@ -208,10 +205,6 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isNotifySnapshotToBinlogSwitch() {
         return notifySnapshotToBinlogSwitch;
-    }
-
-    public int getWatchTowerId() {
-        return watchTowerId;
     }
 
     public Properties getDbzProperties() {
