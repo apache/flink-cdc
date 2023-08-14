@@ -44,6 +44,7 @@ public class MySqlSourceExampleTest extends MySqlSourceTestBase {
                         .password(inventoryDatabase.getPassword())
                         .serverId("5401-5404")
                         .deserializer(new JsonDebeziumDeserializationSchema())
+                        .serverTimeZone("UTC")
                         .includeSchemaChanges(true) // output the schema changes as well
                         .build();
 
