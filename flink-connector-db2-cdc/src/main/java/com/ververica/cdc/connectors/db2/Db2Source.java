@@ -60,7 +60,7 @@ public class Db2Source {
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("database.dbname", checkNotNull(database));
             props.setProperty("database.server.name", DB2_DATABASE_SERVER_NAME); // Hard-coded here
-            props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+            props.setProperty("schema.history.skip.unparseable.ddl", String.valueOf(true));
 
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));

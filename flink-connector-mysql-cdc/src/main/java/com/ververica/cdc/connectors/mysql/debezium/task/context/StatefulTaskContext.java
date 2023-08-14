@@ -35,7 +35,6 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
-import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -46,11 +45,12 @@ import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
-import io.debezium.schema.DataCollectionId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.schema.DefaultTopicNamingStrategy;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.Collect;
-import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +86,7 @@ public class StatefulTaskContext {
     private MySqlTaskContextImpl taskContext;
     private MySqlOffsetContext offsetContext;
     private MySqlPartition mySqlPartition;
-    private TopicSelector<TableId> topicSelector;
+    private TopicNamingStrategy topicNamingStrategy;
     private SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics<MySqlPartition> streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
@@ -110,7 +110,7 @@ public class StatefulTaskContext {
     public void configure(MySqlSplit mySqlSplit) {
         // initial stateful objects
         final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
-        this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
+        this.topicNamingStrategy = DefaultTopicNamingStrategy.create(connectorConfig);
         EmbeddedFlinkDatabaseHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
@@ -121,7 +121,8 @@ public class StatefulTaskContext {
         this.databaseSchema =
                 DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
 
-        this.mySqlPartition = new MySqlPartition(connectorConfig.getLogicalName());
+        this.mySqlPartition =
+                new MySqlPartition(connectorConfig.getLogicalName(), connection.database());
 
         this.offsetContext =
                 loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
@@ -150,7 +151,7 @@ public class StatefulTaskContext {
         this.dispatcher =
                 new EventDispatcherImpl<>(
                         connectorConfig,
-                        topicSelector,
+                        topicNamingStrategy,
                         databaseSchema,
                         queue,
                         connectorConfig.getTableFilters().dataCollectionFilter(),
@@ -162,7 +163,7 @@ public class StatefulTaskContext {
 
         this.signalEventDispatcher =
                 new SignalEventDispatcher(
-                        offsetContext.getOffset(), topicSelector.getPrimaryTopic(), queue);
+                        offsetContext.getOffset(), topicNamingStrategy.schemaChangeTopic(), queue);
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
@@ -403,8 +404,8 @@ public class StatefulTaskContext {
         return mySqlPartition;
     }
 
-    public TopicSelector<TableId> getTopicSelector() {
-        return topicSelector;
+    public TopicNamingStrategy getTopicNamingStrategy() {
+        return topicNamingStrategy;
     }
 
     public SnapshotChangeEventSourceMetrics<MySqlPartition> getSnapshotChangeEventSourceMetrics() {

@@ -73,8 +73,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import static com.ververica.cdc.debezium.internal.Handover.ClosedException.isGentlyClosedException;
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.registerHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.retrieveHistory;
 
 /**
  * The {@link DebeziumSourceFunction} is a streaming data source that pulls captured change data
@@ -392,7 +392,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         // see
         // https://stackoverflow.com/questions/57147584/debezium-error-schema-isnt-know-to-this-connector
         // and https://debezium.io/blog/2018/03/16/note-on-database-history-topic-configuration/
-        properties.setProperty("database.history", determineDatabase().getCanonicalName());
+        properties.setProperty("schema.history", determineDatabase().getCanonicalName());
 
         // we have to filter out the heartbeat events, otherwise the deserializer will fail
         String dbzHeartbeatPrefix =

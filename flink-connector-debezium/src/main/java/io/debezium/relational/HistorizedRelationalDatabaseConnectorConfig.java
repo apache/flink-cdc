@@ -11,11 +11,11 @@ import io.debezium.config.Configuration;
 import io.debezium.config.Field;
 import io.debezium.relational.Selectors.TableIdToStringMapper;
 import io.debezium.relational.Tables.TableFilter;
-import io.debezium.relational.history.DatabaseHistory;
-import io.debezium.relational.history.DatabaseHistoryListener;
-import io.debezium.relational.history.DatabaseHistoryMetrics;
+import io.debezium.relational.history.SchemaHistory;
+import io.debezium.relational.history.SchemaHistoryListener;
+import io.debezium.relational.history.SchemaHistoryMetrics;
 import io.debezium.relational.history.HistoryRecordComparator;
-import io.debezium.relational.history.KafkaDatabaseHistory;
+import io.debezium.storage.kafka.history.KafkaSchemaHistory;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.config.ConfigDef.Width;
@@ -43,21 +43,21 @@ public abstract class HistorizedRelationalDatabaseConnectorConfig
      * work with a user interface, and in these situations using Kafka is the only way to go.
      */
     public static final Field DATABASE_HISTORY =
-            Field.create("database.history")
+            Field.create("schema.history")
                     .withDisplayName("Database history class")
                     .withType(Type.CLASS)
                     .withWidth(Width.LONG)
                     .withImportance(Importance.LOW)
                     .withInvisibleRecommender()
                     .withDescription(
-                            "The name of the DatabaseHistory class that should be used to store and recover database schema changes. "
+                            "The name of the SchemaHistory class that should be used to store and recover database schema changes. "
                                     + "The configuration properties for the history are prefixed with the '"
-                                    + DatabaseHistory.CONFIGURATION_FIELD_PREFIX_STRING
+                                    + SchemaHistory.CONFIGURATION_FIELD_PREFIX_STRING
                                     + "' string.")
-                    .withDefault(KafkaDatabaseHistory.class.getName());
+                    .withDefault(KafkaSchemaHistory.class.getName());
 
     public static final Field JMX_METRICS_ENABLED =
-            Field.create(DatabaseHistory.CONFIGURATION_FIELD_PREFIX_STRING + "metrics.enabled")
+            Field.create(SchemaHistory.CONFIGURATION_FIELD_PREFIX_STRING + "metrics.enabled")
                     .withDisplayName("Skip DDL statements that cannot be parsed")
                     .withType(Type.BOOLEAN)
                     .withImportance(Importance.LOW)
@@ -69,14 +69,14 @@ public abstract class HistorizedRelationalDatabaseConnectorConfig
                     .edit()
                     .history(
                             DATABASE_HISTORY,
-                            DatabaseHistory.SKIP_UNPARSEABLE_DDL_STATEMENTS,
-                            DatabaseHistory.STORE_ONLY_MONITORED_TABLES_DDL,
-                            DatabaseHistory.STORE_ONLY_CAPTURED_TABLES_DDL,
-                            KafkaDatabaseHistory.BOOTSTRAP_SERVERS,
-                            KafkaDatabaseHistory.TOPIC,
-                            KafkaDatabaseHistory.RECOVERY_POLL_ATTEMPTS,
-                            KafkaDatabaseHistory.RECOVERY_POLL_INTERVAL_MS,
-                            KafkaDatabaseHistory.KAFKA_QUERY_TIMEOUT_MS)
+                            SchemaHistory.SKIP_UNPARSEABLE_DDL_STATEMENTS,
+                            SchemaHistory.STORE_ONLY_CAPTURED_TABLES_DDL,
+                            SchemaHistory.STORE_ONLY_CAPTURED_DATABASES_DDL,
+                            KafkaSchemaHistory.BOOTSTRAP_SERVERS,
+                            KafkaSchemaHistory.TOPIC,
+                            KafkaSchemaHistory.RECOVERY_POLL_ATTEMPTS,
+                            KafkaSchemaHistory.RECOVERY_POLL_INTERVAL_MS,
+                            KafkaSchemaHistory.KAFKA_QUERY_TIMEOUT_MS)
                     .create();
 
     protected HistorizedRelationalDatabaseConnectorConfig(
@@ -90,11 +90,11 @@ public abstract class HistorizedRelationalDatabaseConnectorConfig
             boolean multiPartitionMode) {
         super(
                 config,
-                logicalName,
                 systemTablesFilter,
                 TableId::toString,
                 defaultSnapshotFetchSize,
-                columnFilterMode);
+                columnFilterMode,
+                useCatalogBeforeSchema);
         this.useCatalogBeforeSchema = useCatalogBeforeSchema;
         this.logicalName = logicalName;
         this.connectorClass = connectorClass;
@@ -112,11 +112,11 @@ public abstract class HistorizedRelationalDatabaseConnectorConfig
             boolean multiPartitionMode) {
         super(
                 config,
-                logicalName,
                 systemTablesFilter,
                 tableIdMapper,
                 DEFAULT_SNAPSHOT_FETCH_SIZE,
-                columnFilterMode);
+                columnFilterMode,
+                useCatalogBeforeSchema);
         this.useCatalogBeforeSchema = useCatalogBeforeSchema;
         this.logicalName = logicalName;
         this.connectorClass = connectorClass;
@@ -124,41 +124,41 @@ public abstract class HistorizedRelationalDatabaseConnectorConfig
     }
 
     /** Returns a configured (but not yet started) instance of the database history. */
-    public DatabaseHistory getDatabaseHistory() {
+    public SchemaHistory getSchemaHistory() {
         Configuration config = getConfig();
 
-        DatabaseHistory databaseHistory =
+        SchemaHistory SchemaHistory =
                 config.getInstance(
                         HistorizedRelationalDatabaseConnectorConfig.DATABASE_HISTORY,
-                        DatabaseHistory.class);
-        if (databaseHistory == null) {
+                        SchemaHistory.class);
+        if (SchemaHistory == null) {
             throw new ConnectException(
                     "Unable to instantiate the database history class "
                             + config.getString(
-                                    HistorizedRelationalDatabaseConnectorConfig.DATABASE_HISTORY));
+                            HistorizedRelationalDatabaseConnectorConfig.DATABASE_HISTORY));
         }
 
         // Do not remove the prefix from the subset of config properties ...
         Configuration dbHistoryConfig =
-                config.subset(DatabaseHistory.CONFIGURATION_FIELD_PREFIX_STRING, false)
+                config.subset(SchemaHistory.CONFIGURATION_FIELD_PREFIX_STRING, false)
                         .edit()
-                        .withDefault(DatabaseHistory.NAME, getLogicalName() + "-dbhistory")
+                        .withDefault(SchemaHistory.NAME, getLogicalName() + "-dbhistory")
                         .withDefault(
-                                KafkaDatabaseHistory.INTERNAL_CONNECTOR_CLASS,
+                                KafkaSchemaHistory.INTERNAL_CONNECTOR_CLASS,
                                 connectorClass.getName())
-                        .withDefault(KafkaDatabaseHistory.INTERNAL_CONNECTOR_ID, logicalName)
+                        .withDefault(KafkaSchemaHistory.INTERNAL_CONNECTOR_ID, logicalName)
                         .build();
 
-        DatabaseHistoryListener listener =
+        SchemaHistoryListener listener =
                 config.getBoolean(JMX_METRICS_ENABLED)
-                        ? new DatabaseHistoryMetrics(this, multiPartitionMode)
-                        : DatabaseHistoryListener.NOOP;
+                        ? new SchemaHistoryMetrics(this, multiPartitionMode)
+                        : SchemaHistoryListener.NOOP;
 
         HistoryRecordComparator historyComparator = getHistoryRecordComparator();
-        databaseHistory.configure(
+        SchemaHistory.configure(
                 dbHistoryConfig, historyComparator, listener, useCatalogBeforeSchema); // validates
 
-        return databaseHistory;
+        return SchemaHistory;
     }
 
     public boolean useCatalogBeforeSchema() {

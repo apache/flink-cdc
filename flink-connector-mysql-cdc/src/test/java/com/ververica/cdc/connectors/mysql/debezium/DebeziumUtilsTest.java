@@ -20,6 +20,7 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.schema.DefaultTopicNamingStrategy;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -38,9 +39,9 @@ public class DebeziumUtilsTest {
         MySqlSourceConfig configWithoutUseSSL = getConfig(jdbcProps);
         MySqlConnection connection0 = DebeziumUtils.createMySqlConnection(configWithoutUseSSL);
         assertEquals(
-                "jdbc:mysql://localhost:3306/?useSSL=false&connectTimeout=20000&useInformationSchema=true"
-                        + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&onlyTest=test"
-                        + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
+                "jdbc:mysql://localhost:3306/?useSSL=true&connectTimeout=20000&nullCatalogMeansCurrent=false"
+                        + "&useInformationSchema=true&onlyTest=test&useUnicode=true&characterSetResults=UTF-8"
+                        + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8",
                 connection0.connectionString());
 
         // test with set useSSL=false
@@ -48,9 +49,9 @@ public class DebeziumUtilsTest {
         MySqlSourceConfig configNotUseSSL = getConfig(jdbcProps);
         MySqlConnection connection1 = DebeziumUtils.createMySqlConnection(configNotUseSSL);
         assertEquals(
-                "jdbc:mysql://localhost:3306/?connectTimeout=20000&useInformationSchema=true"
-                        + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&useSSL=false&onlyTest=test"
-                        + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
+                "jdbc:mysql://localhost:3306/?connectTimeout=20000&nullCatalogMeansCurrent=false"
+                        + "&useSSL=false&useInformationSchema=true&onlyTest=test&useUnicode=true"
+                        + "&characterSetResults=UTF-8&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8",
                 connection1.connectionString());
 
         // test with set useSSL=true
@@ -58,10 +59,18 @@ public class DebeziumUtilsTest {
         MySqlSourceConfig configUseSSL = getConfig(jdbcProps);
         MySqlConnection connection2 = DebeziumUtils.createMySqlConnection(configUseSSL);
         assertEquals(
-                "jdbc:mysql://localhost:3306/?connectTimeout=20000&useInformationSchema=true"
-                        + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&useSSL=true&onlyTest=test"
-                        + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
+                "jdbc:mysql://localhost:3306/?connectTimeout=20000&nullCatalogMeansCurrent=false&useSSL=true"
+                        + "&useInformationSchema=true&onlyTest=test&useUnicode=true&characterSetResults=UTF-8"
+                        + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8",
                 connection2.connectionString());
+    }
+
+    @Test
+    void testCreateMySqlConnectionAndNamingStrategy() {
+        Properties jdbcProps = new Properties();
+        jdbcProps.setProperty("onlyTest", "test");
+        MySqlSourceConfig configWithoutUseSSL = getConfig(jdbcProps);
+        DefaultTopicNamingStrategy.create(configWithoutUseSSL.getMySqlConnectorConfig());
     }
 
     private MySqlSourceConfig getConfig(Properties jdbcProperties) {

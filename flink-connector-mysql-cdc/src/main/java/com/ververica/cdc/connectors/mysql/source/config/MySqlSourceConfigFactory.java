@@ -292,6 +292,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     public MySqlSourceConfig createConfig(int subtaskId, String serverName) {
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
+        props.setProperty("topic.prefix", serverName);
         props.setProperty("database.server.name", serverName);
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
@@ -301,12 +302,11 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("database.responseBuffering", "adaptive");
         props.setProperty("database.serverTimezone", serverTimeZone);
         // database history
+        props.setProperty("schema.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty(
-                "database.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+                "schema.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
+        props.setProperty("schema.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.refer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // the underlying debezium reader should always capture the schema changes and forward them.
         // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
@@ -335,6 +335,8 @@ public class MySqlSourceConfigFactory implements Serializable {
         if (serverTimeZone != null) {
             props.setProperty("database.serverTimezone", serverTimeZone);
         }
+
+       props.setProperty("schema.history.internal.store.only.captured.databases.ddl", "false");
 
         // override the user-defined debezium properties
         if (dbzProperties != null) {

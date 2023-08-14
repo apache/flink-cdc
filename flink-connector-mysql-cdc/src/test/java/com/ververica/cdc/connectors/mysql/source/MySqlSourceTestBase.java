@@ -16,6 +16,10 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.PortBinding;
+import com.github.dockerjava.api.model.Ports;
+import com.github.dockerjava.api.model.Ulimit;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
@@ -49,7 +53,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
-    protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
+    protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V8_0);
 
     @Rule
     public final MiniClusterWithClientResource miniClusterResource =
@@ -83,7 +87,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         return (MySqlContainer)
                 new MySqlContainer(version)
                         .withConfigurationOverride(configPath)
-                        .withSetupSQL("docker/setup.sql")
+                         .withSetupSQL("docker/setup.sql")
                         .withDatabaseName("flink-test")
                         .withUsername("flinkuser")
                         .withPassword("flinkpw")

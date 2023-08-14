@@ -19,14 +19,13 @@ package com.ververica.cdc.connectors.mysql.source.assigners.state;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 
+import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
+
 import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
-import io.debezium.relational.Column;
-import io.debezium.relational.Table;
-import io.debezium.relational.TableEditor;
-import io.debezium.relational.TableId;
+import io.debezium.relational.*;
 import io.debezium.relational.history.TableChanges;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -228,6 +227,16 @@ public class PendingSplitsStateSerializerTest {
         @Override
         public TableId id() {
             return tableId;
+        }
+
+        @Override
+        public List<Attribute> attributes() {
+            return Lists.newArrayList();
+        }
+
+        @Override
+        public Attribute attributeWithName(String s) {
+            return null;
         }
 
         @Override

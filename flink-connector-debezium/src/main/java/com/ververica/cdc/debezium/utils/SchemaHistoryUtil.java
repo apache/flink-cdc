@@ -18,7 +18,7 @@ package com.ververica.cdc.debezium.utils;
 
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import com.ververica.cdc.debezium.internal.SchemaRecord;
-import io.debezium.relational.history.DatabaseHistory;
+import io.debezium.relational.history.SchemaHistory;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -26,24 +26,24 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Util to safely visit schema history between {@link DatabaseHistory} and {@link
+ * Util to safely visit schema history between {@link SchemaHistory} and {@link
  * DebeziumSourceFunction}.
  */
-public class DatabaseHistoryUtil {
+public class SchemaHistoryUtil {
 
-    private DatabaseHistoryUtil() {
+    private SchemaHistoryUtil() {
         // do nothing
     }
 
     /**
      * Structure to maintain the current schema history. The content in {@link SchemaRecord} is up
-     * to the implementation of the {@link DatabaseHistory}.
+     * to the implementation of the {@link SchemaHistory}.
      */
     private static final Map<String, Collection<SchemaRecord>> HISTORY = new HashMap<>();
 
     /**
-     * The schema history will be clean up once {@link DatabaseHistory#stop()}, the checkpoint
-     * should fail when this happens.
+     * The schema history will be clean up once {@link SchemaHistory#stop()}, the checkpoint should
+     * fail when this happens.
      */
     private static final Map<String, Boolean> HISTORY_CLEANUP_STATUS = new HashMap<>();
 

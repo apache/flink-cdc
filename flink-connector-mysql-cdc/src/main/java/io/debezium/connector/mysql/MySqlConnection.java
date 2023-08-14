@@ -14,14 +14,11 @@ import io.debezium.config.Configuration;
 import io.debezium.config.Configuration.Builder;
 import io.debezium.config.Field;
 import io.debezium.connector.mysql.MySqlConnectorConfig.SecureConnectionMode;
-import io.debezium.connector.mysql.legacy.MySqlJdbcContext.DatabaseLocales;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.DatabaseHistory;
-import io.debezium.schema.DatabaseSchema;
 import io.debezium.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,36 +26,33 @@ import org.slf4j.LoggerFactory;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.OptionalLong;
-import java.util.Properties;
+import java.util.*;
+
+import static io.debezium.config.CommonConnectorConfig.DATABASE_CONFIG_PREFIX;
+import static io.debezium.config.CommonConnectorConfig.DRIVER_CONFIG_PREFIX;
 
 /**
- * Copied from Debezium project(1.9.7.final) to add custom jdbc properties in the jdbc url. The new
+ * Copied from Debezium project(2.3.2.final) to add custom jdbc properties in the jdbc url. The new
  * parameter {@code jdbcProperties} in the constructor of {@link MySqlConnectionConfiguration} will
  * be used to generate the jdbc url pattern, and may overwrite the default value.
  *
- * <p>Line 75: Add field {@code urlPattern} in {@link MySqlConnection} and remove old pattern.
+ * <p>Line 71: Add field {@code urlPattern} in {@link MySqlConnection} and remove old pattern.
  *
- * <p>Line 92: Init {@code urlPattern} using the url pattern from {@link
+ * <p>Line 84: Init {@code urlPattern} using the url pattern from {@link
  * MySqlConnectionConfiguration}.
  *
- * <p>Line 544: Generate the connection string by the new field {@code urlPattern}.
+ * <p>Line 552: Generate the connection string by the new field {@code urlPattern}.
  *
- * <p>Line 569 ~ 574: Add new constant and field {@code urlPattern} to {@link
+ * <p>Line 566 ~ 577: Add new constant and field {@code urlPattern} to {@link
  * MySqlConnectionConfiguration}.
  *
- * <p>Line 625: Init new field {@code urlPattern} in {@link MySqlConnectionConfiguration}.
+ * <p>Line 622 ~ 625: Init new field {@code urlPattern} in {@link MySqlConnectionConfiguration}.
  *
- * <p>Line 715 ~ 741: Add some methods helping to generate the url pattern and add default values.
+ * <p>Line 686 ~ 716: Add some methods helping to generate the url pattern and add default values.
  */
 public class MySqlConnection extends JdbcConnection {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MySqlConnection.class);
+    private static Logger LOGGER = LoggerFactory.getLogger(MySqlConnection.class);
 
     private static final String SQL_SHOW_SYSTEM_VARIABLES = "SHOW VARIABLES";
     private static final String SQL_SHOW_SYSTEM_VARIABLES_CHARACTER_SET =
@@ -233,12 +227,12 @@ public class MySqlConnection extends JdbcConnection {
      * @return the session variables that are related to sessions ssl version
      */
     protected String getSessionVariableForSslVersion() {
-        final String sslVersion = "Ssl_version";
+        final String SSL_VERSION = "Ssl_version";
         LOGGER.debug("Reading MySQL Session variable for Ssl Version");
         Map<String, String> sessionVariables =
                 querySystemVariables(SQL_SHOW_SESSION_VARIABLE_SSL_VERSION);
-        if (!sessionVariables.isEmpty() && sessionVariables.containsKey(sslVersion)) {
-            return sessionVariables.get(sslVersion);
+        if (!sessionVariables.isEmpty() && sessionVariables.containsKey(SSL_VERSION)) {
+            return sessionVariables.get(SSL_VERSION);
         }
         return null;
     }
@@ -255,7 +249,7 @@ public class MySqlConnection extends JdbcConnection {
                     "SHOW GLOBAL VARIABLES LIKE 'GTID_MODE'",
                     rs -> {
                         if (rs.next()) {
-                            return !"OFF".equalsIgnoreCase(rs.getString(2));
+                            return "ON".equalsIgnoreCase(rs.getString(2));
                         }
                         return false;
                     });
@@ -314,7 +308,7 @@ public class MySqlConnection extends JdbcConnection {
     }
 
     /**
-     * Get the purged GTID values from MySQL (gtid_purged value).
+     * Get the purged GTID values from MySQL (gtid_purged value)
      *
      * @return A GTID set; may be empty if not using GTIDs or none have been purged yet
      */
@@ -540,26 +534,23 @@ public class MySqlConnection extends JdbcConnection {
     }
 
     public String connectionString() {
-        return connectionString(urlPattern);
+        return connectionString(this.urlPattern);
     }
 
     public static String getJavaEncodingForMysqlCharSet(String mysqlCharsetName) {
         return CharsetMappingWrapper.getJavaEncodingForMysqlCharSet(mysqlCharsetName);
     }
 
-    /** Helper to gain access to protected method. */
+    /** Helper to gain access to protected method */
     private static final class CharsetMappingWrapper extends CharsetMapping {
         static String getJavaEncodingForMysqlCharSet(String mySqlCharsetName) {
             return CharsetMapping.getStaticJavaEncodingForMysqlCharset(mySqlCharsetName);
         }
     }
 
-    /** Connection configuration to create a {@link MySqlConnection}. */
     public static class MySqlConnectionConfiguration {
 
-        protected static final String JDBC_PROPERTY_LEGACY_DATETIME = "useLegacyDatetimeCode";
         protected static final String JDBC_PROPERTY_CONNECTION_TIME_ZONE = "connectionTimeZone";
-        protected static final String JDBC_PROPERTY_LEGACY_SERVER_TIME_ZONE = "serverTimezone";
 
         private final JdbcConfiguration jdbcConfig;
         private final ConnectionFactory factory;
@@ -585,20 +576,13 @@ public class MySqlConnection extends JdbcConnection {
             this.config = config;
             final boolean useSSL = sslModeEnabled();
             final Configuration dbConfig =
-                    config.filter(
-                                    x ->
-                                            !(x.startsWith(
-                                                            DatabaseHistory
-                                                                    .CONFIGURATION_FIELD_PREFIX_STRING)
-                                                    || x.equals(
-                                                            MySqlConnectorConfig.DATABASE_HISTORY
-                                                                    .name())))
-                            .edit()
+                    config.edit()
                             .withDefault(
                                     MySqlConnectorConfig.PORT,
                                     MySqlConnectorConfig.PORT.defaultValue())
                             .build()
-                            .subset("database.", true);
+                            .subset(DATABASE_CONFIG_PREFIX, true)
+                            .merge(config.subset(DRIVER_CONFIG_PREFIX, true));
 
             final Builder jdbcConfigBuilder =
                     dbConfig.edit()
@@ -607,17 +591,35 @@ public class MySqlConnection extends JdbcConnection {
                                     Long.toString(getConnectionTimeout().toMillis()))
                             .with("useSSL", Boolean.toString(useSSL));
 
-            final String legacyDateTime = dbConfig.getString(JDBC_PROPERTY_LEGACY_DATETIME);
-            if (legacyDateTime == null) {
-                jdbcConfigBuilder.with(JDBC_PROPERTY_LEGACY_DATETIME, "false");
-            } else if ("true".equals(legacyDateTime)) {
-                LOGGER.warn(
-                        "'{}' is set to 'true'. This setting is not recommended and can result in timezone issues.",
-                        JDBC_PROPERTY_LEGACY_DATETIME);
+            if (useSSL) {
+                if (!Strings.isNullOrBlank(sslTrustStore())) {
+                    jdbcConfigBuilder.with(
+                            "trustCertificateKeyStoreUrl", "file:" + sslTrustStore());
+                }
+                if (sslTrustStorePassword() != null) {
+                    jdbcConfigBuilder.with(
+                            "trustCertificateKeyStorePassword",
+                            String.valueOf(sslTrustStorePassword()));
+                }
+                if (!Strings.isNullOrBlank(sslKeyStore())) {
+                    jdbcConfigBuilder.with("clientCertificateKeyStoreUrl", "file:" + sslKeyStore());
+                }
+                if (sslKeyStorePassword() != null) {
+                    jdbcConfigBuilder.with(
+                            "clientCertificateKeyStorePassword",
+                            String.valueOf(sslKeyStorePassword()));
+                }
             }
 
             jdbcConfigBuilder.with(
                     JDBC_PROPERTY_CONNECTION_TIME_ZONE, determineConnectionTimeZone(dbConfig));
+
+            // Set and remove options to prevent potential vulnerabilities
+            jdbcConfigBuilder
+                    .with("allowLoadLocalInfile", "false")
+                    .with("allowUrlInLocalInfile", "false")
+                    .with("autoDeserialize", false)
+                    .without("queryInterceptors");
 
             this.jdbcConfig = JdbcConfiguration.adapt(jdbcConfigBuilder.build());
             String driverClassName = this.jdbcConfig.getString(MySqlConnectorConfig.JDBC_DRIVER);
@@ -635,17 +637,7 @@ public class MySqlConnection extends JdbcConnection {
                 return connectionTimeZone;
             }
 
-            // fall back to legacy property
-            final String serverTimeZone = dbConfig.getString(JDBC_PROPERTY_LEGACY_SERVER_TIME_ZONE);
-            if (serverTimeZone != null) {
-                LOGGER.warn(
-                        "Database configuration option '{}' is set but is obsolete, please use '{}' instead",
-                        JDBC_PROPERTY_LEGACY_SERVER_TIME_ZONE,
-                        JDBC_PROPERTY_CONNECTION_TIME_ZONE);
-                connectionTimeZone = serverTimeZone;
-            }
-
-            return connectionTimeZone != null ? connectionTimeZone : "SERVER";
+            return "SERVER";
         }
 
         public JdbcConfiguration config() {
@@ -757,8 +749,7 @@ public class MySqlConnection extends JdbcConnection {
     }
 
     @Override
-    public <T extends DatabaseSchema<TableId>> Object getColumnValue(
-            ResultSet rs, int columnIndex, Column column, Table table, T schema)
+    public Object getColumnValue(ResultSet rs, int columnIndex, Column column, Table table)
             throws SQLException {
         return mysqlFieldReader.readField(rs, columnIndex, column, table);
     }
@@ -766,5 +757,30 @@ public class MySqlConnection extends JdbcConnection {
     @Override
     public String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
+    }
+
+    public static class DatabaseLocales {
+        private final String charset;
+        private final String collation;
+
+        public DatabaseLocales(String charset, String collation) {
+            this.charset = charset;
+            this.collation = collation;
+        }
+
+        public void appendToDdlStatement(String dbName, StringBuilder ddl) {
+            if (charset != null) {
+                LOGGER.debug("Setting default charset '{}' for database '{}'", charset, dbName);
+                ddl.append(" CHARSET ").append(charset);
+            } else {
+                LOGGER.info("Default database charset for '{}' not found", dbName);
+            }
+            if (collation != null) {
+                LOGGER.debug("Setting default collation '{}' for database '{}'", collation, dbName);
+                ddl.append(" COLLATE ").append(collation);
+            } else {
+                LOGGER.info("Default database collation for '{}' not found", dbName);
+            }
+        }
     }
 }

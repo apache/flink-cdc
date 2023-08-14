@@ -39,8 +39,12 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
     public static final String PK_UPDATE_OLDKEY_FIELD = "__debezium.oldkey";
     public static final String PK_UPDATE_NEWKEY_FIELD = "__debezium.newkey";
 
-    public RelationalChangeRecordEmitter(P partition, OffsetContext offsetContext, Clock clock) {
-        super(partition, offsetContext, clock);
+    public RelationalChangeRecordEmitter(
+            P partition,
+            OffsetContext offsetContext,
+            Clock clock,
+            HistorizedRelationalDatabaseConnectorConfig connectorConfig) {
+        super(partition, offsetContext, clock, connectorConfig);
     }
 
     @Override

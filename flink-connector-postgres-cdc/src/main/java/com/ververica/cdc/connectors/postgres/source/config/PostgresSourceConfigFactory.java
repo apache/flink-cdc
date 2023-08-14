@@ -72,9 +72,9 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         // database history
         props.setProperty(
                 "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+        props.setProperty("schema.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
+        props.setProperty("schema.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.refer.ddl", String.valueOf(true));
         // we have to enable heartbeat for PG to make sure DebeziumChangeConsumer#handleBatch
         // is invoked after job restart
         // Enable TCP keep-alive probe to verify that the database connection is still alive

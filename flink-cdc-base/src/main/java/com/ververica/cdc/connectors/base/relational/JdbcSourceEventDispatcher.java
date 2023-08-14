@@ -25,7 +25,6 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
-import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.Partition;
@@ -36,8 +35,8 @@ import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.HistorizedDatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -46,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -73,14 +73,14 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
     private final HistorizedDatabaseSchema historizedSchema;
     private final DataCollectionFilters.DataCollectionFilter<TableId> filter;
     private final CommonConnectorConfig connectorConfig;
-    private final TopicSelector<TableId> topicSelector;
+    private final TopicNamingStrategy<TableId> topicNamingStrategy;
     private final Schema schemaChangeKeySchema;
     private final Schema schemaChangeValueSchema;
     private final String topic;
 
     public JdbcSourceEventDispatcher(
             CommonConnectorConfig connectorConfig,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy topicNamingStrategy,
             DatabaseSchema<TableId> schema,
             ChangeEventQueue<DataChangeEvent> queue,
             DataCollectionFilters.DataCollectionFilter<TableId> filter,
@@ -89,7 +89,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
             SchemaNameAdjuster schemaNameAdjuster) {
         super(
                 connectorConfig,
-                topicSelector,
+                topicNamingStrategy,
                 schema,
                 queue,
                 filter,
@@ -103,8 +103,8 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         this.filter = filter;
         this.queue = queue;
         this.connectorConfig = connectorConfig;
-        this.topicSelector = topicSelector;
-        this.topic = topicSelector.getPrimaryTopic();
+        this.topicNamingStrategy = topicNamingStrategy;
+        this.topic = topicNamingStrategy.schemaChangeTopic();
         this.schemaChangeKeySchema =
                 SchemaBuilder.struct()
                         .name(
@@ -132,25 +132,26 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         return queue;
     }
 
-    @Override
-    public void dispatchSchemaChangeEvent(
-            P partition,
-            TableId dataCollectionId,
-            SchemaChangeEventEmitter schemaChangeEventEmitter)
-            throws InterruptedException {
-        if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
-            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
-                LOG.trace("Filtering schema change event for {}", dataCollectionId);
-                return;
-            }
-        }
-        schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
-        IncrementalSnapshotChangeEventSource<P, TableId> incrementalEventSource =
-                getIncrementalSnapshotChangeEventSource();
-        if (incrementalEventSource != null) {
-            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
-        }
-    }
+    //    @Override  FIXME
+    //    public void dispatchSchemaChangeEvent(
+    //            P partition,
+    //            TableId dataCollectionId,
+    //            SchemaChangeEventEmitter schemaChangeEventEmitter)
+    //            throws InterruptedException {
+    //        if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
+    //            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
+    //                LOG.trace("Filtering schema change event for {}", dataCollectionId);
+    //                return;
+    //            }
+    //        }
+    //        schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
+    //        IncrementalSnapshotChangeEventSource<P, TableId> incrementalEventSource =
+    //                getIncrementalSnapshotChangeEventSource();
+    //        if (incrementalEventSource != null) {
+    //            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+    //        }
+    //    }
+    //
 
     @Override
     public void dispatchSchemaChangeEvent(
@@ -193,6 +194,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
             String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
             Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
             Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
+            Instant instant = event.getTimestamp();
             source.put(SERVER_ID_KEY, serverId);
             source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
             source.put(BINLOG_POSITION_OFFSET_KEY, pos);
@@ -203,7 +205,8 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
                             event.getDatabase(),
                             null,
                             event.getDdl(),
-                            event.getTableChanges());
+                            event.getTableChanges(),
+                            instant);
             String historyStr = DOCUMENT_WRITER.write(historyRecord.document());
 
             Struct value = new Struct(schemaChangeValueSchema);
@@ -217,7 +220,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
             historizedSchema.applySchemaChange(event);
             if (connectorConfig.isSchemaChangesHistoryEnabled()) {
                 try {
-                    final String topicName = topicSelector.getPrimaryTopic();
+                    final String topicName = topicNamingStrategy.schemaChangeTopic();
                     final Integer partition = 0;
                     final Struct key = schemaChangeRecordKey(event);
                     final Struct value = schemaChangeRecordValue(event);

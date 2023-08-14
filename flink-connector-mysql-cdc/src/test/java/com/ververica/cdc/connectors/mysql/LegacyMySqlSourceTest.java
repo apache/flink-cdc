@@ -21,6 +21,8 @@ import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
+
 import com.fasterxml.jackson.core.JsonParseException;
 import com.jayway.jsonpath.JsonPath;
 import com.ververica.cdc.connectors.mysql.MySqlTestUtils.TestingListState;
@@ -34,10 +36,7 @@ import com.ververica.cdc.debezium.internal.Handover;
 import io.debezium.DebeziumException;
 import io.debezium.document.Document;
 import io.debezium.document.DocumentWriter;
-import io.debezium.relational.Column;
-import io.debezium.relational.Table;
-import io.debezium.relational.TableEditor;
-import io.debezium.relational.TableId;
+import io.debezium.relational.*;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -51,6 +50,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -69,7 +69,7 @@ import static com.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertRead;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertUpdate;
-import static com.ververica.cdc.debezium.utils.DatabaseHistoryUtil.removeHistory;
+import static com.ververica.cdc.debezium.utils.SchemaHistoryUtil.removeHistory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -787,7 +787,8 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                                     "test",
                                     "test",
                                     "CREATE TABLE test(a int)",
-                                    null)
+                                    null,
+                                    Instant.now())
                             .document();
             historyState.add(writer.write(document));
         }
@@ -1270,6 +1271,16 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         @Override
         public String comment() {
             return "";
+        }
+
+        @Override
+        public List<Attribute> attributes() {
+            return Lists.newArrayList();
+        }
+
+        @Override
+        public Attribute attributeWithName(String s) {
+            return null;
         }
 
         @Override

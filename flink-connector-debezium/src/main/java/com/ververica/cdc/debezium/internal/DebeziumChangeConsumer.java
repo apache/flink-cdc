@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.debezium.internal;
 
+import io.debezium.engine.Header;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.flink.annotation.Internal;
 
 import io.debezium.embedded.EmbeddedEngineChangeEvent;
@@ -77,8 +79,8 @@ public class DebeziumChangeConsumer
                         "DUMMY",
                         Schema.BOOLEAN_SCHEMA,
                         true);
-        EmbeddedEngineChangeEvent<SourceRecord, SourceRecord> changeEvent =
-                new EmbeddedEngineChangeEvent<>(null, recordWrapper, recordWrapper);
+        EmbeddedEngineChangeEvent<SourceRecord, SourceRecord, List> changeEvent =
+                new EmbeddedEngineChangeEvent<>(null, recordWrapper, null, recordWrapper);
         currentCommitter.markProcessed(changeEvent);
         currentCommitter.markBatchFinished();
     }

@@ -22,18 +22,17 @@ import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.document.DocumentWriter;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.EventDispatcher;
-import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.schema.DataCollectionFilters;
-import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.HistorizedDatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -71,13 +70,13 @@ public class EventDispatcherImpl<T extends DataCollectionId>
     private final HistorizedDatabaseSchema historizedSchema;
     private final DataCollectionFilters.DataCollectionFilter<T> filter;
     private final CommonConnectorConfig connectorConfig;
-    private final TopicSelector<T> topicSelector;
+    private final TopicNamingStrategy<T> topicNamingStrategy;
     private final Schema schemaChangeKeySchema;
     private final Schema schemaChangeValueSchema;
 
     public EventDispatcherImpl(
             CommonConnectorConfig connectorConfig,
-            TopicSelector<T> topicSelector,
+            TopicNamingStrategy<T> topicNamingStrategy,
             DatabaseSchema<T> schema,
             ChangeEventQueue<DataChangeEvent> queue,
             DataCollectionFilters.DataCollectionFilter<T> filter,
@@ -86,7 +85,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
             SchemaNameAdjuster schemaNameAdjuster) {
         super(
                 connectorConfig,
-                topicSelector,
+                topicNamingStrategy,
                 schema,
                 queue,
                 filter,
@@ -100,7 +99,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
         this.filter = filter;
         this.queue = queue;
         this.connectorConfig = connectorConfig;
-        this.topicSelector = topicSelector;
+        this.topicNamingStrategy = topicNamingStrategy;
         this.schemaChangeKeySchema =
                 SchemaBuilder.struct()
                         .name(
@@ -128,25 +127,25 @@ public class EventDispatcherImpl<T extends DataCollectionId>
         return queue;
     }
 
-    @Override
-    public void dispatchSchemaChangeEvent(
-            MySqlPartition partition,
-            T dataCollectionId,
-            SchemaChangeEventEmitter schemaChangeEventEmitter)
-            throws InterruptedException {
-        if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
-            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
-                LOG.trace("Filtering schema change event for {}", dataCollectionId);
-                return;
-            }
-        }
-        schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
-        IncrementalSnapshotChangeEventSource<MySqlPartition, T> incrementalEventSource =
-                getIncrementalSnapshotChangeEventSource();
-        if (incrementalEventSource != null) {
-            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
-        }
-    }
+    //    @Override FIXME
+    //    public void dispatchSchemaChangeEvent(
+    //            MySqlPartition partition,
+    //            T dataCollectionId,
+    //            SchemaChangeEventEmitter schemaChangeEventEmitter)
+    //            throws InterruptedException {
+    //        if (dataCollectionId != null && !filter.isIncluded(dataCollectionId)) {
+    //            if (historizedSchema == null || historizedSchema.storeOnlyCapturedTables()) {
+    //                LOG.trace("Filtering schema change event for {}", dataCollectionId);
+    //                return;
+    //            }
+    //        }
+    //        schemaChangeEventEmitter.emitSchemaChangeEvent(new SchemaChangeEventReceiver());
+    //        IncrementalSnapshotChangeEventSource<MySqlPartition, T> incrementalEventSource =
+    //                getIncrementalSnapshotChangeEventSource();
+    //        if (incrementalEventSource != null) {
+    //            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+    //        }
+    //    }
 
     @Override
     public void dispatchSchemaChangeEvent(
@@ -198,7 +197,8 @@ public class EventDispatcherImpl<T extends DataCollectionId>
                             event.getDatabase(),
                             null,
                             event.getDdl(),
-                            event.getTableChanges());
+                            event.getTableChanges(),
+                            event.getTimestamp());
             String historyStr = DOCUMENT_WRITER.write(historyRecord.document());
 
             Struct value = new Struct(schemaChangeValueSchema);
@@ -212,7 +212,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
             historizedSchema.applySchemaChange(event);
             if (connectorConfig.isSchemaChangesHistoryEnabled()) {
                 try {
-                    final String topicName = topicSelector.getPrimaryTopic();
+                    final String topicName = topicNamingStrategy.schemaChangeTopic();
                     final Integer partition = 0;
                     final Struct key = schemaChangeRecordKey(event);
                     final Struct value = schemaChangeRecordValue(event);

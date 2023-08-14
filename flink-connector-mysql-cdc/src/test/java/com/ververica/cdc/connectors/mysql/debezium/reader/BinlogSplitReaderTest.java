@@ -102,19 +102,19 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     private BinaryLogClient binaryLogClient;
     private MySqlConnection mySqlConnection;
 
-    @BeforeClass
-    public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
-    }
+//    @BeforeClass
+//    public static void beforeClass() {
+//        LOG.info("Starting MySql8 containers...");
+//        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
+//        LOG.info("Container MySql8 is started.");
+//    }
+//
+//    @AfterClass
+//    public static void afterClass() {
+//        LOG.info("Stopping MySql8 containers...");
+//        MYSQL8_CONTAINER.stop();
+//        LOG.info("Container MySql8 is stopped.");
+//    }
 
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
@@ -854,7 +854,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverSchemaForCapturedTables(
                             new MySqlPartition(
-                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName(),
+                                    mySqlConnection.database()),
                             sourceConfig,
                             jdbc);
             return MySqlBinlogSplit.fillTableSchemas(
