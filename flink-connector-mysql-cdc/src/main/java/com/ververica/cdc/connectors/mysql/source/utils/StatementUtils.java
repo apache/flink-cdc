@@ -243,8 +243,8 @@ public class StatementUtils {
     private static void addPrimaryKeyColumnsToCondition(
             RowType pkRowType, StringBuilder sql, String predicate) {
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
-                fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next()).append(predicate);
+             fieldNamesIt.hasNext(); ) {
+            sql.append(quotedFieldString(fieldNamesIt.next())).append(predicate);
             if (fieldNamesIt.hasNext()) {
                 sql.append(" AND ");
             }
@@ -254,8 +254,8 @@ public class StatementUtils {
     private static String getPrimaryKeyColumnsProjection(RowType pkRowType) {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
-                fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next());
+             fieldNamesIt.hasNext(); ) {
+            sql.append(quotedFieldString(fieldNamesIt.next()));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
@@ -266,8 +266,8 @@ public class StatementUtils {
     private static String getMaxPrimaryKeyColumnsProjection(RowType pkRowType) {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
-                fieldNamesIt.hasNext(); ) {
-            sql.append("MAX(" + fieldNamesIt.next() + ")");
+             fieldNamesIt.hasNext(); ) {
+            sql.append("MAX(" + quotedFieldString(fieldNamesIt.next()) + ")");
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
@@ -320,5 +320,11 @@ public class StatementUtils {
 
     private static String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
+    }
+
+    private static String quotedFieldString(String field) {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("`").append(field).append("`");
+        return stringBuilder.toString();
     }
 }
