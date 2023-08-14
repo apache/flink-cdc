@@ -17,6 +17,7 @@
 package com.ververica.cdc.debezium.internal;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.engine.ChangeEvent;
@@ -222,5 +223,10 @@ public class Handover implements Closeable {
             return cause instanceof ClosedException
                     && GENTLY_CLOSED_MESSAGE.equals(((ClosedException) cause).getMessage());
         }
+    }
+
+    @VisibleForTesting
+    public Object getLock() {
+        return lock;
     }
 }
