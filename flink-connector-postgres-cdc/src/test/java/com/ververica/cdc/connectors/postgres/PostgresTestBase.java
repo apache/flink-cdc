@@ -22,6 +22,7 @@ import org.apache.flink.test.util.AbstractTestBase;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConfiguration;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +82,13 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(POSTGRES_CONTAINER)).join();
         LOG.info("Containers are started.");
+    }
+
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping containers...");
+        POSTGRES_CONTAINER.stop();
+        LOG.info("Containers are stopped.");
     }
 
     protected Connection getJdbcConnection(PostgreSQLContainer container) throws SQLException {
