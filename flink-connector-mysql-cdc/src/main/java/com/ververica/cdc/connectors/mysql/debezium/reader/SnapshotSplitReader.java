@@ -174,7 +174,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                                                     "Read snapshot for mysql split %s fail",
                                                     currentSnapshotSplit)));
                         }
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         setReadException(e);
                     }
                 });
