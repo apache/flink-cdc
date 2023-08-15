@@ -73,6 +73,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean includeSchemaChanges = false;
     private boolean scanNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
+    private String hookUrl = null;
     private boolean notifySnapshotToBinlogSwitch = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
@@ -279,7 +280,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /** Enable to notify phase switch from snapshot to binlog stream. */
-    public MySqlSourceConfigFactory notifySnapshotToBinlogSwitch() {
+    public MySqlSourceConfigFactory notifySnapshotToBinlogSwitch(String hookUrl) {
+        this.hookUrl = hookUrl;
         this.notifySnapshotToBinlogSwitch = true;
         return this;
     }
@@ -374,6 +376,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 scanNewlyAddedTableEnabled,
                 closeIdleReaders,
                 notifySnapshotToBinlogSwitch,
+                hookUrl,
                 props,
                 jdbcProperties,
                 chunkKeyColumns);

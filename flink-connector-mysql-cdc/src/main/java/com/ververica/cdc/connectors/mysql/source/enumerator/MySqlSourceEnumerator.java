@@ -43,6 +43,7 @@ import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.SlackWebhookUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,6 +222,14 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 context.assignSplit(mySqlSplit, nextAwaiting);
                 if (mySqlSplit instanceof MySqlBinlogSplit) {
                     this.binlogSplitTaskId = nextAwaiting;
+                    if (sourceConfig.doNotifySnapshotToBinlogSwitch()) {
+                        MySqlBinlogSplit mySqlBinlogSplit = (MySqlBinlogSplit) mySqlSplit;
+                        SlackWebhookUtils.notify(
+                                this.sourceConfig.getHookUrl(),
+                                "BINLOG STREAM START",
+                                this.sourceConfig.getTableList().get(0),
+                                mySqlBinlogSplit.getStartingOffset().getGtidSet());
+                    }
                 }
                 awaitingReader.remove();
                 LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);

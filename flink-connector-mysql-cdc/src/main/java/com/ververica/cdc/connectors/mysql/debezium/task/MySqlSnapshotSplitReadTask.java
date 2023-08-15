@@ -79,6 +79,8 @@ public class MySqlSnapshotSplitReadTask
     private final EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
     private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
     private final String tableName;
+    private final String hookUrl;
+    private final boolean doNotifySnapshotToBinlogSwitch;
 
     public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
@@ -90,6 +92,8 @@ public class MySqlSnapshotSplitReadTask
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
             String tableName,
+            String hookUrl,
+            boolean doNotifySnapshotToBinlogSwitch,
             MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
         this.connectorConfig = connectorConfig;
@@ -102,6 +106,8 @@ public class MySqlSnapshotSplitReadTask
         this.snapshotReceiver = snapshotReceiver;
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
         this.tableName = tableName;
+        this.hookUrl = hookUrl;
+        this.doNotifySnapshotToBinlogSwitch = doNotifySnapshotToBinlogSwitch;
     }
 
     @Override
@@ -166,8 +172,9 @@ public class MySqlSnapshotSplitReadTask
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setHighWatermark(highWatermark);
 
-        if (snapshotSplit.getSplitEnd() == null) {
-            SlackWebhookUtils.notify(this.tableName);
+        if (this.doNotifySnapshotToBinlogSwitch && snapshotSplit.getSplitEnd() == null) {
+            SlackWebhookUtils.notify(
+                    this.hookUrl, "LAST SNAPSHOT SPLIT FINISHED", this.tableName, "");
         }
         return SnapshotResult.completed(ctx.offset);
     }
