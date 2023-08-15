@@ -27,26 +27,32 @@ import java.net.URL;
 public class SlackWebhookUtils {
     private static final Logger LOG = LoggerFactory.getLogger(SlackWebhookUtils.class);
 
-    public static void notify(String tableName) {
+    public static void notify(String hookUrl, String header, String tableName, String gtids) {
         LOG.info("Send Snapshot Finish Notification ");
+
         try {
-            URL url = new URL("https://hooks.slack.com/services/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");
+            URL url = new URL(hookUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
             conn.setDoInput(true);
             conn.setConnectTimeout(5000);
             conn.setRequestProperty("Content-Type", "application/json");
-            String jsonInputString =
-                    "{\"text\":\""
-                            + "[SNAPSHOT FINISHED]"
-                            + "\\nDatabase: "
-                            + tableName.split("\\.")[0]
-                            + "\\nTable: "
-                            + tableName.split("\\.")[1]
-                            + "\"}";
+            String[] target = tableName.replaceAll("\n", "").replaceAll("\r", "").split("\\.");
+            String database = target[0];
+            String table = target[1];
+            String gtidsInfo =
+                    !gtids.isEmpty()
+                            ? String.format(
+                                    "\\nGTIDs: %s", gtids.replaceAll("\n", "").replaceAll("\r", ""))
+                            : "";
+            String payload =
+                    String.format(
+                            "{\"text\":\"[%s]\\nDatabase: %s\\nTable: %s%s\"}",
+                            header, database, table, gtidsInfo);
+
             try (OutputStream os = conn.getOutputStream()) {
-                byte[] input = jsonInputString.getBytes("utf-8");
+                byte[] input = payload.getBytes("utf-8");
                 os.write(input, 0, input.length);
             }
             conn.getResponseCode();
