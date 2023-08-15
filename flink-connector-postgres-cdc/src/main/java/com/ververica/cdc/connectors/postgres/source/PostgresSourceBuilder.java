@@ -27,11 +27,11 @@ import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.StreamSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
+import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
-import com.ververica.cdc.connectors.postgres.source.enumerator.PostgresSourceEnumerator;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.relational.TableId;
@@ -281,8 +281,7 @@ public class PostgresSourceBuilder<T> {
                         new StreamSplitAssigner(sourceConfig, dataSourceDialect, offsetFactory);
             }
 
-            return new PostgresSourceEnumerator(
-                    enumContext, sourceConfig, splitAssigner, (PostgresDialect) dataSourceDialect);
+            return new IncrementalSourceEnumerator(enumContext, sourceConfig, splitAssigner);
         }
 
         public static <T> PostgresSourceBuilder<T> builder() {
