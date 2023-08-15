@@ -104,6 +104,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
         POSTGRES_CONTAINER_OLD.stop();
         LOG.info("Containers are started.");
     }
+
     @Before
     public void before() {
         initializePostgresTable(POSTGRES_CONTAINER_OLD, "inventory");

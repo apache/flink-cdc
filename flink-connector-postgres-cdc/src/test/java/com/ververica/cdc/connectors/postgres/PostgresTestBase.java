@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.postgres;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
+import com.ververica.cdc.connectors.postgres.source.PostgresConnectionPoolFactory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConfiguration;
@@ -98,10 +99,14 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     public static Connection getJdbcConnection(PostgreSQLContainer container, String databaseName)
             throws SQLException {
+        String jdbcUrl =
+                String.format(
+                        PostgresConnectionPoolFactory.JDBC_URL_PATTERN,
+                        container.getHost(),
+                        container.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
+                        databaseName);
         return DriverManager.getConnection(
-                container.withDatabaseName(databaseName).getJdbcUrl(),
-                container.getUsername(),
-                container.getPassword());
+                jdbcUrl, container.getUsername(), container.getPassword());
     }
 
     public static String getSlotName() {
