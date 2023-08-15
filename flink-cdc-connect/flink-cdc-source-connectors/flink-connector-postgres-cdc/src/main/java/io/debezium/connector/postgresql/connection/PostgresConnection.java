@@ -12,7 +12,6 @@ import io.debezium.annotation.VisibleForTesting;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PgOid;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
-import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresType;
 import io.debezium.connector.postgresql.PostgresValueConverter;
 import io.debezium.connector.postgresql.TypeRegistry;
@@ -767,8 +766,7 @@ public class PostgresConnection extends JdbcConnection {
         try {
             final ResultSetMetaData metaData = rs.getMetaData();
             final String columnTypeName = metaData.getColumnTypeName(columnIndex);
-            final PostgresType type =
-                    ((PostgresSchema) schema).getTypeRegistry().get(columnTypeName);
+            final PostgresType type = getTypeRegistry().get(columnTypeName);
 
             LOGGER.trace("Type of incoming data is: {}", type.getOid());
             LOGGER.trace("ColumnTypeName is: {}", columnTypeName);
