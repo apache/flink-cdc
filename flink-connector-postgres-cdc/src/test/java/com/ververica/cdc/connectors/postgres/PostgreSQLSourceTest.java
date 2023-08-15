@@ -100,9 +100,9 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
     @AfterClass
     public static void stopAll() {
-        LOG.info("Starting containers...");
+        LOG.info("Stopping containers...");
         POSTGRES_CONTAINER_OLD.stop();
-        LOG.info("Containers are started.");
+        LOG.info("Containers are stopped.");
     }
 
     @Before
