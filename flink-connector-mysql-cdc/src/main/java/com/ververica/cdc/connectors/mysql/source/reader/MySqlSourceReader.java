@@ -136,6 +136,9 @@ public class MySqlSourceReader<T>
                         .filter(split -> !finishedUnackedSplits.containsKey(split.splitId()))
                         .collect(Collectors.toList());
 
+        // add finished snapshot splits that did not receive ack yet
+        unfinishedSplits.addAll(finishedUnackedSplits.values());
+
         // add binlog splits who are uncompleted
         unfinishedSplits.addAll(uncompletedBinlogSplits.values());
 
