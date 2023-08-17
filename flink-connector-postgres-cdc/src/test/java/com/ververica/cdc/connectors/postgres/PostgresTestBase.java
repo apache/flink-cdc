@@ -19,9 +19,11 @@ package com.ververica.cdc.connectors.postgres;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
+import com.ververica.cdc.connectors.postgres.source.PostgresConnectionPoolFactory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConfiguration;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +85,13 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         LOG.info("Containers are started.");
     }
 
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping containers...");
+        POSTGRES_CONTAINER.stop();
+        LOG.info("Containers are stopped.");
+    }
+
     protected Connection getJdbcConnection(PostgreSQLContainer container) throws SQLException {
         return DriverManager.getConnection(
                 container.getJdbcUrl(), container.getUsername(), container.getPassword());
@@ -90,10 +99,14 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     public static Connection getJdbcConnection(PostgreSQLContainer container, String databaseName)
             throws SQLException {
+        String jdbcUrl =
+                String.format(
+                        PostgresConnectionPoolFactory.JDBC_URL_PATTERN,
+                        container.getHost(),
+                        container.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
+                        databaseName);
         return DriverManager.getConnection(
-                container.withDatabaseName(databaseName).getJdbcUrl(),
-                container.getUsername(),
-                container.getPassword());
+                jdbcUrl, container.getUsername(), container.getPassword());
     }
 
     public static String getSlotName() {
