@@ -37,6 +37,7 @@ import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -95,6 +96,13 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(POSTGRES_CONTAINER_OLD)).join();
         LOG.info("Containers are started.");
+    }
+
+    @AfterClass
+    public static void stopAll() {
+        LOG.info("Stopping containers...");
+        POSTGRES_CONTAINER_OLD.stop();
+        LOG.info("Containers are stopped.");
     }
 
     @Before
