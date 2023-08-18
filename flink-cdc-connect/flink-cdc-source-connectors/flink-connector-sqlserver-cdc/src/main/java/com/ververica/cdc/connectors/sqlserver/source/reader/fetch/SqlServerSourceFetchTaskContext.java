@@ -66,9 +66,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Instant;
 import java.util.Map;
 
-import static io.debezium.connector.sqlserver.SourceInfo.CHANGE_LSN_KEY;
-import static io.debezium.connector.sqlserver.SourceInfo.COMMIT_LSN_KEY;
-
 /** The context for fetch task that fetching data of snapshot split from SqlServer data source. */
 public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private static final Logger LOG =
@@ -306,8 +303,8 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
                 return null;
             }
             return Collect.hashMapOf(
-                    COMMIT_LSN_KEY, sourceInfo.getString(COMMIT_LSN_KEY),
-                    CHANGE_LSN_KEY, sourceInfo.getString(CHANGE_LSN_KEY));
+                    SourceInfo.COMMIT_LSN_KEY, sourceInfo.getString(SourceInfo.COMMIT_LSN_KEY),
+                    SourceInfo.CHANGE_LSN_KEY, sourceInfo.getString(SourceInfo.CHANGE_LSN_KEY));
         }
 
         @Override
@@ -320,7 +317,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
             if (source == null) {
                 return null;
             }
-            return sourceInfo.getString(COMMIT_LSN_KEY);
+            return sourceInfo.getString(SourceInfo.COMMIT_LSN_KEY);
         }
     }
 }

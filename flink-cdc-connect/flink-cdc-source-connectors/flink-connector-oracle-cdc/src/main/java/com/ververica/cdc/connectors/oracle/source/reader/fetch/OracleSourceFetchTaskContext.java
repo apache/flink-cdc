@@ -70,7 +70,6 @@ import java.util.Map;
 
 import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
 import static com.ververica.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
-import static io.debezium.connector.oracle.SourceInfo.SCN_KEY;
 
 /** The context for fetch task that fetching data of snapshot split from Oracle data source. */
 public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
@@ -301,8 +300,8 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             if (source == null) {
                 return null;
             }
-            final String scn = sourceInfo.getString(SCN_KEY);
-            return Collect.hashMapOf(SCN_KEY, scn == null ? "null" : scn);
+            final String scn = sourceInfo.getString(SourceInfo.SCN_KEY);
+            return Collect.hashMapOf(SourceInfo.SCN_KEY, scn == null ? "null" : scn);
         }
 
         @Override
