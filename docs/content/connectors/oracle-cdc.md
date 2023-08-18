@@ -213,7 +213,7 @@ Flink SQL> CREATE TABLE products (
      'schema-name' = 'inventory',
      'table-name' = 'products');
   
--- read snapshot and binlogs from products table
+-- read snapshot and redo logs from products table
 Flink SQL> SELECT * FROM products;
 ```
 **Note:**
@@ -457,7 +457,7 @@ The Oracle CDC connector is a Flink Source connector which will read database sn
 
 The config option `scan.startup.mode` specifies the startup mode for Oracle CDC consumer. The valid enumerations are:
 
-- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest redo log.
 - `latest-offset`: Never to perform a snapshot on the monitored database tables upon first startup, just read from
   the change since the connector was started.
 
