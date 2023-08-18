@@ -72,7 +72,7 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @ClassRule
     public static final GenericContainer<?> PD =
-            new FixedHostPortGenericContainer<>("pingcap/pd:v6.0.0")
+            new FixedHostPortGenericContainer<>("pingcap/pd:v6.1.0")
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
                     .withFixedExposedPort(pdPort, PD_PORT_ORIGIN)
                     .withCommand(
@@ -92,7 +92,7 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @ClassRule
     public static final GenericContainer<?> TIKV =
-            new FixedHostPortGenericContainer<>("pingcap/tikv:v6.0.0")
+            new FixedHostPortGenericContainer<>("pingcap/tikv:v6.1.0")
                     .withFixedExposedPort(TIKV_PORT_ORIGIN, TIKV_PORT_ORIGIN)
                     .withFileSystemBind("src/test/resources/config/tikv.toml", "/tikv.toml")
                     .withCommand(
@@ -110,7 +110,7 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @ClassRule
     public static final GenericContainer<?> TIDB =
-            new GenericContainer<>("pingcap/tidb:v6.0.0")
+            new GenericContainer<>("pingcap/tidb:v6.1.0")
                     .withExposedPorts(TIDB_PORT)
                     .withFileSystemBind("src/test/resources/config/tidb.toml", "/tidb.toml")
                     .withCommand(
