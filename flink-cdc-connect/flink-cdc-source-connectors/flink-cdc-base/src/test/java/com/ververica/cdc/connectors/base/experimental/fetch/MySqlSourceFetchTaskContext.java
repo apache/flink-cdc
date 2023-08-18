@@ -23,6 +23,7 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.experimental.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.base.experimental.handler.MySqlSchemaChangeEventHandler;
 import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset;
 import com.ververica.cdc.connectors.base.experimental.utils.MySqlUtils;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
@@ -60,7 +61,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -70,11 +70,6 @@ import static com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset
 public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceFetchTaskContext.class);
-
-    public static final String SERVER_ID_KEY = "server_id";
-    public static final String BINLOG_FILENAME_OFFSET_KEY = "file";
-    public static final String BINLOG_POSITION_OFFSET_KEY = "pos";
-
     private final MySqlConnection connection;
     private final BinaryLogClient binaryLogClient;
     private final MySqlEventMetadataProvider metadataProvider;
@@ -150,17 +145,7 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster,
-                        event -> {
-                            Map<String, Object> source = new HashMap<>();
-                            Struct sourceInfo = event.getSource();
-                            String fileName = sourceInfo.getString(BINLOG_FILENAME_OFFSET_KEY);
-                            Long pos = sourceInfo.getInt64(BINLOG_POSITION_OFFSET_KEY);
-                            Long serverId = sourceInfo.getInt64(SERVER_ID_KEY);
-                            source.put(SERVER_ID_KEY, serverId);
-                            source.put(BINLOG_FILENAME_OFFSET_KEY, fileName);
-                            source.put(BINLOG_POSITION_OFFSET_KEY, pos);
-                            return source;
-                        });
+                        new MySqlSchemaChangeEventHandler());
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(

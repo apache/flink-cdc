@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.relational.util;
+package com.ververica.cdc.connectors.base.relational.handler;
 
 import io.debezium.schema.SchemaChangeEvent;
 

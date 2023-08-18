@@ -26,6 +26,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import com.ververica.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
+import com.ververica.cdc.connectors.sqlserver.source.handler.SqlServerSchemaChangeEventHandler;
 import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerUtils;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -63,12 +64,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
 
 import static io.debezium.connector.sqlserver.SourceInfo.CHANGE_LSN_KEY;
 import static io.debezium.connector.sqlserver.SourceInfo.COMMIT_LSN_KEY;
-import static io.debezium.connector.sqlserver.SourceInfo.EVENT_SERIAL_NO_KEY;
 
 /** The context for fetch task that fetching data of snapshot split from SqlServer data source. */
 public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
@@ -158,17 +157,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
                         DataChangeEvent::new,
                         metadataProvider,
                         schemaNameAdjuster,
-                        event -> {
-                            Map<String, Object> source = new HashMap<>();
-                            Struct sourceInfo = event.getSource();
-                            String changeLsn = sourceInfo.getString(CHANGE_LSN_KEY);
-                            String commitLsn = sourceInfo.getString(COMMIT_LSN_KEY);
-                            String eventSerialNo = sourceInfo.getString(EVENT_SERIAL_NO_KEY);
-                            source.put(CHANGE_LSN_KEY, changeLsn);
-                            source.put(COMMIT_LSN_KEY, commitLsn);
-                            source.put(EVENT_SERIAL_NO_KEY, eventSerialNo);
-                            return source;
-                        });
+                        new SqlServerSchemaChangeEventHandler());
 
         this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
 

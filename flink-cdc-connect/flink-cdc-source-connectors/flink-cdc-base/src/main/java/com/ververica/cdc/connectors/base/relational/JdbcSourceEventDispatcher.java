@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.connectors.base.relational;
 
-import com.ververica.cdc.connectors.base.relational.util.SchemaChangeEventHandler;
+import com.ververica.cdc.connectors.base.relational.handler.SchemaChangeEventHandler;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent;
