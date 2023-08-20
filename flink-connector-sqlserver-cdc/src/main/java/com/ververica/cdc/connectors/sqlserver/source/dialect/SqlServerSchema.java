@@ -28,9 +28,7 @@ import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** A component used to get schema by table path. */
@@ -42,20 +40,20 @@ public class SqlServerSchema {
         this.schemasByTableId = new ConcurrentHashMap<>();
     }
 
-    public TableChange getTableSchema(JdbcConnection jdbc, TableId tableId) {
+    public TableChange getTableSchema(
+            JdbcConnection jdbc, TableId tableId, Tables.TableFilter tableFilters) {
         // read schema from cache first
         TableChange schema = schemasByTableId.get(tableId);
         if (schema == null) {
-            schema = readTableSchema(jdbc, tableId);
+            schema = readTableSchema(jdbc, tableId, tableFilters);
             schemasByTableId.put(tableId, schema);
         }
         return schema;
     }
 
-    private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
+    private TableChange readTableSchema(
+            JdbcConnection jdbc, TableId tableId, Tables.TableFilter tableFilters) {
         SqlServerConnection sqlServerConnection = (SqlServerConnection) jdbc;
-        Set<TableId> tableIdSet = new HashSet<>();
-        tableIdSet.add(tableId);
 
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         Tables tables = new Tables();
@@ -63,7 +61,7 @@ public class SqlServerSchema {
 
         try {
             sqlServerConnection.readSchema(
-                    tables, tableId.catalog(), tableId.schema(), null, null, false);
+                    tables, tableId.catalog(), tableId.schema(), tableFilters, null, false);
             Table table = tables.forTable(tableId);
             TableChange tableChange = new TableChange(TableChanges.TableChangeType.CREATE, table);
             tableChangeMap.put(tableId, tableChange);
