@@ -50,12 +50,10 @@ import static com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerUtils
 public class SqlServerDialect implements JdbcDataSourceDialect {
 
     private static final long serialVersionUID = 1L;
-    private final SqlServerSourceConfigFactory configFactory;
     private final SqlServerSourceConfig sourceConfig;
     private transient SqlServerSchema sqlserverSchema;
 
     public SqlServerDialect(SqlServerSourceConfigFactory configFactory) {
-        this.configFactory = configFactory;
         this.sourceConfig = configFactory.create(0);
     }
 
@@ -75,7 +73,6 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
 
     @Override
     public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
-        // todo: need to check the case sensitive of the database
         return true;
     }
 
@@ -100,7 +97,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
             return SqlServerConnectionUtils.listTables(
                     jdbcConnection,
-                    sqlserverSourceConfig.getTableFilters(),
+                    sqlserverSourceConfig.getDbzConnectorConfig().getTableFilters(),
                     sqlserverSourceConfig.getDatabaseList());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
@@ -131,7 +128,10 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         if (sqlserverSchema == null) {
             sqlserverSchema = new SqlServerSchema();
         }
-        return sqlserverSchema.getTableSchema(jdbc, tableId);
+        return sqlserverSchema.getTableSchema(
+                jdbc,
+                tableId,
+                sourceConfig.getDbzConnectorConfig().getTableFilters().dataCollectionFilter());
     }
 
     @Override

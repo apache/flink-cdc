@@ -20,7 +20,6 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
-import io.debezium.relational.RelationalTableFilters;
 
 import java.time.Duration;
 import java.util.List;
@@ -84,13 +83,5 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
     @Override
     public SqlServerConnectorConfig getDbzConnectorConfig() {
         return new SqlServerConnectorConfig(getDbzConfiguration());
-    }
-
-    public Configuration getOriginDbzConnectorConfig() {
-        return super.getDbzConfiguration();
-    }
-
-    public RelationalTableFilters getTableFilters() {
-        return getDbzConnectorConfig().getTableFilters();
     }
 }
