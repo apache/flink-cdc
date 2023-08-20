@@ -21,8 +21,6 @@ import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnector;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -34,17 +32,6 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private static final String DATABASE_SERVER_NAME = "sqlserver_transaction_log_source";
     private static final String DRIVER_ClASS_NAME = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-    private List<String> schemaList;
-
-    /**
-     * An optional list of regular expressions that match schema names to be monitored; any schema
-     * name not included in the whitelist will be excluded from monitoring. By default, all
-     * non-system schemas will be monitored.
-     */
-    public JdbcSourceConfigFactory schemaList(String... schemaList) {
-        this.schemaList = Arrays.asList(schemaList);
-        return this;
-    }
 
     @Override
     public SqlServerSourceConfig create(int subtask) {
