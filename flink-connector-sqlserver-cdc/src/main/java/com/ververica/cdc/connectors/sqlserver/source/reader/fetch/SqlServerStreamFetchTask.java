@@ -44,7 +44,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
-    private LsnSplitReadTask redoLogSplitReadTask;
+    private StreamSplitReadTask redoLogSplitReadTask;
 
     public SqlServerStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -57,7 +57,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         sourceFetchContext.getOffsetContext().preSnapshotCompletion();
         taskRunning = true;
         redoLogSplitReadTask =
-                new LsnSplitReadTask(
+                new StreamSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getMetaDataConnection(),
@@ -92,15 +92,15 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
      * A wrapped task to read all binlog for table and also supports read bounded (from lowWatermark
      * to highWatermark) binlog.
      */
-    public static class LsnSplitReadTask extends SqlServerStreamingChangeEventSource {
+    public static class StreamSplitReadTask extends SqlServerStreamingChangeEventSource {
 
-        private static final Logger LOG = LoggerFactory.getLogger(LsnSplitReadTask.class);
+        private static final Logger LOG = LoggerFactory.getLogger(StreamSplitReadTask.class);
         private final StreamSplit lsnSplit;
         private final JdbcSourceEventDispatcher<SqlServerPartition> dispatcher;
         private final ErrorHandler errorHandler;
         private ChangeEventSourceContext context;
 
-        public LsnSplitReadTask(
+        public StreamSplitReadTask(
                 SqlServerConnectorConfig connectorConfig,
                 SqlServerConnection connection,
                 SqlServerConnection metadataConnection,
@@ -125,21 +125,22 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
         public void afterHandleLsn(SqlServerPartition partition, Lsn toLsn) {
             // check do we need to stop for fetch binlog for snapshot split.
             if (isBoundedRead()) {
+                LsnOffset currentLsnOffset = new LsnOffset(null, toLsn, null);
                 Offset endingOffset = lsnSplit.getEndingOffset();
-                if (toLsn.compareTo(((LsnOffset) endingOffset).getLcn()) >= 0) {
-                    // send binlog end event
+                if (currentLsnOffset.isAtOrAfter(endingOffset)) {
+                    // send streaming end event
                     try {
                         dispatcher.dispatchWatermarkEvent(
                                 partition.getSourcePartition(),
                                 lsnSplit,
-                                endingOffset,
+                                currentLsnOffset,
                                 WatermarkKind.END);
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
                         errorHandler.setProducerThrowable(
                                 new DebeziumException("Error processing binlog signal event", e));
                     }
-                    // tell fetcher the binlog task finished
+                    // tell fetcher the streaming task finished
                     ((SqlServerScanFetchTask.SnapshotBinlogSplitChangeEventSourceContext) context)
                             .finished();
                 }

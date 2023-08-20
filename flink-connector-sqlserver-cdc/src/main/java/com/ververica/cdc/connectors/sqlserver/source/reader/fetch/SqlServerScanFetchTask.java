@@ -23,7 +23,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
-import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerStreamFetchTask.LsnSplitReadTask;
+import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerStreamFetchTask.StreamSplitReadTask;
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
@@ -118,7 +118,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
             final SqlServerOffsetContext streamOffsetContext =
                     loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
 
-            final LsnSplitReadTask backfillBinlogReadTask =
+            final StreamSplitReadTask backfillBinlogReadTask =
                     createBackFillLsnSplitReadTask(backfillBinlogSplit, sourceFetchContext);
             backfillBinlogReadTask.execute(
                     new SnapshotBinlogSplitChangeEventSourceContext(),
@@ -154,7 +154,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
                 WatermarkKind.END);
     }
 
-    private LsnSplitReadTask createBackFillLsnSplitReadTask(
+    private StreamSplitReadTask createBackFillLsnSplitReadTask(
             StreamSplit backfillBinlogSplit, SqlServerSourceFetchTaskContext context) {
         // we should only capture events for the current table,
         // otherwise, we may can't find corresponding schema
@@ -173,7 +173,7 @@ public class SqlServerScanFetchTask implements FetchTask<SourceSplitBase> {
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
         // task to read binlog and backfill for current split
-        return new LsnSplitReadTask(
+        return new StreamSplitReadTask(
                 new SqlServerConnectorConfig(dezConf),
                 context.getConnection(),
                 context.getMetaDataConnection(),

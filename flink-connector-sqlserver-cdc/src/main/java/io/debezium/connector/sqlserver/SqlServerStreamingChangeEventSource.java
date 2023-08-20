@@ -443,13 +443,13 @@ public class SqlServerStreamingChangeEventSource
                                                     clock));
                                     tableWithSmallestLsn.next();
                                 }
-                                // call after handle to judge whether to complete the stream
-                                afterHandleLsn(partition, toLsn);
                             });
                     streamingExecutionContext.setLastProcessedPosition(
                             TxLogPosition.valueOf(toLsn));
                     // Terminate the transaction otherwise CDC could not be disabled for tables
                     dataConnection.rollback();
+                    // Determine whether to continue streaming in sqlserver cdc snapshot phase
+                    afterHandleLsn(partition, toLsn);
                 } catch (SQLException e) {
                     tablesSlot.set(
                             processErrorFromChangeTableQuery(databaseName, e, tablesSlot.get()));
