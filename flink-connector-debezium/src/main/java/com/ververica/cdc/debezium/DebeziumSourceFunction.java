@@ -28,7 +28,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
-import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.OperatorMetricGroup;
+import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -47,7 +48,6 @@ import com.ververica.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
 import com.ververica.cdc.debezium.internal.FlinkOffsetBackingStore;
 import com.ververica.cdc.debezium.internal.Handover;
 import com.ververica.cdc.debezium.internal.SchemaRecord;
-import com.ververica.cdc.debezium.utils.DebeziumSourceMetricConstants;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
@@ -61,7 +61,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Properties;
@@ -429,27 +428,18 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         debeziumStarted = true;
 
         // initialize metrics
-        // make RuntimeContext#getMetricGroup compatible between Flink 1.13 and Flink 1.14
-        final Method getMetricGroupMethod =
-                getRuntimeContext().getClass().getMethod("getMetricGroup");
-        getMetricGroupMethod.setAccessible(true);
-        final MetricGroup metricGroup =
-                (MetricGroup) getMetricGroupMethod.invoke(getRuntimeContext());
-
+        OperatorMetricGroup metricGroup = getRuntimeContext().getMetricGroup();
         metricGroup.gauge(
-                DebeziumSourceMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,
+                MetricNames.CURRENT_FETCH_EVENT_TIME_LAG,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getFetchDelay());
         metricGroup.gauge(
-                DebeziumSourceMetricConstants.CURRENT_EMIT_EVENT_TIME_LAG,
+                MetricNames.CURRENT_EMIT_EVENT_TIME_LAG,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getEmitDelay());
         metricGroup.gauge(
-                DebeziumSourceMetricConstants.SOURCE_IDLE_TIME,
+                MetricNames.SOURCE_IDLE_TIME,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getIdleTime());
         metricGroup.gauge(
-                DebeziumSourceMetricConstants.PENDING_RECORDS,
-                (Gauge<Long>) () -> debeziumChangeFetcher.getPendingRecords());
-        metricGroup.gauge(
-                DebeziumSourceMetricConstants.NUM_RECORDS_IN_ERRORS,
+                MetricNames.NUM_RECORDS_IN_ERRORS,
                 (Gauge<Long>) () -> debeziumChangeFetcher.getNumRecordInErrors());
         // start the real debezium consumer
         try {

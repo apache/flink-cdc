@@ -62,29 +62,23 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
     protected void processElement(
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
-        try {
-            if (isWatermarkEvent(element)) {
-                Offset watermark = getOffsetPosition(element);
-                if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
-                    splitState.asSnapshotSplitState().setHighWatermark(watermark);
-                }
-            } else if (isHeartbeatEvent(element)) {
-                if (splitState.isStreamSplitState()) {
-                    updatePositionForStreamSplit(element, splitState);
-                }
-            } else if (isDataChangeRecord(element)) {
-                if (splitState.isStreamSplitState()) {
-                    updatePositionForStreamSplit(element, splitState);
-                }
-                reportMetrics(element);
-                emitElement(element, output);
-            } else {
-                // unknown element
-                LOG.info("Meet unknown element {}, just skip.", element);
-                sourceReaderMetrics.addNumRecordsInErrors(1L);
+        if (isWatermarkEvent(element)) {
+            Offset watermark = getOffsetPosition(element);
+            if (isHighWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+                splitState.asSnapshotSplitState().setHighWatermark(watermark);
             }
-        } catch (Throwable t) {
-            LOG.error("Failed to process Source Record {}, due to", element, t);
+        } else if (isHeartbeatEvent(element)) {
+            if (splitState.isStreamSplitState()) {
+                updatePositionForStreamSplit(element, splitState);
+            }
+        } else if (isDataChangeRecord(element)) {
+            if (splitState.isStreamSplitState()) {
+                updatePositionForStreamSplit(element, splitState);
+            }
+            reportMetrics(element);
+            emitElement(element, output);
+        } else {
+            LOG.info("Meet unknown element {}, just skip.", element);
             sourceReaderMetrics.addNumRecordsInErrors(1L);
         }
     }
@@ -101,9 +95,6 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
 
     @Override
     protected void reportMetrics(SourceRecord element) {
-        long now = System.currentTimeMillis();
-        // record the latest process time
-        sourceReaderMetrics.recordProcessTime(now);
         Long messageTimestamp = getMessageTimestamp(element);
 
         if (messageTimestamp != null && messageTimestamp > 0L) {
@@ -112,8 +103,6 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
             if (fetchTimestamp != null && fetchTimestamp >= messageTimestamp) {
                 sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
             }
-            // report emit delay
-            sourceReaderMetrics.recordEmitDelay(now - messageTimestamp);
         }
     }
 }
