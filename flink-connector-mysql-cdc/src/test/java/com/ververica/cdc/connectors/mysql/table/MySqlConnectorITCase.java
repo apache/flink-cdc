@@ -1412,7 +1412,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
-                        "default_value_test",
+                        "default_value_test.*",
                         incrementalSnapshot,
                         getServerId(),
                         getSplitSize());
@@ -1479,6 +1479,39 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute(
                     "alter table default_value_test add column\n"
                             + "    `new_col` smallint(1) unsigned DEFAULT ' 31 ';");
+            statement.execute(
+                    " CREATE TABLE default_value_test_ignore (\n"
+                            + "     id INTEGER NOT NULL PRIMARY KEY, \n"
+                            + "     tiny_c TINYINT DEFAULT ' 0 ', \n"
+                            + "     boolean_c BOOLEAN DEFAULT ' 1 ', \n"
+                            + "     tiny_un_z_c TINYINT UNSIGNED ZEROFILL DEFAULT ' 2 ', \n"
+                            + "     small_c SMALLINT DEFAULT ' 3 ', \n"
+                            + "     small_un_c SMALLINT UNSIGNED DEFAULT ' 4 ',\n"
+                            + "     small_un_z_c SMALLINT UNSIGNED ZEROFILL DEFAULT ' 5 ', \n"
+                            + "     medium_c MEDIUMINT DEFAULT ' 6 ', \n"
+                            + "     medium_un_c MEDIUMINT UNSIGNED DEFAULT ' 7 ', \n"
+                            + "     medium_un_z_c MEDIUMINT UNSIGNED ZEROFILL DEFAULT ' 8 ', \n"
+                            + "     int_c INTEGER DEFAULT ' 9 ', \n"
+                            + "     int_un_c INTEGER UNSIGNED DEFAULT ' 10 ', \n"
+                            + "     int_un_z_c INTEGER UNSIGNED ZEROFILL DEFAULT ' 11 ',\n"
+                            + "     int11_c INT(11) DEFAULT ' 12 ', \n"
+                            + "     big_c BIGINT DEFAULT ' 13 ', \n"
+                            + "     big_un_c BIGINT UNSIGNED DEFAULT ' 14 ', \n"
+                            + "     big_un_z_c BIGINT UNSIGNED ZEROFILL DEFAULT ' 15 ', \n"
+                            + "     decimal_c DECIMAL(8, 4) DEFAULT ' 16  ', \n"
+                            + "     decimal_un_c DECIMAL(8, 4) UNSIGNED DEFAULT ' 17 ', \n"
+                            + "     decimal_un_z_c DECIMAL(8, 4) UNSIGNED ZEROFILL DEFAULT ' 18 ', \n"
+                            + "     numeric_c NUMERIC(6, 0) DEFAULT ' 19 ', \n"
+                            + "     big_decimal_c DECIMAL(65, 1) DEFAULT ' 20 ',\n"
+                            + "     real_c REAL DEFAULT ' 21.0',\n"
+                            + "     float_c FLOAT DEFAULT ' 22.0',\n"
+                            + "     float_un_c FLOAT UNSIGNED DEFAULT ' 23',\n"
+                            + "     float_un_z_c FLOAT UNSIGNED ZEROFILL DEFAULT ' 24',\n"
+                            + "     double_c DOUBLE DEFAULT ' 25',\n"
+                            + "     double_un_c DOUBLE UNSIGNED DEFAULT ' 26',\n"
+                            + "     double_un_z_c DOUBLE UNSIGNED ZEROFILL DEFAULT ' 27',\n"
+                            + "     tiny_un_c TINYINT UNSIGNED DEFAULT ' 28 '"
+                            + " );");
         }
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         jobClient.cancel().get();
