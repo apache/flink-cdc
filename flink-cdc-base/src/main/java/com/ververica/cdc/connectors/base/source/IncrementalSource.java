@@ -28,7 +28,6 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig;
@@ -54,7 +53,6 @@ import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitRea
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.relational.TableId;
 
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -106,11 +104,8 @@ public class IncrementalSource<T, C extends SourceConfig>
         FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
 
-        // Forward compatible with flink 1.13
-        final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
-        metricGroupMethod.setAccessible(true);
-        final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
-        final SourceReaderMetrics sourceReaderMetrics = new SourceReaderMetrics(metricGroup);
+        final SourceReaderMetrics sourceReaderMetrics =
+                new SourceReaderMetrics(readerContext.metricGroup());
 
         sourceReaderMetrics.registerMetrics();
         Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier =
