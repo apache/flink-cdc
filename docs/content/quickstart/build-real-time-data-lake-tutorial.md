@@ -15,91 +15,102 @@ You can also use other data sources like Oracle/Postgres and sinks like Hudi to 
 ## Preparation
 Prepare a Linux or MacOS computer with Docker installed.
 
+## Preparing JAR package required
+**Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself.**
+- flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar
+- [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
+- [iceberg-flink-runtime-1.16-1.3.1.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.16/1.3.1/iceberg-flink-runtime-1.16-1.3.1.jar)
+
+
+
 ### Starting components required
 The components required in this tutorial are all managed in containers, so we will use `docker-compose` to start them.
 
-Create `docker-compose.yml` file using following contents:
-```
-version: '2.1'
-services:
-  sql-client:
-    user: flink:flink
-    image: yuxialuo/flink-sql-client:1.13.2.v1 
-    depends_on:
-      - jobmanager
-      - mysql
-    environment:
-      FLINK_JOBMANAGER_HOST: jobmanager
-      MYSQL_HOST: mysql
-    volumes:
-      - shared-tmpfs:/tmp/iceberg
-  jobmanager:
-    user: flink:flink
-    image: flink:1.13.2-scala_2.11
-    ports:
-      - "8081:8081"
-    command: jobmanager
-    environment:
-      - |
-        FLINK_PROPERTIES=
-        jobmanager.rpc.address: jobmanager
-    volumes:
-      - shared-tmpfs:/tmp/iceberg
-  taskmanager:
-    user: flink:flink
-    image: flink:1.13.2-scala_2.11
-    depends_on:
-      - jobmanager
-    command: taskmanager
-    environment:
-      - |
-        FLINK_PROPERTIES=
-        jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 2
-    volumes:
-      - shared-tmpfs:/tmp/iceberg
-  mysql:
-    image: debezium/example-mysql:1.1
-    ports:
-      - "3306:3306"
-    environment:
-      - MYSQL_ROOT_PASSWORD=123456
-      - MYSQL_USER=mysqluser
-      - MYSQL_PASSWORD=mysqlpw
+1. Create `Dockerfile` file using following contents:
+   ```dockerfile
+   FROM flink:1.16.0-scala_2.12
+   # Place the downloaded jar packages in the lib directory at the same level.
+   COPY ./lib /opt/flink/lib
+   RUN apt-get update && apt-get install tree
+   ```
 
-volumes:
-  shared-tmpfs:
-    driver: local
-    driver_opts:
-      type: "tmpfs"
-      device: "tmpfs"
-```
+2. Create `docker-compose.yml` file using following contents:
+   ```yml
+   version: '2.1'
+   services:
+      sql-client:
+         user: flink:flink
+         build: .
+         command: bin/sql-client.sh
+         depends_on:
+            - jobmanager
+            - mysql
+         environment:
+            - MYSQL_HOST=mysql
+            - |
+               FLINK_PROPERTIES=
+               jobmanager.rpc.address: jobmanager
+               rest.address: jobmanager           
+         volumes:
+            - shared-tmpfs:/tmp/iceberg
+      jobmanager:
+         user: flink:flink
+         build: .
+         ports:
+            - "8081:8081"
+         command: jobmanager
+         environment:
+            - |
+               FLINK_PROPERTIES=
+               jobmanager.rpc.address: jobmanager
+         volumes:
+            - shared-tmpfs:/tmp/iceberg
+      taskmanager:
+         user: flink:flink
+         build: .
+         depends_on:
+            - jobmanager
+         command: taskmanager
+         environment:
+            - |
+               FLINK_PROPERTIES=
+               jobmanager.rpc.address: jobmanager
+               taskmanager.numberOfTaskSlots: 2
+         volumes:
+            - shared-tmpfs:/tmp/iceberg
+      mysql:
+         image: debezium/example-mysql:1.1
+         ports:
+            - "3306:3306"
+         environment:
+            - MYSQL_ROOT_PASSWORD=123456
+            - MYSQL_USER=mysqluser
+            - MYSQL_PASSWORD=mysqlpw
+   
+   volumes:
+      shared-tmpfs:
+         driver: local
+         driver_opts:
+            type: "tmpfs"
+            device: "tmpfs"
+   ```
 
-The Docker Compose environment consists of the following containers:
-- SQL-Client: Flink SQL Client, used to submit queries and visualize their results.
-- Flink Cluster: a Flink JobManager and a Flink TaskManager container to execute queries.
-- MySQL: mainly used as a data source to store the sharding table.
+   The Docker Compose environment consists of the following containers:
+   - SQL-Client: Flink SQL Client, used to submit queries and visualize their results.
+   - Flink Cluster: a Flink JobManager and a Flink TaskManager container to execute queries.
+   - MySQL: mainly used as a data source to store the sharding table.
+
+3. To start all containers, run the following command in the directory that contains the `docker-compose.yml` file:
+   ```shell
+   docker-compose up -d
+   ```
+   This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run `docker ps` to check whether these containers are running properly.
+   We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally.
+
 
 ***Note:***
-1. To simply this tutorial, the jar packages required has been packaged into the SQL-Client container. You can see how it's built in [GitHub](https://github.com/luoyuxia/flink-cdc-tutorial/tree/main/flink-cdc-iceberg-demo/sql-client). 
-If you want to run with your own Flink environment, remember to download the following packages and then put them to `FLINK_HOME/lib/`.
-   
-   **Download links are available only for stable releases, SNAPSHOT dependency need build by yourself. **
-   - [flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.5-SNAPSHOT/flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar)
-   - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-   - [iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar](https://raw.githubusercontent.com/luoyuxia/flink-cdc-tutorial/main/flink-cdc-iceberg-demo/sql-client/lib/iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar)
-   
-   Currently, the Iceberg official `iceberg-flink-runtime` jar that supports Flink 1.13 isn't released. 
-   Here, we provide a `iceberg-flink-runtime` jar supporting Flink 1.13, which is built based on the master branch of Iceberg. 
-   You can download the `iceberg-flink-runtime` jar from the [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) once Iceberg 0.13.0 is released.
-2. All the following commands involving `docker-compose` should be executed in the directory of the `docker-compose.yml` file.
-
-To start all containers, run the following command in the directory that contains the `docker-compose.yml` file:
-```shell
-docker-compose up -d
-```
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run `docker ps` to check whether these containers are running properly.
-We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally.
+* If you want to run with your own Flink environment, remember to download the jar packages and then put them to `FLINK_HOME/lib/`.
+* All the following commands involving `docker-compose` should be executed in the directory of the `docker-compose.yml` file.
 
 ![Flink UI](/_static/fig/real-time-data-lake-tutorial/flink-ui.png "Flink UI")
 
@@ -157,7 +168,7 @@ We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Fli
 ## Creating tables using Flink DDL in Flink SQL CLI
 First, use the following command to enter the Flink SQL CLI Container:
 ```shell
-docker-compose exec sql-client ./sql-client
+docker-compose run sql-client
 ```
 
 We should see the welcome screen of the CLI client:

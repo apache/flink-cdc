@@ -32,8 +32,9 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Con
 | <font color="DarkCyan">2.0.*</font> |                                                                                             <font color="MediumVioletRed">1.13.*</font>                                                                                             |
 | <font color="DarkCyan">2.1.*</font> |                                                                                             <font color="MediumVioletRed">1.13.*</font>                                                                                             |
 | <font color="DarkCyan">2.2.*</font> |                                                                     <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>                                                                      |
-| <font color="DarkCyan">2.3.*</font> |                        <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.0</font>                        |
-| <font color="DarkCyan">2.4.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.\*</font>, <font color="MediumVioletRed">1.17.0</font> |
+| <font color="DarkCyan">2.3.*</font> |                       <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.\*</font>                        |
+| <font color="DarkCyan">2.4.*</font> | <font color="MediumVioletRed">1.13.\*</font>, <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.\*</font>, <font color="MediumVioletRed">1.17.\*</font> |
+| <font color="DarkCyan">2.5.*</font> |                       <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.\*</font>, <font color="MediumVioletRed">1.17.\*</font>                        |
 
 ## Features
 
@@ -64,7 +65,7 @@ We need several steps to setup a Flink cluster with the provided connector.
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.
 
-The example shows how to create a MySQL CDC source in [Flink SQL Client](https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/sqlClient.html) and execute queries on it.
+The example shows how to create a MySQL CDC source in [Flink SQL Client](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/table/sqlclient/) and execute queries on it.
 
 ```sql
 -- creates a mysql cdc table source
@@ -97,7 +98,7 @@ Include following Maven dependency (available through Maven Central):
   <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
   <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
