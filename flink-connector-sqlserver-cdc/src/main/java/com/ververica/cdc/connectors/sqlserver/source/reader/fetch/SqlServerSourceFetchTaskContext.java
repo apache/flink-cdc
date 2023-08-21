@@ -77,8 +77,8 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
      * A separate connection for retrieving details of the schema changes; without it, adaptive
      * buffering will not work.
      *
-     * @link
-     *     https://docs.microsoft.com/en-us/sql/connect/jdbc/using-adaptive-buffering?view=sql-server-2017#guidelines-for-using-adaptive-buffering
+     * <p>For more details, please refer to <a
+     * href="https://docs.microsoft.com/en-us/sql/connect/jdbc/using-adaptive-buffering?view=sql-server-2017#guidelines-for-using-adaptive-buffering">guidelines-for-using-adaptive-buffering</a>
      */
     private final SqlServerConnection metaDataConnection;
 
