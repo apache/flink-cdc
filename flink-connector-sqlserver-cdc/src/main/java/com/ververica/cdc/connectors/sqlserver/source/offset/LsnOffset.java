@@ -47,12 +47,8 @@ public class LsnOffset extends Offset {
         this.offset = offsetMap;
     }
 
-    public LsnOffset(Lsn lsn) {
-        this(lsn, null, null);
-    }
-
-    public Lsn getLcn() {
-        return Lsn.valueOf(offset.get(SourceInfo.COMMIT_LSN_KEY));
+    public LsnOffset(Lsn changeLsn) {
+        this(changeLsn, null, null);
     }
 
     @Override
@@ -69,8 +65,8 @@ public class LsnOffset extends Offset {
             return -1;
         }
 
-        Lsn lsn = this.getLcn();
-        Lsn targetLsn = that.getLcn();
+        Lsn lsn = Lsn.valueOf(this.offset.get(SourceInfo.COMMIT_LSN_KEY));
+        Lsn targetLsn = Lsn.valueOf(that.offset.get(SourceInfo.COMMIT_LSN_KEY));
         if (targetLsn.isAvailable()) {
             if (lsn.isAvailable()) {
                 return lsn.compareTo(targetLsn);
