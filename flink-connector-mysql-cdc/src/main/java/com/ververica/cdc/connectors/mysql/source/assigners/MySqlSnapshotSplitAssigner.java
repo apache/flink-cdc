@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.assigners;
 
+import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -24,6 +25,7 @@ import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadF
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState;
+import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
@@ -32,6 +34,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -41,6 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -52,10 +56,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.discoverCapturedTables;
@@ -95,6 +101,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private ExecutorService executor;
 
     @Nullable private Long checkpointIdToFinish;
+
+    private final PendingSplitsStateSerializer splitsStateSerializer;
 
     public MySqlSnapshotSplitAssigner(
             MySqlSourceConfig sourceConfig,
@@ -163,6 +171,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 createChunkSplitter(sourceConfig, isTableIdCaseSensitive, chunkSplitterState);
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
+
+        this.splitsStateSerializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
     }
 
     @Override
@@ -415,26 +426,54 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public SnapshotPendingSplitsState snapshotState(long checkpointId) {
-        SnapshotPendingSplitsState state =
-                new SnapshotPendingSplitsState(
-                        alreadyProcessedTables,
-                        remainingSplits,
-                        assignedSplits,
-                        tableSchemas,
-                        splitFinishedOffsets,
-                        assignerStatus,
-                        remainingTables,
-                        isTableIdCaseSensitive,
-                        true,
-                        chunkSplitter.snapshotState(checkpointId));
-        // we need a complete checkpoint before mark this assigner to be finished, to wait for
-        // all records of snapshot splits are completely processed
-        if (checkpointIdToFinish == null
-                && !isSnapshotAssigningFinished(assignerStatus)
-                && allSnapshotSplitsFinished()) {
-            checkpointIdToFinish = checkpointId;
+        try {
+            SnapshotPendingSplitsState state =
+                    copySnapshotPendingSplitsState(
+                            new SnapshotPendingSplitsState(
+                                    alreadyProcessedTables,
+                                    remainingSplits,
+                                    assignedSplits,
+                                    tableSchemas,
+                                    splitFinishedOffsets,
+                                    assignerStatus,
+                                    remainingTables,
+                                    isTableIdCaseSensitive,
+                                    true,
+                                    chunkSplitter.snapshotState(checkpointId)));
+            // we need a complete checkpoint before mark this assigner to be finished, to wait for
+            // all records of snapshot splits are completely processed
+            if (checkpointIdToFinish == null
+                    && !isSnapshotAssigningFinished(assignerStatus)
+                    && allSnapshotSplitsFinished()) {
+                checkpointIdToFinish = checkpointId;
+            }
+            return state;
+        } catch (IOException e) {
+            throw new FlinkRuntimeException(
+                    "Fail to snapshotState for mysql snapshot assigner.", e);
         }
-        return state;
+    }
+
+    /**
+     * The fields in enumerator state must not be changed by other worker threads. See {@link
+     * SplitEnumeratorContext#callAsync(Callable, BiConsumer)}.
+     *
+     * <p>MySQL CDC enumerator will start a new thread to split tables asynchronously. This worker
+     * thread will change the fields in state, e.g. remainingSplits, remainingTables, tableSchemas.
+     * We need to use the {@link PendingSplitsStateSerializer} to copy a new state for the
+     * enumerator.
+     */
+    private SnapshotPendingSplitsState copySnapshotPendingSplitsState(
+            SnapshotPendingSplitsState state) throws IOException {
+        synchronized (lock) {
+            SnapshotPendingSplitsState copy =
+                    (SnapshotPendingSplitsState)
+                            splitsStateSerializer.deserialize(
+                                    splitsStateSerializer.getVersion(),
+                                    splitsStateSerializer.serialize(state));
+            lock.notify();
+            return copy;
+        }
     }
 
     @Override
