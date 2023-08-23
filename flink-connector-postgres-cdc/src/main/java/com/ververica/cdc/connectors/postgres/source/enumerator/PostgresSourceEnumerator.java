@@ -78,9 +78,9 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
             return;
         }
 
-        try {
+        try (PostgresConnection connection = postgresDialect.openJdbcConnection()) {
             PostgresReplicationConnection replicationConnection =
-                    postgresDialect.openPostgresReplicationConnection();
+                    postgresDialect.openPostgresReplicationConnection(connection);
             replicationConnection.createReplicationSlot();
             replicationConnection.close(false);
         } catch (Throwable t) {
