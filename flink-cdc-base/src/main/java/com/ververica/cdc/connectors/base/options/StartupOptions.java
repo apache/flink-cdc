@@ -77,6 +77,10 @@ public final class StartupOptions implements Serializable {
         return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis);
     }
 
+    public static StartupOptions snapshotOnly() {
+        return new StartupOptions(StartupMode.SNAPSHOT_ONLY, null, null, null);
+    }
+
     private StartupOptions(
             StartupMode startupMode,
             String specificOffsetFile,
@@ -91,6 +95,7 @@ public final class StartupOptions implements Serializable {
             case INITIAL:
             case EARLIEST_OFFSET:
             case LATEST_OFFSET:
+            case SNAPSHOT_ONLY:
                 break;
             case SPECIFIC_OFFSETS:
                 checkNotNull(specificOffsetFile, "specificOffsetFile shouldn't be null");

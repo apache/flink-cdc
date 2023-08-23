@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.oracle.source;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
@@ -28,6 +29,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -58,6 +60,11 @@ public class OracleSourceITCase extends OracleSourceTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(OracleSourceITCase.class);
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
+
+    @Before
+    public void init() throws Exception {
+        createAndInitialize("customer.sql");
+    }
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
@@ -119,7 +126,6 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
-        createAndInitialize("customer.sql");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
@@ -234,6 +240,128 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         }
         assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
         tableResult.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testReadSingleTableSnapshotOnlyWithSingleParallelism() throws Exception {
+        testOracleSnapshotOnlyParallelSource(1, FailoverType.NONE, new String[] {"CUSTOMERS"});
+    }
+
+    @Test
+    public void testReadSingleTableSnapshotOnlyWithMultipleParallelism() throws Exception {
+        testOracleSnapshotOnlyParallelSource(4, FailoverType.NONE, new String[] {"CUSTOMERS"});
+    }
+
+    // Failover tests
+    @Test
+    public void testTaskManagerSnapshotOnlyFailover() throws Exception {
+        testOracleSnapshotOnlyParallelSource(4, FailoverType.TM, new String[] {"CUSTOMERS"});
+    }
+
+    @Test
+    public void testJobManagerSnapshotOnlyFailover() throws Exception {
+        testOracleSnapshotOnlyParallelSource(4, FailoverType.JM, new String[] {"CUSTOMERS"});
+    }
+
+    @Test
+    public void testTaskManagerSnapshotOnlyFailoverSingleParallelism() throws Exception {
+        testOracleSnapshotOnlyParallelSource(1, FailoverType.TM, new String[] {"CUSTOMERS"});
+    }
+
+    @Test
+    public void testJobManagerSnapshotOnlyFailoverSingleParallelism() throws Exception {
+        testOracleSnapshotOnlyParallelSource(1, FailoverType.JM, new String[] {"CUSTOMERS"});
+    }
+
+    private void testOracleSnapshotOnlyParallelSource(
+            int parallelism, FailoverType failoverType, String[] captureCustomerTables)
+            throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
+        String sourceDDL =
+                format(
+                        "CREATE TABLE CUSTOMERS ("
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " ADDRESS STRING,"
+                                + " PHONE_NUMBER STRING,"
+                                + " primary key (ID) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.log.mining.continuous.mine' = 'true',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true'"
+                                + ")",
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
+                        ORACLE_CONTAINER.getUsername(),
+                        ORACLE_CONTAINER.getPassword(),
+                        ORACLE_DATABASE,
+                        ORACLE_SCHEMA,
+                        getTableNameRegex(captureCustomerTables), // (customer|customer_1)
+                        "snapshot-only");
+
+        // check the snapshot data
+        String[] snapshotForSingleTable =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from CUSTOMERS");
+        CloseableIterator<Row> iterator = tableResult.collect();
+        JobID jobId = tableResult.getJobClient().get().getJobID();
+        List<String> expectedSnapshotData = new ArrayList<>();
+        for (int i = 0; i < captureCustomerTables.length; i++) {
+            expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
+        }
+
+        // trigger failover after some snapshot splits read finished
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(100));
+        }
+
+        LOG.info("snapshot data start");
+        assertEqualsInAnyOrder(
+                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+
+        tableResult.getJobClient().get().getJobStatus().get();
     }
 
     private void makeFirstPartBinlogEvents(String tableId) throws Exception {

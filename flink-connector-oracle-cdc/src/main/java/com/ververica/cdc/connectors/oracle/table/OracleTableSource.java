@@ -28,6 +28,7 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.OracleSource;
@@ -140,6 +141,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
 
     @Override
     public ChangelogMode getChangelogMode() {
+        if (startupOptions.startupMode.equals(StartupMode.SNAPSHOT_ONLY)) {
+            return ChangelogMode.insertOnly();
+        }
         return ChangelogMode.all();
     }
 

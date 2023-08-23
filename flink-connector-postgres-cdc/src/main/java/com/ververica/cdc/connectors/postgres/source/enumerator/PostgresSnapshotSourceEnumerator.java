@@ -19,26 +19,24 @@ package com.ververica.cdc.connectors.postgres.source.enumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
-import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
+import com.ververica.cdc.connectors.base.source.enumerator.SnapshotSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.postgres.source.PostgresDialect;
-import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 
 /**
- * The Postgres source enumerator that enumerates receive the split request and assign the split to
- * source readers.
+ * The Postgres snapshot enumerator that enumerates receive the split request and assign the split
+ * to source readers.
  */
-public class PostgresSourceEnumerator extends IncrementalSourceEnumerator
+public class PostgresSnapshotSourceEnumerator extends SnapshotSourceEnumerator
         implements PostgresEnumerator {
 
     private final PostgresDialect postgresDialect;
 
-    public PostgresSourceEnumerator(
+    public PostgresSnapshotSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
-            PostgresSourceConfig sourceConfig,
             SplitAssigner splitAssigner,
             PostgresDialect postgresDialect) {
-        super(context, sourceConfig, splitAssigner);
+        super(context, splitAssigner);
         this.postgresDialect = postgresDialect;
     }
 

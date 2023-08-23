@@ -52,6 +52,7 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "from a particular plug-in for a particular database/schema. The server uses this slot "
                                     + "to stream events to the connector that you are configuring.");
 
+    // TODO add doc
     public static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
             ConfigOptions.key("changelog-mode")
                     .enumType(DebeziumChangelogMode.class)
