@@ -132,7 +132,6 @@ CDC Connectors for Apache Flink<sup>®</sup> welcomes anyone that wants to help 
 
 1. Left comment under the issue that you want to take
 2. Fork Flink CDC project to your GitHub repositories
-![fork](/_static/fig/contribute_guidance/fork.png "fork")
 3. Clone and compile your Flink CDC project
 ```bash
 git clone https://github.com/your_name/flink-cdc-connectors.git
@@ -144,13 +143,11 @@ mvn clean install -DskipTests
 git checkout -b my_feature
 -- develop and commit
 ```
-![check_branch](/_static/fig/contribute_guidance/check_branch.png "check_branch")
 5. Push your branch to your github
 ```bash
 git push origin my_feature
 ```
 6. Open a PR to https://github.com/ververica/flink-cdc-connectors
-![open_pr](/_static/fig/contribute_guidance/open_pr.png "open_pr")
 
 ### Code Style
 
