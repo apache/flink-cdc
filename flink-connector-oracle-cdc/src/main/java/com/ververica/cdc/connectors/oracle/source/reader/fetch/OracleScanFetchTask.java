@@ -446,8 +446,8 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded redo log task
-     * of a snapshot split task.
+     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded redo log
+     * task of a snapshot split task.
      */
     public class SnapshotRedoLogSplitChangeEventSourceContext
             implements ChangeEventSource.ChangeEventSourceContext {

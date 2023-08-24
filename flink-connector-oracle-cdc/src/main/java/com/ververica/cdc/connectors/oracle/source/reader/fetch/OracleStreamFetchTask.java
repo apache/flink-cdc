@@ -91,8 +91,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * A wrapped task to read all redo log for table and also supports read bounded (from lowWatermark
-     * to highWatermark) redo log.
+     * A wrapped task to read all redo log for table and also supports read bounded (from
+     * lowWatermark to highWatermark) redo log.
      */
     public static class RedoLogSplitReadTask extends LogMinerStreamingChangeEventSource {
 
@@ -179,7 +179,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for redo log split task.
+     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for redo log split
+     * task.
      */
     private class RedoLogSplitChangeEventSourceContext
             implements ChangeEventSource.ChangeEventSourceContext {
