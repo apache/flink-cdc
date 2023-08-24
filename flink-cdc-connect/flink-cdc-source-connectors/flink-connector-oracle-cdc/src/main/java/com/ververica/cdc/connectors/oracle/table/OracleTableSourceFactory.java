@@ -79,9 +79,12 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         checkNotNull(databaseName);
         // During the incremental phase, Debezium uses the uppercase database name.
         // However, during the snapshot phase, the database name is user-configurable.
-        // To avoid inconsistencies between the database names in the snapshot and incremental phases,
-        // it is necessary to convert the database name to uppercase when constructing the Oracle Source.
-        // For more details, please refer to: https://github.com/ververica/flink-cdc-connectors/pull/2088.
+        // To avoid inconsistencies between the database names in the snapshot and incremental
+        // phases,
+        // it is necessary to convert the database name to uppercase when constructing the Oracle
+        // Source.
+        // For more details, please refer to:
+        // https://github.com/ververica/flink-cdc-connectors/pull/2088.
         databaseName = databaseName.toUpperCase();
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
