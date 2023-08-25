@@ -16,20 +16,20 @@
 
 package com.ververica.cdc.connectors.postgres.source;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.zaxxer.hikari.HikariDataSource;
+import io.debezium.jdbc.JdbcConfiguration;
 
 /** A connection pool factory to create pooled Postgres {@link HikariDataSource}. */
 public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
     public static final String JDBC_URL_PATTERN = "jdbc:postgresql://%s:%s/%s";
 
     @Override
-    public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
+    public String getJdbcUrl(JdbcConfiguration jdbcConfiguration) {
 
-        String hostName = sourceConfig.getHostname();
-        int port = sourceConfig.getPort();
-        String database = sourceConfig.getDatabaseList().get(0);
+        String hostName = jdbcConfiguration.getHostname();
+        int port = jdbcConfiguration.getPort();
+        String database = jdbcConfiguration.getDatabase();
         return String.format(JDBC_URL_PATTERN, hostName, port, database);
     }
 }

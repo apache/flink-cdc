@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.postgres.source.config;
 
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
@@ -114,17 +115,18 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 closeIdleReaders,
                 props,
                 dbzConfiguration,
-                JDBC_DRIVER,
                 hostname,
                 port,
                 username,
                 password,
                 fetchSize,
-                serverTimeZone,
-                connectTimeout,
-                connectMaxRetries,
-                connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                new DataSourcePoolConfig(
+                        connectTimeout,
+                        connectMaxRetries,
+                        connectionPoolSize,
+                        JDBC_DRIVER,
+                        serverTimeZone));
     }
 
     /**

@@ -18,15 +18,19 @@ package com.ververica.cdc.connectors.base.relational.connection;
 
 import org.apache.flink.annotation.Experimental;
 
-import com.ververica.cdc.connectors.base.config.SourceConfig;
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
+import io.debezium.jdbc.JdbcConfiguration;
 
 /** A pool collection that consists of multiple connection pools. */
 @Experimental
-public interface ConnectionPools<P, C extends SourceConfig> {
+public interface ConnectionPools<P> {
 
     /**
      * Gets a connection pool from pools, create a new pool if the pool does not exists in the
      * connection pools .
      */
-    P getOrCreateConnectionPool(ConnectionPoolId poolId, C sourceConfig);
+    P getOrCreateConnectionPool(
+            ConnectionPoolId poolId,
+            DataSourcePoolConfig sourceConfig,
+            JdbcConfiguration jdbcConfiguration);
 }

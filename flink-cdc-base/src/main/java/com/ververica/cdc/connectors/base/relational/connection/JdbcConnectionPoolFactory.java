@@ -16,9 +16,10 @@
 
 package com.ververica.cdc.connectors.base.relational.connection;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.debezium.jdbc.JdbcConfiguration;
 
 /** A connection pool factory to create pooled DataSource {@link HikariDataSource}. */
 public abstract class JdbcConnectionPoolFactory {
@@ -27,23 +28,23 @@ public abstract class JdbcConnectionPoolFactory {
     public static final String SERVER_TIMEZONE_KEY = "serverTimezone";
     public static final int MINIMUM_POOL_SIZE = 1;
 
-    public HikariDataSource createPooledDataSource(JdbcSourceConfig sourceConfig) {
+    public HikariDataSource createPooledDataSource(
+            DataSourcePoolConfig dataSourcePoolConfig, JdbcConfiguration jdbcConfiguration) {
         final HikariConfig config = new HikariConfig();
-
-        String hostName = sourceConfig.getHostname();
-        int port = sourceConfig.getPort();
+        String hostName = jdbcConfiguration.getHostname();
+        int port = jdbcConfiguration.getPort();
 
         config.setPoolName(CONNECTION_POOL_PREFIX + hostName + ":" + port);
-        config.setJdbcUrl(getJdbcUrl(sourceConfig));
-        config.setUsername(sourceConfig.getUsername());
-        config.setPassword(sourceConfig.getPassword());
+        config.setJdbcUrl(getJdbcUrl(jdbcConfiguration));
+        config.setUsername(jdbcConfiguration.getUser());
+        config.setPassword(jdbcConfiguration.getPassword());
         config.setMinimumIdle(MINIMUM_POOL_SIZE);
-        config.setMaximumPoolSize(sourceConfig.getConnectionPoolSize());
-        config.setConnectionTimeout(sourceConfig.getConnectTimeout().toMillis());
-        config.setDriverClassName(sourceConfig.getDriverClassName());
+        config.setMaximumPoolSize(dataSourcePoolConfig.getConnectionPoolSize());
+        config.setConnectionTimeout(dataSourcePoolConfig.getConnectTimeout().toMillis());
+        config.setDriverClassName(dataSourcePoolConfig.getDriverClassName());
 
         // note: the following properties should be optional (only applied to MySQL)
-        config.addDataSourceProperty(SERVER_TIMEZONE_KEY, sourceConfig.getServerTimeZone());
+        config.addDataSourceProperty(SERVER_TIMEZONE_KEY, dataSourcePoolConfig.getServerTimeZone());
         // optional optimization configurations for pooled DataSource
         config.addDataSourceProperty("cachePrepStmts", "true");
         config.addDataSourceProperty("prepStmtCacheSize", "250");
@@ -60,8 +61,8 @@ public abstract class JdbcConnectionPoolFactory {
      * jdbc:sybase:Tds:<em>hostname</em>:<em>port</em></code>, so generate a jdbc url by specific
      * database.
      *
-     * @param sourceConfig a basic Source configuration.
+     * @param jdbcConfiguration a basic Source configuration.
      * @return a database url.
      */
-    public abstract String getJdbcUrl(JdbcSourceConfig sourceConfig);
+    public abstract String getJdbcUrl(JdbcConfiguration jdbcConfiguration);
 }

@@ -16,13 +16,13 @@
 
 package com.ververica.cdc.connectors.base.experimental.config;
 
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 
@@ -48,16 +48,12 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
             boolean closeIdleReaders,
             Properties dbzProperties,
             Configuration dbzConfiguration,
-            String driverClassName,
             String hostname,
             int port,
             String username,
             String password,
             int fetchSize,
-            String serverTimeZone,
-            Duration connectTimeout,
-            int connectMaxRetries,
-            int connectionPoolSize) {
+            DataSourcePoolConfig dataSourcePoolConfig) {
         super(
                 startupOptions,
                 databaseList,
@@ -71,17 +67,13 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 closeIdleReaders,
                 dbzProperties,
                 dbzConfiguration,
-                driverClassName,
                 hostname,
                 port,
                 username,
                 password,
                 fetchSize,
-                serverTimeZone,
-                connectTimeout,
-                connectMaxRetries,
-                connectionPoolSize,
-                null);
+                null,
+                dataSourcePoolConfig);
     }
 
     @Override

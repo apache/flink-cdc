@@ -16,8 +16,8 @@
 
 package com.ververica.cdc.connectors.sqlserver.source.dialect;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
+import io.debezium.jdbc.JdbcConfiguration;
 
 /** Factory to create {@link JdbcConnectionPoolFactory} for SQL Server. */
 public class SqlServerPooledDataSourceFactory extends JdbcConnectionPoolFactory {
@@ -25,10 +25,10 @@ public class SqlServerPooledDataSourceFactory extends JdbcConnectionPoolFactory 
     private static final String URL_PATTERN = "jdbc:sqlserver://%s:%s;databaseName=%s";
 
     @Override
-    public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
-        String hostName = sourceConfig.getHostname();
-        int port = sourceConfig.getPort();
-        String database = sourceConfig.getDatabaseList().get(0);
+    public String getJdbcUrl(JdbcConfiguration jdbcConfiguration) {
+        String hostName = jdbcConfiguration.getHostname();
+        int port = jdbcConfiguration.getPort();
+        String database = jdbcConfiguration.getDatabase();
         return String.format(URL_PATTERN, hostName, port, database);
     }
 }

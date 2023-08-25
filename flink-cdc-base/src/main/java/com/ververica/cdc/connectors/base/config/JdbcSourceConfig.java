@@ -21,7 +21,6 @@ import com.ververica.cdc.connectors.base.source.IncrementalSource;
 import io.debezium.config.Configuration;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 
@@ -30,20 +29,17 @@ import java.util.Properties;
  */
 public abstract class JdbcSourceConfig extends BaseSourceConfig {
 
-    protected final String driverClassName;
     protected final String hostname;
     protected final int port;
     protected final String username;
     protected final String password;
+
     protected final List<String> databaseList;
     protected final List<String> schemaList;
     protected final List<String> tableList;
     protected final int fetchSize;
-    protected final String serverTimeZone;
-    protected final Duration connectTimeout;
-    protected final int connectMaxRetries;
-    protected final int connectionPoolSize;
     protected final String chunkKeyColumn;
+    protected final DataSourcePoolConfig dataSourcePoolConfig;
 
     public JdbcSourceConfig(
             StartupOptions startupOptions,
@@ -58,17 +54,13 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             boolean closeIdleReaders,
             Properties dbzProperties,
             Configuration dbzConfiguration,
-            String driverClassName,
             String hostname,
             int port,
             String username,
             String password,
             int fetchSize,
-            String serverTimeZone,
-            Duration connectTimeout,
-            int connectMaxRetries,
-            int connectionPoolSize,
-            String chunkKeyColumn) {
+            String chunkKeyColumn,
+            DataSourcePoolConfig dataSourcePoolConfig) {
         super(
                 startupOptions,
                 splitSize,
@@ -79,7 +71,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 closeIdleReaders,
                 dbzProperties,
                 dbzConfiguration);
-        this.driverClassName = driverClassName;
+
         this.hostname = hostname;
         this.port = port;
         this.username = username;
@@ -88,18 +80,11 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         this.schemaList = schemaList;
         this.tableList = tableList;
         this.fetchSize = fetchSize;
-        this.serverTimeZone = serverTimeZone;
-        this.connectTimeout = connectTimeout;
-        this.connectMaxRetries = connectMaxRetries;
-        this.connectionPoolSize = connectionPoolSize;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.dataSourcePoolConfig = dataSourcePoolConfig;
     }
 
     public abstract RelationalDatabaseConnectorConfig getDbzConnectorConfig();
-
-    public String getDriverClassName() {
-        return driverClassName;
-    }
 
     public String getHostname() {
         return hostname;
@@ -129,20 +114,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         return fetchSize;
     }
 
-    public String getServerTimeZone() {
-        return serverTimeZone;
-    }
-
-    public Duration getConnectTimeout() {
-        return connectTimeout;
-    }
-
-    public int getConnectMaxRetries() {
-        return connectMaxRetries;
-    }
-
-    public int getConnectionPoolSize() {
-        return connectionPoolSize;
+    public DataSourcePoolConfig getDataPoolConfig() {
+        return dataSourcePoolConfig;
     }
 
     public String getChunkKeyColumn() {

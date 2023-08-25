@@ -18,8 +18,8 @@ package com.ververica.cdc.connectors.base.experimental;
 
 import org.apache.flink.annotation.Experimental;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
+import io.debezium.jdbc.JdbcConfiguration;
 
 /** A MySQL datasource factory. */
 @Experimental
@@ -29,9 +29,9 @@ public class MysqlPooledDataSourceFactory extends JdbcConnectionPoolFactory {
             "jdbc:mysql://%s:%s/?useInformationSchema=true&nullCatalogMeansCurrent=false&useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&zeroDateTimeBehavior=CONVERT_TO_NULL";
 
     @Override
-    public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
-        String hostName = sourceConfig.getHostname();
-        int port = sourceConfig.getPort();
+    public String getJdbcUrl(JdbcConfiguration jdbcConfiguration) {
+        String hostName = jdbcConfiguration.getHostname();
+        int port = jdbcConfiguration.getPort();
 
         return String.format(JDBC_URL_PATTERN, hostName, port);
     }

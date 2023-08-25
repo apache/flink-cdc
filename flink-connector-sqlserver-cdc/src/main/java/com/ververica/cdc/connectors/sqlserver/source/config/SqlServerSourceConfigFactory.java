@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.sqlserver.source.config;
 
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
@@ -90,16 +91,17 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 closeIdleReaders,
                 props,
                 dbzConfiguration,
-                DRIVER_ClASS_NAME,
                 hostname,
                 port,
                 username,
                 password,
                 fetchSize,
-                serverTimeZone,
-                connectTimeout,
-                connectMaxRetries,
-                connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                new DataSourcePoolConfig(
+                        connectTimeout,
+                        connectMaxRetries,
+                        connectionPoolSize,
+                        DRIVER_ClASS_NAME,
+                        serverTimeZone));
     }
 }

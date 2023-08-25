@@ -18,7 +18,7 @@ package com.ververica.cdc.connectors.base.relational.connection;
 
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
@@ -33,28 +33,30 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcConnectionFactory.class);
 
-    private final JdbcSourceConfig sourceConfig;
+    private final DataSourcePoolConfig dataSourcePoolConfig;
     private final JdbcConnectionPoolFactory jdbcConnectionPoolFactory;
 
     public JdbcConnectionFactory(
-            JdbcSourceConfig sourceConfig, JdbcConnectionPoolFactory jdbcConnectionPoolFactory) {
-        this.sourceConfig = sourceConfig;
+            DataSourcePoolConfig dataSourcePoolConfig,
+            JdbcConnectionPoolFactory jdbcConnectionPoolFactory) {
+        this.dataSourcePoolConfig = dataSourcePoolConfig;
         this.jdbcConnectionPoolFactory = jdbcConnectionPoolFactory;
     }
 
     @Override
-    public Connection connect(JdbcConfiguration config) throws SQLException {
-        final int connectRetryTimes = sourceConfig.getConnectMaxRetries();
+    public Connection connect(JdbcConfiguration jdbcConfiguration) throws SQLException {
+        final int connectRetryTimes = dataSourcePoolConfig.getConnectMaxRetries();
 
         final ConnectionPoolId connectionPoolId =
                 new ConnectionPoolId(
-                        sourceConfig.getHostname(),
-                        sourceConfig.getPort(),
-                        sourceConfig.getUsername());
+                        jdbcConfiguration.getHostname(),
+                        jdbcConfiguration.getPort(),
+                        jdbcConfiguration.getUser());
 
         HikariDataSource dataSource =
                 JdbcConnectionPools.getInstance(jdbcConnectionPoolFactory)
-                        .getOrCreateConnectionPool(connectionPoolId, sourceConfig);
+                        .getOrCreateConnectionPool(
+                                connectionPoolId, dataSourcePoolConfig, jdbcConfiguration);
 
         int i = 0;
         while (i < connectRetryTimes) {

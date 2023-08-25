@@ -16,8 +16,9 @@
 
 package com.ververica.cdc.connectors.base.relational.connection;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.debezium.jdbc.JdbcConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** A Jdbc Connection pools implementation. */
-public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, JdbcSourceConfig> {
+public class JdbcConnectionPools implements ConnectionPools<HikariDataSource> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcConnectionPools.class);
 
@@ -46,11 +47,16 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
 
     @Override
     public HikariDataSource getOrCreateConnectionPool(
-            ConnectionPoolId poolId, JdbcSourceConfig sourceConfig) {
+            ConnectionPoolId poolId,
+            DataSourcePoolConfig dataSourcePoolConfig,
+            JdbcConfiguration jdbcConfiguration) {
         synchronized (pools) {
             if (!pools.containsKey(poolId)) {
                 LOG.info("Create and register connection pool {}", poolId);
-                pools.put(poolId, jdbcConnectionPoolFactory.createPooledDataSource(sourceConfig));
+                pools.put(
+                        poolId,
+                        jdbcConnectionPoolFactory.createPooledDataSource(
+                                dataSourcePoolConfig, jdbcConfiguration));
             }
             return pools.get(poolId);
         }

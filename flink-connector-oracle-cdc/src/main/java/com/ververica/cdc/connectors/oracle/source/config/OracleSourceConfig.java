@@ -22,9 +22,6 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 
-import javax.annotation.Nullable;
-
-import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 
@@ -35,8 +32,6 @@ import java.util.Properties;
 public class OracleSourceConfig extends JdbcSourceConfig {
 
     private static final long serialVersionUID = 1L;
-
-    @Nullable private String url;
 
     public OracleSourceConfig(
             StartupOptions startupOptions,
@@ -50,18 +45,13 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             boolean closeIdleReaders,
             Properties dbzProperties,
             Configuration dbzConfiguration,
-            String driverClassName,
-            @Nullable String url,
             String hostname,
             int port,
             String username,
             String password,
             int fetchSize,
-            String serverTimeZone,
-            Duration connectTimeout,
-            int connectMaxRetries,
-            int connectionPoolSize,
-            String chunkKeyColumn) {
+            String chunkKeyColumn,
+            OracleDataSourceConfig oracleDataSourceConfig) {
         super(
                 startupOptions,
                 databaseList,
@@ -75,18 +65,13 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 closeIdleReaders,
                 dbzProperties,
                 dbzConfiguration,
-                driverClassName,
                 hostname,
                 port,
                 username,
                 password,
                 fetchSize,
-                serverTimeZone,
-                connectTimeout,
-                connectMaxRetries,
-                connectionPoolSize,
-                chunkKeyColumn);
-        this.url = url;
+                chunkKeyColumn,
+                oracleDataSourceConfig);
     }
 
     @Override
@@ -100,10 +85,5 @@ public class OracleSourceConfig extends JdbcSourceConfig {
 
     public RelationalTableFilters getTableFilters() {
         return getDbzConnectorConfig().getTableFilters();
-    }
-
-    @Nullable
-    public String getUrl() {
-        return url;
     }
 }

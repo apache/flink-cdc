@@ -59,12 +59,10 @@ public class MySqlDialect implements JdbcDataSourceDialect {
     private static final String QUOTED_CHARACTER = "`";
 
     private static final long serialVersionUID = 1L;
-    private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
     private transient MySqlSchema mySqlSchema;
 
     public MySqlDialect(MySqlSourceConfigFactory configFactory) {
-        this.configFactory = configFactory;
         this.sourceConfig = configFactory.create(0);
     }
 
@@ -77,7 +75,8 @@ public class MySqlDialect implements JdbcDataSourceDialect {
         JdbcConnection jdbc =
                 new JdbcConnection(
                         JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
-                        new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()),
+                        new JdbcConnectionFactory(
+                                sourceConfig.getDataPoolConfig(), getPooledDataSourceFactory()),
                         QUOTED_CHARACTER,
                         QUOTED_CHARACTER);
         try {

@@ -119,17 +119,18 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 closeIdleReaders,
                 props,
                 dbzConfiguration,
-                DRIVER_ClASS_NAME,
-                url,
                 hostname,
                 port,
                 username,
                 password,
                 fetchSize,
-                serverTimeZone,
-                connectTimeout,
-                connectMaxRetries,
-                connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                new OracleDataSourceConfig(
+                        connectTimeout,
+                        connectMaxRetries,
+                        connectionPoolSize,
+                        DRIVER_ClASS_NAME,
+                        serverTimeZone,
+                        url));
     }
 }

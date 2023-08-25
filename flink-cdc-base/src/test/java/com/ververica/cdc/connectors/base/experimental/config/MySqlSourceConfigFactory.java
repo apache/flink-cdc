@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.base.experimental.config;
 
+import com.ververica.cdc.connectors.base.config.DataSourcePoolConfig;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.base.experimental.EmbeddedFlinkDatabaseHistory;
 import io.debezium.config.Configuration;
@@ -118,15 +119,16 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
                 closeIdleReaders,
                 props,
                 dbzConfiguration,
-                driverClassName,
                 hostname,
                 port,
                 username,
                 password,
                 fetchSize,
-                serverTimeZone,
-                connectTimeout,
-                connectMaxRetries,
-                connectionPoolSize);
+                new DataSourcePoolConfig(
+                        connectTimeout,
+                        connectMaxRetries,
+                        connectionPoolSize,
+                        driverClassName,
+                        serverTimeZone));
     }
 }
