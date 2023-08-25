@@ -271,7 +271,7 @@ public class OracleSourceTest extends AbstractTestBase {
                 String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
                 assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
 
-                // execute 2 more DMLs to have more binlog
+                // execute 2 more DMLs to have more redo log
                 statement.execute(
                         "INSERT INTO debezium.products VALUES (1001,'roy','old robot',1234.56)"); // 1001
                 statement.execute("UPDATE debezium.products SET weight=1345.67 WHERE id=1001");
@@ -300,7 +300,7 @@ public class OracleSourceTest extends AbstractTestBase {
                     };
             runThread3.start();
 
-            // consume the unconsumed binlog
+            // consume the unconsumed redo log
             List<SourceRecord> records = drain(sourceContext3, 2);
             assertInsert(records.get(0), "ID", 1001);
             assertUpdate(records.get(1), "ID", 1001);
