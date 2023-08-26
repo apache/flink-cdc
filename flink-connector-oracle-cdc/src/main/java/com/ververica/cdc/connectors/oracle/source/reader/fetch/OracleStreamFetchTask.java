@@ -91,8 +91,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * A wrapped task to read all binlog for table and also supports read bounded (from lowWatermark
-     * to highWatermark) binlog.
+     * A wrapped task to read all redo log for table and also supports read bounded (from
+     * lowWatermark to highWatermark) redo log.
      */
     public static class RedoLogSplitReadTask extends LogMinerStreamingChangeEventSource {
 
@@ -138,13 +138,13 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         protected void afterHandleScn(
                 OraclePartition partition, OracleOffsetContext offsetContext) {
             super.afterHandleScn(partition, offsetContext);
-            // check do we need to stop for fetch binlog for snapshot split.
+            // check do we need to stop for fetch redo log for snapshot split.
             if (isBoundedRead()) {
                 final RedoLogOffset currentRedoLogOffset =
                         getCurrentRedoLogOffset(offsetContext.getOffset());
-                // reach the high watermark, the binlog fetcher should be finished
+                // reach the high watermark, the redo log fetcher should be finished
                 if (currentRedoLogOffset.isAtOrAfter(redoLogSplit.getEndingOffset())) {
-                    // send binlog end event
+                    // send redo log end event
                     try {
                         dispatcher.dispatchWatermarkEvent(
                                 partition.getSourcePartition(),
@@ -154,10 +154,10 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
                         errorHandler.setProducerThrowable(
-                                new DebeziumException("Error processing binlog signal event", e));
+                                new DebeziumException("Error processing redo log signal event", e));
                     }
-                    // tell fetcher the binlog task finished
-                    ((OracleScanFetchTask.SnapshotBinlogSplitChangeEventSourceContext) context)
+                    // tell fetcher the redo log task finished
+                    ((OracleScanFetchTask.SnapshotRedoLogSplitChangeEventSourceContext) context)
                             .finished();
                 }
             }
@@ -179,7 +179,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for binlog split task.
+     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for redo log split
+     * task.
      */
     private class RedoLogSplitChangeEventSourceContext
             implements ChangeEventSource.ChangeEventSourceContext {
