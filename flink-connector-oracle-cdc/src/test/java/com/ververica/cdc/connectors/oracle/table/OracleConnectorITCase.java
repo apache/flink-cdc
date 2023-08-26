@@ -65,7 +65,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
-/** Integration tests for Oracle binlog SQL source. */
+/** Integration tests for Oracle redo log SQL source. */
 @RunWith(Parameterized.class)
 public class OracleConnectorITCase extends AbstractTestBase {
     private static final int RECORDS_COUNT = 10_000;

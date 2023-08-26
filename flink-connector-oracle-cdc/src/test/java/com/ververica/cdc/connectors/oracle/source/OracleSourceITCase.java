@@ -79,8 +79,9 @@ public class OracleSourceITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverInBinlogPhase() throws Exception {
-        testOracleParallelSource(FailoverType.TM, FailoverPhase.BINLOG, new String[] {"CUSTOMERS"});
+    public void testTaskManagerFailoverInRedoLogPhase() throws Exception {
+        testOracleParallelSource(
+                FailoverType.TM, FailoverPhase.REDO_LOG, new String[] {"CUSTOMERS"});
     }
 
     @Test
@@ -90,8 +91,9 @@ public class OracleSourceITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverInBinlogPhase() throws Exception {
-        testOracleParallelSource(FailoverType.JM, FailoverPhase.BINLOG, new String[] {"CUSTOMERS"});
+    public void testJobManagerFailoverInRedoLogPhase() throws Exception {
+        testOracleParallelSource(
+                FailoverType.JM, FailoverPhase.REDO_LOG, new String[] {"CUSTOMERS"});
     }
 
     @Test
@@ -202,19 +204,19 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         assertEqualsInAnyOrder(
                 expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
 
-        // second step: check the binlog data
+        // second step: check the redo log data
         for (String tableId : captureCustomerTables) {
-            makeFirstPartBinlogEvents(ORACLE_SCHEMA + '.' + tableId);
+            makeFirstPartRedoLogEvents(ORACLE_SCHEMA + '.' + tableId);
         }
-        if (failoverPhase == FailoverPhase.BINLOG) {
+        if (failoverPhase == FailoverPhase.REDO_LOG) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
         }
         for (String tableId : captureCustomerTables) {
-            makeSecondPartBinlogEvents(ORACLE_SCHEMA + '.' + tableId);
+            makeSecondPartRedoLogEvents(ORACLE_SCHEMA + '.' + tableId);
         }
 
-        String[] binlogForSingleTable =
+        String[] redoLogForSingleTable =
                 new String[] {
                     "-U[103, user_3, Shanghai, 123567891234]",
                     "+U[103, user_3, Hangzhou, 123567891234]",
@@ -228,22 +230,23 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                     "+I[2002, user_23, Shanghai, 123567891234]",
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
-        List<String> expectedBinlogData = new ArrayList<>();
+        List<String> expectedRedoLogData = new ArrayList<>();
         for (int i = 0; i < captureCustomerTables.length; i++) {
-            expectedBinlogData.addAll(Arrays.asList(binlogForSingleTable));
+            expectedRedoLogData.addAll(Arrays.asList(redoLogForSingleTable));
         }
-        assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
+        assertEqualsInAnyOrder(
+                expectedRedoLogData, fetchRows(iterator, expectedRedoLogData.size()));
         tableResult.getJobClient().get().cancel().get();
     }
 
-    private void makeFirstPartBinlogEvents(String tableId) throws Exception {
+    private void makeFirstPartRedoLogEvents(String tableId) throws Exception {
         executeSql("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103");
         executeSql("DELETE FROM " + tableId + " where id = 102");
         executeSql("INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')");
         executeSql("UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
     }
 
-    private void makeSecondPartBinlogEvents(String tableId) throws Exception {
+    private void makeSecondPartRedoLogEvents(String tableId) throws Exception {
         executeSql("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 1010");
         executeSql("INSERT INTO " + tableId + " VALUES(2001, 'user_22','Shanghai','123567891234')");
         executeSql("INSERT INTO " + tableId + " VALUES(2002, 'user_23','Shanghai','123567891234')");
@@ -334,7 +337,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
     /** The phase of failover. */
     private enum FailoverPhase {
         SNAPSHOT,
-        BINLOG,
+        REDO_LOG,
         NEVER
     }
 

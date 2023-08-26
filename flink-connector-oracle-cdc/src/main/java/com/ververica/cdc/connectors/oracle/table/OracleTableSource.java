@@ -51,7 +51,7 @@ import java.util.stream.Stream;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A {@link DynamicTableSource} that describes how to create a Oracle binlog from a logical
+ * A {@link DynamicTableSource} that describes how to create a Oracle redo log from a logical
  * description.
  */
 public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
