@@ -275,6 +275,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                 statement.execute(stmt);
             }
         } catch (Exception e) {
+            log.error("initialize Tidb table fails: ", e);
             throw new RuntimeException(e);
         }
     }
