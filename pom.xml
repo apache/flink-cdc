@@ -73,6 +73,7 @@ under the License.
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <mysql.driver.version>8.0.27</mysql.driver.version>
     </properties>
 
     <dependencies>
