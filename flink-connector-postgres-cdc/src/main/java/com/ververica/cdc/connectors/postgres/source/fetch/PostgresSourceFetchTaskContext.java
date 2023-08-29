@@ -141,6 +141,15 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     // Disable heartbeat event in snapshot split fetcher
                                     .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                                     .build());
+        } else {
+            dbzConfig =
+                    new PostgresConnectorConfig(
+                            dbzConfig
+                                    .getConfig()
+                                    .edit()
+                                    // never drop slot for stream split, which is also global split
+                                    .with(DROP_SLOT_ON_STOP.name(), false)
+                                    .build());
         }
 
         setDbzConnectorConfig(dbzConfig);
