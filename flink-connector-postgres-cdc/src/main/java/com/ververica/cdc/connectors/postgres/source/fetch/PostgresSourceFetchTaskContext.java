@@ -128,6 +128,11 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .getConfig()
                                     .edit()
                                     .with(
+                                            "table.include.list",
+                                            ((SnapshotSplit) sourceSplitBase)
+                                                    .getTableId()
+                                                    .toString())
+                                    .with(
                                             SLOT_NAME.name(),
                                             ((PostgresSourceConfig) sourceConfig)
                                                     .getSlotNameForBackfillTask())
@@ -138,6 +143,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .build());
         }
 
+        setDbzConnectorConfig(dbzConfig);
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(
                         dbzConfig.getConfig().getString(SNAPSHOT_MODE));
