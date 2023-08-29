@@ -76,6 +76,7 @@ public class MySqlBinlogSplitAssignerTest {
         assertEquals(BinlogOffset.ofNonStopping(), split.getEndingOffset());
         // There should be only one split to assign
         assertFalse(assigner.getNext().isPresent());
+        assigner.close();
     }
 
     private MySqlSourceConfig getConfig(StartupOptions startupOptions) {

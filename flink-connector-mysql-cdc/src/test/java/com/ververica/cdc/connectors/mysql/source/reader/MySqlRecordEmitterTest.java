@@ -81,6 +81,7 @@ public class MySqlRecordEmitterTest {
                         throw new RuntimeException("Failed to emit heartbeat record", e);
                     }
                 });
+        heartbeat.close();
         assertNotNull(splitState.getStartingOffset());
         assertEquals(0, splitState.getStartingOffset().compareTo(fakeOffset));
     }

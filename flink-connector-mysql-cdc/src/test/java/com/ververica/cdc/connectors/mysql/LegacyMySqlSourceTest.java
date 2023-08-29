@@ -41,6 +41,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -99,6 +100,11 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
     @Before
     public void before() {
         database.createAndInitialize();
+    }
+
+    @After
+    public void after() {
+        database.dropDatabase();
     }
 
     @Test

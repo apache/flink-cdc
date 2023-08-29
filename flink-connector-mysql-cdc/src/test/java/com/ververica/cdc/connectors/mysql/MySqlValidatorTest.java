@@ -16,10 +16,13 @@
 
 package com.ververica.cdc.connectors.mysql;
 
+import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.table.api.ValidationException;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
+import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -162,12 +165,14 @@ public class MySqlValidatorTest {
         } catch (Exception e) {
             assertTrue(e instanceof ValidationException);
             assertEquals(exceptionMessage, e.getMessage());
+        } finally {
+            container.close();
         }
     }
 
     private void startSource(UniqueDatabase database) throws Exception {
         if (runIncrementalSnapshot) {
-            MySqlSource<?> mySqlSource =
+            MySqlSource<SourceRecord> mySqlSource =
                     MySqlSource.<SourceRecord>builder()
                             .hostname(database.getHost())
                             .username(database.getUsername())
@@ -178,12 +183,21 @@ public class MySqlValidatorTest {
                             .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
                             .serverTimeZone("UTC")
                             .build();
-
-            mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
+            SplitEnumerator<MySqlSplit, PendingSplitsState> enumerator =
+                    mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1));
+            try {
+                enumerator.start();
+            } finally {
+                enumerator.close();
+            }
         } else {
             DebeziumSourceFunction<SourceRecord> source =
                     basicSourceBuilder(database, "UTC", false).build();
-            setupSource(source);
+            try {
+                setupSource(source);
+            } finally {
+                source.close();
+            }
         }
     }
 

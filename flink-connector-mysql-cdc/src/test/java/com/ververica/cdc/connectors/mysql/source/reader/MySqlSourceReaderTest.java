@@ -169,6 +169,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         List<String> restRecords = consumeRecords(restartReader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
+        customerDatabase.dropDatabase();
     }
 
     @Test
@@ -225,6 +226,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         reader.addSplits(splits);
         List<MySqlSplit> mySqlSplits = reader.snapshotState(1L);
         assertEquals(1, mySqlSplits.size());
+        reader.close();
+        inventoryDatabase.dropDatabase();
     }
 
     @Test
@@ -323,6 +326,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 recordByKey.put(record.key(), record);
             }
         }
+        reader.close();
+        inventoryDatabase.dropDatabase();
     }
 
     private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration, int limit)

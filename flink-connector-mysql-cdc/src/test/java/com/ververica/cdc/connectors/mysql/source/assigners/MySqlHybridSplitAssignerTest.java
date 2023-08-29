@@ -136,6 +136,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         new HashMap<>(),
                         finishedSnapshotSplitInfos.size());
         assertEquals(expected, mySqlBinlogSplit);
+        assigner.close();
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables) {

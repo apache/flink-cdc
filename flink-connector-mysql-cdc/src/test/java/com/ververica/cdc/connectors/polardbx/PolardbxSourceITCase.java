@@ -123,7 +123,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false'"
                         + ")");
-        tEnv.executeSql("insert into sink select * from orders_source");
+        tableResult = tEnv.executeSql("insert into sink select * from orders_source");
 
         waitForSinkSize("sink", realSnapshotData.size());
         assertEqualsInAnyOrder(expectedSnapshotData, TestValuesTableFactory.getRawResults("sink"));
@@ -155,10 +155,11 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
         }
         List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
         assertEqualsInOrder(expectedBinlogData, realBinlog);
+        tableResult.getJobClient().get().cancel();
     }
 
     @Test
-    public void testFullTypesDdl() {
+    public void testFullTypesDdl() throws Exception {
         int parallelism = 1;
         String[] captureCustomerTables = new String[] {"polardbx_full_types"};
 
@@ -262,6 +263,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                             + "\"type\":\"GeometryCollection\",\"srid\":0}]",
                 };
         assertEqualsInAnyOrder(Arrays.asList(expectedSnapshotData), realSnapshotData);
+        tableResult.getJobClient().get().cancel().get();
     }
 
     @Test
@@ -372,5 +374,6 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                 };
         List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
         assertEqualsInAnyOrder(Arrays.asList(expectedBinlog), realBinlog);
+        tableResult.getJobClient().get().cancel().get();
     }
 }
