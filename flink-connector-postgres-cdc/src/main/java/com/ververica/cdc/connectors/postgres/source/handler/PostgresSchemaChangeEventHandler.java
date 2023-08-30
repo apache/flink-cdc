@@ -22,6 +22,7 @@ import io.debezium.schema.SchemaChangeEvent;
 import java.util.HashMap;
 import java.util.Map;
 
+/** PostgresSchemaChangeEventHandler to deal Postgres's schema change event. */
 public class PostgresSchemaChangeEventHandler implements SchemaChangeEventHandler {
 
     @Override

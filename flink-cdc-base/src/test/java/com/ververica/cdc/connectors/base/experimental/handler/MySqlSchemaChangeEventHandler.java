@@ -11,6 +11,7 @@ import static com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset
 import static com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset.BINLOG_POSITION_OFFSET_KEY;
 import static com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset.SERVER_ID_KEY;
 
+/** MySqlSchemaChangeEventHandler to deal MySql's schema change event. */
 public class MySqlSchemaChangeEventHandler implements SchemaChangeEventHandler {
 
     @Override

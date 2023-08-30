@@ -27,6 +27,7 @@ import static io.debezium.connector.sqlserver.SourceInfo.CHANGE_LSN_KEY;
 import static io.debezium.connector.sqlserver.SourceInfo.COMMIT_LSN_KEY;
 import static io.debezium.connector.sqlserver.SourceInfo.EVENT_SERIAL_NO_KEY;
 
+/** SqlServerSchemaChangeEventHandler to deal SqlServer's schema change event. */
 public class SqlServerSchemaChangeEventHandler implements SchemaChangeEventHandler {
 
     @Override

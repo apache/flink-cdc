@@ -25,6 +25,7 @@ import java.util.Map;
 
 import static io.debezium.connector.oracle.SourceInfo.SCN_KEY;
 
+/** OracleSchemaChangeEventHandler to deal Oracle's schema change event. */
 public class OracleSchemaChangeEventHandler implements SchemaChangeEventHandler {
 
     @Override

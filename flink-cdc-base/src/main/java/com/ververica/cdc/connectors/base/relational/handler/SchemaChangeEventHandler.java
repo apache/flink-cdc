@@ -20,7 +20,7 @@ import io.debezium.schema.SchemaChangeEvent;
 
 import java.util.Map;
 
-/** SchemaChangeEvent Handler */
+/** SchemaChangeEvent Handler. */
 public interface SchemaChangeEventHandler {
     Map<String, Object> parseSource(SchemaChangeEvent event);
 }
