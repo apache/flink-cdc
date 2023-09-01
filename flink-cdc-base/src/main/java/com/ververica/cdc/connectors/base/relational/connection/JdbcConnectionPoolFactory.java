@@ -28,6 +28,7 @@ public abstract class JdbcConnectionPoolFactory {
     public static final int MINIMUM_POOL_SIZE = 1;
 
     public HikariDataSource createPooledDataSource(JdbcSourceConfig sourceConfig) {
+
         final HikariConfig config = new HikariConfig();
 
         String hostName = sourceConfig.getHostname();
@@ -64,4 +65,6 @@ public abstract class JdbcConnectionPoolFactory {
      * @return a database url.
      */
     public abstract String getJdbcUrl(JdbcSourceConfig sourceConfig);
+
+    public abstract String factoryIdentifier();
 }

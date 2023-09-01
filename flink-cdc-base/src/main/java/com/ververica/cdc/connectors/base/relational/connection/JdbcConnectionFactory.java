@@ -54,7 +54,10 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
 
         HikariDataSource dataSource =
                 JdbcConnectionPools.getInstance(jdbcConnectionPoolFactory)
-                        .getOrCreateConnectionPool(connectionPoolId, sourceConfig);
+                        .getOrCreateConnectionPool(
+                                connectionPoolId,
+                                sourceConfig,
+                                jdbcConnectionPoolFactory.factoryIdentifier());
 
         int i = 0;
         while (i < connectRetryTimes) {

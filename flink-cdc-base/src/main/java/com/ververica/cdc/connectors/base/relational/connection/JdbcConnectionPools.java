@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.base.relational.connection;
 
+import org.apache.flink.annotation.VisibleForTesting;
+
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
@@ -31,28 +33,40 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
 
     private static JdbcConnectionPools instance;
     private final Map<ConnectionPoolId, HikariDataSource> pools = new HashMap<>();
-    private static JdbcConnectionPoolFactory jdbcConnectionPoolFactory;
+    private static Map<String, JdbcConnectionPoolFactory> poolFactorys = new HashMap<>();
 
     private JdbcConnectionPools() {}
 
     public static synchronized JdbcConnectionPools getInstance(
             JdbcConnectionPoolFactory jdbcConnectionPoolFactory) {
         if (instance == null) {
-            JdbcConnectionPools.jdbcConnectionPoolFactory = jdbcConnectionPoolFactory;
             instance = new JdbcConnectionPools();
         }
+        poolFactorys.put(jdbcConnectionPoolFactory.factoryIdentifier(), jdbcConnectionPoolFactory);
         return instance;
     }
 
     @Override
     public HikariDataSource getOrCreateConnectionPool(
-            ConnectionPoolId poolId, JdbcSourceConfig sourceConfig) {
+            ConnectionPoolId poolId,
+            JdbcSourceConfig sourceConfig,
+            String dataSourcePoolFactoryIdentifier) {
         synchronized (pools) {
             if (!pools.containsKey(poolId)) {
                 LOG.info("Create and register connection pool {}", poolId);
-                pools.put(poolId, jdbcConnectionPoolFactory.createPooledDataSource(sourceConfig));
+                pools.put(
+                        poolId,
+                        poolFactorys
+                                .get(dataSourcePoolFactoryIdentifier)
+                                .createPooledDataSource(sourceConfig));
             }
             return pools.get(poolId);
         }
+    }
+
+    @VisibleForTesting
+    public String getJdbcUrl(
+            JdbcSourceConfig sourceConfig, String dataSourcePoolFactoryIdentifier) {
+        return poolFactorys.get(dataSourcePoolFactoryIdentifier).getJdbcUrl(sourceConfig);
     }
 }

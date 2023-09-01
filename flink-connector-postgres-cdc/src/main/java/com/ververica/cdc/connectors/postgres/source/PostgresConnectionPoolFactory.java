@@ -32,4 +32,9 @@ public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
         String database = sourceConfig.getDatabaseList().get(0);
         return String.format(JDBC_URL_PATTERN, hostName, port, database);
     }
+
+    @Override
+    public String factoryIdentifier() {
+        return "POSTGRES-POOL-DATASOURCE-FACTORY";
+    }
 }

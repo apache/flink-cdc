@@ -38,4 +38,9 @@ public class OraclePooledDataSourceFactory extends JdbcConnectionPoolFactory {
             return String.format(JDBC_URL_PATTERN, hostName, port, database);
         }
     }
+
+    @Override
+    public String factoryIdentifier() {
+        return "ORACLE-POOL-DATASOURCE-FACTORY";
+    }
 }
