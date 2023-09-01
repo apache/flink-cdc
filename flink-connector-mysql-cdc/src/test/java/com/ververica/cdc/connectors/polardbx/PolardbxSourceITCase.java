@@ -155,7 +155,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
         }
         List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
         assertEqualsInOrder(expectedBinlogData, realBinlog);
-        tableResult.getJobClient().get().cancel();
+        tableResult.getJobClient().get().cancel().get();
     }
 
     @Test

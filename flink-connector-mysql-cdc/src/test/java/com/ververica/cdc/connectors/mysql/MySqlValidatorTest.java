@@ -148,25 +148,27 @@ public class MySqlValidatorTest {
     }
 
     private void doValidate(MySqlVersion version, String configPath, String exceptionMessage) {
-        MySqlContainer container =
-                new MySqlContainer(version).withConfigurationOverride(configPath);
+        try (MySqlContainer container =
+                new MySqlContainer(version).withConfigurationOverride(configPath)) {
 
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(container)).join();
-        LOG.info("Containers are started.");
+            LOG.info("Starting containers...");
+            Startables.deepStart(Stream.of(container)).join();
+            LOG.info("Containers are started.");
 
-        UniqueDatabase database =
-                new UniqueDatabase(
-                        container, "inventory", container.getUsername(), container.getPassword());
+            UniqueDatabase database =
+                    new UniqueDatabase(
+                            container,
+                            "inventory",
+                            container.getUsername(),
+                            container.getPassword());
 
-        try {
-            startSource(database);
-            fail("Should fail.");
-        } catch (Exception e) {
-            assertTrue(e instanceof ValidationException);
-            assertEquals(exceptionMessage, e.getMessage());
-        } finally {
-            container.close();
+            try {
+                startSource(database);
+                fail("Should fail.");
+            } catch (Exception e) {
+                assertTrue(e instanceof ValidationException);
+                assertEquals(exceptionMessage, e.getMessage());
+            }
         }
     }
 
@@ -183,13 +185,11 @@ public class MySqlValidatorTest {
                             .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
                             .serverTimeZone("UTC")
                             .build();
-            SplitEnumerator<MySqlSplit, PendingSplitsState> enumerator =
-                    mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1));
-            try {
+            try (SplitEnumerator<MySqlSplit, PendingSplitsState> enumerator =
+                    mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1))) {
                 enumerator.start();
-            } finally {
-                enumerator.close();
             }
+
         } else {
             DebeziumSourceFunction<SourceRecord> source =
                     basicSourceBuilder(database, "UTC", false).build();

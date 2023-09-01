@@ -55,6 +55,7 @@ import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -116,6 +117,17 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         LOG.info("Container MySql8 is stopped.");
     }
 
+    @After
+    public void after() throws Exception {
+        if (mySqlConnection != null) {
+            mySqlConnection.close();
+        }
+        if (binaryLogClient != null) {
+            binaryLogClient.disconnect();
+        }
+        customerDatabase.dropDatabase();
+    }
+
     @Test
     public void testReadSingleBinlogSplit() throws Exception {
         customerDatabase.createAndInitialize();
@@ -153,8 +165,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
     }
 
     @Test
@@ -203,8 +213,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
     }
 
     @Test
@@ -240,8 +248,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         expected.length,
                         splits.get(splits.size() - 1).getTableId());
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
     }
 
     @Test
@@ -299,8 +305,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                                         + "."
                                         + "customer_card_single_line"));
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
     }
 
     @Test
@@ -344,8 +348,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         assertEqualsInOrder(Arrays.asList(expected), actual);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
     }
 
     @Test
@@ -409,8 +411,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -445,8 +445,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 ExceptionUtils.findThrowable(throwable, SchemaOutOfSyncException.class);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
         assertTrue(schemaOutOfSyncException.isPresent());
         assertEquals(
                 "Internal schema representation is probably out of sync with real database schema. "
@@ -506,8 +504,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -563,8 +559,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -618,8 +612,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -675,8 +667,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -737,8 +727,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -791,8 +779,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 DEFAULT_TIMEOUT,
                 "Timeout waiting for heartbeat event");
         binlogReader.close();
-        mySqlConnection.close();
-        binaryLogClient.disconnect();
     }
 
     @Test
@@ -851,8 +837,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                             + "2. The job runs normally, but something happens in the database and lead to the binlog cleanup. You can try to check why this cleanup happens from MySQL side.");
         } finally {
             reader.close();
-            mySqlConnection.close();
-            binaryLogClient.disconnect();
         }
     }
 
