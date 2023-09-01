@@ -226,6 +226,7 @@ public class OracleSourceTest extends AbstractTestBase {
             assertFalse(state.contains("server_id"));
             assertFalse(state.contains("event"));
 
+            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -428,6 +429,7 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
+                source.cancel();
                 source.close();
                 runThread.sync();
             }

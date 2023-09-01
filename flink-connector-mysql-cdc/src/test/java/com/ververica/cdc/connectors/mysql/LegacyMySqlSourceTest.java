@@ -814,6 +814,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         if (useLegacyImplementation) {
             // should fail because user specifies to use the legacy implementation
             try {
+                source.cancel();
                 source.close();
                 runThread.sync();
                 fail("Should fail.");
@@ -917,6 +918,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                                                             + " this might because the debezium engine has been shutdown due to other errors.",
                                                     engineInstanceName)));
                 } finally {
+                    source.cancel();
                     source.close();
                     runThread.sync();
                 }
@@ -982,6 +984,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
+                source.cancel();
                 source.close();
                 runThread.sync();
             }
@@ -1061,6 +1064,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                     assertTrue(e.getCause() instanceof Handover.ClosedException);
                     assertTrue(e.getCause().getMessage().contains("Close handover with error."));
                 } finally {
+                    source.cancel();
                     source.close();
                     runThread.sync();
                 }
