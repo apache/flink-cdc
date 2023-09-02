@@ -21,7 +21,6 @@ import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatc
 import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
-import com.ververica.cdc.connectors.mysql.source.utils.SlackWebhookUtils;
 import com.ververica.cdc.connectors.mysql.source.utils.StatementUtils;
 import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;

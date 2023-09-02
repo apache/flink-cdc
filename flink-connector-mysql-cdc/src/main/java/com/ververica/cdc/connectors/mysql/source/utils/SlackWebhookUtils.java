@@ -29,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 public class SlackWebhookUtils {
     private static final Logger LOG = LoggerFactory.getLogger(SlackWebhookUtils.class);
 
-
     private static String removeNewlines(String text) {
         return text.replace("\n", "").replace("\r", "");
     }
@@ -73,6 +72,5 @@ public class SlackWebhookUtils {
             LOG.info("Fail to Send Notification to Slack");
             LOG.info(e.getMessage());
         }
-
     }
 }

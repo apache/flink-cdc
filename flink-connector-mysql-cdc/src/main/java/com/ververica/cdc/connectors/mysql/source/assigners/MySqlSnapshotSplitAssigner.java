@@ -32,6 +32,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.SlackWebhookUtils;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -392,6 +393,13 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             // to care about the global output data order of snapshot splits and binlog split.
             if (currentParallelism == 1) {
                 assignerStatus = assignerStatus.onFinish();
+                if (sourceConfig.doNotifySnapshotToBinlogSwitch()) {
+                    SlackWebhookUtils.notify(
+                            this.sourceConfig.getHookUrl(),
+                            "SNAPSHOT FINISHED",
+                            this.sourceConfig.getTableList().get(0),
+                            "");
+                }
                 LOG.info(
                         "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.");
             } else {

@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.mysql.source.enumerator;
 
-import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
@@ -45,6 +44,7 @@ import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.utils.SlackWebhookUtils;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -245,7 +245,6 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                                 this.sourceConfig.getTableList().get(0),
                                 position);
                     }
-
                 }
                 awaitingReader.remove();
                 LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);
