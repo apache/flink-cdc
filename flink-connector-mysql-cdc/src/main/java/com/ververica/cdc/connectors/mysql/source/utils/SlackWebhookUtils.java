@@ -19,47 +19,60 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 /** Send notification to slack. */
 public class SlackWebhookUtils {
     private static final Logger LOG = LoggerFactory.getLogger(SlackWebhookUtils.class);
 
+
+    private static String removeNewlines(String text) {
+        return text.replace("\n", "").replace("\r", "");
+    }
+
+    private static void sendPayload(HttpURLConnection conn, String payload) throws IOException {
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = payload.getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+        }
+        conn.getResponseCode();
+        conn.disconnect();
+    }
+
+    private static HttpURLConnection createConnection() throws IOException {
+        URL url = new URL("slak-hook-url");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setDoInput(true);
+        conn.setConnectTimeout(5000);
+        conn.setRequestProperty("Content-Type", "application/json");
+
+        return conn;
+    }
+
     public static void notify(String hookUrl, String header, String tableName, String gtids) {
-        LOG.info("Send Snapshot Finish Notification ");
 
         try {
-            URL url = new URL(hookUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setDoOutput(true);
-            conn.setDoInput(true);
-            conn.setConnectTimeout(5000);
-            conn.setRequestProperty("Content-Type", "application/json");
-            String[] target = tableName.replaceAll("\n", "").replaceAll("\r", "").split("\\.");
-            String database = target[0];
-            String table = target[1];
+            HttpURLConnection conn = createConnection();
+
+            String database = removeNewlines(tableName.split("\\.")[0]);
+            String table = removeNewlines(tableName.split("\\.")[1]);
             String gtidsInfo =
-                    !gtids.isEmpty()
-                            ? String.format(
-                                    "\\nGTIDs: %s", gtids.replaceAll("\n", "").replaceAll("\r", ""))
-                            : "";
+                    !gtids.isEmpty() ? String.format("\\nGTIDs: %s", removeNewlines(gtids)) : "";
             String payload =
                     String.format(
                             "{\"text\":\"[%s]\\nDatabase: %s\\nTable: %s%s\"}",
                             header, database, table, gtidsInfo);
-
-            try (OutputStream os = conn.getOutputStream()) {
-                byte[] input = payload.getBytes("utf-8");
-                os.write(input, 0, input.length);
-            }
-            conn.getResponseCode();
-            conn.disconnect();
+            sendPayload(conn, payload);
         } catch (Exception e) {
-            LOG.info("Fail to Send Notification");
+            LOG.info("Fail to Send Notification to Slack");
             LOG.info(e.getMessage());
         }
+
     }
 }
