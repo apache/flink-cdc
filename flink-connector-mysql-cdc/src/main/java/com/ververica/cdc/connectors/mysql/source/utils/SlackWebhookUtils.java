@@ -43,8 +43,8 @@ public class SlackWebhookUtils {
         conn.disconnect();
     }
 
-    private static HttpURLConnection createConnection() throws IOException {
-        URL url = new URL("slak-hook-url");
+    private static HttpURLConnection createConnection(String hookUrl) throws IOException {
+        URL url = new URL(hookUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
@@ -58,7 +58,7 @@ public class SlackWebhookUtils {
     public static void notify(String hookUrl, String header, String tableName, String gtids) {
 
         try {
-            HttpURLConnection conn = createConnection();
+            HttpURLConnection conn = createConnection(hookUrl);
 
             String database = removeNewlines(tableName.split("\\.")[0]);
             String table = removeNewlines(tableName.split("\\.")[1]);
