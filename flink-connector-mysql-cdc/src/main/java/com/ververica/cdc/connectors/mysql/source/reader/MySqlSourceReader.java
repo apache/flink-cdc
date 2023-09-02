@@ -47,6 +47,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
+import com.ververica.cdc.connectors.mysql.source.utils.DnsIpChecker;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlPartition;
@@ -86,6 +87,7 @@ public class MySqlSourceReader<T>
     private final MySqlSourceReaderContext mySqlSourceReaderContext;
     private final MySqlPartition partition;
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
+    private DnsIpChecker dnsIpChecker;
 
     public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
@@ -108,6 +110,14 @@ public class MySqlSourceReader<T>
         this.suspendedBinlogSplit = null;
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
+        if (this.enableDnsIpChecker()) {
+            this.dnsIpChecker =
+                    new DnsIpChecker(this.subtaskId, this.context, sourceConfig.getHostname());
+        }
+    }
+
+    private boolean enableDnsIpChecker() {
+        return this.subtaskId == 0 && this.sourceConfig.doRestartOnDbSwitch();
     }
 
     @Override
@@ -115,6 +125,17 @@ public class MySqlSourceReader<T>
         if (getNumberOfCurrentlyAssignedSplits() <= 1) {
             context.sendSplitRequest();
         }
+        if (this.enableDnsIpChecker()) {
+            this.dnsIpChecker.run();
+        }
+    }
+
+    public void close() throws Exception {
+        if (this.enableDnsIpChecker()) {
+            this.dnsIpChecker.close();
+            LOG.info("Closing MySqlSource Reader.");
+        }
+        super.close();
     }
 
     @Override
