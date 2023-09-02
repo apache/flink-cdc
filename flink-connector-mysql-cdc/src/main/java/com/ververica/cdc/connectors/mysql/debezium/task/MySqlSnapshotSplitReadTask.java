@@ -171,11 +171,6 @@ public class MySqlSnapshotSplitReadTask
                 snapshotSplit, highWatermark, SignalEventDispatcher.WatermarkKind.HIGH);
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setHighWatermark(highWatermark);
-
-        if (this.doNotifySnapshotToBinlogSwitch && snapshotSplit.getSplitEnd() == null) {
-            SlackWebhookUtils.notify(
-                    this.hookUrl, "LAST SNAPSHOT SPLIT FINISHED", this.tableName, "");
-        }
         return SnapshotResult.completed(ctx.offset);
     }
 
