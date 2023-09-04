@@ -23,6 +23,7 @@ import org.apache.flink.table.types.DataType;
 
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import io.debezium.connector.AbstractSourceInfo;
+import io.debezium.connector.postgresql.SourceInfo;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -94,7 +95,25 @@ public enum PostgreSQLReadableMetadata {
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
                 }
-            });
+            }),
+
+    /**
+     * An LSN is a 64-bit integer, representing a byte position in the write-ahead log stream.
+     * If the record is read from snapshot of the table instead of the change stream, the value is always 0.
+     */
+    LSN(
+            "lsn",
+            DataTypes.BIGINT().notNull(),
+            new MetadataConverter() {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Object read(SourceRecord record) {
+            Struct messageStruct = (Struct) record.value();
+            Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+            return sourceStruct.get(SourceInfo.LSN_KEY);
+        }
+    });
 
     private final String key;
 
