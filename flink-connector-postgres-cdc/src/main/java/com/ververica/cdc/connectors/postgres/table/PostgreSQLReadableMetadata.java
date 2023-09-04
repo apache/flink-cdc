@@ -98,22 +98,23 @@ public enum PostgreSQLReadableMetadata {
             }),
 
     /**
-     * An LSN is a 64-bit integer, representing a byte position in the write-ahead log stream.
-     * If the record is read from snapshot of the table instead of the change stream, the value is always 0.
+     * An LSN is a 64-bit integer, representing a byte position in the write-ahead log stream. If
+     * the record is read from snapshot of the table instead of the change stream, the value is
+     * always 0.
      */
     LSN(
             "lsn",
             DataTypes.BIGINT().notNull(),
             new MetadataConverter() {
-        private static final long serialVersionUID = 1L;
+                private static final long serialVersionUID = 1L;
 
-        @Override
-        public Object read(SourceRecord record) {
-            Struct messageStruct = (Struct) record.value();
-            Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
-            return sourceStruct.get(SourceInfo.LSN_KEY);
-        }
-    });
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    return sourceStruct.get(SourceInfo.LSN_KEY);
+                }
+            });
 
     private final String key;
 
