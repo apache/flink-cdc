@@ -16,9 +16,9 @@
 
 package org.tikv.cdc;
 
-import org.apache.flink.shaded.guava30.com.google.common.base.Preconditions;
-import org.apache.flink.shaded.guava30.com.google.common.collect.Range;
-import org.apache.flink.shaded.guava30.com.google.common.collect.TreeMultiset;
+import org.apache.flink.shaded.guava31.com.google.common.base.Preconditions;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Range;
+import org.apache.flink.shaded.guava31.com.google.common.collect.TreeMultiset;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
