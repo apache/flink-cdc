@@ -125,12 +125,11 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Before
-    public void before() throws InterruptedException {
+    public void before() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(PD, TIKV, TIDB)).join();
         LOG.info("Containers are started.");
         super.before();
-        Thread.sleep(5000);
         initializeTidbTable("tidb_inventory");
     }
 
@@ -237,15 +236,27 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     protected Connection getTidbJdbcConnection(String databaseName) throws SQLException {
-        return DriverManager.getConnection(
-                "jdbc:mysql://"
-                        + TIDB.getContainerIpAddress()
-                        + ":"
-                        + TIDB.getMappedPort(TIDB_PORT)
-                        + "/"
-                        + databaseName,
-                TIDB_USER,
-                TIDB_PASSWORD);
+        for (int i = 0; i < 3; i++) {
+            try {
+                return DriverManager.getConnection(
+                        "jdbc:mysql://"
+                                + TIDB.getContainerIpAddress()
+                                + ":"
+                                + TIDB.getMappedPort(TIDB_PORT)
+                                + "/"
+                                + databaseName,
+                        TIDB_USER,
+                        TIDB_PASSWORD);
+            } catch (SQLException e) {
+                LOG.warn("Failed to connect to TiDB, retrying...", e);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        throw new SQLException("Failed to connect to TiDB after 3 retries.");
     }
 
     /**
