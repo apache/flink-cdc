@@ -125,11 +125,12 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Before
-    public void before() {
+    public void before() throws InterruptedException {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(PD, TIKV, TIDB)).join();
         LOG.info("Containers are started.");
         super.before();
+        Thread.sleep(5000);
         initializeTidbTable("tidb_inventory");
     }
 
