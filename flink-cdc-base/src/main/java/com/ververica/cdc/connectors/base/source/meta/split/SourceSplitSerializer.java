@@ -70,7 +70,7 @@ public abstract class SourceSplitSerializer
             boolean useCatalogBeforeSchema =
                     SerializerUtils.shouldUseCatalogBeforeSchema(snapshotSplit.getTableId());
             out.writeBoolean(useCatalogBeforeSchema);
-            out.writeUTF(snapshotSplit.getTableId().toString());
+            out.writeUTF(snapshotSplit.getTableId().toDoubleQuotedString());
             out.writeUTF(snapshotSplit.splitId());
             out.writeUTF(snapshotSplit.getSplitKeyType().asSerializableString());
 
