@@ -138,7 +138,6 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
         assertDelete(records.get(0), "000000000000000000001001");
 
         // cleanup
-        source.cancel();
         source.close();
         runThread.sync();
     }
@@ -228,7 +227,6 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
             String resumeToken = JsonPath.read(state, "$.sourceOffset._id");
             assertTrue(resumeToken.contains("_data"));
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -286,7 +284,6 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
                     Updates.set("weight", 1345.67));
 
             // cancel the source
-            source2.cancel();
             source2.close();
             runThread2.sync();
         }
@@ -344,7 +341,6 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
             String resumeToken = JsonPath.read(state, "$.sourceOffset._id");
             assertTrue(resumeToken.contains("_data"));
 
-            source3.cancel();
             source3.close();
             runThread3.sync();
         }

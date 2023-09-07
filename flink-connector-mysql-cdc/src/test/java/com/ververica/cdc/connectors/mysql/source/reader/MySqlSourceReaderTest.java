@@ -61,6 +61,7 @@ import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.After;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +107,12 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+
+    @After
+    public void clear() {
+        customerDatabase.dropDatabase();
+        inventoryDatabase.dropDatabase();
+    }
 
     @Test
     public void testBinlogReadFailoverCrossTransaction() throws Exception {
@@ -169,7 +176,6 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         List<String> restRecords = consumeRecords(restartReader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
-        customerDatabase.dropDatabase();
     }
 
     @Test
@@ -227,7 +233,6 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         List<MySqlSplit> mySqlSplits = reader.snapshotState(1L);
         assertEquals(1, mySqlSplits.size());
         reader.close();
-        inventoryDatabase.dropDatabase();
     }
 
     @Test
@@ -327,7 +332,6 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             }
         }
         reader.close();
-        inventoryDatabase.dropDatabase();
     }
 
     private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration, int limit)

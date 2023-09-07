@@ -160,7 +160,6 @@ public class OracleSourceTest extends AbstractTestBase {
             assertUpdate(records.get(0), "ID", 2001);
 
             // cleanup
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -226,7 +225,6 @@ public class OracleSourceTest extends AbstractTestBase {
             assertFalse(state.contains("server_id"));
             assertFalse(state.contains("event"));
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -429,7 +427,6 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
-                source.cancel();
                 source.close();
                 runThread.sync();
             }
@@ -537,7 +534,6 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
             }
 
-            source.cancel();
             source.close();
             runThread.sync();
         }

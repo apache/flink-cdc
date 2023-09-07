@@ -127,7 +127,6 @@ public class VitessSourceTest extends VitessTestBase {
             assertUpdate(records.get(0), "id", 2001);
 
             // cleanup
-            source.cancel();
             source.close();
             runThread.sync();
         }

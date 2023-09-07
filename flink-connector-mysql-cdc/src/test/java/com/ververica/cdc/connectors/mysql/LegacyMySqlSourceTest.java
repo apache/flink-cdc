@@ -178,7 +178,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             assertUpdate(records.get(0), "id", 2001);
 
             // cleanup
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -248,7 +247,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             assertTrue(pos > prevPos);
             prevPos = pos;
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -309,7 +307,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             }
 
             // cancel the source
-            source2.cancel();
             source2.close();
             runThread2.sync();
         }
@@ -366,7 +363,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             int pos = JsonPath.read(state, "$.sourceOffset.pos");
             assertTrue(pos > prevPos);
 
-            source3.cancel();
             source3.close();
             runThread3.sync();
         }
@@ -410,7 +406,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             int pos = JsonPath.read(state, "$.sourceOffset.pos");
             assertTrue(pos > prevPos);
 
-            source4.cancel();
             source4.close();
             runThread4.sync();
         }
@@ -462,7 +457,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             int pos = JsonPath.read(state, "$.sourceOffset.pos");
             assertTrue(pos > prevPos);
 
-            source5.cancel();
             source5.close();
             runThread5.sync();
         }
@@ -493,7 +487,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 assertInsert(records.get(0), "id", 1003);
             }
 
-            source6.cancel();
             source6.close();
             runThread6.sync();
         }
@@ -555,7 +548,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
-                source.cancel();
                 source.close();
                 runThread.sync();
             }
@@ -586,7 +578,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 assertEquals(1, records.size());
                 assertInsert(records.get(0), "id", 113);
 
-                source2.cancel();
                 source2.close();
                 runThread2.sync();
             }
@@ -648,7 +639,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 source2.snapshotState(new StateSnapshotContextSynchronousImpl(201, 201));
             }
 
-            source2.cancel();
             source2.close();
             runThread2.sync();
         }
@@ -677,7 +667,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             assertEquals(1, records.size());
             assertDelete(records.get(0), "id", 2001);
 
-            source3.cancel();
             source3.close();
             runThread3.sync();
         }
@@ -761,7 +750,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 assertTrue(pos > prevPos);
             }
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -814,7 +802,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         if (useLegacyImplementation) {
             // should fail because user specifies to use the legacy implementation
             try {
-                source.cancel();
                 source.close();
                 runThread.sync();
                 fail("Should fail.");
@@ -828,7 +815,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             // check the debezium status to verify
             waitDebeziumStartWithTimeout(source, 5_000L);
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -918,7 +904,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                                                             + " this might because the debezium engine has been shutdown due to other errors.",
                                                     engineInstanceName)));
                 } finally {
-                    source.cancel();
                     source.close();
                     runThread.sync();
                 }
@@ -984,7 +969,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                 assertTrue(historyState.list.size() > 0);
                 assertTrue(offsetState.list.size() > 0);
 
-                source.cancel();
                 source.close();
                 runThread.sync();
             }
@@ -1064,7 +1048,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                     assertTrue(e.getCause() instanceof Handover.ClosedException);
                     assertTrue(e.getCause().getMessage().contains("Close handover with error."));
                 } finally {
-                    source.cancel();
                     source.close();
                     runThread.sync();
                 }
@@ -1127,7 +1110,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         String offsetFile = JsonPath.read(state, "$.sourceOffset.file");
         int offsetPos = JsonPath.read(state, "$.sourceOffset.pos");
 
-        source.cancel();
         source.close();
         runThread.sync();
 

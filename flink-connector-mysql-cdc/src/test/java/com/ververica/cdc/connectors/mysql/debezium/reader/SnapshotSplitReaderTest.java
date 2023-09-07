@@ -43,6 +43,7 @@ import io.debezium.schema.DataCollectionSchema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -79,6 +80,17 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 getConfig(customerDatabase, new String[] {"customers"}, 10);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+    }
+
+    @AfterClass
+    public static void afterClass() throws Exception {
+        if (mySqlConnection != null) {
+            mySqlConnection.close();
+        }
+
+        if (binaryLogClient != null) {
+            binaryLogClient.disconnect();
+        }
     }
 
     @Test
@@ -457,12 +469,6 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
             }
         }
 
-        if (mySqlConnection != null) {
-            mySqlConnection.close();
-        }
-        if (binaryLogClient != null) {
-            binaryLogClient.disconnect();
-        }
         snapshotSplitReader.close();
 
         assertNotNull(snapshotSplitReader.getExecutorService());
