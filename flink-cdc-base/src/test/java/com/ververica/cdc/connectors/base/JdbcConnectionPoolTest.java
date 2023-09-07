@@ -66,15 +66,15 @@ public class JdbcConnectionPoolTest {
                         3);
         Assert.assertEquals(
                 mockInstance.getJdbcUrl(
-                        mySqlSourceConfig, mockConnectionPoolFactory.factoryIdentifier()),
+                        mySqlSourceConfig, mockConnectionPoolFactory.getClass().getName()),
                 mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
         Assert.assertEquals(
                 mysqlInstance.getJdbcUrl(
-                        mySqlSourceConfig, mysqlPooledDataSourceFactory.factoryIdentifier()),
+                        mySqlSourceConfig, mysqlPooledDataSourceFactory.getClass().getName()),
                 mysqlPooledDataSourceFactory.getJdbcUrl(mySqlSourceConfig));
         Assert.assertNotEquals(
                 mysqlInstance.getJdbcUrl(
-                        mySqlSourceConfig, mysqlPooledDataSourceFactory.factoryIdentifier()),
+                        mySqlSourceConfig, mysqlPooledDataSourceFactory.getClass().getName()),
                 mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
     }
 
@@ -83,11 +83,6 @@ public class JdbcConnectionPoolTest {
         @Override
         public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
             return "mock-url";
-        }
-
-        @Override
-        public String factoryIdentifier() {
-            return "test-identifier";
         }
     }
 }

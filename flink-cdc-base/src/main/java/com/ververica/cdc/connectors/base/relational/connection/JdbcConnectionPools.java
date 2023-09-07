@@ -33,7 +33,7 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
 
     private static JdbcConnectionPools instance;
     private final Map<ConnectionPoolId, HikariDataSource> pools = new HashMap<>();
-    private static Map<String, JdbcConnectionPoolFactory> poolFactorys = new HashMap<>();
+    private static final Map<String, JdbcConnectionPoolFactory> poolFactoryMap = new HashMap<>();
 
     private JdbcConnectionPools() {}
 
@@ -42,22 +42,21 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
         if (instance == null) {
             instance = new JdbcConnectionPools();
         }
-        poolFactorys.put(jdbcConnectionPoolFactory.factoryIdentifier(), jdbcConnectionPoolFactory);
+        poolFactoryMap.put(
+                jdbcConnectionPoolFactory.getClass().getName(), jdbcConnectionPoolFactory);
         return instance;
     }
 
     @Override
     public HikariDataSource getOrCreateConnectionPool(
-            ConnectionPoolId poolId,
-            JdbcSourceConfig sourceConfig,
-            String dataSourcePoolFactoryIdentifier) {
+            ConnectionPoolId poolId, JdbcSourceConfig sourceConfig) {
         synchronized (pools) {
             if (!pools.containsKey(poolId)) {
                 LOG.info("Create and register connection pool {}", poolId);
                 pools.put(
                         poolId,
-                        poolFactorys
-                                .get(dataSourcePoolFactoryIdentifier)
+                        poolFactoryMap
+                                .get(poolId.getDataSourcePoolFactoryIdentifier())
                                 .createPooledDataSource(sourceConfig));
             }
             return pools.get(poolId);
@@ -67,6 +66,6 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
     @VisibleForTesting
     public String getJdbcUrl(
             JdbcSourceConfig sourceConfig, String dataSourcePoolFactoryIdentifier) {
-        return poolFactorys.get(dataSourcePoolFactoryIdentifier).getJdbcUrl(sourceConfig);
+        return poolFactoryMap.get(dataSourcePoolFactoryIdentifier).getJdbcUrl(sourceConfig);
     }
 }

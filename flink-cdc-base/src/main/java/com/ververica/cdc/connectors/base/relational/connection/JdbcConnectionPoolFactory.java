@@ -65,6 +65,4 @@ public abstract class JdbcConnectionPoolFactory {
      * @return a database url.
      */
     public abstract String getJdbcUrl(JdbcSourceConfig sourceConfig);
-
-    public abstract String factoryIdentifier();
 }

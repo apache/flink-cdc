@@ -35,9 +35,4 @@ public class MysqlPooledDataSourceFactory extends JdbcConnectionPoolFactory {
 
         return String.format(JDBC_URL_PATTERN, hostName, port);
     }
-
-    @Override
-    public String factoryIdentifier() {
-        return "MYSQL-POOL-DATASOURCE-FACTORY";
-    }
 }

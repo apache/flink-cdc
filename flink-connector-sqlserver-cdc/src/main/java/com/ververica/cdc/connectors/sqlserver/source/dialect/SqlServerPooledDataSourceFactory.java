@@ -31,9 +31,4 @@ public class SqlServerPooledDataSourceFactory extends JdbcConnectionPoolFactory 
         String database = sourceConfig.getDatabaseList().get(0);
         return String.format(URL_PATTERN, hostName, port, database);
     }
-
-    @Override
-    public String factoryIdentifier() {
-        return "SQLSERVER-POOL-DATASOURCE-FACTORY";
-    }
 }
