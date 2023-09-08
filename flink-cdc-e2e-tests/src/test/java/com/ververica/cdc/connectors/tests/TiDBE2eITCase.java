@@ -71,7 +71,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
 
     @ClassRule
     public static final GenericContainer<?> PD =
-            new GenericContainer<>("pingcap/pd:v6.1.0")
+            new GenericContainer<>("pingcap/pd:v6.1.7")
                     .withExposedPorts(PD_PORT)
                     .withFileSystemBind("src/test/resources/docker/tidb/pd.toml", "/pd.toml")
                     .withCommand(
@@ -92,7 +92,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
 
     @ClassRule
     public static final GenericContainer<?> TIKV =
-            new GenericContainer<>("pingcap/tikv:v6.1.0")
+            new GenericContainer<>("pingcap/tikv:v6.1.7")
                     .withExposedPorts(TIKV_PORT)
                     .withFileSystemBind("src/test/resources/docker/tidb/tikv.toml", "/tikv.toml")
                     .withCommand(
@@ -110,7 +110,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
 
     @ClassRule
     public static final GenericContainer<?> TIDB =
-            new GenericContainer<>("pingcap/tidb:v6.1.0")
+            new GenericContainer<>("pingcap/tidb:v6.1.7")
                     .withExposedPorts(TIDB_PORT)
                     .withFileSystemBind("src/test/resources/docker/tidb/tidb.toml", "/tidb.toml")
                     .withCommand(
