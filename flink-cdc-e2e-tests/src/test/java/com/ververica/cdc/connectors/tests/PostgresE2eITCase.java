@@ -91,7 +91,8 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                             "-c",
                             "max_wal_senders=20",
                             "-c",
-                            "max_replication_slots=20");
+                            "max_replication_slots=20")
+                    .withReuse(true);
 
     @Before
     public void before() {
