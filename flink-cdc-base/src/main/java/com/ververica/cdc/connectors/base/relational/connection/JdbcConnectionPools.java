@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.relational.connection;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -33,7 +34,7 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
 
     private static JdbcConnectionPools instance;
     private final Map<ConnectionPoolId, HikariDataSource> pools = new HashMap<>();
-    private static final Map<String, JdbcConnectionPoolFactory> poolFactoryMap = new HashMap<>();
+    private static final Map<String, JdbcConnectionPoolFactory> POOL_FACTORY_MAP = new HashMap<>();
 
     private JdbcConnectionPools() {}
 
@@ -42,7 +43,7 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
         if (instance == null) {
             instance = new JdbcConnectionPools();
         }
-        poolFactoryMap.put(
+        POOL_FACTORY_MAP.put(
                 jdbcConnectionPoolFactory.getClass().getName(), jdbcConnectionPoolFactory);
         return instance;
     }
@@ -53,19 +54,32 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
         synchronized (pools) {
             if (!pools.containsKey(poolId)) {
                 LOG.info("Create and register connection pool {}", poolId);
-                pools.put(
-                        poolId,
-                        poolFactoryMap
-                                .get(poolId.getDataSourcePoolFactoryIdentifier())
-                                .createPooledDataSource(sourceConfig));
+                JdbcConnectionPoolFactory jdbcConnectionPoolFactory =
+                        POOL_FACTORY_MAP.get(poolId.getDataSourcePoolFactoryIdentifier());
+                if (jdbcConnectionPoolFactory == null) {
+                    throw new FlinkRuntimeException(
+                            String.format(
+                                    "DataSourcePoolFactoryIdentifier named %s doesn't exists",
+                                    poolId.getDataSourcePoolFactoryIdentifier()));
+                }
+                pools.put(poolId, jdbcConnectionPoolFactory.createPooledDataSource(sourceConfig));
             }
             return pools.get(poolId);
         }
     }
 
+    /** this method is only supported for test. */
     @VisibleForTesting
     public String getJdbcUrl(
             JdbcSourceConfig sourceConfig, String dataSourcePoolFactoryIdentifier) {
-        return poolFactoryMap.get(dataSourcePoolFactoryIdentifier).getJdbcUrl(sourceConfig);
+        JdbcConnectionPoolFactory jdbcConnectionPoolFactory =
+                POOL_FACTORY_MAP.get(dataSourcePoolFactoryIdentifier);
+        if (jdbcConnectionPoolFactory == null) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "no such dataSourcePoolFactoryIdentifier named %s exists",
+                            dataSourcePoolFactoryIdentifier));
+        }
+        return jdbcConnectionPoolFactory.getJdbcUrl(sourceConfig);
     }
 }
