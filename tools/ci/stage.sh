@@ -130,7 +130,7 @@ function get_test_modules_for_stage() {
     local negated_tidb=\!${MODULES_TIDB//,/,\!}
     local negated_oceanbase=\!${MODULES_OCEANBASE//,/,\!}
     local negated_db2=\!${MODULES_DB2//,/,\!}
-    local negated_vitess=\!${MODULES_vitess//,/,\!}
+    local negated_vitess=\!${MODULES_VITESS//,/,\!}
     local negated_e2e=\!${MODULES_E2E//,/,\!}
     local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_sqlserver,$negated_tidb,$negated_oceanbase,$negated_db2,$negated_vitess,$negated_e2e"
 
