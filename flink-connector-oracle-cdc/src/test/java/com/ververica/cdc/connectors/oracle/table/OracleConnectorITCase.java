@@ -21,13 +21,11 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
 
 import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
 import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.RateLimiter;
 
-import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
-import org.junit.After;
+import com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,12 +33,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.ZoneId;
@@ -56,25 +50,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.assertEqualsInAnyOrder;
-import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_PWD;
-import static com.ververica.cdc.connectors.oracle.utils.OracleTestUtils.CONNECTOR_USER;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /** Integration tests for Oracle redo log SQL source. */
 @RunWith(Parameterized.class)
-public class OracleConnectorITCase extends AbstractTestBase {
+public class OracleConnectorITCase extends OracleSourceTestBase {
     private static final int RECORDS_COUNT = 10_000;
     private static final int WORKERS_COUNT = 4;
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleConnectorITCase.class);
-
-    private OracleContainer oracleContainer =
-            OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -96,10 +83,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     @Before
     public void before() throws Exception {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(oracleContainer)).join();
-        LOG.info("Containers are started.");
-
         TestValuesTableFactory.clearAllData();
 
         if (parallelismSnapshot) {
@@ -108,11 +91,6 @@ public class OracleConnectorITCase extends AbstractTestBase {
         } else {
             env.setParallelism(1);
         }
-    }
-
-    @After
-    public void teardown() {
-        oracleContainer.stop();
     }
 
     @Test
@@ -140,8 +118,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         parallelismSnapshot,
@@ -253,8 +231,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         parallelismSnapshot,
@@ -345,8 +323,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         parallelismSnapshot,
@@ -441,8 +419,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'table-name' = '%s' ,"
                                 + " 'scan.startup.mode' = 'latest-offset'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         parallelismSnapshot,
@@ -489,7 +467,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
     @Test
     public void testConsumingNumericColumns() throws Exception {
         // Prepare numeric type data
-        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "CREATE TABLE debezium.test_numeric_table ("
@@ -540,8 +518,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         parallelismSnapshot,
@@ -591,7 +569,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
     @Test
     public void testXmlType() throws Exception {
         // Prepare xml type data
-        try (Connection connection = OracleTestUtils.testConnection(oracleContainer);
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "CREATE TABLE debezium.xmltype_table ("
@@ -624,8 +602,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         parallelismSnapshot,
@@ -661,7 +639,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + "</name>]",
                         lineSeparator, lineSeparator);
 
-        List<String> expected = Arrays.asList(expectedResult);
+        List<String> expected = Collections.singletonList(expectedResult);
 
         List<String> actual = TestValuesTableFactory.getRawResults("test_xmltype_sink");
         Collections.sort(actual);
@@ -671,8 +649,7 @@ public class OracleConnectorITCase extends AbstractTestBase {
 
     @Test
     public void testAllDataTypes() throws Throwable {
-        OracleTestUtils.createAndInitialize(
-                OracleTestUtils.ORACLE_CONTAINER, "column_type_test.sql");
+        createAndInitialize("column_type_test.sql");
 
         tEnv.getConfig().setLocalTimeZone(ZoneId.of("Asia/Shanghai"));
         String sourceDDL =
@@ -735,8 +712,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         CONNECTOR_USER,
                         CONNECTOR_PWD,
                         parallelismSnapshot,
@@ -812,8 +789,8 @@ public class OracleConnectorITCase extends AbstractTestBase {
                                 + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'debezium.log.mining.continuous.mine' = 'true'"
                                 + ")",
-                        oracleContainer.getHost(),
-                        oracleContainer.getOraclePort(),
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
                         "dbzuser",
                         "dbz",
                         "XE",
@@ -939,9 +916,5 @@ public class OracleConnectorITCase extends AbstractTestBase {
                 return 0;
             }
         }
-    }
-
-    public Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(oracleContainer.getJdbcUrl(), "dbzuser", "dbz");
     }
 }
