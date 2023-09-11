@@ -23,7 +23,8 @@ STAGE_TIDB="tidb"
 STAGE_OCEANBASE="oceanbase"
 STAGE_DB2="db2"
 STAGE_VITESS="vitess"
-STAGE_E2E="e2e"
+STAGE_E2E_1="e2e_1"
+STAGE_E2E_2="e2e_2"
 STAGE_MISC="misc"
 
 MODULES_MYSQL="\
@@ -96,7 +97,12 @@ function get_compile_modules_for_stage() {
         (${STAGE_VITESS})
             echo "-pl $MODULES_VITESS -am"
         ;;
-        (${STAGE_E2E})
+        (${STAGE_E2E_1})
+            # compile everything; using the -am switch does not work with negated module lists!
+            # the negation takes precedence, thus not all required modules would be built
+            echo ""
+        ;;
+        (${STAGE_E2E_2})
             # compile everything; using the -am switch does not work with negated module lists!
             # the negation takes precedence, thus not all required modules would be built
             echo ""
@@ -162,8 +168,11 @@ function get_test_modules_for_stage() {
         (${STAGE_VITESS})
             echo "-pl $modules_vitess"
         ;;
-        (${STAGE_E2E})
-            echo "-pl $modules_e2e"
+        (${STAGE_E2E_1})
+            echo "-pl $modules_e2e -Dtest=Db2E2eITCase,MongoE2eITCase,OracleE2eITCase,PostgresE2eITCase,SqlServerE2eITCas,VitessE2eITCase"
+        ;;
+        (${STAGE_E2E_2})
+            echo "-pl $modules_e2e -Dtest=MySqlE2eITCase,TiDBE2eITCase"
         ;;
         (${STAGE_MISC})
             echo "-pl $modules_misc"
