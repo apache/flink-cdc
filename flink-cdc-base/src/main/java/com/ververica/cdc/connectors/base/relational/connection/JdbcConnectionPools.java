@@ -77,7 +77,7 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
         if (jdbcConnectionPoolFactory == null) {
             throw new FlinkRuntimeException(
                     String.format(
-                            "no such dataSourcePoolFactoryIdentifier named %s exists",
+                            "Pool factory identifier is required for connection pools, but unknown pool factory identifier %s found.",
                             dataSourcePoolFactoryIdentifier));
         }
         return jdbcConnectionPoolFactory.getJdbcUrl(sourceConfig);
