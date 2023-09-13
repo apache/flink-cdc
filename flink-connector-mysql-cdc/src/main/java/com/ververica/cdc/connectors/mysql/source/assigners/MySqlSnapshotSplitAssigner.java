@@ -47,6 +47,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -152,7 +153,15 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
-        this.assignedSplits = assignedSplits;
+        this.assignedSplits =
+                assignedSplits.entrySet().stream()
+                        .sorted(Comparator.comparing(Map.Entry::getKey))
+                        .collect(
+                                Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        Map.Entry::getValue,
+                                        (o, o2) -> o,
+                                        LinkedHashMap::new));
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
@@ -367,9 +376,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
         final List<MySqlSchemalessSnapshotSplit> assignedSnapshotSplit =
-                assignedSplits.values().stream()
-                        .sorted(Comparator.comparing(MySqlSplit::splitId))
-                        .collect(Collectors.toList());
+                new ArrayList<>(assignedSplits.values());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         for (MySqlSchemalessSnapshotSplit split : assignedSnapshotSplit) {
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
