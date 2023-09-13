@@ -70,11 +70,29 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
         return "MongoDB";
     }
 
+    private static TableId parseTableId(String str) {
+        return parseTableId(str, true);
+    }
+
+    private static TableId parseTableId(String str, boolean useCatalogBeforeSchema) {
+        String[] parts = str.split("[.]", 2);
+        int numParts = parts.length;
+        if (numParts == 1) {
+            return new TableId(null, null, parts[0]);
+        } else if (numParts == 2) {
+            return useCatalogBeforeSchema
+                    ? new TableId(parts[0], null, parts[1])
+                    : new TableId(null, parts[0], parts[1]);
+        } else {
+            return null;
+        }
+    }
+
     @Override
     public List<TableId> discoverDataCollections(MongoDBSourceConfig sourceConfig) {
         CollectionDiscoveryInfo discoveryInfo = discoverAndCacheDataCollections(sourceConfig);
         return discoveryInfo.getDiscoveredCollections().stream()
-                .map(TableId::parse)
+                .map(MongoDBDialect::parseTableId)
                 .collect(Collectors.toList());
     }
 
