@@ -79,7 +79,7 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                         .pollAwaitTimeMillis(500)
                         .create(0);
 
-        assertEquals(MongoUtils.getMongoVersion(config), "6.0.6");
+        assertEquals(MongoUtils.getMongoVersion(config), "6.0.9");
     }
 
     @Test
