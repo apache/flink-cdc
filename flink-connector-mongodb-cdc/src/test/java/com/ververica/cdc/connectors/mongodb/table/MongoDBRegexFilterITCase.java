@@ -266,6 +266,31 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testMatchCollectionWithDots() throws Exception {
+        // 1. Given colllections:
+        // db: [coll.name]
+        String db = CONTAINER.executeCommandFileInSeparateDatabase("ns-dotted");
+
+        TableResult result = submitTestCase(db, db + "[.]coll[.]name");
+
+        // 2. Wait change stream records come
+        waitForSinkSize("mongodb_sink", 3);
+
+        // 3. Check results
+        String[] expected =
+                new String[] {
+                    String.format("+I[%s, coll.name, A101]", db),
+                    String.format("+I[%s, coll.name, A102]", db),
+                    String.format("+I[%s, coll.name, A103]", db)
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        assertThat(actual, containsInAnyOrder(expected));
+
+        result.getJobClient().get().cancel().get();
+    }
+
     private TableResult submitTestCase(String database, String collection) throws Exception {
         String sourceDDL =
                 "CREATE TABLE mongodb_source ("

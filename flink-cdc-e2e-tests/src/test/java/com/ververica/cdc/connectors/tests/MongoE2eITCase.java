@@ -89,7 +89,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         super.before();
 
         container =
-                new MongoDBContainer("mongo:6.0.6")
+                new MongoDBContainer("mongo:6.0.9")
                         .withSharding()
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)

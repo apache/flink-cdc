@@ -71,7 +71,7 @@ public class MongoDBSourceTestBase {
 
     @ClassRule
     public static final MongoDBContainer CONTAINER =
-            new MongoDBContainer("mongo:6.0.6")
+            new MongoDBContainer("mongo:6.0.9")
                     .withSharding()
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 }

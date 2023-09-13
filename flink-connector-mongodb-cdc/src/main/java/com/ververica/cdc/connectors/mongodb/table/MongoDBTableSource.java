@@ -173,7 +173,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 checkDatabaseNameValidity(database);
                 checkCollectionNameValidity(collection);
                 databaseList = database;
-                collectionList = database + "." + collection;
+                // match dot explicitly since it will be used for regex match later
+                collectionList = database + "[.]" + collection;
             } else {
                 databaseList = database;
                 collectionList = collection;
