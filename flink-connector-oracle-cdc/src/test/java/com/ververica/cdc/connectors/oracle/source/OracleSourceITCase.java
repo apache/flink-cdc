@@ -61,65 +61,151 @@ public class OracleSourceITCase extends OracleSourceTestBase {
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
+        String[] captureCustomerTables = new String[] {"CUSTOMERS"};
         testOracleParallelSource(
-                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"CUSTOMERS"});
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                ProjectionType.FULL,
+                captureCustomerTables,
+                getSourceDDL(captureCustomerTables),
+                initSnapshotForSingleTable(),
+                initRedoLogForSingleTable());
     }
 
     @Test
     public void testReadSingleTableWithMultipleParallelism() throws Exception {
+        String[] captureCustomerTables = new String[] {"CUSTOMERS"};
         testOracleParallelSource(
-                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"CUSTOMERS"});
+                4,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                ProjectionType.FULL,
+                captureCustomerTables,
+                getSourceDDL(captureCustomerTables),
+                initSnapshotForSingleTable(),
+                initRedoLogForSingleTable());
+    }
+
+    @Test
+    public void testReadSingleTableWithSingleParallelismAndProjection() throws Exception {
+        String[] captureCustomerTables = new String[] {"CUSTOMERS"};
+        testOracleParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                ProjectionType.PARTIAL,
+                captureCustomerTables,
+                getSourceDDLWithProjection(captureCustomerTables),
+                initSnapshotForSingleTableWithProjection(),
+                initRedoLogForSingleTableWithProjection());
+    }
+
+    @Test
+    public void testReadSingleTableWithMultipleParallelismAndProjection() throws Exception {
+        String[] captureCustomerTables = new String[] {"CUSTOMERS"};
+        testOracleParallelSource(
+                4,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                ProjectionType.PARTIAL,
+                captureCustomerTables,
+                getSourceDDLWithProjection(captureCustomerTables),
+                initSnapshotForSingleTableWithProjection(),
+                initRedoLogForSingleTableWithProjection());
     }
 
     // Failover tests
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
         testOracleParallelSource(
-                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+                FailoverType.TM,
+                FailoverPhase.SNAPSHOT,
+                ProjectionType.FULL,
+                new String[] {"CUSTOMERS"});
     }
 
     @Test
     public void testTaskManagerFailoverInRedoLogPhase() throws Exception {
         testOracleParallelSource(
-                FailoverType.TM, FailoverPhase.REDO_LOG, new String[] {"CUSTOMERS"});
+                FailoverType.TM,
+                FailoverPhase.REDO_LOG,
+                ProjectionType.FULL,
+                new String[] {"CUSTOMERS"});
     }
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
         testOracleParallelSource(
-                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+                FailoverType.JM,
+                FailoverPhase.SNAPSHOT,
+                ProjectionType.FULL,
+                new String[] {"CUSTOMERS"});
     }
 
     @Test
     public void testJobManagerFailoverInRedoLogPhase() throws Exception {
         testOracleParallelSource(
-                FailoverType.JM, FailoverPhase.REDO_LOG, new String[] {"CUSTOMERS"});
+                FailoverType.JM,
+                FailoverPhase.REDO_LOG,
+                ProjectionType.FULL,
+                new String[] {"CUSTOMERS"});
     }
 
     @Test
     public void testTaskManagerFailoverSingleParallelism() throws Exception {
+        String[] captureCustomerTables = new String[] {"CUSTOMERS"};
         testOracleParallelSource(
-                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+                1,
+                FailoverType.TM,
+                FailoverPhase.SNAPSHOT,
+                ProjectionType.FULL,
+                captureCustomerTables,
+                getSourceDDL(captureCustomerTables),
+                initSnapshotForSingleTable(),
+                initRedoLogForSingleTable());
     }
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
+        String[] captureCustomerTables = new String[] {"CUSTOMERS"};
         testOracleParallelSource(
-                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"CUSTOMERS"});
+                1,
+                FailoverType.JM,
+                FailoverPhase.SNAPSHOT,
+                ProjectionType.FULL,
+                captureCustomerTables,
+                getSourceDDL(captureCustomerTables),
+                initSnapshotForSingleTable(),
+                initRedoLogForSingleTable());
     }
 
     private void testOracleParallelSource(
-            FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            ProjectionType projectionType,
+            String[] captureCustomerTables)
             throws Exception {
         testOracleParallelSource(
-                DEFAULT_PARALLELISM, failoverType, failoverPhase, captureCustomerTables);
+                DEFAULT_PARALLELISM,
+                failoverType,
+                failoverPhase,
+                projectionType,
+                captureCustomerTables,
+                getSourceDDL(captureCustomerTables),
+                initSnapshotForSingleTable(),
+                initRedoLogForSingleTable());
     }
 
     private void testOracleParallelSource(
             int parallelism,
             FailoverType failoverType,
             FailoverPhase failoverPhase,
-            String[] captureCustomerTables)
+            ProjectionType projectionType,
+            String[] captureCustomerTables,
+            String sourceDDL,
+            String[] snapshotForSingleTable,
+            String[] redoLogForSingleTable)
             throws Exception {
         createAndInitialize("customer.sql");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -129,62 +215,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         env.enableCheckpointing(200L);
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
 
-        String sourceDDL =
-                format(
-                        "CREATE TABLE products ("
-                                + " ID INT NOT NULL,"
-                                + " NAME STRING,"
-                                + " ADDRESS STRING,"
-                                + " PHONE_NUMBER STRING,"
-                                + " primary key (ID) not enforced"
-                                + ") WITH ("
-                                + " 'connector' = 'oracle-cdc',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = 'false',"
-                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
-                                + " 'debezium.log.mining.continuous.mine' = 'true',"
-                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true'"
-                                + ")",
-                        ORACLE_CONTAINER.getHost(),
-                        ORACLE_CONTAINER.getOraclePort(),
-                        ORACLE_CONTAINER.getUsername(),
-                        ORACLE_CONTAINER.getPassword(),
-                        ORACLE_DATABASE,
-                        ORACLE_SCHEMA,
-                        getTableNameRegex(captureCustomerTables) // (customer|customer_1)
-                        );
-
         // first step: check the snapshot data
-        String[] snapshotForSingleTable =
-                new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]",
-                    "+I[1009, user_10, Shanghai, 123567891234]",
-                    "+I[1010, user_11, Shanghai, 123567891234]",
-                    "+I[1011, user_12, Shanghai, 123567891234]",
-                    "+I[1012, user_13, Shanghai, 123567891234]",
-                    "+I[1013, user_14, Shanghai, 123567891234]",
-                    "+I[1014, user_15, Shanghai, 123567891234]",
-                    "+I[1015, user_16, Shanghai, 123567891234]",
-                    "+I[1016, user_17, Shanghai, 123567891234]",
-                    "+I[1017, user_18, Shanghai, 123567891234]",
-                    "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
-                };
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from products");
         CloseableIterator<Row> iterator = tableResult.collect();
@@ -206,30 +237,16 @@ public class OracleSourceITCase extends OracleSourceTestBase {
 
         // second step: check the redo log data
         for (String tableId : captureCustomerTables) {
-            makeFirstPartRedoLogEvents(ORACLE_SCHEMA + '.' + tableId);
+            makeFirstPartRedoLogEvents(ORACLE_SCHEMA + '.' + tableId, projectionType);
         }
         if (failoverPhase == FailoverPhase.REDO_LOG) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
         }
         for (String tableId : captureCustomerTables) {
-            makeSecondPartRedoLogEvents(ORACLE_SCHEMA + '.' + tableId);
+            makeSecondPartRedoLogEvents(ORACLE_SCHEMA + '.' + tableId, projectionType);
         }
 
-        String[] redoLogForSingleTable =
-                new String[] {
-                    "-U[103, user_3, Shanghai, 123567891234]",
-                    "+U[103, user_3, Hangzhou, 123567891234]",
-                    "-D[102, user_2, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "-U[103, user_3, Hangzhou, 123567891234]",
-                    "+U[103, user_3, Shanghai, 123567891234]",
-                    "-U[1010, user_11, Shanghai, 123567891234]",
-                    "+U[1010, user_11, Hangzhou, 123567891234]",
-                    "+I[2001, user_22, Shanghai, 123567891234]",
-                    "+I[2002, user_23, Shanghai, 123567891234]",
-                    "+I[2003, user_24, Shanghai, 123567891234]"
-                };
         List<String> expectedRedoLogData = new ArrayList<>();
         for (int i = 0; i < captureCustomerTables.length; i++) {
             expectedRedoLogData.addAll(Arrays.asList(redoLogForSingleTable));
@@ -239,18 +256,204 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         tableResult.getJobClient().get().cancel().get();
     }
 
-    private void makeFirstPartRedoLogEvents(String tableId) throws Exception {
+    private String getSourceDDL(String[] captureCustomerTables) {
+        return format(
+                "CREATE TABLE products ("
+                        + " ID INT NOT NULL,"
+                        + " NAME STRING,"
+                        + " ADDRESS STRING,"
+                        + " PHONE_NUMBER STRING,"
+                        + " primary key (ID) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'oracle-cdc',"
+                        + " 'hostname' = '%s',"
+                        + " 'port' = '%s',"
+                        + " 'username' = '%s',"
+                        + " 'password' = '%s',"
+                        + " 'database-name' = '%s',"
+                        + " 'schema-name' = '%s',"
+                        + " 'table-name' = '%s',"
+                        + " 'scan.incremental.snapshot.enabled' = 'false',"
+                        + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                        + " 'debezium.log.mining.continuous.mine' = 'true',"
+                        + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true'"
+                        + ")",
+                ORACLE_CONTAINER.getHost(),
+                ORACLE_CONTAINER.getOraclePort(),
+                ORACLE_CONTAINER.getUsername(),
+                ORACLE_CONTAINER.getPassword(),
+                ORACLE_DATABASE,
+                ORACLE_SCHEMA,
+                getTableNameRegex(captureCustomerTables) // (customer|customer_1)
+                );
+    }
+
+    private String[] initSnapshotForSingleTable() {
+        return new String[] {
+            "+I[101, user_1, Shanghai, 123567891234]",
+            "+I[102, user_2, Shanghai, 123567891234]",
+            "+I[103, user_3, Shanghai, 123567891234]",
+            "+I[109, user_4, Shanghai, 123567891234]",
+            "+I[110, user_5, Shanghai, 123567891234]",
+            "+I[111, user_6, Shanghai, 123567891234]",
+            "+I[118, user_7, Shanghai, 123567891234]",
+            "+I[121, user_8, Shanghai, 123567891234]",
+            "+I[123, user_9, Shanghai, 123567891234]",
+            "+I[1009, user_10, Shanghai, 123567891234]",
+            "+I[1010, user_11, Shanghai, 123567891234]",
+            "+I[1011, user_12, Shanghai, 123567891234]",
+            "+I[1012, user_13, Shanghai, 123567891234]",
+            "+I[1013, user_14, Shanghai, 123567891234]",
+            "+I[1014, user_15, Shanghai, 123567891234]",
+            "+I[1015, user_16, Shanghai, 123567891234]",
+            "+I[1016, user_17, Shanghai, 123567891234]",
+            "+I[1017, user_18, Shanghai, 123567891234]",
+            "+I[1018, user_19, Shanghai, 123567891234]",
+            "+I[1019, user_20, Shanghai, 123567891234]",
+            "+I[2000, user_21, Shanghai, 123567891234]"
+        };
+    }
+
+    private String[] initRedoLogForSingleTable() {
+        return new String[] {
+            "-U[103, user_3, Shanghai, 123567891234]",
+            "+U[103, user_3, Hangzhou, 123567891234]",
+            "-D[102, user_2, Shanghai, 123567891234]",
+            "+I[102, user_2, Shanghai, 123567891234]",
+            "-U[103, user_3, Hangzhou, 123567891234]",
+            "+U[103, user_3, Shanghai, 123567891234]",
+            "-U[1010, user_11, Shanghai, 123567891234]",
+            "+U[1010, user_11, Hangzhou, 123567891234]",
+            "+I[2001, user_22, Shanghai, 123567891234]",
+            "+I[2002, user_23, Shanghai, 123567891234]",
+            "+I[2003, user_24, Shanghai, 123567891234]"
+        };
+    }
+
+    private String getSourceDDLWithProjection(String[] captureCustomerTables) {
+        return format(
+                "CREATE TABLE products ("
+                        + " ID INT NOT NULL,"
+                        + " NAME STRING,"
+                        + " primary key (ID) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'oracle-cdc',"
+                        + " 'hostname' = '%s',"
+                        + " 'port' = '%s',"
+                        + " 'username' = '%s',"
+                        + " 'password' = '%s',"
+                        + " 'database-name' = '%s',"
+                        + " 'schema-name' = '%s',"
+                        + " 'table-name' = '%s',"
+                        + " 'scan.incremental.snapshot.enabled' = 'false',"
+                        + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                        + " 'debezium.log.mining.continuous.mine' = 'true',"
+                        + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true'"
+                        + ")",
+                ORACLE_CONTAINER.getHost(),
+                ORACLE_CONTAINER.getOraclePort(),
+                ORACLE_CONTAINER.getUsername(),
+                ORACLE_CONTAINER.getPassword(),
+                ORACLE_DATABASE,
+                ORACLE_SCHEMA,
+                getTableNameRegex(captureCustomerTables) // (customer|customer_1)
+                );
+    }
+
+    private String[] initSnapshotForSingleTableWithProjection() {
+        return new String[] {
+            "+I[101, user_1]",
+            "+I[102, user_2]",
+            "+I[103, user_3]",
+            "+I[109, user_4]",
+            "+I[110, user_5]",
+            "+I[111, user_6]",
+            "+I[118, user_7]",
+            "+I[121, user_8]",
+            "+I[123, user_9]",
+            "+I[1009, user_10]",
+            "+I[1010, user_11]",
+            "+I[1011, user_12]",
+            "+I[1012, user_13]",
+            "+I[1013, user_14]",
+            "+I[1014, user_15]",
+            "+I[1015, user_16]",
+            "+I[1016, user_17]",
+            "+I[1017, user_18]",
+            "+I[1018, user_19]",
+            "+I[1019, user_20]",
+            "+I[2000, user_21]"
+        };
+    }
+
+    private String[] initRedoLogForSingleTableWithProjection() {
+        return new String[] {
+            "-U[103, user_3]",
+            "+U[103, user_233]",
+            "-D[102, user_2]",
+            "+I[102, user_2]",
+            "-U[103, user_233]",
+            "+U[103, user_3]",
+            "-U[1010, user_11]",
+            "+U[1010, user_1111]",
+            "+I[2001, user_22]",
+            "+I[2002, user_23]",
+            "+I[2003, user_24]"
+        };
+    }
+
+    private void firstPartRedoLogEvents(String tableId) throws Exception {
         executeSql("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103");
         executeSql("DELETE FROM " + tableId + " where id = 102");
         executeSql("INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')");
         executeSql("UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
     }
 
-    private void makeSecondPartRedoLogEvents(String tableId) throws Exception {
+    private void secondPartRedoLogEvents(String tableId) throws Exception {
         executeSql("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 1010");
         executeSql("INSERT INTO " + tableId + " VALUES(2001, 'user_22','Shanghai','123567891234')");
         executeSql("INSERT INTO " + tableId + " VALUES(2002, 'user_23','Shanghai','123567891234')");
         executeSql("INSERT INTO " + tableId + " VALUES(2003, 'user_24','Shanghai','123567891234')");
+    }
+
+    private void firstPartRedoLogEventsWithProjection(String tableId) throws Exception {
+        executeSql("UPDATE " + tableId + " SET name = 'user_233' where id = 103");
+        executeSql("DELETE FROM " + tableId + " where id = 102");
+        executeSql("INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')");
+        executeSql("UPDATE " + tableId + " SET name = 'user_3' where id = 103");
+    }
+
+    private void secondPartRedoLogEventsWithProjection(String tableId) throws Exception {
+        executeSql("UPDATE " + tableId + " SET name = 'user_1111' where id = 1010");
+        executeSql("INSERT INTO " + tableId + " VALUES(2001, 'user_22','Shanghai','123567891234')");
+        executeSql("INSERT INTO " + tableId + " VALUES(2002, 'user_23','Shanghai','123567891234')");
+        executeSql("INSERT INTO " + tableId + " VALUES(2003, 'user_24','Shanghai','123567891234')");
+    }
+
+    private void makeFirstPartRedoLogEvents(String tableId, ProjectionType type) throws Exception {
+        switch (type) {
+            case FULL:
+                firstPartRedoLogEvents(tableId);
+                break;
+            case PARTIAL:
+                firstPartRedoLogEventsWithProjection(tableId);
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + type);
+        }
+    }
+
+    private void makeSecondPartRedoLogEvents(String tableId, ProjectionType type) throws Exception {
+        switch (type) {
+            case FULL:
+                secondPartRedoLogEvents(tableId);
+                break;
+            case PARTIAL:
+                secondPartRedoLogEventsWithProjection(tableId);
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + type);
+        }
     }
 
     private void sleepMs(long millis) {
@@ -339,6 +542,12 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         SNAPSHOT,
         REDO_LOG,
         NEVER
+    }
+
+    /** The type of projection. */
+    private enum ProjectionType {
+        FULL,
+        PARTIAL
     }
 
     private static void triggerFailover(

@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
@@ -38,6 +39,7 @@ import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
+import io.debezium.relational.Column;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
@@ -95,6 +97,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         taskRunning = true;
         snapshotSplitReadTask =
                 new OracleSnapshotSplitReadTask(
+                        sourceFetchContext.getSourceConfig(),
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getOffsetContext(),
                         sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
@@ -213,8 +216,10 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
         private final SnapshotSplit snapshotSplit;
         private final OracleOffsetContext offsetContext;
         private final SnapshotProgressListener<OraclePartition> snapshotProgressListener;
+        private final OracleSourceConfig sourceConfig;
 
         public OracleSnapshotSplitReadTask(
+                OracleSourceConfig sourceConfig,
                 OracleConnectorConfig connectorConfig,
                 OracleOffsetContext previousOffset,
                 SnapshotProgressListener<OraclePartition> snapshotProgressListener,
@@ -231,6 +236,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
             this.clock = Clock.SYSTEM;
             this.snapshotSplit = snapshotSplit;
             this.snapshotProgressListener = snapshotProgressListener;
+            this.sourceConfig = sourceConfig;
         }
 
         @Override
@@ -343,6 +349,7 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
             final String selectSql =
                     buildSplitScanQuery(
                             snapshotSplit.getTableId(),
+                            sourceConfig.getPhysicalSchema(),
                             snapshotSplit.getSplitKeyType(),
                             snapshotSplit.getSplitStart() == null,
                             snapshotSplit.getSplitEnd() == null);
@@ -370,8 +377,17 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
 
                 while (rs.next()) {
                     rows++;
-                    final Object[] row =
-                            jdbcConnection.rowToArray(table, databaseSchema, rs, columnArray);
+                    // init a full table schema columns array to ensure compatibility with
+                    // downstream.
+                    final Object[] row = new Object[table.columns().size()];
+                    final int length = columnArray.getColumns().length;
+                    for (int i = 0; i < length; i++) {
+                        Column actualColumn = columnArray.getColumns()[i];
+                        // setup actual schema columns value in the full table schema.
+                        row[actualColumn.position() - 1] =
+                                jdbcConnection.getColumnValue(
+                                        rs, i + 1, actualColumn, table, databaseSchema);
+                    }
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
                         LOG.info(

@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.base.config;
 
+import org.apache.flink.table.types.logical.RowType;
+
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.IncrementalSource;
 import io.debezium.config.Configuration;
@@ -44,6 +46,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final int connectMaxRetries;
     protected final int connectionPoolSize;
     protected final String chunkKeyColumn;
+    protected final RowType physicalSchema;
 
     public JdbcSourceConfig(
             StartupOptions startupOptions,
@@ -68,7 +71,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn) {
+            String chunkKeyColumn,
+            RowType physicalSchema) {
         super(
                 startupOptions,
                 splitSize,
@@ -93,6 +97,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.physicalSchema = physicalSchema;
     }
 
     public abstract RelationalDatabaseConnectorConfig getDbzConnectorConfig();
@@ -147,5 +152,9 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
 
     public String getChunkKeyColumn() {
         return chunkKeyColumn;
+    }
+
+    public RowType getPhysicalSchema() {
+        return physicalSchema;
     }
 }
