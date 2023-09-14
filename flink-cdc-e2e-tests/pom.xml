@@ -64,6 +64,18 @@ under the License.
             <version>db2jcc4</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                </exclusion>
+            </exclusions>
+            <version>2.7.9</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- CDC connectors test utils -->
         <dependency>
@@ -157,6 +169,12 @@ under the License.
             <groupId>org.testcontainers</groupId>
             <artifactId>mongodb</artifactId>
             <version>1.18.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mariadb</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
