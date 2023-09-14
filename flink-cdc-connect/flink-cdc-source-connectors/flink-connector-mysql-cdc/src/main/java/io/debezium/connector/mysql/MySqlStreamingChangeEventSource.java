@@ -15,6 +15,7 @@ import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.GtidEventData;
+import com.github.shyiko.mysql.binlog.event.MariadbGtidEventData;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.RowsQueryEventData;
@@ -24,6 +25,7 @@ import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.MariadbGtidEventDataDeserializer;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.DefaultSSLSocketFactory;
@@ -312,6 +314,8 @@ public class MySqlStreamingChangeEventSource
         eventDeserializer.setEventDataDeserializer(EventType.STOP, new StopEventDataDeserializer());
         eventDeserializer.setEventDataDeserializer(EventType.GTID, new GtidEventDataDeserializer());
         eventDeserializer.setEventDataDeserializer(
+                EventType.MARIADB_GTID, new MariadbGtidEventDataDeserializer());
+        eventDeserializer.setEventDataDeserializer(
                 EventType.WRITE_ROWS,
                 new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId));
         eventDeserializer.setEventDataDeserializer(
@@ -567,6 +571,15 @@ public class MySqlStreamingChangeEventSource
                 ignoreDmlEventByGtidSource = true;
             }
         }
+        metrics.onGtidChange(gtid);
+    }
+
+    protected void handleMariaGtidEvent(MySqlOffsetContext offsetContext, Event event) {
+        LOGGER.debug("GTID transaction: {}", event);
+        MariadbGtidEventData gtidEvent = unwrapData(event);
+        String gtid = gtidEvent.toString();
+        gtidSet.add(gtid);
+        offsetContext.startGtid(gtid, gtidSet.toString()); // rather than use the client's GTID set
         metrics.onGtidChange(gtid);
     }
 
@@ -1117,33 +1130,51 @@ public class MySqlStreamingChangeEventSource
         // the last Debezium checkpoint.
         String availableServerGtidStr = connection.knownGtidSet();
         if (isGtidModeEnabled) {
-            // The server is using GTIDs, so enable the handler ...
-            eventHandlers.put(
-                    EventType.GTID, (event) -> handleGtidEvent(effectiveOffsetContext, event));
-
-            // Now look at the GTID set from the server and what we've previously seen ...
-            GtidSet availableServerGtidSet = new GtidSet(availableServerGtidStr);
-
-            // also take into account purged GTID logs
-            GtidSet purgedServerGtidSet = connection.purgedGtidSet();
-            LOGGER.info("GTID set purged on server: {}", purgedServerGtidSet);
-
-            GtidSet filteredGtidSet =
-                    filterGtidSet(
-                            effectiveOffsetContext, availableServerGtidSet, purgedServerGtidSet);
-            if (filteredGtidSet != null) {
-                // We've seen at least some GTIDs, so start reading from the filtered GTID set ...
-                LOGGER.info("Registering binlog reader with GTID set: {}", filteredGtidSet);
-                String filteredGtidSetStr = filteredGtidSet.toString();
-                client.setGtidSet(filteredGtidSetStr);
-                effectiveOffsetContext.setCompletedGtidSet(filteredGtidSetStr);
-                gtidSet = new com.github.shyiko.mysql.binlog.GtidSet(filteredGtidSetStr);
+            if (connection.isMariaDB()) {
+                eventHandlers.put(
+                        EventType.MARIADB_GTID,
+                        (event) -> handleMariaGtidEvent(effectiveOffsetContext, event));
+                if (offsetContext.gtidSet() != null) {
+                    //  MariaDB can not detect purged GTID logs.
+                    client.setGtidSet(offsetContext.gtidSet());
+                    offsetContext.setCompletedGtidSet(offsetContext.gtidSet());
+                    gtidSet =
+                            new com.github.shyiko.mysql.binlog.MariadbGtidSet(
+                                    offsetContext.gtidSet());
+                }
             } else {
-                // We've not yet seen any GTIDs, so that means we have to start reading the binlog
-                // from the beginning ...
-                client.setBinlogFilename(effectiveOffsetContext.getSource().binlogFilename());
-                client.setBinlogPosition(effectiveOffsetContext.getSource().binlogPosition());
-                gtidSet = new com.github.shyiko.mysql.binlog.GtidSet("");
+                // The server is using GTIDs, so enable the handler ...
+                eventHandlers.put(
+                        EventType.GTID, (event) -> handleGtidEvent(effectiveOffsetContext, event));
+
+                // Now look at the GTID set from the server and what we've previously seen ...
+                GtidSet availableServerGtidSet = new GtidSet(availableServerGtidStr);
+
+                // also take into account purged GTID logs
+                GtidSet purgedServerGtidSet = connection.purgedGtidSet();
+                LOGGER.info("GTID set purged on server: {}", purgedServerGtidSet);
+
+                GtidSet filteredGtidSet =
+                        filterGtidSet(
+                                effectiveOffsetContext,
+                                availableServerGtidSet,
+                                purgedServerGtidSet);
+                if (filteredGtidSet != null) {
+                    // We've seen at least some GTIDs, so start reading from the filtered GTID set
+                    // ...
+                    LOGGER.info("Registering binlog reader with GTID set: {}", filteredGtidSet);
+                    String filteredGtidSetStr = filteredGtidSet.toString();
+                    client.setGtidSet(filteredGtidSetStr);
+                    effectiveOffsetContext.setCompletedGtidSet(filteredGtidSetStr);
+                    gtidSet = new com.github.shyiko.mysql.binlog.GtidSet(filteredGtidSetStr);
+                } else {
+                    // We've not yet seen any GTIDs, so that means we have to start reading the
+                    // binlog
+                    // from the beginning ...
+                    client.setBinlogFilename(effectiveOffsetContext.getSource().binlogFilename());
+                    client.setBinlogPosition(effectiveOffsetContext.getSource().binlogPosition());
+                    gtidSet = new com.github.shyiko.mysql.binlog.GtidSet("");
+                }
             }
         } else {
             // The server is not using GTIDs, so start reading the binlog based upon where we last

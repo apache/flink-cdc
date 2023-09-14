@@ -21,7 +21,8 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 
-import io.debezium.connector.mysql.GtidSet;
+import com.github.shyiko.mysql.binlog.GtidSet;
+import com.github.shyiko.mysql.binlog.MariadbGtidSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.errors.ConnectException;
 
@@ -188,8 +189,14 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
             // The target offset uses GTIDs, so we ideally compare using GTIDs ...
             if (StringUtils.isNotEmpty(gtidSetStr)) {
                 // Both have GTIDs, so base the comparison entirely on the GTID sets.
-                GtidSet gtidSet = new GtidSet(gtidSetStr);
-                GtidSet targetGtidSet = new GtidSet(targetGtidSetStr);
+                com.github.shyiko.mysql.binlog.GtidSet gtidSet =
+                        gtidSetStr.contains(":")
+                                ? new com.github.shyiko.mysql.binlog.GtidSet(gtidSetStr)
+                                : new MariadbGtidSet(gtidSetStr);
+                com.github.shyiko.mysql.binlog.GtidSet targetGtidSet =
+                        targetGtidSetStr.contains(":")
+                                ? new GtidSet(targetGtidSetStr)
+                                : new MariadbGtidSet(targetGtidSetStr);
                 if (gtidSet.equals(targetGtidSet)) {
                     long restartSkipEvents = this.getRestartSkipEvents();
                     long targetRestartSkipEvents = that.getRestartSkipEvents();
