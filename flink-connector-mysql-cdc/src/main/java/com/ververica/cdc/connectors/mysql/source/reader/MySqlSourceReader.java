@@ -471,20 +471,24 @@ public class MySqlSourceReader<T>
 
     private Set<String> getExistedSplitsOfLastGroup(
             List<FinishedSnapshotSplitInfo> finishedSnapshotSplits, int metaGroupSize) {
-        Set<String> existedSplitsOfLastGroup = new HashSet<>();
         int splitsNumOfLastGroup =
                 finishedSnapshotSplits.size() % sourceConfig.getSplitMetaGroupSize();
         if (splitsNumOfLastGroup != 0) {
             int lastGroupStart =
                     ((int) (finishedSnapshotSplits.size() / sourceConfig.getSplitMetaGroupSize()))
                             * metaGroupSize;
-            existedSplitsOfLastGroup =
-                    finishedSnapshotSplits
-                            .subList(lastGroupStart, lastGroupStart + splitsNumOfLastGroup).stream()
+            // Keep same order with MySqlHybridSplitAssigner.createBinlogSplit() to avoid
+            // 'invalid request meta group id' error
+            List<String> sortedFinishedSnapshotSplits =
+                    finishedSnapshotSplits.stream()
                             .map(FinishedSnapshotSplitInfo::getSplitId)
-                            .collect(Collectors.toSet());
+                            .sorted()
+                            .collect(Collectors.toList());
+            return new HashSet<>(
+                    sortedFinishedSnapshotSplits.subList(
+                            lastGroupStart, lastGroupStart + splitsNumOfLastGroup));
         }
-        return existedSplitsOfLastGroup;
+        return new HashSet<>();
     }
 
     private void logCurrentBinlogOffsets(List<MySqlSplit> splits, long checkpointId) {
