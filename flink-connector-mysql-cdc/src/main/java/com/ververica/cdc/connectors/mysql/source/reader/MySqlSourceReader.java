@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.reader;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -135,6 +136,9 @@ public class MySqlSourceReader<T>
                 stateSplits.stream()
                         .filter(split -> !finishedUnackedSplits.containsKey(split.splitId()))
                         .collect(Collectors.toList());
+
+        // add finished snapshot splits that did not receive ack yet
+        unfinishedSplits.addAll(finishedUnackedSplits.values());
 
         // add binlog splits who are uncompleted
         unfinishedSplits.addAll(uncompletedBinlogSplits.values());
@@ -499,5 +503,10 @@ public class MySqlSourceReader<T>
     @Override
     protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState.toMySqlSplit();
+    }
+
+    @VisibleForTesting
+    public Map<String, MySqlSnapshotSplit> getFinishedUnackedSplits() {
+        return finishedUnackedSplits;
     }
 }
