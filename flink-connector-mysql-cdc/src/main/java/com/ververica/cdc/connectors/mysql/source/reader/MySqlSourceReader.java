@@ -473,7 +473,7 @@ public class MySqlSourceReader<T>
             int lastGroupStart =
                     ((int) (finishedSnapshotSplits.size() / sourceConfig.getSplitMetaGroupSize()))
                             * metaGroupSize;
-            // ordered same with MySqlHybridSplitAssigner.createBinlogSplit() to avoid
+            // Keep same order with MySqlHybridSplitAssigner.createBinlogSplit() to avoid
             // 'invalid request meta group id' error
             List<String> sortedFinishedSnapshotSplits =
                     finishedSnapshotSplits.stream()
