@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.reader;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -135,6 +136,9 @@ public class MySqlSourceReader<T>
                 stateSplits.stream()
                         .filter(split -> !finishedUnackedSplits.containsKey(split.splitId()))
                         .collect(Collectors.toList());
+
+        // add finished snapshot splits that did not receive ack yet
+        unfinishedSplits.addAll(finishedUnackedSplits.values());
 
         // add binlog splits who are uncompleted
         unfinishedSplits.addAll(uncompletedBinlogSplits.values());
@@ -467,20 +471,24 @@ public class MySqlSourceReader<T>
 
     private Set<String> getExistedSplitsOfLastGroup(
             List<FinishedSnapshotSplitInfo> finishedSnapshotSplits, int metaGroupSize) {
-        Set<String> existedSplitsOfLastGroup = new HashSet<>();
         int splitsNumOfLastGroup =
                 finishedSnapshotSplits.size() % sourceConfig.getSplitMetaGroupSize();
         if (splitsNumOfLastGroup != 0) {
             int lastGroupStart =
                     ((int) (finishedSnapshotSplits.size() / sourceConfig.getSplitMetaGroupSize()))
                             * metaGroupSize;
-            existedSplitsOfLastGroup =
-                    finishedSnapshotSplits
-                            .subList(lastGroupStart, lastGroupStart + splitsNumOfLastGroup).stream()
+            // Keep same order with MySqlHybridSplitAssigner.createBinlogSplit() to avoid
+            // 'invalid request meta group id' error
+            List<String> sortedFinishedSnapshotSplits =
+                    finishedSnapshotSplits.stream()
                             .map(FinishedSnapshotSplitInfo::getSplitId)
-                            .collect(Collectors.toSet());
+                            .sorted()
+                            .collect(Collectors.toList());
+            return new HashSet<>(
+                    sortedFinishedSnapshotSplits.subList(
+                            lastGroupStart, lastGroupStart + splitsNumOfLastGroup));
         }
-        return existedSplitsOfLastGroup;
+        return new HashSet<>();
     }
 
     private void logCurrentBinlogOffsets(List<MySqlSplit> splits, long checkpointId) {
@@ -499,5 +507,10 @@ public class MySqlSourceReader<T>
     @Override
     protected MySqlSplit toSplitType(String splitId, MySqlSplitState splitState) {
         return splitState.toMySqlSplit();
+    }
+
+    @VisibleForTesting
+    public Map<String, MySqlSnapshotSplit> getFinishedUnackedSplits() {
+        return finishedUnackedSplits;
     }
 }
