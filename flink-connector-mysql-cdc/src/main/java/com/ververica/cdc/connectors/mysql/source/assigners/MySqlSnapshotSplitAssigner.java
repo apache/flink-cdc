@@ -153,6 +153,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
+        // When job restore from savepoint, sort the existing tables and newly added tables
+        // to let enumerator only send newly added tables's BinlogSplitMetaEvent
         this.assignedSplits =
                 assignedSplits.entrySet().stream()
                         .sorted(Comparator.comparing(Map.Entry::getKey))
