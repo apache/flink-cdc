@@ -67,6 +67,7 @@ under the License.
                                     <include>com.google.guava:*</include>
                                     <!--  Include fixed version 30.1.1-jre-14.0 of flink shaded guava  -->
                                     <include>org.apache.flink:flink-shaded-guava</include>
+                                    <include>commons-collections:commons-collections</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -84,6 +85,10 @@ under the License.
                                 </filter>
                             </filters>
                             <relocations>
+                                <relocation>
+                                    <pattern>org.apache.commons.collections</pattern>
+                                    <shadedPattern>com.ververica.cdc.connectors.shaded.org.apache.commons.collections</shadedPattern>
+                                </relocation>
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
