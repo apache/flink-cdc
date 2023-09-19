@@ -56,9 +56,6 @@ public class OceanBaseTestBase extends TestLogger {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     private static final Duration CONTAINER_STARTUP_TIMEOUT = Duration.ofMinutes(4);
 
-    public static final String OB_SYS_PASSWORD = "pswd";
-    public static final String OB_TEST_PASSWORD = "test";
-
     public static final String NETWORK_MODE = "host";
 
     // --------------------------------------------------------------------------------------------
@@ -82,6 +79,8 @@ public class OceanBaseTestBase extends TestLogger {
     // From OceanBase 4.0.0.0 CE, we can only fetch the commit log of non-sys tenant.
     // --------------------------------------------------------------------------------------------
 
+    public static final String OB_SYS_PASSWORD = "pswd";
+
     protected static String getTenant() {
         return "test";
     }
@@ -91,7 +90,7 @@ public class OceanBaseTestBase extends TestLogger {
     }
 
     protected static String getPassword() {
-        return OB_TEST_PASSWORD;
+        return "test";
     }
 
     @ClassRule
