@@ -52,7 +52,7 @@ jobs:
         displayName: "Set JDK"
       # Compile
       - script: |
-          ./tools/ci/compile.sh default || exit $?
+          ./tools/ci/compile.sh || exit $?
           ./tools/azure-pipelines/create_build_artifact.sh
         displayName: Compile
 
