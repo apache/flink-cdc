@@ -96,9 +96,9 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
 
     @Before
     public void before() {
+        overrideFlinkProperties(FLINK_PROPERTIES);
         super.before();
         initializePostgresTable("postgres_inventory");
-        overrideFlinkProperties(FLINK_PROPERTIES);
     }
 
     @After
