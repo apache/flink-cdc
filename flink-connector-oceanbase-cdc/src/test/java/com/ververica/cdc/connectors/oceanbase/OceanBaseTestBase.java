@@ -95,7 +95,7 @@ public class OceanBaseTestBase extends TestLogger {
 
     @ClassRule
     public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>("whhe/oceanbase-ce:4.2.0.0")
+            new GenericContainer<>("oceanbase/oceanbase-ce:4.2.0.0")
                     .withNetworkMode(NETWORK_MODE)
                     .withEnv("MODE", "slim")
                     .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
