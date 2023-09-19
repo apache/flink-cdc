@@ -144,6 +144,8 @@ jobs:
       matrix:
         mysql:
           module: mysql
+        oceanbase:
+          module: oceanbase
         tidb:
           module: tidb
         e2e_2:
