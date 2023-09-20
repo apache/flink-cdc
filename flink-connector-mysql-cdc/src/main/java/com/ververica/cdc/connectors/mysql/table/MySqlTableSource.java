@@ -81,6 +81,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
+    private final Properties hikariProperties;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -117,7 +118,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean closeIdleReaders,
             Properties jdbcProperties,
             Duration heartbeatInterval,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            Properties hikariProperties) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -146,6 +148,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.hikariProperties = hikariProperties;
     }
 
     @Override
@@ -200,6 +203,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
                             .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
+                            .hikariProperties(hikariProperties)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -280,7 +284,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         closeIdleReaders,
                         jdbcProperties,
                         heartbeatInterval,
-                        chunkKeyColumn);
+                        chunkKeyColumn,
+                        hikariProperties);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -321,7 +326,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(jdbcProperties, that.jdbcProperties)
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
-                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(hikariProperties, that.hikariProperties);
     }
 
     @Override
@@ -353,7 +359,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 closeIdleReaders,
                 jdbcProperties,
                 heartbeatInterval,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                hikariProperties);
     }
 
     @Override

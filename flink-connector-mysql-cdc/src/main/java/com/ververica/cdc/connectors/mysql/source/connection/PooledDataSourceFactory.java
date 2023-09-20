@@ -36,7 +36,7 @@ public class PooledDataSourceFactory {
     private PooledDataSourceFactory() {}
 
     public static HikariDataSource createPooledDataSource(MySqlSourceConfig sourceConfig) {
-        final HikariConfig config = new HikariConfig();
+        final HikariConfig config = new HikariConfig(sourceConfig.getHikariProperties());
 
         String hostName = sourceConfig.getHostname();
         int port = sourceConfig.getPort();

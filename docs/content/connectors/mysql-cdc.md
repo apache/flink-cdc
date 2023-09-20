@@ -329,6 +329,15 @@ During a snapshot operation, the connector will query each included table to pro
       <td>Boolean</td>
       <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
     </tr>
+    <tr>
+      <td>hikari.*</td>
+      <td>optional</td>
+       <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Pass-through Hikari's properties to connection pool which is used to reduce connection usage.
+          For example: <code>'hikari.keepaliveTime' = '60000'</code>.
+          See more about the <a href="https://github.com/brettwooldridge/HikariCP#frequently-used">Hikari's configuration</a></td> 
+    </tr>
     </tbody>
 </table>
 </div>

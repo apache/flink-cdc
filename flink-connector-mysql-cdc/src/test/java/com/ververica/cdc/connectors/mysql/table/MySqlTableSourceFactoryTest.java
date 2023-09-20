@@ -124,7 +124,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -169,7 +170,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        "testCol");
+                        "testCol",
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -210,7 +212,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -249,7 +252,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -265,12 +269,15 @@ public class MySqlTableSourceFactoryTest {
         options.put("heartbeat.interval", "15213ms");
         options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
         options.put("scan.incremental.close-idle-reader.enabled", "true");
+        options.put("hikari.keepaliveTime", "60000");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "never");
         Properties jdbcProperties = new Properties();
         jdbcProperties.setProperty("useSSL", "false");
+        Properties hikariProperties = new Properties();
+        hikariProperties.setProperty("keepaliveTime", "60000");
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -297,7 +304,8 @@ public class MySqlTableSourceFactoryTest {
                         true,
                         jdbcProperties,
                         Duration.ofMillis(15213),
-                        "testCol");
+                        "testCol",
+                        hikariProperties);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -342,7 +350,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -379,7 +388,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -417,7 +427,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -456,7 +467,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -493,7 +505,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -535,7 +548,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
