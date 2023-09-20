@@ -52,7 +52,7 @@ jobs:
         displayName: "Set JDK"
       # Compile
       - script: |
-          ./tools/ci/compile.sh default || exit $?
+          ./tools/ci/compile.sh || exit $?
           ./tools/azure-pipelines/create_build_artifact.sh
         displayName: Compile
 
@@ -144,6 +144,8 @@ jobs:
       matrix:
         mysql:
           module: mysql
+        oceanbase:
+          module: oceanbase
         tidb:
           module: tidb
         e2e_2:

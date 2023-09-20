@@ -56,37 +56,22 @@ public class OceanBaseTestBase extends TestLogger {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     private static final Duration CONTAINER_STARTUP_TIMEOUT = Duration.ofMinutes(4);
 
-    public static final int OB_SERVER_SQL_PORT = 2881;
-    public static final int OB_SERVER_RPC_PORT = 2882;
-    public static final int LOG_PROXY_PORT = 2983;
-
-    public static final String OB_SYS_PASSWORD = "pswd";
-    public static final String OB_TEST_PASSWORD = "test";
-
     public static final String NETWORK_MODE = "host";
 
     // --------------------------------------------------------------------------------------------
     // Attributes about host and port when network is on 'host' mode.
     // --------------------------------------------------------------------------------------------
 
-    protected static String getObServerHost() {
-        return "127.0.0.1";
-    }
-
-    protected static String getLogProxyHost() {
-        return "127.0.0.1";
-    }
-
     protected static int getObServerSqlPort() {
-        return OB_SERVER_SQL_PORT;
-    }
-
-    protected static int getObServerRpcPort() {
-        return OB_SERVER_RPC_PORT;
+        return 2881;
     }
 
     protected static int getLogProxyPort() {
-        return LOG_PROXY_PORT;
+        return 2983;
+    }
+
+    public static String getRsList() {
+        return "127.0.0.1:2882:2881";
     }
 
     // --------------------------------------------------------------------------------------------
@@ -94,33 +79,34 @@ public class OceanBaseTestBase extends TestLogger {
     // From OceanBase 4.0.0.0 CE, we can only fetch the commit log of non-sys tenant.
     // --------------------------------------------------------------------------------------------
 
+    public static final String OB_SYS_PASSWORD = "pswd";
+
     protected static String getTenant() {
         return "test";
     }
 
     protected static String getUsername() {
-        return "root@test";
+        return "root@" + getTenant();
     }
 
     protected static String getPassword() {
-        return OB_TEST_PASSWORD;
+        return "test";
     }
 
     @ClassRule
     public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>("oceanbase/oceanbase-ce:4.0.0.0")
+            new GenericContainer<>("oceanbase/oceanbase-ce:4.2.0.0")
                     .withNetworkMode(NETWORK_MODE)
-                    .withExposedPorts(OB_SERVER_SQL_PORT, OB_SERVER_RPC_PORT)
+                    .withEnv("MODE", "slim")
+                    .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
     public static final GenericContainer<?> LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy:1.1.0_4x")
+            new GenericContainer<>("whhe/oblogproxy:1.1.3_4x")
                     .withNetworkMode(NETWORK_MODE)
-                    .withExposedPorts(LOG_PROXY_PORT)
-                    .withEnv("OB_SYS_USERNAME", "root")
                     .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD)
                     .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
                     .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT)
@@ -132,17 +118,12 @@ public class OceanBaseTestBase extends TestLogger {
         Startables.deepStart(Stream.of(OB_SERVER, LOG_PROXY)).join();
         LOG.info("Containers are started.");
 
-        setPassword("root@sys", OB_SYS_PASSWORD);
-        setPassword("root@test", OB_TEST_PASSWORD);
-    }
-
-    private static void setPassword(String username, String password) {
-        try (Connection connection = DriverManager.getConnection(getJdbcUrl(""), username, "");
+        try (Connection connection =
+                        DriverManager.getConnection(getJdbcUrl(""), getUsername(), "");
                 Statement statement = connection.createStatement()) {
-            statement.execute(String.format("ALTER USER root IDENTIFIED BY '%s'", password));
-            LOG.info("Set password of {} to {}", username, password);
+            statement.execute(String.format("ALTER USER root IDENTIFIED BY '%s'", getPassword()));
         } catch (SQLException e) {
-            LOG.error("Set password of {} failed.", username, e);
+            LOG.error("Set test user password failed.", e);
             throw new RuntimeException(e);
         }
     }
@@ -156,17 +137,12 @@ public class OceanBaseTestBase extends TestLogger {
 
     public static String getJdbcUrl(String databaseName) {
         return "jdbc:mysql://"
-                + getObServerHost()
+                + OB_SERVER.getHost()
                 + ":"
                 + getObServerSqlPort()
                 + "/"
                 + databaseName
                 + "?useSSL=false";
-    }
-
-    public static String getRsList() {
-        return String.format(
-                "%s:%s:%s", getObServerHost(), getObServerRpcPort(), getObServerSqlPort());
     }
 
     protected static Connection getJdbcConnection(String databaseName) throws SQLException {
