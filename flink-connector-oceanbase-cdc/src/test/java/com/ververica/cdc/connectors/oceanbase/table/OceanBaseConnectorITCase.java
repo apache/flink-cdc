@@ -104,9 +104,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         getPassword(),
                         getTenant(),
                         "inventory.products",
-                        getObServerHost(),
+                        OB_SERVER.getHost(),
                         getObServerSqlPort(),
-                        getLogProxyHost(),
+                        LOG_PROXY.getHost(),
                         getLogProxyPort(),
                         getRsList());
 
@@ -230,9 +230,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         getTenant(),
                         "^inventory_meta$",
                         "^products$",
-                        getObServerHost(),
+                        OB_SERVER.getHost(),
                         getObServerSqlPort(),
-                        getLogProxyHost(),
+                        LOG_PROXY.getHost(),
                         getLogProxyPort(),
                         getRsList());
 
@@ -382,9 +382,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         "^column_type_test$",
                         "^full_types$",
                         serverTimeZone,
-                        getObServerHost(),
+                        OB_SERVER.getHost(),
                         getObServerSqlPort(),
-                        getLogProxyHost(),
+                        LOG_PROXY.getHost(),
                         getLogProxyPort(),
                         getRsList());
         String sinkDDL =
@@ -512,9 +512,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         "column_type_test",
                         "full_types",
                         serverTimeZone,
-                        getObServerHost(),
+                        OB_SERVER.getHost(),
                         getObServerSqlPort(),
-                        getLogProxyHost(),
+                        LOG_PROXY.getHost(),
                         getLogProxyPort(),
                         getRsList());
 
