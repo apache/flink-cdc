@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
+import static com.ververica.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -51,6 +52,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
+        checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         props.setProperty("connector.class", PostgresConnector.class.getCanonicalName());
         props.setProperty("plugin.name", pluginName);

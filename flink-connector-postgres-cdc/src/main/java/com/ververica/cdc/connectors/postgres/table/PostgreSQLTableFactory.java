@@ -42,6 +42,7 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWO
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCHEMA_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHANGELOG_MODE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -108,6 +109,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         String chunkKeyColumn =
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
 
+        boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
@@ -148,7 +151,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 distributionFactorLower,
                 heartbeatInterval,
                 startupOptions,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                closeIdlerReaders);
     }
 
     @Override
@@ -187,6 +191,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
         options.add(HEARTBEAT_INTERVAL);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         return options;
     }
 

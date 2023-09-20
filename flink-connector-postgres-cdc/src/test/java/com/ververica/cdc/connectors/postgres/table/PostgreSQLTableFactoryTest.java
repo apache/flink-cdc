@@ -49,6 +49,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECT_MAX_RETRIES;
@@ -110,6 +111,8 @@ public class PostgreSQLTableFactoryTest {
     private static final String MY_SCHEMA = "public";
     private static final String MY_SLOT_NAME = "flinktest";
     private static final Properties PROPERTIES = new Properties();
+    private static final boolean SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT =
+            SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue();
 
     @Test
     public void testCommonProperties() {
@@ -142,7 +145,8 @@ public class PostgreSQLTableFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         StartupOptions.initial(),
-                        null);
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -182,7 +186,8 @@ public class PostgreSQLTableFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         StartupOptions.initial(),
-                        null);
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -222,7 +227,8 @@ public class PostgreSQLTableFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         StartupOptions.initial(),
-                        null);
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
@@ -272,7 +278,8 @@ public class PostgreSQLTableFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         StartupOptions.initial(),
-                        null);
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -312,7 +319,8 @@ public class PostgreSQLTableFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         StartupOptions.latest(),
-                        null);
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT);
         assertEquals(expectedSource, actualSource);
     }
 
