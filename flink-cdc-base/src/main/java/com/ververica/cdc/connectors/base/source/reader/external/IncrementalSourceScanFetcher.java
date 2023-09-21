@@ -75,6 +75,8 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder()
                         .setNameFormat("debezium-snapshot-reader-" + subtaskId)
+                        .setUncaughtExceptionHandler(
+                                (thread, throwable) -> setReadException(throwable))
                         .build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.hasNextElement = new AtomicBoolean(false);
@@ -89,17 +91,13 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         this.queue = taskContext.getQueue();
         this.hasNextElement.set(true);
         this.reachEnd.set(false);
-        executorService.submit(
+
+        executorService.execute(
                 () -> {
                     try {
                         snapshotSplitReadTask.execute(taskContext);
                     } catch (Exception e) {
-                        LOG.error(
-                                String.format(
-                                        "Execute snapshot read task for snapshot split %s fail",
-                                        currentSnapshotSplit),
-                                e);
-                        readException = e;
+                        setReadException(e);
                     }
                 });
     }
@@ -183,6 +181,19 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
                             "Read split %s error due to %s.",
                             currentSnapshotSplit, readException.getMessage()),
                     readException);
+        }
+    }
+
+    private void setReadException(Throwable throwable) {
+        LOG.error(
+                String.format(
+                        "Execute snapshot read task for snapshot split %s fail",
+                        currentSnapshotSplit),
+                throwable);
+        if (readException == null) {
+            readException = throwable;
+        } else {
+            readException.addSuppressed(throwable);
         }
     }
 
