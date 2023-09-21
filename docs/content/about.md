@@ -308,7 +308,7 @@ mvn clean install -DskipTests
 git checkout -b my_feature
 -- develop and commit
 ```
-![check_branch](/_static/fig/contribute_guidance/check_branch.png "check_branch")
+   ![check_branch](/_static/fig/contribute_guidance/check_branch.png "check_branch")
 5. Push your branch to your github
 ```bash
 git push origin my_feature
