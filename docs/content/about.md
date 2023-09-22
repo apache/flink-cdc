@@ -298,21 +298,21 @@ The dependencies are now available in your local `.m2` repository.
 2. Fork Flink CDC project to your GitHub repositories
    ![fork](/_static/fig/contribute_guidance/fork.png "fork")
 3. Clone and compile your Flink CDC project
-  ```bash
+    ```bash
 git clone https://github.com/your_name/flink-cdc-connectors.git
 cd flink-cdc-connectors
 mvn clean install -DskipTests
-  ```
+    ```
 4. Check to a new branch and start your work
-  ```bash
+    ```bash
 git checkout -b my_feature
 -- develop and commit
-  ```
+    ```
    ![check_branch](/_static/fig/contribute_guidance/check_branch.png "check_branch")
 5. Push your branch to your github
-  ```bash
+    ```bash
 git push origin my_feature
-  ```
+    ```
 6. Open a PR to https://github.com/ververica/flink-cdc-connectors
    ![open_pr](/_static/fig/contribute_guidance/open_pr.png "open_pr")
 
