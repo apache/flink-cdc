@@ -60,7 +60,6 @@ import java.util.Objects;
 
 import static io.debezium.connector.postgresql.PostgresObjectUtils.waitForReplicationSlotReady;
 import static io.debezium.connector.postgresql.Utils.currentOffset;
-import static io.debezium.connector.postgresql.Utils.refreshSchema;
 
 /** A {@link FetchTask} implementation for Postgres to read snapshot split. */
 public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
@@ -278,7 +277,11 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
             final PostgresSnapshotContext ctx = (PostgresSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
             createSlotForBackFillReadTask();
-            refreshSchema(databaseSchema, jdbcConnection, true);
+            // It's not necessary to refresh schema again, which is very time-consuming.
+            // The databaseSchema is the reference of PostgresSourceFetchTaskContext#schema, and has
+            // been initialized when submit SnapshotSplit fetch task by
+            // IncrementalSourceScanFetcher#submitTask -> PostgresSourceFetchTaskContext#configure.
+            // refreshSchema(databaseSchema, jdbcConnection, true);
             final PostgresOffset lowWatermark = currentOffset(jdbcConnection);
             LOG.info(
                     "Snapshot step 1 - Determining low watermark {} for split {}",
