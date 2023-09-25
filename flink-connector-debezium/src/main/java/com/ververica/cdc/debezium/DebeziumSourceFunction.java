@@ -434,7 +434,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 getRuntimeContext().getClass().getMethod("getMetricGroup");
         getMetricGroupMethod.setAccessible(true);
         final MetricGroup metricGroup =
-                (MetricGroup) getMetricGroupMethod.invoke(getRuntimeContext());
+                ((MetricGroup) getMetricGroupMethod.invoke(getRuntimeContext())).addGroup("cdc");
 
         metricGroup.gauge(
                 DebeziumSourceMetricConstants.CURRENT_FETCH_EVENT_TIME_LAG,

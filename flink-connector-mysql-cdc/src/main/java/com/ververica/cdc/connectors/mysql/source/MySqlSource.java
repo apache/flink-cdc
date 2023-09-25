@@ -138,7 +138,7 @@ public class MySqlSource<T>
 
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
         metricGroupMethod.setAccessible(true);
-        final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
+        final MetricGroup metricGroup = ((MetricGroup) metricGroupMethod.invoke(readerContext)).addGroup("cdc");
 
         final MySqlSourceReaderMetrics sourceReaderMetrics =
                 new MySqlSourceReaderMetrics(metricGroup);
