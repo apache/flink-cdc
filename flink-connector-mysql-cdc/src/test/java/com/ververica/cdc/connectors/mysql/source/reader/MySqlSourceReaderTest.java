@@ -684,9 +684,6 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         }
 
         private void reportMetrics(SourceRecord element) {
-            long now = System.currentTimeMillis();
-            // record the latest process time
-            sourceReaderMetrics.recordProcessTime(now);
             Long messageTimestamp = getMessageTimestamp(element);
 
             if (messageTimestamp != null && messageTimestamp > 0L) {
@@ -695,8 +692,6 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 if (fetchTimestamp != null && fetchTimestamp >= messageTimestamp) {
                     sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
                 }
-                // report emit delay
-                sourceReaderMetrics.recordEmitDelay(now - messageTimestamp);
             }
         }
 
