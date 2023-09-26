@@ -29,7 +29,6 @@ import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
 import com.ververica.cdc.connectors.postgres.source.utils.PostgresQueryUtils;
-import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
@@ -37,7 +36,6 @@ import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
-import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
@@ -60,8 +58,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Objects;
 
-import static io.debezium.connector.postgresql.PostgresConnectorConfig.DROP_SLOT_ON_STOP;
-import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.waitForReplicationSlotReady;
 import static io.debezium.connector.postgresql.Utils.currentOffset;
 import static io.debezium.connector.postgresql.Utils.refreshSchema;
@@ -164,24 +160,9 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
                 PostgresOffsetUtils.getPostgresOffsetContext(
                         loader, backfillSplit.getStartingOffset());
 
-        // we should only capture events for the current table,
-        // otherwise, we may not find corresponding schema
-        PostgresSourceConfig config = (PostgresSourceConfig) ctx.getSourceConfig();
-        Configuration dbzConf =
-                ctx.getDbzConnectorConfig()
-                        .getConfig()
-                        .edit()
-                        .with("table.include.list", split.getTableId().toString())
-                        .with(SLOT_NAME.name(), config.getSlotNameForBackfillTask())
-                        // drop slot for backfill stream split
-                        .with(DROP_SLOT_ON_STOP.name(), true)
-                        // Disable heartbeat event in snapshot split fetcher
-                        .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
-                        .build();
-
         final PostgresStreamFetchTask.StreamSplitReadTask backfillReadTask =
                 new PostgresStreamFetchTask.StreamSplitReadTask(
-                        new PostgresConnectorConfig(dbzConf),
+                        ctx.getDbzConnectorConfig(),
                         ctx.getSnapShotter(),
                         ctx.getConnection(),
                         ctx.getDispatcher(),
@@ -195,7 +176,7 @@ public class PostgresScanFetchTask implements FetchTask<SourceSplitBase> {
         LOG.info(
                 "Execute backfillReadTask for split {} with slot name {}",
                 split,
-                dbzConf.getString(SLOT_NAME.name()));
+                ((PostgresSourceConfig) ctx.getSourceConfig()).getSlotNameForBackfillTask());
         backfillReadTask.execute(
                 new PostgresChangeEventSourceContext(), ctx.getPartition(), postgresOffsetContext);
     }
