@@ -55,3 +55,12 @@ CREATE TABLE mongodb_products_sink (
   description VARCHAR(512),
   weight FLOAT
 );
+
+CREATE TABLE ob_products_sink (
+  id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  description VARCHAR(512),
+  weight FLOAT,
+  enum_c VARCHAR(255),
+  json_c VARCHAR(255)
+);
