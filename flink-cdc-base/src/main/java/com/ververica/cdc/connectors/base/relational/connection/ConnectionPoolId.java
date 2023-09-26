@@ -27,10 +27,15 @@ public class ConnectionPoolId implements Serializable {
     private final int port;
     private final String username;
 
-    public ConnectionPoolId(String host, int port, String username) {
+    /** the identifier of a data source pool factory is its class name. */
+    private final String dataSourcePoolFactoryIdentifier;
+
+    public ConnectionPoolId(
+            String host, int port, String username, String dataSourcePoolFactoryIdentifier) {
         this.host = host;
         this.port = port;
         this.username = username;
+        this.dataSourcePoolFactoryIdentifier = dataSourcePoolFactoryIdentifier;
     }
 
     @Override
@@ -44,16 +49,22 @@ public class ConnectionPoolId implements Serializable {
         ConnectionPoolId that = (ConnectionPoolId) o;
         return Objects.equals(host, that.host)
                 && Objects.equals(port, that.port)
-                && Objects.equals(username, that.username);
+                && Objects.equals(username, that.username)
+                && Objects.equals(
+                        dataSourcePoolFactoryIdentifier, that.dataSourcePoolFactoryIdentifier);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(host, port, username);
+        return Objects.hash(host, port, username, dataSourcePoolFactoryIdentifier);
     }
 
     @Override
     public String toString() {
         return username + '@' + host + ':' + port;
+    }
+
+    public String getDataSourcePoolFactoryIdentifier() {
+        return dataSourcePoolFactoryIdentifier;
     }
 }

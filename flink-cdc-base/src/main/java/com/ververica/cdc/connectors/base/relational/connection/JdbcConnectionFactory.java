@@ -50,7 +50,8 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
                 new ConnectionPoolId(
                         sourceConfig.getHostname(),
                         sourceConfig.getPort(),
-                        sourceConfig.getUsername());
+                        sourceConfig.getUsername(),
+                        jdbcConnectionPoolFactory.getClass().getName());
 
         HikariDataSource dataSource =
                 JdbcConnectionPools.getInstance(jdbcConnectionPoolFactory)
