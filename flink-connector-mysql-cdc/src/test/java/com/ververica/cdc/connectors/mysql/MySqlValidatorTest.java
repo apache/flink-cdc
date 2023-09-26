@@ -16,10 +16,13 @@
 
 package com.ververica.cdc.connectors.mysql;
 
+import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.table.api.ValidationException;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
+import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -145,29 +148,33 @@ public class MySqlValidatorTest {
     }
 
     private void doValidate(MySqlVersion version, String configPath, String exceptionMessage) {
-        MySqlContainer container =
-                new MySqlContainer(version).withConfigurationOverride(configPath);
+        try (MySqlContainer container =
+                new MySqlContainer(version).withConfigurationOverride(configPath)) {
 
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(container)).join();
-        LOG.info("Containers are started.");
+            LOG.info("Starting containers...");
+            Startables.deepStart(Stream.of(container)).join();
+            LOG.info("Containers are started.");
 
-        UniqueDatabase database =
-                new UniqueDatabase(
-                        container, "inventory", container.getUsername(), container.getPassword());
+            UniqueDatabase database =
+                    new UniqueDatabase(
+                            container,
+                            "inventory",
+                            container.getUsername(),
+                            container.getPassword());
 
-        try {
-            startSource(database);
-            fail("Should fail.");
-        } catch (Exception e) {
-            assertTrue(e instanceof ValidationException);
-            assertEquals(exceptionMessage, e.getMessage());
+            try {
+                startSource(database);
+                fail("Should fail.");
+            } catch (Exception e) {
+                assertTrue(e instanceof ValidationException);
+                assertEquals(exceptionMessage, e.getMessage());
+            }
         }
     }
 
     private void startSource(UniqueDatabase database) throws Exception {
         if (runIncrementalSnapshot) {
-            MySqlSource<?> mySqlSource =
+            MySqlSource<SourceRecord> mySqlSource =
                     MySqlSource.<SourceRecord>builder()
                             .hostname(database.getHost())
                             .username(database.getUsername())
@@ -178,8 +185,11 @@ public class MySqlValidatorTest {
                             .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
                             .serverTimeZone("UTC")
                             .build();
+            try (SplitEnumerator<MySqlSplit, PendingSplitsState> enumerator =
+                    mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1))) {
+                enumerator.start();
+            }
 
-            mySqlSource.createEnumerator(new MockSplitEnumeratorContext<>(1)).start();
         } else {
             DebeziumSourceFunction<SourceRecord> source =
                     basicSourceBuilder(database, "UTC", false).build();

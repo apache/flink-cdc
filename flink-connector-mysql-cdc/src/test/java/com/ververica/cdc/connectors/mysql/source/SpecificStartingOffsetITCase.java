@@ -163,7 +163,7 @@ public class SpecificStartingOffsetITCase {
                                 savepointDir.toAbsolutePath().toString(),
                                 SavepointFormatType.DEFAULT)
                         .get();
-        jobClient.cancel();
+        jobClient.cancel().get();
 
         // Make some changes after the savepoint
         executeStatements(
@@ -179,7 +179,7 @@ public class SpecificStartingOffsetITCase {
                 .containsExactly(
                         "-U[15213, Alice, Rome, 123456987]", "+U[15213, Alicia, Rome, 123456987]");
 
-        restoredJobClient.cancel();
+        restoredJobClient.cancel().get();
     }
 
     @Test
@@ -239,7 +239,7 @@ public class SpecificStartingOffsetITCase {
                                 savepointDir.toAbsolutePath().toString(),
                                 SavepointFormatType.DEFAULT)
                         .get();
-        jobClient.cancel();
+        jobClient.cancel().get();
 
         // Make some changes after the savepoint
         executeStatements(
@@ -255,7 +255,7 @@ public class SpecificStartingOffsetITCase {
                 .containsExactly(
                         "-U[15213, Alice, Rome, 123456987]", "+U[15213, Alicia, Rome, 123456987]");
 
-        restoredJobClient.cancel();
+        restoredJobClient.cancel().get();
     }
 
     @Test
@@ -325,7 +325,7 @@ public class SpecificStartingOffsetITCase {
                                 savepointDir.toAbsolutePath().toString(),
                                 SavepointFormatType.DEFAULT)
                         .get();
-        jobClient.cancel();
+        jobClient.cancel().get();
 
         // Make some changes after the savepoint
         executeStatements(
@@ -342,7 +342,7 @@ public class SpecificStartingOffsetITCase {
                         "-U[18213, Charlie, Paris, 123456987]",
                         "+U[18213, George, Paris, 123456987]");
 
-        restoredJobClient.cancel();
+        restoredJobClient.cancel().get();
     }
 
     private MySqlSourceBuilder<RowData> getSourceBuilder() {

@@ -49,5 +49,6 @@ public class LegacyMySqlSourceExampleTest extends LegacyMySqlTestBase {
         env.addSource(sourceFunction).print().setParallelism(1);
 
         env.execute("Print MySQL Snapshot + Binlog");
+        inventoryDatabase.dropDatabase();
     }
 }

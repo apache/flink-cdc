@@ -174,7 +174,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertUpdate(records.get(0), "id", 2001);
 
             // cleanup
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -245,7 +244,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertTrue(lsn > prevLsn);
             prevLsn = lsn;
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -305,7 +303,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             }
 
             // cancel the source
-            source2.cancel();
             source2.close();
             runThread2.sync();
         }
@@ -361,7 +358,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
             assertTrue(lsn > prevLsn);
 
-            source3.cancel();
             source3.close();
             runThread3.sync();
         }
@@ -405,7 +401,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertTrue(lsn > prevLsn);
             prevLsn = lsn;
 
-            source4.cancel();
             source4.close();
             runThread4.sync();
         }
@@ -456,7 +451,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             int pos = JsonPath.read(state, "$.sourceOffset.lsn");
             assertTrue(pos > prevLsn);
 
-            source5.cancel();
             source5.close();
             runThread5.sync();
         }
@@ -488,7 +482,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 assertInsert(records.get(0), "id", 112);
             }
 
-            source6.cancel();
             source6.close();
             runThread6.sync();
         }
@@ -545,7 +538,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext));
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -600,7 +592,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext2));
 
-            source2.cancel();
             source2.close();
             runThread.sync();
         }

@@ -55,6 +55,7 @@ import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -114,6 +115,17 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
+    }
+
+    @After
+    public void after() throws Exception {
+        if (mySqlConnection != null) {
+            mySqlConnection.close();
+        }
+        if (binaryLogClient != null) {
+            binaryLogClient.disconnect();
+        }
+        customerDatabase.dropDatabase();
     }
 
     @Test
@@ -399,7 +411,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -434,7 +445,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 ExceptionUtils.findThrowable(throwable, SchemaOutOfSyncException.class);
 
         reader.close();
-
         assertTrue(schemaOutOfSyncException.isPresent());
         assertEquals(
                 "Internal schema representation is probably out of sync with real database schema. "
@@ -494,7 +504,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -550,7 +559,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -604,7 +612,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -660,7 +667,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -721,7 +727,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
 
         reader.close();
-
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
@@ -830,6 +835,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "The required binary logs are no longer available on the server. This may happen in following situations:\n"
                             + "1. The speed of CDC source reading is too slow to exceed the binlog expired period. You can consider increasing the binary log expiration period, you can also to check whether there is back pressure in the job and optimize your job.\n"
                             + "2. The job runs normally, but something happens in the database and lead to the binlog cleanup. You can try to check why this cleanup happens from MySQL side.");
+        } finally {
+            reader.close();
         }
     }
 

@@ -160,7 +160,6 @@ public class OracleSourceTest extends AbstractTestBase {
             assertUpdate(records.get(0), "ID", 2001);
 
             // cleanup
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -535,7 +534,6 @@ public class OracleSourceTest extends AbstractTestBase {
                 assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
             }
 
-            source.cancel();
             source.close();
             runThread.sync();
         }

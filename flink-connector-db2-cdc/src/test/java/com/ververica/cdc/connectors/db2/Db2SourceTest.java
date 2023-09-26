@@ -131,7 +131,6 @@ public class Db2SourceTest extends Db2TestBase {
             assertUpdate(records.get(0), "ID", 2001);
 
             // cleanup
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -198,7 +197,6 @@ public class Db2SourceTest extends Db2TestBase {
             assertTrue(lsn.compareTo(prevLsn) > 0);
             prevLsn = lsn;
 
-            source.cancel();
             source.close();
             runThread.sync();
         }
@@ -253,7 +251,6 @@ public class Db2SourceTest extends Db2TestBase {
             }
 
             // cancel the source
-            source2.cancel();
             source2.close();
             runThread2.sync();
         }
@@ -306,7 +303,6 @@ public class Db2SourceTest extends Db2TestBase {
             String lsn = JsonPath.read(state, "$.sourceOffset.commit_lsn");
             assertTrue(lsn.compareTo(prevLsn) > 0);
 
-            source3.cancel();
             source3.close();
             runThread3.sync();
         }

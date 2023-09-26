@@ -196,7 +196,7 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
         }
         assertEqualsInAnyOrder(
                 Arrays.asList(binlogExpected), fetchRows(iterator, binlogExpected.length));
-        result.getJobClient().ifPresent(client -> client.cancel());
+        result.getJobClient().get().cancel().get();
     }
 
     private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {

@@ -387,7 +387,7 @@ public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
         }
         assertEqualsInAnyOrder(
                 Arrays.asList(binlogExpected), fetchRows(iterator, binlogExpected.length));
-        result.getJobClient().ifPresent(client -> client.cancel());
+        result.getJobClient().get().cancel().get();
     }
 
     private String getServerId() {
