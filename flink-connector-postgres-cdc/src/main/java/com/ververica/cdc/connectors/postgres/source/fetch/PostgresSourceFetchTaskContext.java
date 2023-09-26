@@ -128,6 +128,11 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .getConfig()
                                     .edit()
                                     .with(
+                                            "table.include.list",
+                                            ((SnapshotSplit) sourceSplitBase)
+                                                    .getTableId()
+                                                    .toString())
+                                    .with(
                                             SLOT_NAME.name(),
                                             ((PostgresSourceConfig) sourceConfig)
                                                     .getSlotNameForBackfillTask())
@@ -136,8 +141,19 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     // Disable heartbeat event in snapshot split fetcher
                                     .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                                     .build());
+        } else {
+            dbzConfig =
+                    new PostgresConnectorConfig(
+                            dbzConfig
+                                    .getConfig()
+                                    .edit()
+                                    // never drop slot for stream split, which is also global split
+                                    .with(DROP_SLOT_ON_STOP.name(), false)
+                                    .build());
         }
 
+        LOG.info("PostgresConnectorConfig is ", dbzConfig.getConfig().asProperties().toString());
+        setDbzConnectorConfig(dbzConfig);
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(
                         dbzConfig.getConfig().getString(SNAPSHOT_MODE));
