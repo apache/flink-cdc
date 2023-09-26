@@ -46,7 +46,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     protected final JdbcSourceConfig sourceConfig;
     protected final JdbcDataSourceDialect dataSourceDialect;
-    protected final CommonConnectorConfig dbzConnectorConfig;
+    protected CommonConnectorConfig dbzConnectorConfig;
     protected final SchemaNameAdjuster schemaNameAdjuster;
 
     public JdbcSourceFetchTaskContext(
@@ -154,6 +154,10 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     public CommonConnectorConfig getDbzConnectorConfig() {
         return dbzConnectorConfig;
+    }
+
+    public void setDbzConnectorConfig(CommonConnectorConfig dbzConnectorConfig) {
+        this.dbzConnectorConfig = dbzConnectorConfig;
     }
 
     public SchemaNameAdjuster getSchemaNameAdjuster() {
