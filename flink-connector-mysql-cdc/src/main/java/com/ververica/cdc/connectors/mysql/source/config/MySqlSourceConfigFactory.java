@@ -77,6 +77,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
+    private Properties listenerProperties;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -262,6 +263,12 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** The Listener properties. */
+    public MySqlSourceConfigFactory listenerProperties(Properties properties) {
+        this.listenerProperties = properties;
+        return this;
+    }
+
     /**
      * Whether to close idle readers at the end of the snapshot phase. This feature depends on
      * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
@@ -345,6 +352,10 @@ public class MySqlSourceConfigFactory implements Serializable {
             jdbcProperties = new Properties();
         }
 
+        if (listenerProperties == null) {
+            listenerProperties = new Properties();
+        }
+
         return new MySqlSourceConfig(
                 hostname,
                 port,
@@ -368,6 +379,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 closeIdleReaders,
                 props,
                 jdbcProperties,
-                chunkKeyColumns);
+                chunkKeyColumns,
+                listenerProperties);
     }
 }

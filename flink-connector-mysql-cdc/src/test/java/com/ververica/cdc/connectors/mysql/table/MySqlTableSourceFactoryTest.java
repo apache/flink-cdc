@@ -124,7 +124,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -169,7 +170,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        "testCol");
+                        "testCol",
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -210,7 +212,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -249,7 +252,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -265,12 +269,19 @@ public class MySqlTableSourceFactoryTest {
         options.put("heartbeat.interval", "15213ms");
         options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
         options.put("scan.incremental.close-idle-reader.enabled", "true");
+        options.put(
+                "external-system.listener.class",
+                "com.ververica.cdc.connectors.mysql.source.listener.ExternalSystemListenerImpl");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "never");
         Properties jdbcProperties = new Properties();
         jdbcProperties.setProperty("useSSL", "false");
+        Properties listenerProperties = new Properties();
+        listenerProperties.setProperty(
+                "listener.class",
+                "com.ververica.cdc.connectors.mysql.source.listener.ExternalSystemListenerImpl");
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -297,7 +308,8 @@ public class MySqlTableSourceFactoryTest {
                         true,
                         jdbcProperties,
                         Duration.ofMillis(15213),
-                        "testCol");
+                        "testCol",
+                        listenerProperties);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -342,7 +354,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -379,7 +392,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -417,7 +431,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -456,7 +471,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -493,7 +509,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -535,7 +552,8 @@ public class MySqlTableSourceFactoryTest {
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
-                        null);
+                        null,
+                        new Properties());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 

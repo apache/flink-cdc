@@ -39,6 +39,7 @@ import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRe
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.listener.ListenerService;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -74,6 +75,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
+    private final ListenerService listenerService;
 
     @Nullable private Integer binlogSplitTaskId;
 
@@ -85,6 +87,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
+        this.listenerService = new ListenerService(sourceConfig.getListenerProperties());
     }
 
     @Override
@@ -188,6 +191,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     public void close() {
         LOG.info("Closing enumerator...");
         splitAssigner.close();
+        listenerService.close();
     }
 
     // ------------------------------------------------------------------------------------------
@@ -224,6 +228,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 }
                 awaitingReader.remove();
                 LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);
+                listenerService.notifyAllListeners(splitAssigner.getAssignerStatus());
             } else {
                 // there is no available splits by now, skip assigning
                 requestBinlogSplitUpdateIfNeed();

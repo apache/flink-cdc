@@ -329,6 +329,20 @@ During a snapshot operation, the connector will query each included table to pro
       <td>Boolean</td>
       <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
     </tr>
+    <tr>
+      <td>external-system.listener.class</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>String</td>
+      <td>class name of custom listener, if there are multiple implementations, use `,` for segmentation.</td>
+    </tr>
+    <tr>
+      <td>external-system.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>String</td>
+      <td>Pass-through properties to custom listener, user can use those properties to build and initial custom listener.</td>
+    </tr>
     </tbody>
 </table>
 </div>
