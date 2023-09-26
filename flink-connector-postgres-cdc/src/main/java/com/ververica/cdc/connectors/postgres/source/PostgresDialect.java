@@ -100,10 +100,9 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         return (PostgresConnection) openJdbcConnection(sourceConfig);
     }
 
-    public PostgresReplicationConnection openPostgresReplicationConnection() {
+    public PostgresReplicationConnection openPostgresReplicationConnection(
+            PostgresConnection jdbcConnection) {
         try {
-            PostgresConnection jdbcConnection =
-                    (PostgresConnection) openJdbcConnection(sourceConfig);
             PostgresConnectorConfig pgConnectorConfig = sourceConfig.getDbzConnectorConfig();
             TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(pgConnectorConfig);
             PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
