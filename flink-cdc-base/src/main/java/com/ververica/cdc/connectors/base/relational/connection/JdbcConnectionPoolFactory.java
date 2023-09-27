@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.base.relational.connection;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.debezium.jdbc.JdbcConfiguration;
 
 /** A connection pool factory to create pooled DataSource {@link HikariDataSource}. */
 public abstract class JdbcConnectionPoolFactory {
@@ -64,4 +65,20 @@ public abstract class JdbcConnectionPoolFactory {
      * @return a database url.
      */
     public abstract String getJdbcUrl(JdbcSourceConfig sourceConfig);
+
+    /**
+     * The reuse strategy of connection pools. In most situations, connections to different
+     * databases in same instance (which means same host and port) can reuse same connection pool.
+     * However, in some situations when different databases in same instance cannot reuse same
+     * connection pool to connect, such as postgresql, this method should be overridden.
+     */
+    public ConnectionPoolId getPoolId(
+            JdbcConfiguration config, String dataSourcePoolFactoryIdentifier) {
+        return new ConnectionPoolId(
+                config.getHostname(),
+                config.getPort(),
+                config.getUser(),
+                null,
+                dataSourcePoolFactoryIdentifier);
+    }
 }

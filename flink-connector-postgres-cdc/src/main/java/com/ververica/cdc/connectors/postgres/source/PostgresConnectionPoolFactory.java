@@ -17,8 +17,10 @@
 package com.ververica.cdc.connectors.postgres.source;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.relational.connection.ConnectionPoolId;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.zaxxer.hikari.HikariDataSource;
+import io.debezium.jdbc.JdbcConfiguration;
 
 /** A connection pool factory to create pooled Postgres {@link HikariDataSource}. */
 public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
@@ -31,5 +33,20 @@ public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
         int port = sourceConfig.getPort();
         String database = sourceConfig.getDatabaseList().get(0);
         return String.format(JDBC_URL_PATTERN, hostName, port, database);
+    }
+
+    /**
+     * The reuses of connection pools are based on databases in postgresql. Different databases in
+     * same instance cannot reuse same connection pool to connect.
+     */
+    @Override
+    public ConnectionPoolId getPoolId(
+            JdbcConfiguration config, String dataSourcePoolFactoryIdentifier) {
+        return new ConnectionPoolId(
+                config.getHostname(),
+                config.getPort(),
+                config.getHostname(),
+                config.getDatabase(),
+                dataSourcePoolFactoryIdentifier);
     }
 }
