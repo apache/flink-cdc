@@ -169,7 +169,7 @@ function get_test_modules_for_stage() {
             echo "-pl $modules_vitess"
         ;;
         (${STAGE_E2E_1})
-            echo "-pl $modules_e2e -Dtest=Db2E2eITCase,MongoE2eITCase,OracleE2eITCase,PostgresE2eITCase,SqlServerE2eITCas,VitessE2eITCase"
+            echo "-pl $modules_e2e -Dtest=Db2E2eITCase,MongoE2eITCase,OracleE2eITCase,PostgresE2eITCase,SqlServerE2eITCas,VitessE2eITCase,AssortedE2eITCase"
         ;;
         (${STAGE_E2E_2})
             echo "-pl $modules_e2e -Dtest=MySqlE2eITCase,TiDBE2eITCase"

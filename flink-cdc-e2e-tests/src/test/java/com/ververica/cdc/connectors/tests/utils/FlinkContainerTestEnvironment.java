@@ -75,7 +75,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     private static final String FLINK_BIN = "bin";
     private static final String INTER_CONTAINER_JM_ALIAS = "jobmanager";
     private static final String INTER_CONTAINER_TM_ALIAS = "taskmanager";
-    private static final String FLINK_PROPERTIES =
+    private static String flinkProperties =
             String.join(
                     "\n",
                     Arrays.asList(
@@ -142,14 +142,14 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", flinkProperties)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("taskmanager")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", flinkProperties)
                         .dependsOn(jobManager)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
 
@@ -174,8 +174,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     /** Allow overriding the default flink properties. */
     public void overrideFlinkProperties(String properties) {
-        jobManager.withEnv("FLINK_PROPERTIES", properties);
-        taskManager.withEnv("FLINK_PROPERTIES", properties);
+        flinkProperties = properties;
     }
 
     /**

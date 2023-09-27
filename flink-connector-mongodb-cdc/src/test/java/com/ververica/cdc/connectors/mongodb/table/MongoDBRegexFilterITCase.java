@@ -268,7 +268,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
 
     @Test
     public void testMatchCollectionWithDots() throws Exception {
-        // 1. Given colllections:
+        // 1. Given collections:
         // db: [coll.name]
         String db = CONTAINER.executeCommandFileInSeparateDatabase("ns-dotted");
 
