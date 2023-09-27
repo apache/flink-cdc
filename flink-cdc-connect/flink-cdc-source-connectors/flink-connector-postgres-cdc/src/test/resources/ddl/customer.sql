@@ -108,3 +108,4 @@ VALUES (101,'user_1','Shanghai','123567891234'),
        (1018,'user_19','Shanghai','123567891234'),
        (1019,'user_20','Shanghai','123567891234'),
        (2000,'user_21','Shanghai','123567891234');
+ALTER TABLE customers_no_pk REPLICA IDENTITY FULL;

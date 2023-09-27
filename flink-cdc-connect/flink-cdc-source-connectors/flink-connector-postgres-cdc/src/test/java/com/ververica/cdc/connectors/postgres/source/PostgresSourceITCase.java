@@ -38,6 +38,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -62,6 +64,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
+@RunWith(Parameterized.class)
 public class PostgresSourceITCase extends PostgresTestBase {
 
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
@@ -70,6 +73,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private static final String DB_NAME_PREFIX = "postgres";
     private static final String SCHEMA_NAME = "customer";
+
+    private final String scanStartupMode;
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
@@ -100,6 +105,15 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     "+I[102, user_2, Shanghai, 123567891234]",
                     "-U[103, user_3, Hangzhou, 123567891234]",
                     "+U[103, user_3, Shanghai, 123567891234]");
+
+    public PostgresSourceITCase(String scanStartupMode) {
+        this.scanStartupMode = scanStartupMode;
+    }
+
+    @Parameterized.Parameters(name = "scanStartupMode: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {"initial"}, new Object[] {"latest-offset"}};
+    }
 
     /** Second part stream events, which is made by {@link #makeSecondPartStreamEvents}. */
     private final List<String> secondPartStreamEvents =
@@ -178,23 +192,33 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
-    public void testConsumingTableWithoutPrimaryKey() {
-        try {
+    public void testConsumingTableWithoutPrimaryKey() throws Exception {
+        if (scanStartupMode == DEFAULT_SCAN_STARTUP_MODE) {
+            try {
+                testPostgresParallelSource(
+                        1,
+                        scanStartupMode,
+                        FailoverType.NONE,
+                        FailoverPhase.NEVER,
+                        new String[] {"customers_no_pk"},
+                        RestartStrategies.noRestart());
+            } catch (Exception e) {
+                assertTrue(
+                        ExceptionUtils.findThrowableWithMessage(
+                                        e,
+                                        String.format(
+                                                "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
+                                                SCHEMA_NAME + ".customers_no_pk"))
+                                .isPresent());
+            }
+        } else {
             testPostgresParallelSource(
                     1,
-                    DEFAULT_SCAN_STARTUP_MODE,
+                    scanStartupMode,
                     FailoverType.NONE,
                     FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
                     RestartStrategies.noRestart());
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
-                                            SCHEMA_NAME + ".customers_no_pk"))
-                            .isPresent());
         }
     }
 
@@ -271,7 +295,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
             throws Exception {
         testPostgresParallelSource(
                 parallelism,
-                DEFAULT_SCAN_STARTUP_MODE,
+                scanStartupMode,
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
