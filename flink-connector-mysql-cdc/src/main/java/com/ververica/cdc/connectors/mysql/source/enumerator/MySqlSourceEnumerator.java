@@ -39,11 +39,13 @@ import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRe
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.listener.ListenerMessageInformation;
 import com.ververica.cdc.connectors.mysql.source.listener.ListenerService;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -223,12 +225,28 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             if (split.isPresent()) {
                 final MySqlSplit mySqlSplit = split.get();
                 context.assignSplit(mySqlSplit, nextAwaiting);
+
+                StartupMode startupMode = sourceConfig.getStartupOptions().startupMode;
+                String gtids = "";
+
                 if (mySqlSplit instanceof MySqlBinlogSplit) {
                     this.binlogSplitTaskId = nextAwaiting;
+
+                    MySqlBinlogSplit mySqlBinlogSplit = (MySqlBinlogSplit) mySqlSplit;
+                    if (startupMode == StartupMode.INITIAL) {
+                        gtids = mySqlBinlogSplit.getStartingOffset().getGtidSet();
+                    } else if (startupMode == StartupMode.SPECIFIC_OFFSETS
+                            && mySqlBinlogSplit.getStartingOffset().getGtidSet() != null) {
+                        gtids = mySqlBinlogSplit.getStartingOffset().getGtidSet();
+                    }
                 }
+                ListenerMessageInformation listenerMessageInformation =
+                        new ListenerMessageInformation(startupMode.toString(), gtids);
                 awaitingReader.remove();
                 LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);
-                listenerService.notifyAllListeners(splitAssigner.getAssignerStatus());
+
+                listenerService.notifyAllListeners(
+                        splitAssigner.getAssignerStatus(), listenerMessageInformation);
             } else {
                 // there is no available splits by now, skip assigning
                 requestBinlogSplitUpdateIfNeed();

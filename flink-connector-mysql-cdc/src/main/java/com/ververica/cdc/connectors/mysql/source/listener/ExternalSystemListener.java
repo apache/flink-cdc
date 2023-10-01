@@ -34,7 +34,7 @@ public interface ExternalSystemListener extends Serializable {
     void init(Properties properties);
 
     /** Send the given event to the external system. */
-    void send(AssignerStatus assignerStatus);
+    void send(AssignerStatus assignerStatus, ListenerMessageInformation listenerMessageInformation);
 
     /** Close the listener. */
     void close();

@@ -80,7 +80,9 @@ public class ListenerService implements Serializable {
     }
 
     /** notify all external system listeners. */
-    public void notifyAllListeners(final AssignerStatus assignerStatus) {
+    public void notifyAllListeners(
+            final AssignerStatus assignerStatus,
+            ListenerMessageInformation listenerMessageInformation) {
         if (externalSystemListeners.isEmpty() || executorService == null) {
             return;
         }
@@ -91,7 +93,8 @@ public class ListenerService implements Serializable {
                     externalSystemListeners.forEach(
                             externalSystemListener -> {
                                 try {
-                                    externalSystemListener.send(assignerStatus);
+                                    externalSystemListener.send(
+                                            assignerStatus, listenerMessageInformation);
                                 } catch (Exception e) {
                                     LOG.warn(
                                             "failed to send notification to {}",

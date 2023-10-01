@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.source.listener;
 
 import com.ververica.cdc.connectors.mysql.source.assigners.AssignerStatus;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.junit.Test;
 
 import java.util.Properties;
@@ -32,7 +33,11 @@ public class ListenerServiceTest {
         listenerProperties.setProperty(
                 "listener.class", ExternalSystemListenerImplTest.class.getName());
         ListenerService listenerService = new ListenerService(listenerProperties);
-        listenerService.notifyAllListeners(AssignerStatus.INITIAL_ASSIGNING_FINISHED);
+        ListenerMessageInformation listenerMessageInformation =
+                new ListenerMessageInformation(
+                        StartupMode.SPECIFIC_OFFSETS.toString(), "UUID:1-100");
+        listenerService.notifyAllListeners(
+                AssignerStatus.INITIAL_ASSIGNING_FINISHED, listenerMessageInformation);
         /* wait for async execution */
         Thread.sleep(200);
         listenerService.close();
@@ -44,6 +49,7 @@ public class ListenerServiceTest {
     static class ExternalSystemListenerImplTest implements ExternalSystemListener {
 
         public static AssignerStatus assignerStatus;
+        public static ListenerMessageInformation listenerMessageInformation;
 
         @Override
         public String name() {
@@ -56,8 +62,11 @@ public class ListenerServiceTest {
         }
 
         @Override
-        public void send(AssignerStatus assignerStatus) {
+        public void send(
+                AssignerStatus assignerStatus,
+                ListenerMessageInformation listenerMessageInformation) {
             ExternalSystemListenerImplTest.assignerStatus = assignerStatus;
+            ExternalSystemListenerImplTest.listenerMessageInformation = listenerMessageInformation;
         }
 
         @Override
