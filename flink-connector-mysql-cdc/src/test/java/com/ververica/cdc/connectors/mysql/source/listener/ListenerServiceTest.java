@@ -33,9 +33,8 @@ public class ListenerServiceTest {
         listenerProperties.setProperty(
                 "listener.class", ExternalSystemListenerImplTest.class.getName());
         ListenerService listenerService = new ListenerService(listenerProperties);
-        ListenerMessageInformation listenerMessageInformation =
-                new ListenerMessageInformation(
-                        StartupMode.SPECIFIC_OFFSETS.toString(), "UUID:1-100");
+        MysqlListenerMessage listenerMessageInformation =
+                new MysqlListenerMessage(StartupMode.SPECIFIC_OFFSETS.toString(), "UUID:1-100");
         listenerService.notifyAllListeners(
                 AssignerStatus.INITIAL_ASSIGNING_FINISHED, listenerMessageInformation);
         /* wait for async execution */
@@ -49,7 +48,7 @@ public class ListenerServiceTest {
     static class ExternalSystemListenerImplTest implements ExternalSystemListener {
 
         public static AssignerStatus assignerStatus;
-        public static ListenerMessageInformation listenerMessageInformation;
+        public static AbstractListenerMessage listenerMessage;
 
         @Override
         public String name() {
@@ -62,11 +61,9 @@ public class ListenerServiceTest {
         }
 
         @Override
-        public void send(
-                AssignerStatus assignerStatus,
-                ListenerMessageInformation listenerMessageInformation) {
+        public void send(AssignerStatus assignerStatus, AbstractListenerMessage listenerMessage) {
             ExternalSystemListenerImplTest.assignerStatus = assignerStatus;
-            ExternalSystemListenerImplTest.listenerMessageInformation = listenerMessageInformation;
+            ExternalSystemListenerImplTest.listenerMessage = listenerMessage;
         }
 
         @Override

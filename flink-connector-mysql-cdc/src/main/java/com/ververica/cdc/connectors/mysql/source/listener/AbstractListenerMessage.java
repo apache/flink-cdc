@@ -16,13 +16,16 @@
 
 package com.ververica.cdc.connectors.mysql.source.listener;
 
-/** The information that will be sent with the notification. */
-public class ListenerMessageInformation {
-    private final String startupMode;
-    private final String gtids;
+import java.util.Properties;
 
-    public ListenerMessageInformation(String startupMode, String gtids) {
-        this.startupMode = startupMode;
-        this.gtids = gtids;
+/** The information that will be sent with the notification. */
+public abstract class AbstractListenerMessage {
+
+    public Properties getProperties() {
+        return properties;
     }
+
+    Properties properties = new Properties();
+
+    abstract String getName();
 }

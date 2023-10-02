@@ -39,8 +39,8 @@ import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRe
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberRequestEvent;
-import com.ververica.cdc.connectors.mysql.source.listener.ListenerMessageInformation;
 import com.ververica.cdc.connectors.mysql.source.listener.ListenerService;
+import com.ververica.cdc.connectors.mysql.source.listener.MysqlListenerMessage;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -240,8 +240,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                         gtids = mySqlBinlogSplit.getStartingOffset().getGtidSet();
                     }
                 }
-                ListenerMessageInformation listenerMessageInformation =
-                        new ListenerMessageInformation(startupMode.toString(), gtids);
+                MysqlListenerMessage listenerMessageInformation =
+                        new MysqlListenerMessage(startupMode.toString(), gtids);
                 awaitingReader.remove();
                 LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);
 
