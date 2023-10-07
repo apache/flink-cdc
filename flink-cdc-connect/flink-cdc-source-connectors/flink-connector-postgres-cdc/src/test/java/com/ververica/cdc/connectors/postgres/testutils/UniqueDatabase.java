@@ -154,6 +154,19 @@ public class UniqueDatabase {
         }
     }
 
+    /**
+     * Drop slot from database.
+     *
+     * @param slotName
+     */
+    public void removeSlot(String slotName) throws SQLException {
+        String sql = String.format("SELECT pg_drop_replication_slot('%s')", slotName);
+        try (Connection connection = PostgresTestBase.getJdbcConnection(container, databaseName);
+                Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        }
+    }
+
     private String convertSQL(final String sql) {
         return sql.replace("$DBNAME$", schemaName);
     }
