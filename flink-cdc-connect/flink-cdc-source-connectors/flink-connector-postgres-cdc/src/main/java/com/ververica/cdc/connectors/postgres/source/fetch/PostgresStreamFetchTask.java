@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.postgres.source.fetch;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
@@ -41,6 +42,8 @@ import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -119,7 +122,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
         return split;
     }
 
-    public void commitCurrentOffset() {
+    public void commitCurrentOffset(@Nullable Offset offsetToCommit) {
         if (streamSplitReadTask != null && streamSplitReadTask.offsetContext != null) {
             PostgresOffsetContext postgresOffsetContext = streamSplitReadTask.offsetContext;
 
@@ -129,6 +132,21 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                             postgresOffsetContext
                                     .getOffset()
                                     .get(PostgresOffsetContext.LAST_COMMIT_LSN_KEY);
+
+            if (offsetToCommit != null) {
+                // We should commit the checkpoint's LSN instead of postgresOffsetContext's LSN to
+                // the slot.
+                // If the checkpoint succeeds and a table UPDATE message arrives before the
+                // notifyCheckpoint is called, which is represented as a BEGIN/UPDATE/COMMIT WAL
+                // event sequence. The LSN of postgresOffsetContext will be updated to the LSN of
+                // the COMMIT event. Committing the COMMIT LSN to the slot is incorrect because if a
+                // failover occurs after the successful commission, Flink will recover from that
+                // checkpoint and consume WAL starting from the slot LSN that is the LSN of COMMIT
+                // event, rather than from the checkpoint's LSN. Therefore, UPDATE messages cannot
+                // be consumed, resulting in data loss.
+                commitLsn = ((PostgresOffset) offsetToCommit).getLsn().asLong();
+            }
+
             if (commitLsn != null
                     && (lastCommitLsn == null
                             || Lsn.valueOf(commitLsn).compareTo(Lsn.valueOf(lastCommitLsn)) > 0)) {
