@@ -26,6 +26,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.bson.BsonBoolean;
 import org.bson.BsonDocument;
+import org.bson.BsonString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.DROPPED_FIELD;
+import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.HASHED_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.KEY_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MAX_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MIN_FIELD;
@@ -56,6 +58,8 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.readC
  * Key Index Type</a> for details.
  *
  * <p>Split collections by shard and chunk.
+ *
+ * <p>Does not support collections sharded using hashed shard keys
  */
 @Internal
 public class ShardedSplitStrategy implements SplitStrategy {
@@ -73,11 +77,19 @@ public class ShardedSplitStrategy implements SplitStrategy {
 
         List<BsonDocument> chunks;
         BsonDocument collectionMetadata;
+        BsonDocument splitKeys;
         try {
             collectionMetadata = readCollectionMetadata(mongoClient, collectionId);
             if (!isValidShardedCollection(collectionMetadata)) {
                 LOG.warn(
                         "Collection {} does not appear to be sharded, fallback to SampleSplitter.",
+                        collectionId);
+                return SampleBucketSplitStrategy.INSTANCE.split(splitContext);
+            }
+            splitKeys = collectionMetadata.getDocument(KEY_FIELD);
+            if (hasHashedShardKeys(splitKeys)) {
+                LOG.warn(
+                        "Collection {} has hashed shard keys, fallback to SampleSplitter.",
                         collectionId);
                 return SampleBucketSplitStrategy.INSTANCE.split(splitContext);
             }
@@ -102,7 +114,6 @@ public class ShardedSplitStrategy implements SplitStrategy {
             return SampleBucketSplitStrategy.INSTANCE.split(splitContext);
         }
 
-        BsonDocument splitKeys = collectionMetadata.getDocument(KEY_FIELD);
         RowType rowType = shardKeysToRowType(splitKeys);
 
         Map<TableId, TableChanges.TableChange> schema = new HashMap<>();
@@ -125,8 +136,12 @@ public class ShardedSplitStrategy implements SplitStrategy {
         return snapshotSplits;
     }
 
-    private boolean isValidShardedCollection(BsonDocument collectionMetadata) {
+    private static boolean isValidShardedCollection(BsonDocument collectionMetadata) {
         return collectionMetadata != null
                 && !collectionMetadata.getBoolean(DROPPED_FIELD, BsonBoolean.FALSE).getValue();
+    }
+
+    private static boolean hasHashedShardKeys(BsonDocument splitKeys) {
+        return splitKeys.containsValue(new BsonString(HASHED_FIELD));
     }
 }

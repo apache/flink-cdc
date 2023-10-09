@@ -51,6 +51,8 @@ public class MongoDBEnvelope {
 
     public static final String DROPPED_FIELD = "dropped";
 
+    public static final String HASHED_FIELD = "hashed";
+
     public static final String KEY_FIELD = "key";
 
     public static final String MAX_FIELD = "max";
