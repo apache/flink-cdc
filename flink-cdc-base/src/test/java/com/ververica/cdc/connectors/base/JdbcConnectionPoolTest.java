@@ -80,7 +80,11 @@ public class JdbcConnectionPoolTest {
                 getMockMySqlSourceConfig(HOSTNAME, PORT, USER_NAME, PASSWORD, DATABASE, TABLE);
         ConnectionPoolId poolId =
                 new ConnectionPoolId(
-                        HOSTNAME, PORT, USER_NAME, MockConnectionPoolFactory.class.getName());
+                        HOSTNAME,
+                        PORT,
+                        USER_NAME,
+                        DATABASE,
+                        MockConnectionPoolFactory.class.getName());
         Assert.assertThrows(
                 String.format(
                         "DataSourcePoolFactoryIdentifier named %s doesn't exists",
