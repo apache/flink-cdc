@@ -20,6 +20,7 @@ import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -53,13 +54,13 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Path oracleCdcJar = TestUtils.getResource("oracle-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-
-    public OracleContainer oracle;
+    private static OracleContainer oracle;
 
     @Before
     public void before() {
         super.before();
         LOG.info("Starting containers...");
+
         oracle =
                 new OracleContainer(ORACLE_IMAGE)
                         .withNetwork(NETWORK)
@@ -75,6 +76,16 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
             oracle.stop();
         }
         super.after();
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        // Cleanup the oracle image, because it's too large and will cause the next test to fail.
+        oracle.getDockerClient()
+                .listImagesCmd()
+                .withImageNameFilter(ORACLE_IMAGE)
+                .exec()
+                .forEach(image -> oracle.getDockerClient().removeImageCmd(image.getId()).exec());
     }
 
     @Test
