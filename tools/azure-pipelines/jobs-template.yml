@@ -80,14 +80,14 @@ jobs:
           module: mongodb
         sqlserver:
           module: sqlserver
+        tidb:
+          module: tidb
         db2:
           module: db2
         vitess:
           module: vitess
         misc:
           module: misc
-        e2e_1:
-          module: e2e_1
     steps:
       # download artifact from compile stage
       - task: DownloadPipelineArtifact@2
@@ -146,10 +146,8 @@ jobs:
           module: mysql
         oceanbase:
           module: oceanbase
-        tidb:
-          module: tidb
-        e2e_2:
-          module: e2e_2
+        e2e:
+          module: e2e
     steps:
       # download artifact from compile stage
       - task: DownloadPipelineArtifact@2
