@@ -368,30 +368,30 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     @Override
     public void run(SourceContext<T> sourceContext) throws Exception {
         properties.putIfAbsent("name", "engine");
-        properties.putIfAbsent("offset.storage", FlinkOffsetBackingStore.class.getCanonicalName());
+        properties.setProperty("offset.storage", FlinkOffsetBackingStore.class.getCanonicalName());
         if (restoredOffsetState != null) {
             // restored from state
-            properties.putIfAbsent(FlinkOffsetBackingStore.OFFSET_STATE_VALUE, restoredOffsetState);
+            properties.setProperty(FlinkOffsetBackingStore.OFFSET_STATE_VALUE, restoredOffsetState);
         }
         // DO NOT include schema change, e.g. DDL
         properties.putIfAbsent("include.schema.changes", "false");
         // disable the offset flush totally
         properties.putIfAbsent("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
-        properties.putIfAbsent("tombstones.on.delete", "false");
+        properties.setProperty("tombstones.on.delete", "false");
         if (engineInstanceName == null) {
             // not restore from recovery
             engineInstanceName = UUID.randomUUID().toString();
         }
         // history instance name to initialize FlinkDatabaseHistory
-        properties.putIfAbsent(
+        properties.setProperty(
                 FlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME, engineInstanceName);
         // we have to use a persisted DatabaseHistory implementation, otherwise, recovery can't
         // continue to read binlog
         // see
         // https://stackoverflow.com/questions/57147584/debezium-error-schema-isnt-know-to-this-connector
         // and https://debezium.io/blog/2018/03/16/note-on-database-history-topic-configuration/
-        properties.putIfAbsent("database.history", determineDatabase().getCanonicalName());
+        properties.setProperty("database.history", determineDatabase().getCanonicalName());
 
         // we have to filter out the heartbeat events, otherwise the deserializer will fail
         String dbzHeartbeatPrefix =
