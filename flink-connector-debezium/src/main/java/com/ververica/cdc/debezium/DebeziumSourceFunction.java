@@ -367,16 +367,16 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     @Override
     public void run(SourceContext<T> sourceContext) throws Exception {
-        properties.setProperty("name", "engine");
+        properties.putIfAbsent("name", "engine");
         properties.setProperty("offset.storage", FlinkOffsetBackingStore.class.getCanonicalName());
         if (restoredOffsetState != null) {
             // restored from state
             properties.setProperty(FlinkOffsetBackingStore.OFFSET_STATE_VALUE, restoredOffsetState);
         }
         // DO NOT include schema change, e.g. DDL
-        properties.setProperty("include.schema.changes", "false");
+        properties.putIfAbsent("include.schema.changes", "false");
         // disable the offset flush totally
-        properties.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
+        properties.putIfAbsent("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
         properties.setProperty("tombstones.on.delete", "false");
         if (engineInstanceName == null) {
