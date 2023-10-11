@@ -316,7 +316,7 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>否</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>传递自定义参数到<code>libobcdc</code>，如 'obcdc.properties.sort_trans_participants' = '1'。</td>
+                <td>传递参数到<code>libobcdc</code>，如 'obcdc.properties.sort_trans_participants' = '1'。更多参数信息见 <a href="https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000221094">obcdc 配置项说明</a>。</td>
             </tr>
         </tbody>
     </table>
