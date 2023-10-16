@@ -45,6 +45,8 @@ public class OracleSourceBuilder<T> {
     private OracleDialect dialect;
     private DebeziumDeserializationSchema<T> deserializer;
 
+    private OracleSourceBuilder() {}
+
     public OracleSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);
         return this;

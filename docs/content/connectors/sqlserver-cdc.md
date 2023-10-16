@@ -350,7 +350,7 @@ import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 public class SqlServerIncrementalSourceExample {
     public static void main(String[] args) throws Exception {
         SqlServerIncrementalSource<String> sqlServerSource =
-                new SqlServerSourceBuilder()
+                SqlServerSourceBuilder.SqlServerIncrementalSource.<String>builder()
                         .hostname("localhost")
                         .port(1433)
                         .databaseList("inventory")
