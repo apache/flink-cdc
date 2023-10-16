@@ -29,6 +29,7 @@ import org.apache.kafka.connect.data.Struct;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 /** Used to create {@link DeserializationRuntimeConverterFactory} specified to Oracle. */
@@ -86,7 +87,8 @@ public class OracleDeserializationConverterFactory {
                         if (dbzObj instanceof String) {
                             String str = (String) dbzObj;
                             // TIMESTAMP_LTZ type is encoded in string type
-                            Instant instant = Instant.parse(str);
+                            Instant instant =
+                                    DateTimeFormatter.ISO_DATE_TIME.parse(str, Instant::from);
                             return TimestampData.fromInstant(instant);
                         }
                         throw new IllegalArgumentException(
