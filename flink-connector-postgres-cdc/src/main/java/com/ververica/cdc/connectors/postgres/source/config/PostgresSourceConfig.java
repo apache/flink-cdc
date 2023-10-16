@@ -85,7 +85,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                null);
         this.subtaskId = subtaskId;
     }
 

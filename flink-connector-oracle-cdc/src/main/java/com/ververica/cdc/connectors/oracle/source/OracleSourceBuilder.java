@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.oracle.source;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
@@ -215,6 +216,15 @@ public class OracleSourceBuilder<T> {
      */
     public OracleSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
         this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
+    /**
+     * The actual definition of the table structure, may differ from the original table schema. It's
+     * used for querying fields during the snapshot phase.
+     */
+    public OracleSourceBuilder<T> physicalSchema(RowType physicalSchema) {
+        this.configFactory.physicalSchema(physicalSchema);
         return this;
     }
 

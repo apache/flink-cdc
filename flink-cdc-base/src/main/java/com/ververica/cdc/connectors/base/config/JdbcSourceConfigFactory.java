@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.base.config;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.base.config.SourceConfig.Factory;
 import com.ververica.cdc.connectors.base.options.JdbcSourceOptions;
@@ -56,6 +57,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     protected Properties dbzProperties;
     protected String chunkKeyColumn;
+    protected RowType physicalSchema;
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -193,6 +195,15 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
      */
     public JdbcSourceConfigFactory chunkKeyColumn(String chunkKeyColumn) {
         this.chunkKeyColumn = chunkKeyColumn;
+        return this;
+    }
+
+    /**
+     * The actual definition of the table structure, may differ from the original table schema. It's
+     * used for querying fields during the snapshot phase.
+     */
+    public JdbcSourceConfigFactory physicalSchema(RowType physicalSchema) {
+        this.physicalSchema = physicalSchema;
         return this;
     }
 

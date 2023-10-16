@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.oracle.source.config;
 
+import org.apache.flink.table.types.logical.RowType;
+
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
@@ -61,7 +63,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn) {
+            String chunkKeyColumn,
+            RowType physicalSchema) {
         super(
                 startupOptions,
                 databaseList,
@@ -85,7 +88,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                physicalSchema);
         this.url = url;
     }
 

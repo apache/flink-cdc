@@ -146,12 +146,18 @@ public class OracleUtils {
     }
 
     public static String buildSplitScanQuery(
-            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+            TableId tableId,
+            RowType physicalSchema,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit) {
+        return buildSplitQuery(
+                tableId, physicalSchema, pkRowType, isFirstSplit, isLastSplit, -1, true);
     }
 
     private static String buildSplitQuery(
             TableId tableId,
+            RowType physicalSchema,
             RowType pkRowType,
             boolean isFirstSplit,
             boolean isLastSplit,
@@ -189,7 +195,13 @@ public class OracleUtils {
 
         if (isScanningData) {
             return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
+                    tableId,
+                    limitSize,
+                    physicalSchema.getFields().stream()
+                            .map(f -> f.getName())
+                            .collect(Collectors.joining(", ")),
+                    Optional.ofNullable(condition),
+                    Optional.empty());
         } else {
             final String orderBy =
                     pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));

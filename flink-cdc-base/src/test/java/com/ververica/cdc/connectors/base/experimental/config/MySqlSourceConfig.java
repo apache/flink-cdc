@@ -81,6 +81,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                null,
                 null);
     }
 

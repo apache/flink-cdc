@@ -145,7 +145,8 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
     @Override
     public String buildSplitScanQuery(
             TableId tableId, RowType splitKeyType, boolean isFirstSplit, boolean isLastSplit) {
-        return OracleUtils.buildSplitScanQuery(tableId, splitKeyType, isFirstSplit, isLastSplit);
+        return OracleUtils.buildSplitScanQuery(
+                tableId, sourceConfig.getPhysicalSchema(), splitKeyType, isFirstSplit, isLastSplit);
     }
 
     @Override
