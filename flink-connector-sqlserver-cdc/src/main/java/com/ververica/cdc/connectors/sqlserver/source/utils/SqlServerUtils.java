@@ -200,7 +200,7 @@ public class SqlServerUtils {
     /** Fetch current largest log sequence number (LSN) of the database. */
     public static LsnOffset currentLsn(SqlServerConnection connection) {
         try {
-            Lsn maxLsn = connection.getMaxLsn(connection.database());
+            Lsn maxLsn = connection.getMaxTransactionLsn(connection.database());
             return new LsnOffset(maxLsn, maxLsn, null);
         } catch (SQLException e) {
             throw new FlinkRuntimeException(e.getMessage(), e);
