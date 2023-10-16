@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.mysql;
 
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -66,15 +65,7 @@ public class MySqlValidator implements Validator {
 
     @Override
     public void validate() {
-        JdbcConnection connection = null;
-        try {
-            if (sourceConfig != null) {
-                connection = DebeziumUtils.openJdbcConnection(sourceConfig);
-            } else {
-                // for the legacy source
-                connection =
-                        DebeziumUtils.createMySqlConnection(from(dbzProperties), new Properties());
-            }
+        try (JdbcConnection connection = createJdbcConnection(sourceConfig, dbzProperties)) {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);
@@ -82,16 +73,18 @@ public class MySqlValidator implements Validator {
         } catch (SQLException ex) {
             throw new TableException(
                     "Unexpected error while connecting to MySQL and validating", ex);
-        } finally {
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                    throw new FlinkRuntimeException("Closing connection error", e);
-                }
-            }
         }
         LOG.info("MySQL validation passed.");
+    }
+
+    private JdbcConnection createJdbcConnection(
+            MySqlSourceConfig sourceConfig, Properties dbzProperties) {
+        if (sourceConfig != null) {
+            return DebeziumUtils.openJdbcConnection(sourceConfig);
+        } else {
+            // for the legacy source
+            return DebeziumUtils.createMySqlConnection(from(dbzProperties), new Properties());
+        }
     }
 
     private void checkVersion(JdbcConnection connection) throws SQLException {
