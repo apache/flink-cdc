@@ -15,8 +15,8 @@
 -- DATABASE:  inventory
 -- ----------------------------------------------------------------------------------------------------------------
 
-CREATE DATABASE inventory;
-USE inventory;
+CREATE DATABASE inventory_uppercase_column;
+USE inventory_uppercase_column;
 
 CREATE TABLE products
 (

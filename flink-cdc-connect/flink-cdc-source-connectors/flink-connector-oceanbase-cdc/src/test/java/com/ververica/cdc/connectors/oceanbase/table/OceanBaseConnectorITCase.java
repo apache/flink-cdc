@@ -593,7 +593,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         getUsername(),
                         getPassword(),
                         getTenant(),
-                        "inventory.products",
+                        "inventory_uppercase_column.products",
                         OB_SERVER.getHost(),
                         getObServerSqlPort(),
                         LOG_PROXY.getHost(),
@@ -621,7 +621,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         waitForSinkSize("sink", 9);
         int snapshotSize = sinkSize("sink");
 
-        try (Connection connection = getJdbcConnection("inventory");
+        try (Connection connection = getJdbcConnection("inventory_uppercase_column");
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "UPDATE products SET description='18oz carpenter hammer' WHERE `ROWID`=106;");
