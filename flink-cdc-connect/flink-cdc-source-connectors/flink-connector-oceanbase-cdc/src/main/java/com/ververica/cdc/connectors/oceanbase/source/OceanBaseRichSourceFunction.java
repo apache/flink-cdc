@@ -89,6 +89,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final int logProxyPort;
     private final ClientConf logProxyClientConf;
     private final ObReaderConfig obReaderConfig;
+    private final boolean columnCaseSensitive;
     private final OceanBaseDeserializationSchema<T> deserializer;
 
     private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
@@ -120,6 +121,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             int logProxyPort,
             ClientConf logProxyClientConf,
             ObReaderConfig obReaderConfig,
+            boolean columnCaseSensitive,
             OceanBaseDeserializationSchema<T> deserializer) {
         this.snapshot = checkNotNull(snapshot);
         this.username = checkNotNull(username);
@@ -138,6 +140,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.logProxyPort = checkNotNull(logProxyPort);
         this.logProxyClientConf = checkNotNull(logProxyClientConf);
         this.obReaderConfig = checkNotNull(obReaderConfig);
+        this.columnCaseSensitive = columnCaseSensitive;
         this.deserializer = checkNotNull(deserializer);
     }
 
@@ -273,8 +276,11 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                 while (rs.next()) {
                                     Map<String, Object> fieldMap = new HashMap<>();
                                     for (int i = 0; i < metaData.getColumnCount(); i++) {
-                                        fieldMap.put(
-                                                metaData.getColumnName(i + 1), rs.getObject(i + 1));
+                                        String columnName = metaData.getColumnName(i + 1);
+                                        if (!columnCaseSensitive) {
+                                            columnName = columnName.toLowerCase();
+                                        }
+                                        fieldMap.put(columnName, rs.getObject(i + 1));
                                     }
                                     OceanBaseRecord record =
                                             new OceanBaseRecord(sourceInfo, fieldMap);
@@ -387,7 +393,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                         databaseName,
                         message.getTableName(),
                         Long.parseLong(message.getSafeTimestamp()));
-        return new OceanBaseRecord(sourceInfo, message.getOpt(), message.getFieldList());
+        return new OceanBaseRecord(
+                sourceInfo, message.getOpt(), message.getFieldList(), columnCaseSensitive);
     }
 
     @Override

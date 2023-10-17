@@ -90,6 +90,7 @@ public class OceanBaseTableFactoryTest {
     private static final String LOG_PROXY_CLIENT_ID = "clientId";
     private static final String RS_LIST = "127.0.0.1:2882:2881";
     private static final String WORKING_MODE = "storage";
+    private static final boolean COLUMN_CASE_SENSITIVE = true;
 
     @Test
     public void testCommonProperties() {
@@ -123,7 +124,8 @@ public class OceanBaseTableFactoryTest {
                         null,
                         RS_LIST,
                         null,
-                        WORKING_MODE);
+                        WORKING_MODE,
+                        COLUMN_CASE_SENSITIVE);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -165,7 +167,8 @@ public class OceanBaseTableFactoryTest {
                         null,
                         RS_LIST,
                         null,
-                        WORKING_MODE);
+                        WORKING_MODE,
+                        COLUMN_CASE_SENSITIVE);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -207,7 +210,8 @@ public class OceanBaseTableFactoryTest {
                         null,
                         RS_LIST,
                         null,
-                        WORKING_MODE);
+                        WORKING_MODE,
+                        COLUMN_CASE_SENSITIVE);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "tenant_name", "database_name", "table_name");

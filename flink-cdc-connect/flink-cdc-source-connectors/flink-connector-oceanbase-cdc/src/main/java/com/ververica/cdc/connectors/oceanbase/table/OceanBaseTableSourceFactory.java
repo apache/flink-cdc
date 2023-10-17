@@ -173,6 +173,13 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The working mode of 'obcdc', can be `storage` (default value, supported from `obcdc` 3.1.3) or `memory`.");
 
+    public static final ConfigOption<Boolean> COLUMN_CASE_SENSITIVE =
+            ConfigOptions.key("column.case-sensitive")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Flag of whether column names are case-sensitive, default value is 'true', and when set to false, column names will be converted to lowercase.");
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
@@ -208,6 +215,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         String rsList = config.get(RS_LIST);
         String configUrl = config.get(CONFIG_URL);
         String workingMode = config.get(WORKING_MODE);
+        Boolean columnCaseSensitive = config.get(COLUMN_CASE_SENSITIVE);
 
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
@@ -233,7 +241,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 startupTimestamp,
                 rsList,
                 configUrl,
-                workingMode);
+                workingMode,
+                columnCaseSensitive);
     }
 
     @Override
@@ -270,6 +279,7 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(RS_LIST);
         options.add(CONFIG_URL);
         options.add(WORKING_MODE);
+        options.add(COLUMN_CASE_SENSITIVE);
         return options;
     }
 

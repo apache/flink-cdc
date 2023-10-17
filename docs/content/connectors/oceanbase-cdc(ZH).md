@@ -311,6 +311,13 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>String</td>
                 <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
             </tr>
+            <tr>
+                <td>column.case-sensitive</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">true</td>
+                <td>String</td>
+                <td>列名是否大小写敏感，默认为 true，当置为 false 时，将会把列名转为小写使用。</td>
+            </tr>
         </tbody>
     </table>
 </div>

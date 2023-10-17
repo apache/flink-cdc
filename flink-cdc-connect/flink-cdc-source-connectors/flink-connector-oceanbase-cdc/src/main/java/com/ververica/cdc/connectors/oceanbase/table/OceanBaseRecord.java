@@ -46,7 +46,8 @@ public class OceanBaseRecord implements Serializable {
     public OceanBaseRecord(
             SourceInfo sourceInfo,
             DataMessage.Record.Type opt,
-            List<DataMessage.Record.Field> logMessageFieldList) {
+            List<DataMessage.Record.Field> logMessageFieldList,
+            boolean columnCaseSensitive) {
         this.sourceInfo = sourceInfo;
         this.isSnapshotRecord = false;
         this.jdbcFields = null;
@@ -54,10 +55,14 @@ public class OceanBaseRecord implements Serializable {
         this.logMessageFieldsBefore = new HashMap<>();
         this.logMessageFieldsAfter = new HashMap<>();
         for (DataMessage.Record.Field field : logMessageFieldList) {
+            String fieldName = field.getFieldname();
+            if (!columnCaseSensitive) {
+                fieldName = fieldName.toLowerCase();
+            }
             if (field.isPrev()) {
-                logMessageFieldsBefore.put(field.getFieldname(), getFieldStringValue(field));
+                logMessageFieldsBefore.put(fieldName, getFieldStringValue(field));
             } else {
-                logMessageFieldsAfter.put(field.getFieldname(), getFieldStringValue(field));
+                logMessageFieldsAfter.put(fieldName, getFieldStringValue(field));
             }
         }
     }

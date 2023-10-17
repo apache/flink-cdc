@@ -69,6 +69,7 @@ public class OceanBaseSource {
         private String rsList;
         private String configUrl;
         private String workingMode;
+        private Boolean columnCaseSensitive;
 
         private OceanBaseDeserializationSchema<T> deserializer;
 
@@ -177,6 +178,11 @@ public class OceanBaseSource {
             return this;
         }
 
+        public Builder<T> columnCaseSensitive(Boolean columnCaseSensitive) {
+            this.columnCaseSensitive = columnCaseSensitive;
+            return this;
+        }
+
         public Builder<T> deserializer(OceanBaseDeserializationSchema<T> deserializer) {
             this.deserializer = deserializer;
             return this;
@@ -261,6 +267,10 @@ public class OceanBaseSource {
             obReaderConfig.setStartTimestamp(startupTimestamp);
             obReaderConfig.setTimezone(serverTimeZone);
 
+            if (columnCaseSensitive == null) {
+                columnCaseSensitive = true;
+            }
+
             return new OceanBaseRichSourceFunction<>(
                     StartupMode.INITIAL.equals(startupMode),
                     username,
@@ -279,6 +289,7 @@ public class OceanBaseSource {
                     logProxyPort,
                     clientConf,
                     obReaderConfig,
+                    columnCaseSensitive,
                     deserializer);
         }
     }

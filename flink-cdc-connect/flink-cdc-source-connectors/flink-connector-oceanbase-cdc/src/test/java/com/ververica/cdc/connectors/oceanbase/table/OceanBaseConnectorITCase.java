@@ -562,6 +562,129 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    public void testColumnCaseInsensitive() throws Exception {
+        initializeTable("inventory_uppercase_column");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE ob_source ("
+                                + " rowid INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(20, 10),"
+                                + " PRIMARY KEY (rowid) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'scan.startup.mode' = 'initial',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'tenant-name' = '%s',"
+                                + " 'table-list' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'logproxy.host' = '%s',"
+                                + " 'logproxy.port' = '%s',"
+                                + " 'rootserver-list' = '%s',"
+                                + " 'working-mode' = 'memory',"
+                                + " 'jdbc.properties.useSSL' = 'false',"
+                                + " 'column.case-sensitive' = 'false'"
+                                + ")",
+                        getUsername(),
+                        getPassword(),
+                        getTenant(),
+                        "inventory.products",
+                        OB_SERVER.getHost(),
+                        getObServerSqlPort(),
+                        LOG_PROXY.getHost(),
+                        getLogProxyPort(),
+                        getRsList());
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " `id` INT NOT NULL,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(20, 10),"
+                        + " PRIMARY KEY (`id`) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '30'"
+                        + ")";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM ob_source");
+
+        waitForSinkSize("sink", 9);
+        int snapshotSize = sinkSize("sink");
+
+        try (Connection connection = getJdbcConnection("inventory");
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE `ROWID`=106;");
+            statement.execute("UPDATE products SET weight='5.1' WHERE `ROWID`=107;");
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE `ROWID`=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE `ROWID`=111;");
+            statement.execute("DELETE FROM products WHERE `ROWID`=111;");
+        }
+
+        waitForSinkSize("sink", snapshotSize + 7);
+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * |ROWID| name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I(101,scooter,Small 2-wheel scooter,3.1400000000)",
+                        "+I(102,car battery,12V car battery,8.1000000000)",
+                        "+I(103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                        "+I(104,hammer,12oz carpenter's hammer,0.7500000000)",
+                        "+I(105,hammer,14oz carpenter's hammer,0.8750000000)",
+                        "+I(106,hammer,16oz carpenter's hammer,1.0000000000)",
+                        "+I(107,rocks,box of assorted rocks,5.3000000000)",
+                        "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(109,spare tire,24 inch spare tire,22.2000000000)",
+                        "+U(106,hammer,18oz carpenter hammer,1.0000000000)",
+                        "+U(107,rocks,box of assorted rocks,5.1000000000)",
+                        "+I(110,jacket,water resistent white wind breaker,0.2000000000)",
+                        "+I(111,scooter,Big 2-wheel scooter ,5.1800000000)",
+                        "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
+                        "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
+                        "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        assertContainsInAnyOrder(expected, actual);
+
+        result.getJobClient().get().cancel().get();
+    }
+
     private static void waitForSinkSize(String sinkName, int expectedSize)
             throws InterruptedException {
         while (sinkSize(sinkName) < expectedSize) {
