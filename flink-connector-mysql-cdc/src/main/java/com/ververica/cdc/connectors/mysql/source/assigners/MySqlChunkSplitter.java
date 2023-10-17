@@ -132,7 +132,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             }
         } else {
             Preconditions.checkState(
-                    currentSplittingTableId.equals(tableId),
+                    tableId.equals(currentSplittingTableId),
                     "Can not split a new table before the previous table splitting finish.");
             if (currentSplittingTable == null) {
                 analyzeTable(partition, currentSplittingTableId);
