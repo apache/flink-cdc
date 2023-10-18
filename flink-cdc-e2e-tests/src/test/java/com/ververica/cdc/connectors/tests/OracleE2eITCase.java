@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -39,21 +40,21 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.CONNECTOR_PWD;
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.CONNECTOR_USER;
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.ORACLE_DATABASE;
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.TEST_PWD;
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.TEST_USER;
+
 /** End-to-end tests for oracle-cdc connector uber jar. */
 public class OracleE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleE2eITCase.class);
-    private static final String ORACLE_SYSTEM_USER = "system";
-    private static final String ORACLE_SYSTEM_PASSWORD = "oracle";
-    private static final String ORACLE_TEST_USER = "dbzuser";
-    private static final String ORACLE_TEST_PASSWORD = "dbz";
     private static final String ORACLE_DRIVER_CLASS = "oracle.jdbc.driver.OracleDriver";
     private static final String INTER_CONTAINER_ORACLE_ALIAS = "oracle";
-    private static final String ORACLE_IMAGE = "jark/oracle-xe-11g-r2-cdc:0.1";
-    private static final int ORACLE_PORT = 1521;
-
     private static final Path oracleCdcJar = TestUtils.getResource("oracle-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+    public static final String ORACLE_IMAGE = "goodboy008/oracle-19.3.0-ee";
     private static OracleContainer oracle;
 
     @Before
@@ -62,10 +63,15 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
         LOG.info("Starting containers...");
 
         oracle =
-                new OracleContainer(ORACLE_IMAGE)
+                new OracleContainer(DockerImageName.parse(ORACLE_IMAGE).withTag("non-cdb"))
+                        .withUsername(CONNECTOR_USER)
+                        .withPassword(CONNECTOR_PWD)
+                        .withDatabaseName(ORACLE_DATABASE)
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_ORACLE_ALIAS)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+                        .withLogConsumer(new Slf4jLogConsumer(LOG))
+                        .withReuse(true);
+
         Startables.deepStart(Stream.of(oracle)).join();
         LOG.info("Containers are started.");
     }
@@ -101,15 +107,14 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         " primary key (`ID`) not enforced",
                         ") WITH (",
                         " 'connector' = 'oracle-cdc',",
-                        " 'hostname' = '" + INTER_CONTAINER_ORACLE_ALIAS + "',",
-                        " 'port' = '" + ORACLE_PORT + "',",
-                        " 'username' = '" + ORACLE_SYSTEM_USER + "',",
-                        " 'password' = '" + ORACLE_SYSTEM_PASSWORD + "',",
-                        " 'database-name' = 'XE',",
+                        " 'hostname' = '" + oracle.getNetworkAliases().get(0) + "',",
+                        " 'port' = '" + oracle.getExposedPorts().get(0) + "',",
+                        " 'username' = '" + CONNECTOR_USER + "',",
+                        " 'password' = '" + CONNECTOR_PWD + "',",
+                        " 'database-name' = 'ORCLCDB',",
                         " 'schema-name' = 'DEBEZIUM',",
                         " 'scan.incremental.snapshot.enabled' = 'true',",
                         " 'debezium.log.mining.strategy' = 'online_catalog',",
-                        " 'debezium.log.mining.continuous.mine' = 'true',",
                         " 'table-name' = 'PRODUCTS',",
                         " 'scan.incremental.snapshot.chunk.size' = '4'",
                         ");",
@@ -135,7 +140,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
         submitSQLJob(sqlLines, oracleCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
-        // generate binlogs
+        // generate redo log
         Class.forName(ORACLE_DRIVER_CLASS);
         // we need to set this property, otherwise Azure Pipeline will complain
         // "ORA-01882: timezone region not found" error when building the Oracle JDBC connection
@@ -189,7 +194,6 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     private Connection getOracleJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(
-                oracle.getJdbcUrl(), ORACLE_TEST_USER, ORACLE_TEST_PASSWORD);
+        return DriverManager.getConnection(oracle.getJdbcUrl(), TEST_USER, TEST_PWD);
     }
 }
