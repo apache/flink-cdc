@@ -29,25 +29,19 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
-import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import com.jayway.jsonpath.JsonPath;
-import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
+import com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -64,7 +58,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertDelete;
 import static com.ververica.cdc.connectors.utils.AssertUtils.assertInsert;
@@ -75,34 +68,21 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link OracleSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class OracleSourceTest extends AbstractTestBase {
+public class OracleSourceTest extends OracleSourceTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSourceTest.class);
 
-    private OracleContainer oracleContainer =
-            OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @Before
-    public void before() throws Exception {
-
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(oracleContainer)).join();
-        LOG.info("Containers are started.");
-    }
-
-    @After
-    public void teardown() {
-        oracleContainer.stop();
-    }
-
     @Test
     public void testConsumingAllEvents() throws Exception {
+
+        createAndInitialize("product.sql");
+
         DebeziumSourceFunction<SourceRecord> source = createOracleLogminerSource();
         TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
 
         setupSource(source);
 
-        try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
 
             // start the source
@@ -168,6 +148,9 @@ public class OracleSourceTest extends AbstractTestBase {
     @Test
     @Ignore("It can be open until DBZ-5245 and DBZ-4936 fix")
     public void testCheckpointAndRestore() throws Exception {
+
+        createAndInitialize("product.sql");
+
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
         {
@@ -248,7 +231,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
@@ -308,7 +291,7 @@ public class OracleSourceTest extends AbstractTestBase {
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
 
             // can continue to receive new events
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
                 statement.execute("DELETE FROM debezium.products WHERE id=1001");
             }
@@ -372,11 +355,13 @@ public class OracleSourceTest extends AbstractTestBase {
     @Test
     @Ignore("Debezium Oracle connector don't monitor unknown tables since 1.6, see DBZ-3612")
     public void testRecoverFromRenameOperation() throws Exception {
+
+        createAndInitialize("product.sql");
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
 
         {
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
                 // Step-1: start the source from empty state
                 final DebeziumSourceFunction<SourceRecord> source = createOracleLogminerSource();
@@ -449,7 +434,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
 
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
                 statement.execute(
                         "INSERT INTO debezium.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT) VALUES (113,'Airplane','Toy airplane',1.304)"); // 113
@@ -465,6 +450,8 @@ public class OracleSourceTest extends AbstractTestBase {
 
     @Test
     public void testConsumingEmptyTable() throws Exception {
+
+        createAndInitialize("product.sql");
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
         int prevPos = 0;
@@ -473,9 +460,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
             DebeziumSourceFunction<SourceRecord> source =
-                    basicSourceBuilder(oracleContainer)
-                            .tableList("debezium" + "." + "category")
-                            .build();
+                    basicSourceBuilder().tableList("debezium.category").build();
             // we use blocking context to block the source to emit before last snapshot record
             final BlockingSourceContext<SourceRecord> sourceContext =
                     new BlockingSourceContext<>(8);
@@ -508,7 +493,7 @@ public class OracleSourceTest extends AbstractTestBase {
             // make sure there is no more events
             assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext));
 
-            try (Connection connection = OracleTestUtils.getJdbcConnection(oracleContainer);
+            try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
 
                 statement.execute("INSERT INTO debezium.category VALUES (1, 'book')");
@@ -566,22 +551,21 @@ public class OracleSourceTest extends AbstractTestBase {
     // ------------------------------------------------------------------------------------------
 
     private DebeziumSourceFunction<SourceRecord> createOracleLogminerSource() {
-        return basicSourceBuilder(oracleContainer).build();
+        return basicSourceBuilder().build();
     }
 
-    private OracleSource.Builder<SourceRecord> basicSourceBuilder(OracleContainer oracleContainer) {
+    private OracleSource.Builder<SourceRecord> basicSourceBuilder() {
         Properties debeziumProperties = new Properties();
         debeziumProperties.setProperty("debezium.log.mining.strategy", "online_catalog");
-        debeziumProperties.setProperty("debezium.log.mining.continuous.mine", "true");
-        // ignore APEX XE system tables changes
+        // ignore APEX ORCLCDB system tables changes
         debeziumProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
         return OracleSource.<SourceRecord>builder()
-                .hostname(oracleContainer.getHost())
-                .port(oracleContainer.getOraclePort())
-                .database("XE")
+                .hostname(ORACLE_CONTAINER.getHost())
+                .port(ORACLE_CONTAINER.getOraclePort())
+                .database("ORCLCDB")
                 .tableList("debezium" + "." + "products") // monitor table "products"
-                .username(oracleContainer.getUsername())
-                .password(oracleContainer.getPassword())
+                .username(ORACLE_CONTAINER.getUsername())
+                .password(ORACLE_CONTAINER.getPassword())
                 .debeziumProperties(debeziumProperties)
                 .deserializer(new ForwardDeserializeSchema());
     }

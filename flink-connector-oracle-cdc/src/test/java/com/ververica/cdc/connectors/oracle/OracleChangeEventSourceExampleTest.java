@@ -26,32 +26,24 @@ import org.apache.flink.test.util.MiniClusterWithClientResource;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.source.OracleSourceBuilder;
-import com.ververica.cdc.connectors.oracle.utils.OracleTestUtils;
+import com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.junit.After;
-import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.OracleContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
 
 import java.util.Properties;
-import java.util.stream.Stream;
 
 /** Example Tests for {@link JdbcIncrementalSource}. */
-public class OracleChangeEventSourceExampleTest {
+public class OracleChangeEventSourceExampleTest extends OracleSourceTestBase {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(OracleChangeEventSourceExampleTest.class);
 
     private static final int DEFAULT_PARALLELISM = 4;
     private static final long DEFAULT_CHECKPOINT_INTERVAL = 1000;
-    private static final OracleContainer oracleContainer =
-            OracleTestUtils.ORACLE_CONTAINER.withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Rule
     public final MiniClusterWithClientResource miniClusterResource =
@@ -64,40 +56,30 @@ public class OracleChangeEventSourceExampleTest {
                             .withHaLeadershipControl()
                             .build());
 
-    @BeforeClass
-    public static void startContainers() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(oracleContainer)).join();
-        LOG.info("Containers are started.");
-    }
-
-    @After
-    public void teardown() {
-        oracleContainer.stop();
-    }
-
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testConsumingAllEvents() throws Exception {
+
+        createAndInitialize("product.sql");
+
         LOG.info(
                 "getOraclePort:{},getUsername:{},getPassword:{}",
-                oracleContainer.getOraclePort(),
-                oracleContainer.getUsername(),
-                oracleContainer.getPassword());
+                ORACLE_CONTAINER.getOraclePort(),
+                ORACLE_CONTAINER.getUsername(),
+                ORACLE_CONTAINER.getPassword());
 
         Properties debeziumProperties = new Properties();
         debeziumProperties.setProperty("log.mining.strategy", "online_catalog");
-        debeziumProperties.setProperty("log.mining.continuous.mine", "true");
 
         JdbcIncrementalSource<String> oracleChangeEventSource =
-                new OracleSourceBuilder()
-                        .hostname(oracleContainer.getHost())
-                        .port(oracleContainer.getOraclePort())
-                        .databaseList("XE")
-                        .schemaList("DEBEZIUM")
+                new OracleSourceBuilder<String>()
+                        .hostname(ORACLE_CONTAINER.getHost())
+                        .port(ORACLE_CONTAINER.getOraclePort())
+                        .databaseList(ORACLE_DATABASE)
+                        .schemaList(ORACLE_SCHEMA)
                         .tableList("DEBEZIUM.PRODUCTS")
-                        .username(oracleContainer.getUsername())
-                        .password(oracleContainer.getPassword())
+                        .username(ORACLE_CONTAINER.getUsername())
+                        .password(ORACLE_CONTAINER.getPassword())
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .includeSchemaChanges(true) // output the schema changes as well
                         .startupOptions(StartupOptions.initial())
