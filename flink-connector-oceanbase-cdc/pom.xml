@@ -21,6 +21,10 @@ under the License.
         <groupId>com.ververica</groupId>
         <version>2.5-SNAPSHOT</version>
     </parent>
+    <properties>
+        <!-- Because of oceanbase docker image can not expose port quickly, so we need to specify testcontainers version to 1.15.3 -->
+        <jdbc.version>1.15.3</jdbc.version>
+    </properties>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>flink-connector-oceanbase-cdc</artifactId>
@@ -138,8 +142,8 @@ under the License.
         <!-- test dependencies on TestContainers -->
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>mssqlserver</artifactId>
-            <version>${testcontainers.version}</version>
+            <artifactId>jdbc</artifactId>
+            <version>${jdbc.version}</version>
             <scope>test</scope>
         </dependency>
 
