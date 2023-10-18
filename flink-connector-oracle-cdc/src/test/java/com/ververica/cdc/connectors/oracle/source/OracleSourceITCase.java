@@ -23,7 +23,6 @@ import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
@@ -34,23 +33,15 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertNotNull;
 
 /** IT tests for {@link OracleSourceBuilder.OracleIncrementalSource}. */
 public class OracleSourceITCase extends OracleSourceTestBase {
@@ -148,7 +139,6 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = 'false',"
                                 + " 'debezium.log.mining.strategy' = 'online_catalog',"
-                                + " 'debezium.log.mining.continuous.mine' = 'true',"
                                 + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true'"
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
@@ -280,44 +270,8 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         }
     }
 
-    private void createAndInitialize(String sqlFile) throws Exception {
-        final String ddlFile = String.format("ddl/%s", sqlFile);
-        final URL ddlTestFile = OracleSourceITCase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-        try (Connection connection = getConnection();
-                Statement statement = connection.createStatement()) {
-
-            try {
-                // DROP TABLE IF EXITS
-                statement.execute("DROP TABLE DEBEZIUM.CUSTOMERS");
-                statement.execute("DROP TABLE DEBEZIUM.CUSTOMERS_1");
-            } catch (Exception e) {
-                LOG.error("DEBEZIUM.CUSTOMERS DEBEZIUM.CUSTOMERS_1 NOT EXITS", e);
-            }
-
-            final List<String> statements =
-                    Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                                            .map(String::trim)
-                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
-                                            .map(
-                                                    x -> {
-                                                        final Matcher m =
-                                                                COMMENT_PATTERN.matcher(x);
-                                                        return m.matches() ? m.group(1) : x;
-                                                    })
-                                            .collect(Collectors.joining("\n"))
-                                            .split(";"))
-                            .collect(Collectors.toList());
-
-            for (String stmt : statements) {
-                statement.execute(stmt);
-            }
-        }
-    }
-
     private void executeSql(String sql) throws Exception {
-        try (Connection connection = getConnection();
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
@@ -371,28 +325,5 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         miniCluster.terminateTaskManager(0).get();
         afterFailAction.run();
         miniCluster.startTaskManager();
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
-    public Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(
-                ORACLE_CONTAINER.getJdbcUrl(), ORACLE_SYSTEM_USER, ORACLE_SYSTEM_PASSWORD);
     }
 }

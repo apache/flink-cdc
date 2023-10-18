@@ -6,7 +6,7 @@
 version: '2.1'
 services:
   oracle:
-    image: yuxialuo/oracle-xe-11g-r2-cdc-demo:v1.0
+    image: goodboy008/oracle-19.3.0-ee:non-cdb
     ports:
       - "1521:1521"
   elasticsearch:
@@ -75,7 +75,7 @@ Flink SQL> CREATE TABLE products (
     'port' = '1521',
     'username' = 'flinkuser',
     'password' = 'flinkpw',
-    'database-name' = 'XE',
+    'database-name' = 'ORCLCDB',
     'schema-name' = 'flinkuser',  
     'table-name' = 'products'
   );
@@ -93,7 +93,7 @@ Flink SQL> CREATE TABLE orders (
    'port' = '1521',
    'username' = 'flinkuser',
    'password' = 'flinkpw',
-   'database-name' = 'XE',
+   'database-name' = 'ORCLCDB',
    'schema-name' = 'flinkuser',  
    'table-name' = 'orders'
  );

@@ -209,7 +209,7 @@ Flink SQL> CREATE TABLE products (
      'port' = '1521',
      'username' = 'flinkuser',
      'password' = 'flinkpw',
-     'database-name' = 'XE',
+     'database-name' = 'ORCLCDB',
      'schema-name' = 'inventory',
      'table-name' = 'products');
   
@@ -436,7 +436,7 @@ CREATE TABLE products (
     'port' = '1521',
     'username' = 'flinkuser',
     'password' = 'flinkpw',
-    'database-name' = 'XE',
+    'database-name' = 'ORCLCDB',
     'schema-name' = 'inventory',
     'table-name' = 'products',
     'debezium.log.mining.strategy' = 'online_catalog',
@@ -491,13 +491,12 @@ public class OracleParallelSourceExample {
     public static void main(String[] args) throws Exception {
         Properties debeziumProperties = new Properties();
         debeziumProperties.setProperty("log.mining.strategy", "online_catalog");
-        debeziumProperties.setProperty("log.mining.continuous.mine", "true");
 
         JdbcIncrementalSource<String> oracleChangeEventSource =
                 new OracleSourceBuilder()
                         .hostname("host")
                         .port(1521)
-                        .databaseList("XE")
+                        .databaseList("ORCLCDB")
                         .schemaList("DEBEZIUM")
                         .tableList("DEBEZIUM.PRODUCTS")
                         .username("username")
@@ -538,7 +537,7 @@ public class OracleSourceExample {
      SourceFunction<String> sourceFunction = OracleSource.<String>builder()
              .url("jdbc:oracle:thin:@{hostname}:{port}:{database}")
              .port(1521)
-             .database("XE") // monitor XE database
+             .database("ORCLCDB") // monitor XE database
              .schemaList("inventory") // monitor inventory schema
              .tableList("inventory.products") // monitor products table
              .username("flinkuser")
