@@ -96,7 +96,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
 
     private transient Set<String> tableSet;
     private transient volatile long resolvedTimestamp;
-    private transient volatile long startTimestamp;
     private transient volatile OceanBaseConnection snapshotConnection;
     private transient LogProxyClient logProxyClient;
     private transient ListState<Long> offsetState;
@@ -154,18 +153,23 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             LOG.info("Start to initial table whitelist");
             initTableWhiteList();
 
-            LOG.info("Start readChangeRecords process");
-            readChangeRecords();
-
             if (shouldReadSnapshot()) {
-                LOG.info("Snapshot reading started");
+                Long globalTimestamp = getSnapshotConnection().getGlobalTimestamp();
+                if (globalTimestamp == null || globalTimestamp <= 0) {
+                    throw new RuntimeException("Got invalid global timestamp: " + globalTimestamp);
+                }
+                long startTimestamp = globalTimestamp / 1000_000_000;
+                LOG.info("Snapshot reading started from timestamp: {}", startTimestamp);
                 readSnapshotRecords();
                 LOG.info("Snapshot reading finished");
+                snapshotCompleted.set(true);
+                resolvedTimestamp = startTimestamp;
             } else {
                 LOG.info("Snapshot reading skipped");
             }
 
-            logProxyClient.join();
+            LOG.info("Change events reading started");
+            readChangeRecords();
         } finally {
             cancel();
         }
@@ -249,8 +253,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                     String[] schema = table.split("\\.");
                     readSnapshotRecordsByTable(schema[0], schema[1]);
                 });
-        snapshotCompleted.set(true);
-        resolvedTimestamp = startTimestamp;
     }
 
     private void readSnapshotRecordsByTable(String databaseName, String tableName) {
@@ -296,7 +298,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     protected void readChangeRecords() throws InterruptedException, TimeoutException {
         if (resolvedTimestamp > 0) {
             obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
-            LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
+            LOG.info("Read change events from timestamp: {}", resolvedTimestamp);
         }
 
         logProxyClient =
@@ -316,7 +318,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                             case BEGIN:
                                 if (!started) {
                                     started = true;
-                                    startTimestamp = Long.parseLong(message.getSafeTimestamp());
                                     latch.countDown();
                                 }
                                 break;
@@ -373,7 +374,9 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         if (!latch.await(connectTimeout.getSeconds(), TimeUnit.SECONDS)) {
             throw new TimeoutException("Timeout to receive messages in RecordListener");
         }
-        LOG.info("LogProxyClient packet processing started from timestamp {}", startTimestamp);
+        LOG.info("LogProxyClient packet processing started");
+
+        logProxyClient.join();
     }
 
     private OceanBaseRecord getChangeRecord(LogMessage message) {
