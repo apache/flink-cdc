@@ -13,8 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-blank_issues_enabled: false
-contact_links:
-  - name: Ask a question or get support
-    url: https://github.com/ververica/flink-cdc-connectors/discussions/categories/q-a
-    about: Ask a question or request support for CDC Connectors for Apache Flink®
+# This workflow will triage pull requests and apply a label based on the
+# paths that are modified in the pull request.
+#
+# To use this workflow, you will need to set up a .github/label.yml
+# file with configuration.  For more information, see:
+# https://github.com/actions/labeler
+
+name: Labeler
+on: [pull_request_target]
+
+jobs:
+  label:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/labeler@v4
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
