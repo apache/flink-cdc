@@ -55,7 +55,6 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -91,7 +90,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final ObReaderConfig obReaderConfig;
     private final OceanBaseDeserializationSchema<T> deserializer;
 
-    private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
     private final List<OceanBaseRecord> changeRecordBuffer = new LinkedList<>();
 
     private transient Set<String> tableSet;
@@ -162,7 +160,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                 LOG.info("Snapshot reading started from timestamp: {}", startTimestamp);
                 readSnapshotRecords();
                 LOG.info("Snapshot reading finished");
-                snapshotCompleted.set(true);
                 resolvedTimestamp = startTimestamp;
             } else {
                 LOG.info("Snapshot reading skipped");
@@ -333,21 +330,18 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                 }
                                 break;
                             case COMMIT:
-                                // flush buffer after snapshot completed
-                                if (!shouldReadSnapshot() || snapshotCompleted.get()) {
-                                    changeRecordBuffer.forEach(
-                                            r -> {
-                                                try {
-                                                    deserializer.deserialize(r, outputCollector);
-                                                } catch (Exception e) {
-                                                    throw new FlinkRuntimeException(e);
-                                                }
-                                            });
-                                    changeRecordBuffer.clear();
-                                    long timestamp = Long.parseLong(message.getSafeTimestamp());
-                                    if (timestamp > resolvedTimestamp) {
-                                        resolvedTimestamp = timestamp;
-                                    }
+                                changeRecordBuffer.forEach(
+                                        r -> {
+                                            try {
+                                                deserializer.deserialize(r, outputCollector);
+                                            } catch (Exception e) {
+                                                throw new FlinkRuntimeException(e);
+                                            }
+                                        });
+                                changeRecordBuffer.clear();
+                                long timestamp = Long.parseLong(message.getSafeTimestamp());
+                                if (timestamp > resolvedTimestamp) {
+                                    resolvedTimestamp = timestamp;
                                 }
                                 break;
                             case DDL:
