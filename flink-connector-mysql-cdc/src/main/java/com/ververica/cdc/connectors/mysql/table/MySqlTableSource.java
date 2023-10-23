@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -240,10 +241,14 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
 
     @Override
     public Map<String, DataType> listReadableMetadata() {
+        // Return metadata in a fixed order
         return Stream.of(MySqlReadableMetadata.values())
                 .collect(
                         Collectors.toMap(
-                                MySqlReadableMetadata::getKey, MySqlReadableMetadata::getDataType));
+                                MySqlReadableMetadata::getKey,
+                                MySqlReadableMetadata::getDataType,
+                                (existingValue, newValue) -> newValue,
+                                LinkedHashMap::new));
     }
 
     @Override
