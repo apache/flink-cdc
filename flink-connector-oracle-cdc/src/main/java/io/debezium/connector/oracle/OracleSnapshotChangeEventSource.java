@@ -43,7 +43,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * A {@link StreamingChangeEventSource} for Oracle.
+ * Copied from Debezium 1.9.7.
+ *
+ * <p>Line 118-138: Add table filter by tableIncludeList and tableExcludeList. Only add designated
+ * tables to the list of capture schema tables.
+ *
+ * <p>A {@link StreamingChangeEventSource} for Oracle.
  *
  * @author Gunnar Morling
  */
@@ -130,7 +135,6 @@ public class OracleSnapshotChangeEventSource
                                         && !tableExcludeSet.contains(t.schema() + "." + t.table()))
                 .collect(Collectors.toSet());
 
-        // this very slow approach(commented out), it took 30 minutes on an instance with 600 tables
         // return jdbcConnection.getAllTableIds(ctx.catalogName);
         // this very slow approach(commented out), it took 30 minutes on an instance with 600 tables
         // return jdbcConnection.readTableNames(ctx.catalogName, null, null, new String[] {"TABLE"}
