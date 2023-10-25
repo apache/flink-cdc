@@ -26,9 +26,43 @@ under the License.
     <artifactId>flink-connector-debezium</artifactId>
     <name>flink-connector-debezium</name>
 
-    <dependencies>
+    <properties>
+        <version.kafka>3.5.0</version.kafka>
+    </properties>
 
-        <!-- Debezium dependencies -->
+    <dependencyManagement>
+        <!--region Fix https://github.com/ververica/flink-cdc-connectors/issues/604 -->
+        <dependencies>
+            <dependency>
+                <artifactId>connect-json</artifactId>
+                <groupId>org.apache.kafka</groupId>
+                <version>${version.kafka}</version>
+            </dependency>
+            <dependency>
+                <artifactId>connect-file</artifactId>
+                <groupId>org.apache.kafka</groupId>
+                <version>${version.kafka}</version>
+            </dependency>
+            <dependency>
+                <artifactId>connect-transforms</artifactId>
+                <groupId>org.apache.kafka</groupId>
+                <version>${version.kafka}</version>
+            </dependency>
+            <dependency>
+                <artifactId>connect-runtime</artifactId>
+                <groupId>org.apache.kafka</groupId>
+                <version>${version.kafka}</version>
+            </dependency>
+            <dependency>
+                <artifactId>connect-api</artifactId>
+                <groupId>org.apache.kafka</groupId>
+                <version>${version.kafka}</version>
+            </dependency>
+        </dependencies>
+        <!--endregion-->
+    </dependencyManagement>
+
+    <dependencies>
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-api</artifactId>
