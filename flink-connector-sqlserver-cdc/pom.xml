@@ -30,23 +30,11 @@ under the License.
 
     <dependencies>
 
-        <dependency>
-            <groupId>com.ververica</groupId>
-            <artifactId>flink-cdc-base</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Debezium dependencies -->
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-connector-debezium</artifactId>
             <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>kafka-log4j-appender</artifactId>
-                    <groupId>org.apache.kafka</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>

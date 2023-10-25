@@ -306,7 +306,7 @@ public class VitessSource {
                 props.setProperty("column.exclude.list", String.join(",", columnExcludeList));
             }
             if (dbzProperties != null) {
-                dbzProperties.forEach(props::put);
+                props.putAll(dbzProperties);
             }
 
             return new DebeziumSourceFunction<>(

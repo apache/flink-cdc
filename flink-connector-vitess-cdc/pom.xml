@@ -34,12 +34,6 @@ under the License.
             <groupId>com.ververica</groupId>
             <artifactId>flink-connector-debezium</artifactId>
             <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>kafka-log4j-appender</artifactId>
-                    <groupId>org.apache.kafka</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>

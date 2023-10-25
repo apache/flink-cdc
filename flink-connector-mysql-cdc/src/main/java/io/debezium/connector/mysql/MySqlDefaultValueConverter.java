@@ -150,7 +150,7 @@ public class MySqlDefaultValueConverter implements DefaultValueConverter {
      */
     public Object convert(Column column, String value) {
         if (value == null) {
-            return value;
+            return null;
         }
 
         // trim non varchar data types before converting
