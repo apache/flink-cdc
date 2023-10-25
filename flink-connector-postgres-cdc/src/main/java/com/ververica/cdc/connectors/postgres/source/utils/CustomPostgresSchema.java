@@ -17,13 +17,13 @@
 package com.ververica.cdc.connectors.postgres.source.utils;
 
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
-import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges;
@@ -35,7 +35,6 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /** A CustomPostgresSchema similar to PostgresSchema with customization. */
 public class CustomPostgresSchema {
@@ -86,22 +85,27 @@ public class CustomPostgresSchema {
             throw new FlinkRuntimeException("Failed to read schema", e);
         }
 
-        Table table = Objects.requireNonNull(tables.forTable(tableId));
+        Preconditions.checkNotNull(tables.forTable(tableId));
+        tables.tableIds()
+                .forEach(
+                        id -> {
+                            // TODO: check whether we always set isFromSnapshot = true
+                            SchemaChangeEvent schemaChangeEvent =
+                                    SchemaChangeEvent.ofCreate(
+                                            partition,
+                                            offsetContext,
+                                            dbzConfig.databaseName(),
+                                            id.schema(),
+                                            null,
+                                            tables.forTable(id),
+                                            true);
 
-        // TODO: check whether we always set isFromSnapshot = true
-        SchemaChangeEvent schemaChangeEvent =
-                SchemaChangeEvent.ofCreate(
-                        partition,
-                        offsetContext,
-                        dbzConfig.databaseName(),
-                        tableId.schema(),
-                        null,
-                        table,
-                        true);
+                            for (TableChanges.TableChange tableChange :
+                                    schemaChangeEvent.getTableChanges()) {
+                                this.schemasByTableId.put(id, tableChange);
+                            }
+                        });
 
-        for (TableChanges.TableChange tableChange : schemaChangeEvent.getTableChanges()) {
-            this.schemasByTableId.put(tableId, tableChange);
-        }
         return this.schemasByTableId.get(tableId);
     }
 }
