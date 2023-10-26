@@ -139,6 +139,12 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
         return SqlServerUtils.queryMin(jdbc, tableId, columnName, excludedLowerBound);
     }
 
+    public Integer queryCounts(
+            JdbcConnection jdbc, TableId tableId, String columnName, Object min, Object max)
+            throws SQLException {
+        return SqlServerUtils.queryCounts(jdbc, tableId, columnName, min, max);
+    }
+
     @Override
     public DataType fromDbzColumn(Column splitColumn) {
         return SqlServerTypeUtils.fromDbzColumn(splitColumn);
@@ -179,6 +185,7 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
     private List<ChunkRange> splitTableIntoChunks(
             JdbcConnection jdbc, TableId tableId, Column splitColumn) throws SQLException {
         final String splitColumnName = splitColumn.name();
+        final String splitColumnTypeName = splitColumn.typeName();
         final Object[] minMax = queryMinMax(jdbc, tableId, splitColumnName);
         final Object min = minMax[0];
         final Object max = minMax[1];
@@ -210,6 +217,9 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
                         jdbc, tableId, splitColumnName, min, max, chunkSize);
             }
         } else {
+            if (splitColumnTypeName.equals("uniqueidentifier")) {
+                return splitUnevenlySizedChunksSqlCompare(jdbc, tableId, splitColumnName, min, max, chunkSize);
+            }
             return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
         }
     }
@@ -256,7 +266,9 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
 
     // ------------------------------------------------------------------------------------------
 
-    /** Split table into unevenly sized chunks by continuously calculating next chunk max value. */
+    /**
+     * Split table into unevenly sized chunks by continuously calculating next chunk max value.
+     */
     private List<ChunkRange> splitUnevenlySizedChunks(
             JdbcConnection jdbc,
             TableId tableId,
@@ -278,6 +290,36 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             maySleep(count++, tableId);
             chunkStart = chunkEnd;
             chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
+        }
+        // add the ending split
+        splits.add(ChunkRange.of(chunkStart, null));
+        return splits;
+    }
+
+    /**
+     * Split table into unevenly sized chunks by continuously calculating next chunk max value.
+     */
+    private List<ChunkRange> splitUnevenlySizedChunksSqlCompare(
+            JdbcConnection jdbc,
+            TableId tableId,
+            String splitColumnName,
+            Object min,
+            Object max,
+            int chunkSize)
+            throws SQLException {
+        LOG.info(
+                "Use unevenly-sized chunks for table {}, the chunk size is {}, compare by sql", tableId, chunkSize);
+        final List<ChunkRange> splits = new ArrayList<>();
+        Object chunkStart = null;
+        Object chunkEnd = nextChunkEndCompareBySql(jdbc, min, tableId, splitColumnName, max, chunkSize);
+        int count = 0;
+        while (chunkEnd != null && queryCounts(jdbc, tableId, splitColumnName, chunkEnd, max) > 0) {
+            // we start from [null, min + chunk_size) and avoid [null, min)
+            splits.add(ChunkRange.of(chunkStart, chunkEnd));
+            // may sleep awhile to avoid DDOS on SqlServer server
+            maySleep(count++, tableId);
+            chunkStart = chunkEnd;
+            chunkEnd = nextChunkEndCompareBySql(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
@@ -307,6 +349,29 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
         }
     }
 
+    private Object nextChunkEndCompareBySql(
+            JdbcConnection jdbc,
+            Object previousChunkEnd,
+            TableId tableId,
+            String splitColumnName,
+            Object max,
+            int chunkSize)
+            throws SQLException {
+        // chunk end might be null when max values are removed
+        Object chunkEnd =
+                queryNextChunkMax(jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
+        if (Objects.equals(previousChunkEnd, chunkEnd)) {
+            // we don't allow equal chunk start and end,
+            // should query the next one larger than chunkEnd
+            chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
+        }
+        if (queryCounts(jdbc, tableId, splitColumnName, chunkEnd, max) <= 0) {
+            return null;
+        } else {
+            return chunkEnd;
+        }
+    }
+
     private SnapshotSplit createSnapshotSplit(
             JdbcConnection jdbc,
             TableId tableId,
@@ -315,8 +380,8 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             Object chunkStart,
             Object chunkEnd) {
         // currently, we only support single split column
-        Object[] splitStart = chunkStart == null ? null : new Object[] {chunkStart};
-        Object[] splitEnd = chunkEnd == null ? null : new Object[] {chunkEnd};
+        Object[] splitStart = chunkStart == null ? null : new Object[]{chunkStart};
+        Object[] splitEnd = chunkEnd == null ? null : new Object[]{chunkEnd};
         Map<TableId, TableChange> schema = new HashMap<>();
         schema.put(tableId, dialect.queryTableSchema(jdbc, tableId));
         return new SnapshotSplit(
@@ -329,7 +394,9 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
                 schema);
     }
 
-    /** Returns the distribution factor of the given table. */
+    /**
+     * Returns the distribution factor of the given table.
+     */
     private double calculateDistributionFactor(
             TableId tableId, Object min, Object max, long approximateRowCnt) {
 

@@ -121,6 +121,31 @@ public class SqlServerUtils {
                 });
     }
 
+    public static Integer queryCounts(
+            JdbcConnection jdbc, TableId tableId, String columnName, Object min, Object max)
+            throws SQLException {
+        final String countQuery =
+                String.format(
+                        "SELECT COUNT(%s) FROM %s WHERE %s > ? AND %s <= ?",
+                        quote(columnName), quote(tableId), quote(columnName), quote(columnName));
+        Integer res = jdbc.prepareQueryAndMap(
+                countQuery,
+                ps -> {
+                    ps.setObject(1, min);
+                    ps.setObject(2, max);
+                },
+                rs -> {
+                    if (!rs.next()) {
+                        // this should never happen
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]", countQuery));
+                    }
+                    return rs.getInt(1);
+                });
+        return res;
+    }
+
     /**
      * Returns the next LSN to be read from the database. This is the LSN of the last record that
      * was read from the database.
