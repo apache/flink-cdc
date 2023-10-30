@@ -60,7 +60,7 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.readC
 @Internal
 public class ShardedSplitStrategy implements SplitStrategy {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SplitVectorSplitStrategy.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ShardedSplitStrategy.class);
 
     public static final ShardedSplitStrategy INSTANCE = new ShardedSplitStrategy();
 
@@ -75,9 +75,10 @@ public class ShardedSplitStrategy implements SplitStrategy {
         BsonDocument collectionMetadata;
         try {
             collectionMetadata = readCollectionMetadata(mongoClient, collectionId);
-            if (!isValidShardedCollection(collectionMetadata)) {
+            if (!(isValidShardedCollection(collectionMetadata)
+                    && isNotShardedByHash(collectionMetadata))) {
                 LOG.warn(
-                        "Collection {} does not appear to be sharded, fallback to SampleSplitter.",
+                        "Collection {} does not appear to be sharded, or shared by hash, fallback to SampleSplitter.",
                         collectionId);
                 return SampleBucketSplitStrategy.INSTANCE.split(splitContext);
             }
@@ -128,5 +129,11 @@ public class ShardedSplitStrategy implements SplitStrategy {
     private boolean isValidShardedCollection(BsonDocument collectionMetadata) {
         return collectionMetadata != null
                 && !collectionMetadata.getBoolean(DROPPED_FIELD, BsonBoolean.FALSE).getValue();
+    }
+
+    private boolean isNotShardedByHash(BsonDocument collectionMetadata) {
+        BsonDocument splitKeys = collectionMetadata.getDocument(KEY_FIELD);
+        return splitKeys.values().stream()
+                .noneMatch(v -> v.isString() && v.asString().getValue().equals("hashed"));
     }
 }

@@ -26,6 +26,8 @@ import io.debezium.relational.history.TableChanges;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -66,9 +68,13 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.colle
 @Internal
 public class SampleBucketSplitStrategy implements SplitStrategy {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SampleBucketSplitStrategy.class);
+
     public static final SampleBucketSplitStrategy INSTANCE = new SampleBucketSplitStrategy();
     private static final int DEFAULT_SAMPLING_THRESHOLD = 102400;
     private static final double DEFAULT_SAMPLING_RATE = 0.05;
+    private static final int SAMPLING_COUNT_BY_RATE_THRESHOLD = 1000000;
+    private static final int MAX_SAMPLE_PER_CHUNK = 20;
 
     private SampleBucketSplitStrategy() {}
 
@@ -93,6 +99,10 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
         } else {
             // sampled using sample rate.
             numberOfSamples = (int) Math.floor(count * DEFAULT_SAMPLING_RATE);
+            // avoid sampling too much records on a huge collection
+            if (numberOfSamples > SAMPLING_COUNT_BY_RATE_THRESHOLD) {
+                numberOfSamples = numChunks * MAX_SAMPLE_PER_CHUNK;
+            }
         }
 
         TableId collectionId = splitContext.getCollectionId();
@@ -105,9 +115,18 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
             pipeline.add(sample(numberOfSamples));
         }
         pipeline.add(bucketAuto("$" + ID_FIELD, numChunks));
+        LOG.info(
+                "Collection {} going to sample {} records into {} chunks",
+                collectionId,
+                numberOfSamples,
+                numChunks);
 
         List<BsonDocument> chunks =
                 collection.aggregate(pipeline).allowDiskUse(true).into(new ArrayList<>());
+        LOG.info(
+                "Collection {} got {} chunks by auto bucket and sample",
+                collectionId,
+                chunks.size());
 
         RowType rowType = shardKeysToRowType(Collections.singleton(ID_FIELD));
 
