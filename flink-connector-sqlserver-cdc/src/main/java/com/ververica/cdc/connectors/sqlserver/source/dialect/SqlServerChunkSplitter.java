@@ -218,7 +218,8 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             }
         } else {
             if (splitColumnTypeName.equals("uniqueidentifier")) {
-                return splitUnevenlySizedChunksSqlCompare(jdbc, tableId, splitColumnName, min, max, chunkSize);
+                return splitUnevenlySizedChunksSqlCompare(
+                        jdbc, tableId, splitColumnName, min, max, chunkSize);
             }
             return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
         }
@@ -266,9 +267,7 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
 
     // ------------------------------------------------------------------------------------------
 
-    /**
-     * Split table into unevenly sized chunks by continuously calculating next chunk max value.
-     */
+    /** Split table into unevenly sized chunks by continuously calculating next chunk max value. */
     private List<ChunkRange> splitUnevenlySizedChunks(
             JdbcConnection jdbc,
             TableId tableId,
@@ -296,9 +295,7 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
         return splits;
     }
 
-    /**
-     * Split table into unevenly sized chunks by continuously calculating next chunk max value.
-     */
+    /** Split table into unevenly sized chunks by continuously calculating next chunk max value. */
     private List<ChunkRange> splitUnevenlySizedChunksSqlCompare(
             JdbcConnection jdbc,
             TableId tableId,
@@ -308,10 +305,13 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             int chunkSize)
             throws SQLException {
         LOG.info(
-                "Use unevenly-sized chunks for table {}, the chunk size is {}, compare by sql", tableId, chunkSize);
+                "Use unevenly-sized chunks for table {}, the chunk size is {}, compare by sql",
+                tableId,
+                chunkSize);
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
-        Object chunkEnd = nextChunkEndCompareBySql(jdbc, min, tableId, splitColumnName, max, chunkSize);
+        Object chunkEnd =
+                nextChunkEndCompareBySql(jdbc, min, tableId, splitColumnName, max, chunkSize);
         int count = 0;
         while (chunkEnd != null && queryCounts(jdbc, tableId, splitColumnName, chunkEnd, max) > 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
@@ -319,7 +319,9 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             // may sleep awhile to avoid DDOS on SqlServer server
             maySleep(count++, tableId);
             chunkStart = chunkEnd;
-            chunkEnd = nextChunkEndCompareBySql(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
+            chunkEnd =
+                    nextChunkEndCompareBySql(
+                            jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
@@ -380,8 +382,8 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             Object chunkStart,
             Object chunkEnd) {
         // currently, we only support single split column
-        Object[] splitStart = chunkStart == null ? null : new Object[]{chunkStart};
-        Object[] splitEnd = chunkEnd == null ? null : new Object[]{chunkEnd};
+        Object[] splitStart = chunkStart == null ? null : new Object[] {chunkStart};
+        Object[] splitEnd = chunkEnd == null ? null : new Object[] {chunkEnd};
         Map<TableId, TableChange> schema = new HashMap<>();
         schema.put(tableId, dialect.queryTableSchema(jdbc, tableId));
         return new SnapshotSplit(
@@ -394,9 +396,7 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
                 schema);
     }
 
-    /**
-     * Returns the distribution factor of the given table.
-     */
+    /** Returns the distribution factor of the given table. */
     private double calculateDistributionFactor(
             TableId tableId, Object min, Object max, long approximateRowCnt) {
 
