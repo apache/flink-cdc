@@ -22,7 +22,7 @@ import org.testcontainers.containers.JdbcDatabaseContainer;
 public class VitessContainer extends JdbcDatabaseContainer {
 
     public static final String IMAGE = "vitess/vttestserver";
-    public static final String DEFAULT_TAG = "mysql80";
+    public static final String DEFAULT_TAG = "v17.0.2-mysql80";
     private static final Integer VITESS_PORT = 15991;
     public static final Integer GRPC_PORT = VITESS_PORT + 1;
     public static final Integer MYSQL_PORT = VITESS_PORT + 3;
