@@ -30,8 +30,8 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.connectors.vitess.config.SchemaAdjustmentMode;
 import com.ververica.cdc.connectors.vitess.config.TabletType;
-import com.ververica.cdc.connectors.vitess.config.VtctldConfig;
 import com.ververica.cdc.connectors.vitess.table.VitessTableFactory;
 import com.ververica.cdc.connectors.vitess.table.VitessTableSource;
 import org.junit.Test;
@@ -61,7 +61,6 @@ public class VitessTableFactoryTest {
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Arrays.asList("bbb", "aaa")));
 
-    private static final String MY_SCHEMA = "public";
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
@@ -84,7 +83,11 @@ public class VitessTableFactoryTest {
                         MY_TABLE,
                         null,
                         null,
-                        VtctldConfig.builder().hostname(MY_LOCALHOST).port(15999).build(),
+                        null,
+                        "current",
+                        false,
+                        true,
+                        SchemaAdjustmentMode.AVRO,
                         TabletType.RDONLY,
                         "decoderbufs",
                         "flink",
@@ -96,7 +99,6 @@ public class VitessTableFactoryTest {
     public void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("port", "5444");
-        options.put("vtctl.port", "5445");
         options.put("decoding.plugin.name", "wal2json");
         options.put("debezium.snapshot.mode", "never");
         options.put("name", "flink");
@@ -116,7 +118,11 @@ public class VitessTableFactoryTest {
                         MY_TABLE,
                         MY_USERNAME,
                         MY_PASSWORD,
-                        VtctldConfig.builder().hostname(MY_LOCALHOST).port(5445).build(),
+                        null,
+                        "current",
+                        false,
+                        true,
+                        SchemaAdjustmentMode.AVRO,
                         TabletType.MASTER,
                         "wal2json",
                         "flink",
@@ -177,7 +183,6 @@ public class VitessTableFactoryTest {
         options.put("connector", "vitess-cdc");
         options.put("hostname", MY_LOCALHOST);
         options.put("keyspace", MY_KEYSPACE);
-        options.put("vtctl.hostname", MY_LOCALHOST);
         options.put("table-name", MY_TABLE);
         return options;
     }

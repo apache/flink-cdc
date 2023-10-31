@@ -45,7 +45,6 @@ import java.util.stream.Collectors;
 
 import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.GRPC_PORT;
 import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.MYSQL_PORT;
-import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.VTCTLD_GRPC_PORT;
 import static org.junit.Assert.assertNotNull;
 
 /** End-to-end test for Vitess CDC connector. */
@@ -63,7 +62,7 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
                             .withKeyspace("test")
                             .withUsername("flinkuser")
                             .withPassword("flinkpwd")
-                            .withExposedPorts(MYSQL_PORT, GRPC_PORT, VTCTLD_GRPC_PORT)
+                            .withExposedPorts(MYSQL_PORT, GRPC_PORT)
                             .withLogConsumer(new Slf4jLogConsumer(LOG))
                             .withNetwork(NETWORK)
                             .withNetworkAliases(VITESS_CONTAINER_NETWORK_ALIAS);
@@ -98,15 +97,11 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
                                 + " 'tablet-type' = 'MASTER',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
-                                + " 'vtctl.hostname' = '%s',"
-                                + " 'vtctl.port' = '%s',"
                                 + " 'keyspace' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ");",
                         VITESS_CONTAINER_NETWORK_ALIAS,
                         GRPC_PORT,
-                        VITESS_CONTAINER_NETWORK_ALIAS,
-                        VTCTLD_GRPC_PORT,
                         VITESS_CONTAINER.getKeyspace(),
                         "test.products");
         String sinkDDL =

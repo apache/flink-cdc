@@ -69,11 +69,11 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
 
     @Before
     public void before() {
-        database = ROUTER.executeCommandFileInSeparateDatabase("chunk_test");
+        database = CONTAINER.executeCommandFileInSeparateDatabase("chunk_test");
 
         MongoDBSourceConfigFactory configFactory =
                 new MongoDBSourceConfigFactory()
-                        .hosts(ROUTER.getHostAndPort())
+                        .hosts(CONTAINER.getHostAndPort())
                         .databaseList(database)
                         .collectionList(database + ".shopping_cart")
                         .username(FLINK_USER)

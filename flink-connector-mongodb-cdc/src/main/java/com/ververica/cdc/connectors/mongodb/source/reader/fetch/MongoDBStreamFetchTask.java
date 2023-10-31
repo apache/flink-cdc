@@ -334,7 +334,6 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         Instant clusterInstant = Instant.ofEpochSecond(clusterTime.getTime());
         source.put(TIMESTAMP_KEY_FIELD, new BsonInt64(clusterInstant.toEpochMilli()));
         changeStreamDocument.put(SOURCE_FIELD, source);
-
         return changeStreamDocument;
     }
 

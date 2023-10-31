@@ -196,6 +196,26 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * scan.full-changelog
+     *
+     * <p>Whether to generate full mode row data by looking up full document pre- and post-image
+     * collections. Requires MongoDB >= 6.0.
+     */
+    public MongoDBSourceBuilder<T> scanFullChangelog(boolean enableFullDocPrePostImage) {
+        this.configFactory.scanFullChangelog(enableFullDocPrePostImage);
+        return this;
+    }
+
+    /**
+     * Whether disable cursor timeout during snapshot phase. Defaults to true. Only enable this when
+     * MongoDB server doesn't support noCursorTimeout option.
+     */
+    public MongoDBSourceBuilder<T> disableCursorTimeout(boolean disableCursorTimeout) {
+        this.configFactory.disableCursorTimeout(disableCursorTimeout);
+        return this;
+    }
+
+    /**
      * The deserializer used to convert from consumed {@link
      * org.apache.kafka.connect.source.SourceRecord}.
      */
