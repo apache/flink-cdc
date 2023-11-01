@@ -279,7 +279,7 @@ Connector Options
     <tr>
       <td>scan.incremental.snapshot.chunk.samples</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">64</td>
+      <td style="word-wrap: break-word;">20</td>
       <td>Integer</td>
       <td>The sample count per chunk when using SampleBucketSplitStrategy during incremental snapshot.</td>
     </tr>
