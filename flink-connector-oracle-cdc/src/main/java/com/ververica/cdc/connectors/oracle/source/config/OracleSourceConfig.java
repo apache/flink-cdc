@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.oracle.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.Tables;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnectorConfig;
@@ -41,7 +42,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
     public OracleSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
-            List<String> tableList,
+            Tables tables,
             int splitSize,
             int splitMetaGroupSize,
             double distributionFactorUpper,
@@ -66,7 +67,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 startupOptions,
                 databaseList,
                 null,
-                tableList,
+                tables,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,

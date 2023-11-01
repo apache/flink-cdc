@@ -39,7 +39,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected String username;
     protected String password;
     protected List<String> databaseList;
-    protected List<String> tableList;
+    protected Tables tables;
     protected StartupOptions startupOptions = StartupOptions.initial();
     protected boolean includeSchemaChanges = false;
     protected boolean closeIdleReaders = false;
@@ -82,11 +82,21 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     /**
      * An optional list of regular expressions that match fully-qualified table identifiers for
      * tables to be monitored; any table not included in the list will be excluded from monitoring.
-     * Each identifier is of t、he form databaseName.tableName. By default the connector will monitor
+     * Each identifier is of the form databaseName.tableName. By default the connector will monitor
      * every non-system table in each monitored database.
      */
+    @Deprecated
     public JdbcSourceConfigFactory tableList(String... tableList) {
-        this.tableList = Arrays.asList(tableList);
+        return tables(Tables.include(tableList));
+    }
+
+    /**
+     * An optional list of regular expressions that match fully-qualified table identifiers for
+     * tables to be monitored or excluded. Each identifier is of the form databaseName.tableName. By
+     * default, the connector will monitor every non-system table in each monitored database.
+     */
+    public JdbcSourceConfigFactory tables(Tables tables) {
+        this.tables = tables;
         return this;
     }
 

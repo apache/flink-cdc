@@ -58,8 +58,9 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
 
-        if (tableList != null) {
-            props.setProperty("table.include.list", String.join(",", tableList));
+        if (tables != null) {
+            String type = tables.isToInclude() ? "table.include.list" : "table.exclude.list";
+            props.setProperty(type, String.join(",", tables.getTableList()));
         }
 
         switch (startupOptions.startupMode) {
@@ -81,7 +82,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
         return new SqlServerSourceConfig(
                 startupOptions,
                 databaseList,
-                tableList,
+                tables,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,

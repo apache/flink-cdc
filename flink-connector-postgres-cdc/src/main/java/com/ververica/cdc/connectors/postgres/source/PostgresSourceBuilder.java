@@ -21,6 +21,7 @@ import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.connectors.base.config.Tables;
 import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
@@ -95,6 +96,16 @@ public class PostgresSourceBuilder<T> {
      */
     public PostgresSourceBuilder<T> tableList(String... tableList) {
         this.configFactory.tableList(tableList);
+        return this;
+    }
+
+    /**
+     * An optional list of regular expressions that match fully-qualified table identifiers for
+     * tables to be monitored or excluded. Each identifier is of the form databaseName.tableName. By
+     * default, the connector will monitor every non-system table in each monitored database.
+     */
+    public PostgresSourceBuilder<T> tables(Tables tables) {
+        this.configFactory.tables(tables);
         return this;
     }
 

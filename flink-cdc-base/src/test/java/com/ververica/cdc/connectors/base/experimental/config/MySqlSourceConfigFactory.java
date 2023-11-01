@@ -92,8 +92,9 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         if (databaseList != null) {
             props.setProperty("database.include.list", String.join(",", databaseList));
         }
-        if (tableList != null) {
-            props.setProperty("table.include.list", String.join(",", tableList));
+        if (tables != null) {
+            String type = tables.isToInclude() ? "table.include.list" : "table.exclude.list";
+            props.setProperty(type, String.join(",", tables.getTableList()));
         }
         if (serverTimeZone != null) {
             props.setProperty("database.serverTimezone", serverTimeZone);
@@ -109,7 +110,7 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         return new MySqlSourceConfig(
                 startupOptions,
                 databaseList,
-                tableList,
+                tables,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,

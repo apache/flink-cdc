@@ -37,7 +37,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final String password;
     protected final List<String> databaseList;
     protected final List<String> schemaList;
-    protected final List<String> tableList;
+    protected final Tables tables;
     protected final int fetchSize;
     protected final String serverTimeZone;
     protected final Duration connectTimeout;
@@ -49,7 +49,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             StartupOptions startupOptions,
             List<String> databaseList,
             List<String> schemaList,
-            List<String> tableList,
+            Tables tables,
             int splitSize,
             int splitMetaGroupSize,
             double distributionFactorUpper,
@@ -86,7 +86,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         this.password = password;
         this.databaseList = databaseList;
         this.schemaList = schemaList;
-        this.tableList = tableList;
+        this.tables = tables;
         this.fetchSize = fetchSize;
         this.serverTimeZone = serverTimeZone;
         this.connectTimeout = connectTimeout;
@@ -121,8 +121,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         return databaseList;
     }
 
-    public List<String> getTableList() {
-        return tableList;
+    public Tables getTables() {
+        return tables;
     }
 
     public int getFetchSize() {

@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.sqlserver.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.Tables;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
@@ -34,7 +35,7 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
     public SqlServerSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
-            List<String> tableList,
+            Tables tables,
             int splitSize,
             int splitMetaGroupSize,
             double distributionFactorUpper,
@@ -58,7 +59,7 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 startupOptions,
                 databaseList,
                 null,
-                tableList,
+                tables,
                 splitSize,
                 splitMetaGroupSize,
                 distributionFactorUpper,
