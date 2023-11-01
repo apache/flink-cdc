@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql;
 
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
@@ -44,6 +45,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 
 import static org.junit.Assert.assertTrue;
 
@@ -52,6 +54,55 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
 
     private final UniqueDatabase fullTypesDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
+
+    private static List<Object> fetchRows(Iterator<Row> iter, int size) {
+        List<Object> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Row row = iter.next();
+            // ignore rowKind marker
+            rows.add(row.getField(0));
+            size--;
+        }
+        return rows;
+    }
+
+    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
+        while (!iterator.hasNext()) {
+            Thread.sleep(100);
+        }
+    }
+
+    private static byte[] readLines(String resource) throws IOException, URISyntaxException {
+        Path path =
+                Paths.get(
+                        Objects.requireNonNull(
+                                        LegacyMySqlSourceITCase.class
+                                                .getClassLoader()
+                                                .getResource(resource))
+                                .toURI());
+        return Files.readAllBytes(path);
+    }
+
+    private static boolean dataInJsonIsEquals(String actual, String expect) {
+        JSONObject actualJsonObject = JSONObject.parseObject(actual);
+        JSONObject expectJsonObject = JSONObject.parseObject(expect);
+        if (expectJsonObject.getJSONObject("payload") != null
+                && actualJsonObject.getJSONObject("payload") != null) {
+            expectJsonObject = expectJsonObject.getJSONObject("payload");
+            actualJsonObject = actualJsonObject.getJSONObject("payload");
+        }
+        return jsonObjectEquals(
+                        expectJsonObject.getJSONObject("after"),
+                        actualJsonObject.getJSONObject("after"))
+                && jsonObjectEquals(
+                        expectJsonObject.getJSONObject("before"),
+                        actualJsonObject.getJSONObject("before"))
+                && Objects.equals(expectJsonObject.get("op"), actualJsonObject.get("op"));
+    }
+
+    private static boolean jsonObjectEquals(JSONObject a, JSONObject b) {
+        return (a == b) || (a != null && a.toString().equals(b.toString()));
+    }
 
     @Test
     public void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
@@ -73,6 +124,79 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                 "file/debezium-data-schema-exclude-with-numeric-decimal.json");
     }
 
+    private void testNewSourceApiConsumingAllEventsWithJsonFormat(
+            Boolean includeSchema, Map<String, Object> customConverterConfigs, String expectedFile)
+            throws Exception {
+        fullTypesDatabase.createAndInitialize();
+        Properties properties = new Properties();
+        properties.put("converters", "flinkcdc-converter");
+        properties.put(
+                "mysql-converter.type",
+                "com.ververica.cdc.debezium.converter.FlinkCDCFormatConverter");
+        properties.put("flinkcdc-converter.format.date", "yyyy-MM-dd");
+        properties.put("flinkcdc-converter.format.time", "HH:mm:ss");
+        properties.put("flinkcdc-converter.format.datetime", "yyyy-MM-dd HH:mm:ss");
+        properties.put("flinkcdc-converter.format.timestamp", "yyyy-MM-dd HH:mm:ss");
+        properties.put("flinkcdc-converter.format.timestamp.zone", "Asia/Shanghai");
+        JsonDebeziumDeserializationSchema schema =
+                customConverterConfigs == null
+                        ? new JsonDebeziumDeserializationSchema(includeSchema)
+                        : new JsonDebeziumDeserializationSchema(
+                                includeSchema, customConverterConfigs);
+        com.ververica.cdc.connectors.mysql.source.MySqlSource<String> mySqlSource =
+                com.ververica.cdc.connectors.mysql.source.MySqlSource.<String>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(fullTypesDatabase.getDatabaseName())
+                        .tableList(fullTypesDatabase.getDatabaseName() + ".full_types")
+                        .username(fullTypesDatabase.getUsername())
+                        .password(fullTypesDatabase.getPassword())
+                        .debeziumProperties(properties)
+                        .serverTimeZone("Asia/Shanghai")
+                        .serverId("5401-5404")
+                        .deserializer(schema)
+                        .build();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.enableCheckpointing(1000);
+        StreamTableEnvironment tEnv =
+                StreamTableEnvironment.create(
+                        env, EnvironmentSettings.newInstance().inStreamingMode().build());
+
+        final JSONObject expected =
+                JSONObject.parseObject(readLines(expectedFile), JSONObject.class);
+        JSONObject expectSnapshot = expected.getJSONObject("expected_snapshot");
+
+        // enable checkpoint
+        env.enableCheckpointing(3000);
+        // set the source parallelism to 4
+        DataStreamSource<String> source =
+                env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySqlParallelSource")
+                        .setParallelism(4);
+        tEnv.createTemporaryView("full_types", source);
+        TableResult result = tEnv.executeSql("SELECT * FROM full_types");
+
+        // check the snapshot result
+        CloseableIterator<Row> snapshot = result.collect();
+        waitForSnapshotStarted(snapshot);
+        assertTrue(
+                dataInJsonIsEquals(
+                        fetchRows(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
+        try (Connection connection = fullTypesDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+        }
+
+        // check the binlog result
+        CloseableIterator<Row> binlog = result.collect();
+        JSONObject expectBinlog = expected.getJSONObject("expected_binlog");
+        assertTrue(
+                dataInJsonIsEquals(
+                        fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Deprecated
     private void testConsumingAllEventsWithJsonFormat(
             Boolean includeSchema, Map<String, Object> customConverterConfigs, String expectedFile)
             throws Exception {
@@ -132,55 +256,6 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                 includeSchema
                         ? "file/debezium-data-schema-include.json"
                         : "file/debezium-data-schema-exclude.json";
-        testConsumingAllEventsWithJsonFormat(includeSchema, null, expectedFile);
-    }
-
-    private static List<Object> fetchRows(Iterator<Row> iter, int size) {
-        List<Object> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            // ignore rowKind marker
-            rows.add(row.getField(0));
-            size--;
-        }
-        return rows;
-    }
-
-    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
-        while (!iterator.hasNext()) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static byte[] readLines(String resource) throws IOException, URISyntaxException {
-        Path path =
-                Paths.get(
-                        Objects.requireNonNull(
-                                        LegacyMySqlSourceITCase.class
-                                                .getClassLoader()
-                                                .getResource(resource))
-                                .toURI());
-        return Files.readAllBytes(path);
-    }
-
-    private static boolean dataInJsonIsEquals(String actual, String expect) {
-        JSONObject actualJsonObject = JSONObject.parseObject(actual);
-        JSONObject expectJsonObject = JSONObject.parseObject(expect);
-        if (expectJsonObject.getJSONObject("payload") != null
-                && actualJsonObject.getJSONObject("payload") != null) {
-            expectJsonObject = expectJsonObject.getJSONObject("payload");
-            actualJsonObject = actualJsonObject.getJSONObject("payload");
-        }
-        return jsonObjectEquals(
-                        expectJsonObject.getJSONObject("after"),
-                        actualJsonObject.getJSONObject("after"))
-                && jsonObjectEquals(
-                        expectJsonObject.getJSONObject("before"),
-                        actualJsonObject.getJSONObject("before"))
-                && Objects.equals(expectJsonObject.get("op"), actualJsonObject.get("op"));
-    }
-
-    private static boolean jsonObjectEquals(JSONObject a, JSONObject b) {
-        return (a == b) || (a != null && a.toString().equals(b.toString()));
+        testNewSourceApiConsumingAllEventsWithJsonFormat(includeSchema, null, expectedFile);
     }
 }
