@@ -319,7 +319,7 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td>optional</td>
                 <td style="word-wrap: break-word;">true</td>
                 <td>Boolean</td>
-                <td>Flag of whether column names are case-sensitive, default value is 'true', and when set to false, column names will be converted to lowercase.</td>
+                <td>Flag of whether column names are case-sensitive, default value is 'true'.</td>
             </tr>
         </tbody>
     </table>

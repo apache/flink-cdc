@@ -316,7 +316,7 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>否</td>
                 <td style="word-wrap: break-word;">true</td>
                 <td>Boolean</td>
-                <td>列名是否大小写敏感，默认为 true，当置为 false 时，将会把列名转为小写使用。</td>
+                <td>列名是否大小写敏感，默认为 true。</td>
             </tr>
         </tbody>
     </table>

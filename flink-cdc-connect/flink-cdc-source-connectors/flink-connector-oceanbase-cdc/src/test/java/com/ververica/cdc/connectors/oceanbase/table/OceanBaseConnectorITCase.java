@@ -570,9 +570,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                 String.format(
                         "CREATE TABLE ob_source ("
                                 + " rowid INT NOT NULL,"
-                                + " name STRING,"
-                                + " description STRING,"
-                                + " weight DECIMAL(20, 10),"
+                                + " Name STRING,"
+                                + " Description STRING,"
+                                + " Weight DECIMAL(20, 10),"
                                 + " PRIMARY KEY (rowid) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'oceanbase-cdc',"

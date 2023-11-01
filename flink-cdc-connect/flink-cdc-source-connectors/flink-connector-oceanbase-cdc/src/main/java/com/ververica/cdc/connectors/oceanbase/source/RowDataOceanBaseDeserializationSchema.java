@@ -85,10 +85,13 @@ public class RowDataOceanBaseDeserializationSchema
             RowType physicalDataType,
             OceanBaseMetadataConverter[] metadataConverters,
             TypeInformation<RowData> resultTypeInfo,
-            ZoneId serverTimeZone) {
+            ZoneId serverTimeZone,
+            boolean columnCaseSensitive) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
         this.appendMetadataCollector = new OceanBaseAppendMetadataCollector(metadataConverters);
-        this.physicalConverter = createConverter(checkNotNull(physicalDataType), serverTimeZone);
+        this.physicalConverter =
+                createConverter(
+                        checkNotNull(physicalDataType), serverTimeZone, columnCaseSensitive);
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
     }
 
@@ -156,6 +159,7 @@ public class RowDataOceanBaseDeserializationSchema
         private TypeInformation<RowData> resultTypeInfo;
         private OceanBaseMetadataConverter[] metadataConverters = new OceanBaseMetadataConverter[0];
         private ZoneId serverTimeZone = ZoneId.of("UTC");
+        private boolean columnCaseSensitive = true;
 
         public RowDataOceanBaseDeserializationSchema.Builder setPhysicalRowType(
                 RowType physicalRowType) {
@@ -181,15 +185,26 @@ public class RowDataOceanBaseDeserializationSchema
             return this;
         }
 
+        public RowDataOceanBaseDeserializationSchema.Builder setColumnCaseSensitive(
+                boolean columnCaseSensitive) {
+            this.columnCaseSensitive = columnCaseSensitive;
+            return this;
+        }
+
         public RowDataOceanBaseDeserializationSchema build() {
             return new RowDataOceanBaseDeserializationSchema(
-                    physicalRowType, metadataConverters, resultTypeInfo, serverTimeZone);
+                    physicalRowType,
+                    metadataConverters,
+                    resultTypeInfo,
+                    serverTimeZone,
+                    columnCaseSensitive);
         }
     }
 
     private static OceanBaseDeserializationRuntimeConverter createConverter(
-            LogicalType type, ZoneId serverTimeZone) {
-        return wrapIntoNullableConverter(createNotNullConverter(type, serverTimeZone));
+            LogicalType type, ZoneId serverTimeZone, boolean columnCaseSensitive) {
+        return wrapIntoNullableConverter(
+                createNotNullConverter(type, serverTimeZone, columnCaseSensitive));
     }
 
     private static OceanBaseDeserializationRuntimeConverter wrapIntoNullableConverter(
@@ -208,10 +223,10 @@ public class RowDataOceanBaseDeserializationSchema
     }
 
     public static OceanBaseDeserializationRuntimeConverter createNotNullConverter(
-            LogicalType type, ZoneId serverTimeZone) {
+            LogicalType type, ZoneId serverTimeZone, boolean columnCaseSensitive) {
         switch (type.getTypeRoot()) {
             case ROW:
-                return createRowConverter((RowType) type, serverTimeZone);
+                return createRowConverter((RowType) type, serverTimeZone, columnCaseSensitive);
             case NULL:
                 return convertToNull();
             case BOOLEAN:
@@ -255,11 +270,14 @@ public class RowDataOceanBaseDeserializationSchema
     }
 
     private static OceanBaseDeserializationRuntimeConverter createRowConverter(
-            RowType rowType, ZoneId serverTimeZone) {
+            RowType rowType, ZoneId serverTimeZone, boolean columnCaseSensitive) {
         final OceanBaseDeserializationRuntimeConverter[] fieldConverters =
                 rowType.getFields().stream()
                         .map(RowType.RowField::getType)
-                        .map(logicType -> createConverter(logicType, serverTimeZone))
+                        .map(
+                                logicType ->
+                                        createConverter(
+                                                logicType, serverTimeZone, columnCaseSensitive))
                         .toArray(OceanBaseDeserializationRuntimeConverter[]::new);
         final String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
         return new OceanBaseDeserializationRuntimeConverter() {
@@ -273,6 +291,9 @@ public class RowDataOceanBaseDeserializationSchema
                 Map<String, Object> fieldMap = (Map<String, Object>) object;
                 for (int i = 0; i < arity; i++) {
                     String fieldName = fieldNames[i];
+                    if (!columnCaseSensitive) {
+                        fieldName = fieldName.toLowerCase();
+                    }
                     Object value = fieldMap.get(fieldName);
                     try {
                         row.setField(i, fieldConverters[i].convert(value));

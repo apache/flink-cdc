@@ -152,6 +152,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(resultTypeInfo)
                         .setServerTimeZone(ZoneId.of(serverTimeZone))
+                        .setColumnCaseSensitive(columnCaseSensitive)
                         .build();
 
         OceanBaseSource.Builder<RowData> builder =
