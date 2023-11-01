@@ -197,7 +197,7 @@ Then you could click "View" → "Tool Windows" → "Checkstyle" and find the "Ch
 
 ### Documentation Contribute
 
-Flink cdc documentation is located at `docs/content`.
+Flink cdc documentations are located at `docs/content`.
 
 The contribution step is the same as the code contribution. We use markdown as the source code of the document.
 
