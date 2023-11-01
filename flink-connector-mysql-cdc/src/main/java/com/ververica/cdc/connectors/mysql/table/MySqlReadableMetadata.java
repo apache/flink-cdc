@@ -78,6 +78,21 @@ public enum MySqlReadableMetadata {
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
                 }
+            }),
+
+    /** it indicates the time that the data consumed by the FlinkCDC. */
+    TS(
+            "meta_ts",
+            DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3).notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    return TimestampData.fromEpochMillis(
+                            (Long) messageStruct.get(Envelope.FieldName.TIMESTAMP));
+                }
             });
 
     private final String key;
