@@ -176,10 +176,10 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         switch (row.getType()) {
             case COMMITTED:
                 prewrites.put(RowKeyWithTs.ofStart(row), row);
-                commits.put(RowKeyWithTs.ofCommit(row), row);
+                commits.put(RowKeyWithTs.ofStart(row), row);
                 break;
             case COMMIT:
-                commits.put(RowKeyWithTs.ofCommit(row), row);
+                commits.put(RowKeyWithTs.ofStart(row), row);
                 break;
             case PREWRITE:
                 prewrites.put(RowKeyWithTs.ofStart(row), row);
