@@ -81,7 +81,7 @@ The Docker Compose environment consists of the following containers:
 - MySQL: mainly used as a data source to store the sharding table.
 
 ***Note:***
-1. To simply this tutorial, the jar packages required has been packaged into the SQL-Client container. You can see how it's built in [GitHub](https://github.com/luoyuxia/flink-cdc-tutorial/tree/main/flink-cdc-iceberg-demo/sql-client). 
+1. To simplify this tutorial, the required jar packages have been packaged into the SQL-Client container. You can see how it's built in [GitHub](https://github.com/luoyuxia/flink-cdc-tutorial/tree/main/flink-cdc-iceberg-demo/sql-client). 
 If you want to run with your own Flink environment, remember to download the following packages and then put them to `FLINK_HOME/lib/`.
    
    **Download links are available only for stable releases, SNAPSHOT dependency need build by yourself. **
@@ -89,8 +89,8 @@ If you want to run with your own Flink environment, remember to download the fol
    - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
    - [iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar](https://raw.githubusercontent.com/luoyuxia/flink-cdc-tutorial/main/flink-cdc-iceberg-demo/sql-client/lib/iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar)
    
-   Currently, the Iceberg official `iceberg-flink-runtime` jar that supports Flink 1.13 isn't released. 
-   Here, we provide a `iceberg-flink-runtime` jar supporting Flink 1.13, which is built based on the master branch of Iceberg. 
+   Currently, the Iceberg official `iceberg-flink-runtime` jar that supports Flink 1.13 hasn't been released. 
+   Here, we provide an `iceberg-flink-runtime` jar supporting Flink 1.13, which is built based on the master branch of Iceberg. 
    You can download the `iceberg-flink-runtime` jar from the [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) once Iceberg 0.13.0 is released.
 2. All the following commands involving `docker-compose` should be executed in the directory of the `docker-compose.yml` file.
 
@@ -281,7 +281,7 @@ Then do the following steps in Flink SQL CLI:
    ![Final Data in Iceberg](/_static/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png "Final Data in Iceberg")
 
    From the latest result in Iceberg, we can see that there is a new record of `(db_1, user_1, 111)`, and the address of `(db_1, user_2, 120)` has been updated to `Beijing`.
-   Besides, the record of `(db_2, user_2, 220)` has been deleted. The result is exactly the same with the changes we did in MySQL.
+   Besides, the record of `(db_2, user_2, 220)` has been deleted. The result is exactly the same as the changes we made in MySQL.
    
 ## Clean up
 After finishing the tutorial, run the following command in the directory of `docker-compose.yml` to stop all containers:
