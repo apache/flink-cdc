@@ -130,7 +130,7 @@ CDC Connectors for Apache Flink<sup>®</sup> welcomes anyone that wants to help 
 
 ### Code Contribute
 
-1. Left comment under the issue that you want to take
+1. Leave a comment under the issue that you want to take
 2. Fork Flink CDC project to your GitHub repositories
 3. Clone and compile your Flink CDC project
 ```bash
@@ -197,7 +197,7 @@ Then you could click "View" → "Tool Windows" → "Checkstyle" and find the "Ch
 
 ### Documentation Contribute
 
-Flink cdc documentations locates at `docs/content`.
+Flink cdc documentation is located at `docs/content`.
 
 The contribution step is the same as the code contribution. We use markdown as the source code of the document.
 
@@ -205,7 +205,7 @@ The contribution step is the same as the code contribution. We use markdown as t
 
 * [DingTalk](https://www.dingtalk.com/) Chinese User Group
 
-  You can search the group number [**33121212**] or scan the following QR code to join in the group.
+  You can search the group number [**33121212**] or scan the following QR code to join the group.
   
   <div align=center>
      <img src="https://user-images.githubusercontent.com/5163645/233297896-0195d0ae-eb1c-4604-977b-1d08e424c7e7.png" width=400 />
