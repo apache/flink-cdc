@@ -105,8 +105,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig) {
         OracleSourceConfig oracleSourceConfig = (OracleSourceConfig) sourceConfig;
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
-            return OracleConnectionUtils.listTables(
-                    jdbcConnection, oracleSourceConfig.getTableFilters());
+            return OracleConnectionUtils.listTables(jdbcConnection, oracleSourceConfig);
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
         }
