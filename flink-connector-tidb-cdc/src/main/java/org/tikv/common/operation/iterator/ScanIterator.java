@@ -76,7 +76,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
 
     // return true if current cache is not loaded or empty
     boolean cacheLoadFails() {
-        if (endOfScan || processingLastBatch) {
+        if (endOfScan || processingLastBatch || this.limit <= 0) {
             return true;
         }
         if (startKey == null) {
@@ -102,15 +102,9 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
             if (currentCache.size() < scanLimit) {
                 startKey = curRegionEndKey;
                 lastKey = Key.toRawKey(curRegionEndKey);
-            } else if (currentCache.size() > scanLimit) {
-                throw new IndexOutOfBoundsException(
-                        "current cache size = "
-                                + currentCache.size()
-                                + ", larger than "
-                                + scanLimit);
             } else {
                 // Start new scan from exact next key in current region
-                lastKey = Key.toRawKey(currentCache.get(currentCache.size() - 1).getKey());
+                lastKey = Key.toRawKey(currentCache.get(scanLimit - 1).getKey());
                 startKey = lastKey.next().toByteString();
             }
             // notify last batch if lastKey is greater than or equal to endKey
