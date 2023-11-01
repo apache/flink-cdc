@@ -79,6 +79,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean enableParallelRead;
     private final Integer splitMetaGroupSize;
     private final Integer splitSizeMB;
+    private final Integer samplesPerChunk;
     private final boolean closeIdlerReaders;
     private final boolean enableFullDocPrePostImage;
     private final boolean noCursorTimeout;
@@ -112,6 +113,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean enableParallelRead,
             @Nullable Integer splitMetaGroupSize,
             @Nullable Integer splitSizeMB,
+            @Nullable Integer samplesPerChunk,
             boolean closeIdlerReaders,
             boolean enableFullDocPrePostImage,
             boolean noCursorTimeout) {
@@ -135,6 +137,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.enableParallelRead = enableParallelRead;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
+        this.samplesPerChunk = samplesPerChunk;
         this.closeIdlerReaders = closeIdlerReaders;
         this.enableFullDocPrePostImage = enableFullDocPrePostImage;
         this.noCursorTimeout = noCursorTimeout;
@@ -209,6 +212,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                     .ifPresent(builder::heartbeatIntervalMillis);
             Optional.ofNullable(splitMetaGroupSize).ifPresent(builder::splitMetaGroupSize);
             Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
+            Optional.ofNullable(samplesPerChunk).ifPresent(builder::samplesPerChunk);
             return SourceProvider.of(builder.build());
         } else {
             com.ververica.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
@@ -289,6 +293,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         enableParallelRead,
                         splitMetaGroupSize,
                         splitSizeMB,
+                        samplesPerChunk,
                         closeIdlerReaders,
                         enableFullDocPrePostImage,
                         noCursorTimeout);
@@ -324,6 +329,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(enableParallelRead, that.enableParallelRead)
                 && Objects.equals(splitMetaGroupSize, that.splitMetaGroupSize)
                 && Objects.equals(splitSizeMB, that.splitSizeMB)
+                && Objects.equals(samplesPerChunk, that.samplesPerChunk)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(closeIdlerReaders, that.closeIdlerReaders)
@@ -352,6 +358,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 enableParallelRead,
                 splitMetaGroupSize,
                 splitSizeMB,
+                samplesPerChunk,
                 producedDataType,
                 metadataKeys,
                 closeIdlerReaders,

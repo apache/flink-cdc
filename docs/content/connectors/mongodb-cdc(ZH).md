@@ -271,6 +271,13 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>增量快照的区块大小 mb。</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.chunk.samples</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">20</td>
+      <td>Integer</td>
+      <td>采样分片策略，每个chunk采样的数据条数。</td>
+    </tr>
+    <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

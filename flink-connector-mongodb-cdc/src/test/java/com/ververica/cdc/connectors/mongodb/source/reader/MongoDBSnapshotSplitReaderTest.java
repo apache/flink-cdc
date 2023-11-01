@@ -79,6 +79,7 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
                         .username(FLINK_USER)
                         .password(FLINK_USER_PASSWORD)
                         .splitSizeMB(1)
+                        .samplesPerChunk(10)
                         .pollAwaitTimeMillis(500);
 
         sourceConfig = configFactory.create(0);

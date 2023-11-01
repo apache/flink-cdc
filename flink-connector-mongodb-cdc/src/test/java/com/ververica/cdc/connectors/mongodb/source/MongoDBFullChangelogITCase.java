@@ -76,6 +76,7 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                 new MongoDBSourceConfigFactory()
                         .hosts(CONTAINER.getHostAndPort())
                         .splitSizeMB(1)
+                        .samplesPerChunk(10)
                         .pollAwaitTimeMillis(500)
                         .create(0);
 

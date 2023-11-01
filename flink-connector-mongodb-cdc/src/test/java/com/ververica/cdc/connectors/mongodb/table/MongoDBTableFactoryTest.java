@@ -53,6 +53,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
@@ -104,6 +105,8 @@ public class MongoDBTableFactoryTest {
             SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue();
     private static final int SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT =
             SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
+    private static final int SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES_DEFAULT =
+            SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES.defaultValue();
     private static final int CHUNK_META_GROUP_SIZE_DEFAULT = CHUNK_META_GROUP_SIZE.defaultValue();
     private static final boolean SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT =
             SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue();
@@ -140,6 +143,7 @@ public class MongoDBTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_ENABLED_DEFAULT,
                         CHUNK_META_GROUP_SIZE_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES_DEFAULT,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT);
@@ -161,6 +165,7 @@ public class MongoDBTableFactoryTest {
         options.put("scan.incremental.snapshot.enabled", "true");
         options.put("chunk-meta.group.size", "1001");
         options.put("scan.incremental.snapshot.chunk.size.mb", "10");
+        options.put("scan.incremental.snapshot.chunk.samples", "10");
         options.put("scan.incremental.close-idle-reader.enabled", "true");
         options.put("scan.full-changelog", "true");
         options.put("scan.cursor.no-timeout", "false");
@@ -185,6 +190,7 @@ public class MongoDBTableFactoryTest {
                         LOCAL_TIME_ZONE,
                         true,
                         1001,
+                        10,
                         10,
                         true,
                         true,
@@ -224,6 +230,7 @@ public class MongoDBTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_ENABLED_DEFAULT,
                         CHUNK_META_GROUP_SIZE_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES_DEFAULT,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT);
