@@ -48,6 +48,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final int heartbeatIntervalMillis;
     private final int splitMetaGroupSize;
     private final int splitSizeMB;
+    private final int samplesPerChunk;
     private final boolean closeIdleReaders;
     private final boolean enableFullDocPrePostImage;
     private final boolean disableCursorTimeout;
@@ -68,6 +69,7 @@ public class MongoDBSourceConfig implements SourceConfig {
             int heartbeatIntervalMillis,
             int splitMetaGroupSize,
             int splitSizeMB,
+            int samplesPerChunk,
             boolean closeIdleReaders,
             boolean enableFullDocPrePostImage,
             boolean disableCursorTimeout) {
@@ -87,6 +89,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.heartbeatIntervalMillis = heartbeatIntervalMillis;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.splitSizeMB = splitSizeMB;
+        this.samplesPerChunk = samplesPerChunk;
         this.closeIdleReaders = closeIdleReaders;
         this.enableFullDocPrePostImage = enableFullDocPrePostImage;
         this.disableCursorTimeout = disableCursorTimeout;
@@ -159,6 +162,10 @@ public class MongoDBSourceConfig implements SourceConfig {
         return splitMetaGroupSize;
     }
 
+    public int getSamplesPerChunk() {
+        return samplesPerChunk;
+    }
+
     @Override
     public boolean isIncludeSchemaChanges() {
         return false;
@@ -194,6 +201,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && heartbeatIntervalMillis == that.heartbeatIntervalMillis
                 && splitMetaGroupSize == that.splitMetaGroupSize
                 && splitSizeMB == that.splitSizeMB
+                && samplesPerChunk == that.samplesPerChunk
                 && closeIdleReaders == that.closeIdleReaders
                 && Objects.equals(scheme, that.scheme)
                 && Objects.equals(hosts, that.hosts)
@@ -222,6 +230,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
                 splitSizeMB,
+                samplesPerChunk,
                 closeIdleReaders);
     }
 }

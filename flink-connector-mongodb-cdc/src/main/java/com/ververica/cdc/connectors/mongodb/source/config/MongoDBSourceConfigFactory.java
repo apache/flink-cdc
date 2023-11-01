@@ -32,6 +32,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -58,6 +59,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private Integer heartbeatIntervalMillis = HEARTBEAT_INTERVAL_MILLIS.defaultValue();
     private Integer splitMetaGroupSize = CHUNK_META_GROUP_SIZE.defaultValue();
     private Integer splitSizeMB = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB.defaultValue();
+    private Integer samplesPerChunk = SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES.defaultValue();
     private boolean closeIdleReaders = false;
     private boolean enableFullDocPrePostImage = false;
     private boolean disableCursorTimeout = true;
@@ -207,6 +209,17 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     }
 
     /**
+     * scan.incremental.snapshot.chunk.samples
+     *
+     * <p>The number of samples to take per chunk. Defaults to 20.
+     */
+    public MongoDBSourceConfigFactory samplesPerChunk(int samplesPerChunk) {
+        checkArgument(samplesPerChunk > 0);
+        this.samplesPerChunk = samplesPerChunk;
+        return this;
+    }
+
+    /**
      * Whether to close idle readers at the end of the snapshot phase. This feature depends on
      * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
      * greater than or equal to 1.14, and the configuration <code>
@@ -261,6 +274,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 heartbeatIntervalMillis,
                 splitMetaGroupSize,
                 splitSizeMB,
+                samplesPerChunk,
                 closeIdleReaders,
                 enableFullDocPrePostImage,
                 disableCursorTimeout);

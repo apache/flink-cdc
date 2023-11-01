@@ -72,9 +72,6 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
 
     public static final SampleBucketSplitStrategy INSTANCE = new SampleBucketSplitStrategy();
     private static final int DEFAULT_SAMPLING_THRESHOLD = 102400;
-    private static final double DEFAULT_SAMPLING_RATE = 0.05;
-    private static final int SAMPLING_COUNT_BY_RATE_THRESHOLD = 1000000;
-    private static final int MAX_SAMPLE_PER_CHUNK = 20;
 
     private SampleBucketSplitStrategy() {}
 
@@ -97,12 +94,8 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
             // full sampling if document count less than sampling size threshold.
             numberOfSamples = (int) count;
         } else {
-            // sampled using sample rate.
-            numberOfSamples = (int) Math.floor(count * DEFAULT_SAMPLING_RATE);
             // avoid sampling too much records on a huge collection
-            if (numberOfSamples > SAMPLING_COUNT_BY_RATE_THRESHOLD) {
-                numberOfSamples = numChunks * MAX_SAMPLE_PER_CHUNK;
-            }
+            numberOfSamples = numChunks * splitContext.getSamplesPerChunk();
         }
 
         TableId collectionId = splitContext.getCollectionId();

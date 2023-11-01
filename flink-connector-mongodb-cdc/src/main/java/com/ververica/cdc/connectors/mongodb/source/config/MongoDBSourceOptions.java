@@ -135,6 +135,13 @@ public class MongoDBSourceOptions {
                             "The chunk size mb of incremental snapshot. Defaults to 64mb.");
 
     @Experimental
+    public static final ConfigOption<Integer> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES =
+            ConfigOptions.key("scan.incremental.snapshot.chunk.samples")
+                    .intType()
+                    .defaultValue(20)
+                    .withDescription("The number of samples to take per chunk. Defaults to 20.");
+
+    @Experimental
     public static final ConfigOption<Boolean> FULL_DOCUMENT_PRE_POST_IMAGE =
             ConfigOptions.key("scan.full-changelog")
                     .booleanType()

@@ -39,16 +39,19 @@ public class SplitContext {
     private final TableId collectionId;
     private final BsonDocument collectionStats;
     private final int chunkSizeMB;
+    private final int samplesPerChunk;
 
     public SplitContext(
             MongoClient mongoClient,
             TableId collectionId,
             BsonDocument collectionStats,
-            int chunkSizeMB) {
+            int chunkSizeMB,
+            int samplesPerChunk) {
         this.mongoClient = mongoClient;
         this.collectionId = collectionId;
         this.collectionStats = collectionStats;
         this.chunkSizeMB = chunkSizeMB;
+        this.samplesPerChunk = samplesPerChunk;
     }
 
     public static SplitContext of(MongoDBSourceConfig sourceConfig, TableId collectionId) {
@@ -57,7 +60,8 @@ public class SplitContext {
                 mongoClient,
                 collectionId,
                 collStats(mongoClient, collectionId),
-                sourceConfig.getSplitSize());
+                sourceConfig.getSplitSize(),
+                sourceConfig.getSamplesPerChunk());
     }
 
     public MongoClient getMongoClient() {
@@ -70,6 +74,10 @@ public class SplitContext {
 
     public int getChunkSizeMB() {
         return chunkSizeMB;
+    }
+
+    public int getSamplesPerChunk() {
+        return samplesPerChunk;
     }
 
     /** The number of objects or documents in this collection. */
