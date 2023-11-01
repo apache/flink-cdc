@@ -129,6 +129,11 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    public MySqlSourceBuilder<T> hikariProperties(Properties hikariProperties) {
+        this.configFactory.hikariProperties(hikariProperties);
+        return this;
+    }
+
     /**
      * The split size (number of rows) of table snapshot, captured tables are split into multiple
      * splits when read the snapshot of table.

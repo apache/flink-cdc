@@ -77,6 +77,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
+    private Properties hikariProperties;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -161,6 +162,11 @@ public class MySqlSourceConfigFactory implements Serializable {
      */
     public MySqlSourceConfigFactory chunkKeyColumn(Map<ObjectPath, String> chunkKeyColumns) {
         this.chunkKeyColumns.putAll(chunkKeyColumns);
+        return this;
+    }
+
+    public MySqlSourceConfigFactory hikariProperties(Properties hikariProperties) {
+        this.hikariProperties = hikariProperties;
         return this;
     }
 
@@ -345,6 +351,10 @@ public class MySqlSourceConfigFactory implements Serializable {
             jdbcProperties = new Properties();
         }
 
+        if (hikariProperties == null) {
+            hikariProperties = new Properties();
+        }
+
         return new MySqlSourceConfig(
                 hostname,
                 port,
@@ -368,6 +378,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 closeIdleReaders,
                 props,
                 jdbcProperties,
-                chunkKeyColumns);
+                chunkKeyColumns,
+                hikariProperties);
     }
 }

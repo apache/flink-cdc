@@ -28,6 +28,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import com.ververica.cdc.connectors.mysql.source.config.ServerIdRange;
+import com.ververica.cdc.connectors.mysql.source.connection.ConnectionPoolUtils;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
 import com.ververica.cdc.connectors.mysql.utils.OptionUtils;
@@ -89,7 +90,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
         helper.validateExcept(
-                DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX, JdbcUrlUtils.PROPERTIES_PREFIX);
+                DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX,
+                JdbcUrlUtils.PROPERTIES_PREFIX,
+                ConnectionPoolUtils.PROPERTIES_PREFIX);
 
         final ReadableConfig config = helper.getOptions();
         String hostname = config.get(HOSTNAME);
@@ -160,7 +163,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 closeIdleReaders,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                ConnectionPoolUtils.getConnectionPoolProperties(
+                        context.getCatalogTable().getOptions()));
     }
 
     @Override
