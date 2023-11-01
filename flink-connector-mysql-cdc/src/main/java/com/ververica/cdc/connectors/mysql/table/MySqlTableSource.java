@@ -72,6 +72,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final int fetchSize;
     private final Duration connectTimeout;
     private final int connectionPoolSize;
+    private final long outputRateLimit;
     private final int connectMaxRetries;
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
@@ -110,6 +111,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
+            long outputRateLimit,
             double distributionFactorUpper,
             double distributionFactorLower,
             StartupOptions startupOptions,
@@ -135,6 +137,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.connectTimeout = connectTimeout;
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
+        this.outputRateLimit = outputRateLimit;
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
@@ -192,6 +195,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .connectTimeout(connectTimeout)
                             .connectMaxRetries(connectMaxRetries)
                             .connectionPoolSize(connectionPoolSize)
+                            .outputRateLimit(outputRateLimit)
                             .debeziumProperties(dbzProperties)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
@@ -273,6 +277,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         connectTimeout,
                         connectMaxRetries,
                         connectionPoolSize,
+                        outputRateLimit,
                         distributionFactorUpper,
                         distributionFactorLower,
                         startupOptions,
@@ -316,6 +321,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(connectTimeout, that.connectTimeout)
                 && Objects.equals(connectMaxRetries, that.connectMaxRetries)
                 && Objects.equals(connectionPoolSize, that.connectionPoolSize)
+                && Objects.equals(outputRateLimit, that.outputRateLimit)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
                 && Objects.equals(metadataKeys, that.metadataKeys)
@@ -344,6 +350,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                outputRateLimit,
                 distributionFactorUpper,
                 distributionFactorLower,
                 startupOptions,

@@ -53,6 +53,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Duration connectTimeout;
     private final int connectMaxRetries;
     private final int connectionPoolSize;
+    private final long outputRateLimit;
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
@@ -84,6 +85,7 @@ public class MySqlSourceConfig implements Serializable {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
+            long outputRateLimit,
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
@@ -107,6 +109,7 @@ public class MySqlSourceConfig implements Serializable {
         this.connectTimeout = checkNotNull(connectTimeout);
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
+        this.outputRateLimit = outputRateLimit;
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
@@ -186,6 +189,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public int getConnectionPoolSize() {
         return connectionPoolSize;
+    }
+
+    public long getOutputRateLimit() {
+        return outputRateLimit;
     }
 
     public boolean isIncludeSchemaChanges() {
