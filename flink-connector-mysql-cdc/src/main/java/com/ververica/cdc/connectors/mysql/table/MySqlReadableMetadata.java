@@ -78,6 +78,26 @@ public enum MySqlReadableMetadata {
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
                 }
+            }),
+
+    /** Operation type, INSERT/UPDATE/DELETE. */
+    OP_TYPE(
+            "op_type",
+            DataTypes.STRING().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    final Envelope.Operation op = Envelope.operationFor(record);
+                    if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+                        return StringData.fromString(OperationConstants.INSERT);
+                    } else if (op == Envelope.Operation.DELETE) {
+                        return StringData.fromString(OperationConstants.DELETE);
+                    } else {
+                        return StringData.fromString(OperationConstants.UPDATE);
+                    }
+                }
             });
 
     private final String key;
@@ -102,5 +122,11 @@ public enum MySqlReadableMetadata {
 
     public MetadataConverter getConverter() {
         return converter;
+    }
+
+    private static class OperationConstants {
+        public static final String INSERT = "INSERT";
+        public static final String DELETE = "DELETE";
+        public static final String UPDATE = "UPDATE";
     }
 }
