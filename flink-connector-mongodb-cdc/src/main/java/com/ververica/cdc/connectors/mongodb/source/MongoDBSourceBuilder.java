@@ -179,6 +179,16 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * scan.incremental.snapshot.chunk.samples
+     *
+     * <p>The number of samples to take per chunk. Defaults to 20.
+     */
+    public MongoDBSourceBuilder<T> samplesPerChunk(int samplesPerChunk) {
+        this.configFactory.samplesPerChunk(samplesPerChunk);
+        return this;
+    }
+
+    /**
      * scan.incremental.close-idle-reader.enabled
      *
      * <p>Whether to close idle readers at the end of the snapshot phase. This feature depends on

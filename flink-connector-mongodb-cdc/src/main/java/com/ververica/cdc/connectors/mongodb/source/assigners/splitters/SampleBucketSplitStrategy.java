@@ -94,8 +94,7 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
             // full sampling if document count less than sampling size threshold.
             numberOfSamples = (int) count;
         } else {
-            // avoid sampling too much records on a huge collection
-            numberOfSamples = numChunks * splitContext.getSamplesPerChunk();
+            numberOfSamples = Math.min(numChunks * splitContext.getSamplesPerChunk(), (int) count);
         }
 
         TableId collectionId = splitContext.getCollectionId();

@@ -49,6 +49,7 @@ import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOp
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
@@ -104,6 +105,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         int splitSizeMB = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
+        int samplesPerChunk = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES);
 
         boolean enableFullDocumentPrePostImage =
                 config.getOptional(FULL_DOCUMENT_PRE_POST_IMAGE).orElse(false);
@@ -135,6 +137,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 enableParallelRead,
                 splitMetaGroupSize,
                 splitSizeMB,
+                samplesPerChunk,
                 enableCloseIdleReaders,
                 enableFullDocumentPrePostImage,
                 noCursorTimeout);
@@ -207,6 +210,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(HEARTBEAT_INTERVAL_MILLIS);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES);
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(FULL_DOCUMENT_PRE_POST_IMAGE);

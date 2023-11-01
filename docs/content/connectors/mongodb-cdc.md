@@ -281,7 +281,7 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">20</td>
       <td>Integer</td>
-      <td>The sample count per chunk when using SampleBucketSplitStrategy during incremental snapshot.</td>
+      <td>The samples count per chunk when using sample partition strategy during incremental snapshot.</td>
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
