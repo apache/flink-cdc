@@ -83,6 +83,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     private transient CDCClient cdcClient = null;
     private transient SourceContext<T> sourceContext = null;
     private transient volatile long resolvedTs = -1L;
+    private transient volatile long checkpointsResolvedTs = -1L;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> prewrites = null;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> commits = null;
     private transient BlockingQueue<Cdcpb.Event.Row> committedEvents = null;
@@ -159,6 +160,10 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         } else {
             LOG.info("Skip snapshot read");
             resolvedTs = session.getTimestamp().getVersion();
+            // get the resolvedTs from checkpoints in LATEST_OFFSET mode
+            if (checkpointsResolvedTs != SNAPSHOT_VERSION_EPOCH) {
+                resolvedTs = checkpointsResolvedTs;
+            }
         }
 
         LOG.info("start read change events");
@@ -196,6 +201,9 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         LOG.info("read snapshot events");
         try (KVClient scanClient = session.createKVClient()) {
             long startTs = session.getTimestamp().getVersion();
+            if (checkpointsResolvedTs != SNAPSHOT_VERSION_EPOCH) {
+                startTs = checkpointsResolvedTs;
+            }
             ByteString start = keyRange.getStart();
             while (true) {
                 final List<Kvrpcpb.KvPair> segment =
@@ -304,13 +312,13 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                                         "resolvedTsState", LongSerializer.INSTANCE));
         if (context.isRestored()) {
             for (final Long offset : offsetState.get()) {
-                resolvedTs = offset;
-                LOG.info("Restore State from resolvedTs: {}", resolvedTs);
+                checkpointsResolvedTs = offset;
+                LOG.info("Restore State from resolvedTs: {}", checkpointsResolvedTs);
                 return;
             }
         } else {
-            resolvedTs = 0;
-            LOG.info("Initialize State from resolvedTs: {}", resolvedTs);
+            checkpointsResolvedTs = SNAPSHOT_VERSION_EPOCH;
+            LOG.info("Initialize State from resolvedTs: {}", checkpointsResolvedTs);
         }
     }
 
