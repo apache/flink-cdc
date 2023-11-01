@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.debezium.task.context;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.github.shyiko.mysql.binlog.MariadbGtidSet;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
@@ -210,7 +211,7 @@ public class StatefulTaskContext {
     private boolean isBinlogAvailable(MySqlOffsetContext offset) {
         String gtidStr = offset.gtidSet();
         if (gtidStr != null) {
-            return checkGtidSet(offset);
+            return connection.isMariaDB() ? checkMariaDBGtidSet(offset) : checkGtidSet(offset);
         }
 
         return checkBinlogFilename(offset);
@@ -269,6 +270,29 @@ public class StatefulTaskContext {
         }
         LOG.info("Connector last known GTIDs are {}, but MySQL has {}", gtidSet, availableGtidSet);
         return false;
+    }
+
+    private boolean checkMariaDBGtidSet(MySqlOffsetContext offset) {
+        String gtidStr = offset.gtidSet();
+
+        if (gtidStr.trim().isEmpty()) {
+            return true; // start at beginning ...
+        }
+
+        String availableGtidStr = connection.knownGtidSet();
+        if (availableGtidStr == null || availableGtidStr.trim().isEmpty()) {
+            // Last offsets had GTIDs but the server does not use them ...
+            LOG.warn(
+                    "Connector used GTIDs previously, but MySQL does not know of any GTIDs or they are not enabled");
+            return false;
+        }
+        // GTIDs are enabled
+        MariadbGtidSet mariadbGtidSet = new MariadbGtidSet(gtidStr);
+        // Get the GTID set that is available in the server ...
+        MariadbGtidSet availableGtidSet = new MariadbGtidSet(availableGtidStr);
+        // GTIDs are enabled
+        // MariaDB cannot detect purge gtid.
+        return mariadbGtidSet.isContainedWithin(availableGtidSet);
     }
 
     private boolean checkBinlogFilename(MySqlOffsetContext offset) {

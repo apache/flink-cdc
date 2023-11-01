@@ -29,6 +29,7 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.connector.mysql.binlogclient.MariaDBBinaryLogClient;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
@@ -96,6 +97,22 @@ public class DebeziumUtils {
                 connectorConfig.password());
     }
 
+    public static BinaryLogClient createBinaryClient(
+            Configuration dbzConfiguration, boolean isMariaDB) {
+        final MySqlConnectorConfig connectorConfig = new MySqlConnectorConfig(dbzConfiguration);
+        return isMariaDB
+                ? new MariaDBBinaryLogClient(
+                        connectorConfig.hostname(),
+                        connectorConfig.port(),
+                        connectorConfig.username(),
+                        connectorConfig.password())
+                : new BinaryLogClient(
+                        connectorConfig.hostname(),
+                        connectorConfig.port(),
+                        connectorConfig.username(),
+                        connectorConfig.password());
+    }
+
     /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
     public static MySqlDatabaseSchema createMySqlDatabaseSchema(
             MySqlConnectorConfig dbzMySqlConfig, boolean isTableIdCaseSensitive) {
@@ -120,8 +137,16 @@ public class DebeziumUtils {
                         if (rs.next()) {
                             final String binlogFilename = rs.getString(1);
                             final long binlogPosition = rs.getLong(2);
-                            final String gtidSet =
-                                    rs.getMetaData().getColumnCount() > 4 ? rs.getString(5) : null;
+                            final String gtidSet;
+                            if (jdbc instanceof MySqlConnection
+                                    && ((MySqlConnection) jdbc).isMariaDB()) {
+                                gtidSet = ((MySqlConnection) jdbc).knownGtidSet();
+                            } else {
+                                gtidSet =
+                                        rs.getMetaData().getColumnCount() > 4
+                                                ? rs.getString(5)
+                                                : null;
+                            }
                             return BinlogOffset.builder()
                                     .setBinlogFilePosition(binlogFilename, binlogPosition)
                                     .setGtidSet(gtidSet)

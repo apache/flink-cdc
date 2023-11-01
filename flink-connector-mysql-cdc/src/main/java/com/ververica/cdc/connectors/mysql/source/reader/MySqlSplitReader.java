@@ -228,7 +228,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
         if (reusedSnapshotReader == null) {
             final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
             final BinaryLogClient binaryLogClient =
-                    createBinaryClient(sourceConfig.getDbzConfiguration());
+                    createBinaryClient(
+                            sourceConfig.getDbzConfiguration(), jdbcConnection.isMariaDB());
             final StatefulTaskContext statefulTaskContext =
                     new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
             reusedSnapshotReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
@@ -240,7 +241,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
         if (reusedBinlogReader == null) {
             final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
             final BinaryLogClient binaryLogClient =
-                    createBinaryClient(sourceConfig.getDbzConfiguration());
+                    createBinaryClient(
+                            sourceConfig.getDbzConfiguration(), jdbcConnection.isMariaDB());
             final StatefulTaskContext statefulTaskContext =
                     new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
             reusedBinlogReader = new BinlogSplitReader(statefulTaskContext, subtaskId);
