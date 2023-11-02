@@ -23,13 +23,6 @@ under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-cdc-e2e-tests</artifactId>
-    <name>flink-cdc-e2e-tests</name>
-    <packaging>pom</packaging>
-
-    <modules>
-        <module>cdc-source-e2e-tests</module>
-        <module>cdc-pipeline-e2e-tests</module>
-    </modules>
+    <artifactId>flink-cdc-cli</artifactId>
 
 </project>
