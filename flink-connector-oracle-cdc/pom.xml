@@ -48,10 +48,11 @@ under the License.
             </exclusions>
         </dependency>
 
+        <!-- 使用本地编译版本，便于日志调试 -->
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-connector-oracle</artifactId>
-            <version>${debezium.version}</version>
+            <version>1.6.0-SNAPSHOT</version>
         </dependency>
 
         <!-- test dependencies on Debezium -->

@@ -62,7 +62,6 @@ import static io.debezium.connector.oracle.logminer.LogMinerHelper.instantiateFl
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.logError;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setLogFilesForMining;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setNlsSessionParameters;
-import static io.debezium.connector.oracle.logminer.LogMinerHelper.startLogMining;
 
 /**
  * A {@link StreamingChangeEventSource} based on Oracle's LogMiner utility. The event handler loop
@@ -73,6 +72,11 @@ public class LogMinerStreamingChangeEventSource
 
     private static final Logger LOGGER =
             LoggerFactory.getLogger(LogMinerStreamingChangeEventSource.class);
+    private static final int MINING_START_RETRIES = 5;
+    /**
+     * Represents an Scn with value 1, useful for playing with inclusive/exclusive query boundaries.
+     */
+    public static final Scn ONE = new Scn(BigInteger.valueOf(1));
 
     private final OracleConnection jdbcConnection;
     private final EventDispatcher<TableId> dispatcher;
@@ -137,8 +141,10 @@ public class LogMinerStreamingChangeEventSource
                 new TransactionalBuffer(
                         connectorConfig, schema, clock, errorHandler, streamingMetrics)) {
             try {
-                startScn = offsetContext.getScn();
+                // We explicitly expect auto-commit to be disabled
+                jdbcConnection.setAutoCommit(false);
 
+                startScn = offsetContext.getScn();
                 if (!isContinuousMining
                         && startScn.compareTo(
                                         getFirstOnlineLogScn(
@@ -195,6 +201,8 @@ public class LogMinerStreamingChangeEventSource
                                             ResultSet.HOLD_CURSORS_OVER_COMMIT)) {
 
                         currentRedoLogSequences = getCurrentRedoLogSequences();
+
+                        int retryAttempts = 1;
                         Stopwatch stopwatch = Stopwatch.reusable();
                         while (context.isRunning()) {
                             // Calculate time difference before each mining session to detect time
@@ -234,7 +242,8 @@ public class LogMinerStreamingChangeEventSource
                                 // With one mining session, it grows and maybe there is another way
                                 // to flush PGA.
                                 // At this point we use a new mining session
-                                LOGGER.trace(
+                                LOGGER.info("!!! log switch occurred !!!");
+                                LOGGER.info(
                                         "Ending log mining startScn={}, endScn={}, offsetContext.getScn={}, strategy={}, continuous={}",
                                         startScn,
                                         endScn,
@@ -243,77 +252,96 @@ public class LogMinerStreamingChangeEventSource
                                         isContinuousMining);
                                 endMining(jdbcConnection);
 
+                                LOGGER.info(
+                                        "log mining already end, try to initialize redo logs for mining");
                                 initializeRedoLogsForMining(jdbcConnection, true, startScn);
 
                                 abandonOldTransactionsIfExist(
                                         jdbcConnection, offsetContext, transactionalBuffer);
 
+                                LOGGER.info("try to get current redo sequences... ");
                                 // This needs to be re-calculated because building the data
                                 // dictionary will force the
                                 // current redo log sequence to be advanced due to a complete log
                                 // switch of all logs.
                                 currentRedoLogSequences = getCurrentRedoLogSequences();
+                                LOGGER.info("<<< log switched success !");
                             }
 
-                            startLogMining(
-                                    jdbcConnection,
-                                    startScn,
-                                    endScn,
-                                    strategy,
-                                    isContinuousMining,
-                                    streamingMetrics);
-
-                            LOGGER.trace(
-                                    "Fetching LogMiner view results SCN {} to {}",
-                                    startScn,
-                                    endScn);
-                            stopwatch.start();
-                            miningView.setFetchSize(connectorConfig.getMaxQueueSize());
-                            miningView.setFetchDirection(ResultSet.FETCH_FORWARD);
-                            miningView.setString(1, startScn.toString());
-                            miningView.setString(2, endScn.toString());
-                            try (ResultSet rs = miningView.executeQuery()) {
-                                Duration lastDurationOfBatchCapturing =
-                                        stopwatch.stop().durations().statistics().getTotal();
-                                streamingMetrics.setLastDurationOfBatchCapturing(
-                                        lastDurationOfBatchCapturing);
-                                processor.processResult(rs);
-                                if (connectorConfig.isLobEnabled()) {
-                                    startScn =
-                                            transactionalBuffer.updateOffsetContext(
-                                                    offsetContext, dispatcher);
+                            if (context.isRunning()) {
+                                if (!startMiningSession(
+                                        jdbcConnection, startScn, endScn, retryAttempts)) {
+                                    retryAttempts++;
                                 } else {
+                                    // start mining session success
+                                    retryAttempts = 1;
+                                    LOGGER.info(
+                                            "start mining session success, fetching LogMiner view results SCN {} to {}",
+                                            startScn,
+                                            endScn);
+                                    stopwatch.start();
+                                    miningView.setFetchSize(connectorConfig.getMaxQueueSize());
+                                    miningView.setFetchDirection(ResultSet.FETCH_FORWARD);
+                                    miningView.setString(1, startScn.toString());
+                                    miningView.setString(2, endScn.toString());
+                                    try (ResultSet rs = miningView.executeQuery()) {
+                                        Duration lastDurationOfBatchCapturing =
+                                                stopwatch
+                                                        .stop()
+                                                        .durations()
+                                                        .statistics()
+                                                        .getTotal();
+                                        streamingMetrics.setLastDurationOfBatchCapturing(
+                                                lastDurationOfBatchCapturing);
+                                        LOGGER.info(
+                                                "Fetched LogMiner view results, start process results...");
+                                        processor.processResult(rs);
+                                        if (connectorConfig.isLobEnabled()) {
+                                            startScn =
+                                                    transactionalBuffer.updateOffsetContext(
+                                                            offsetContext, dispatcher);
+                                        } else {
 
-                                    final Scn lastProcessedScn = processor.getLastProcessedScn();
-                                    if (!lastProcessedScn.isNull()
-                                            && lastProcessedScn.compareTo(endScn) < 0) {
-                                        // If the last processed SCN is before the endScn we need to
-                                        // use the last processed SCN as the
-                                        // next starting point as the LGWR buffer didn't flush all
-                                        // entries from memory to disk yet.
-                                        endScn = lastProcessedScn;
-                                    }
+                                            final Scn lastProcessedScn =
+                                                    processor.getLastProcessedScn();
+                                            // only after processed data, use lastProcessedScn as
+                                            // endScn
+                                            if (!lastProcessedScn.isNull()
+                                                    && lastProcessedScn.compareTo(startScn) > 0
+                                                    && lastProcessedScn.compareTo(endScn) < 0) {
+                                                // If the last processed SCN is before the endScn we
+                                                // need to
+                                                // use the last processed SCN as the
+                                                // next starting point as the LGWR buffer didn't
+                                                // flush all
+                                                // entries from memory to disk yet.
+                                                endScn = lastProcessedScn;
+                                            }
 
-                                    if (transactionalBuffer.isEmpty()) {
-                                        LOGGER.debug(
-                                                "Buffer is empty, updating offset SCN to {}",
-                                                endScn);
-                                        offsetContext.setScn(endScn);
-                                    } else {
-                                        final Scn minStartScn = transactionalBuffer.getMinimumScn();
-                                        if (!minStartScn.isNull()) {
-                                            offsetContext.setScn(
-                                                    minStartScn.subtract(Scn.valueOf(1)));
-                                            dispatcher.dispatchHeartbeatEvent(offsetContext);
+                                            if (transactionalBuffer.isEmpty()) {
+                                                LOGGER.debug(
+                                                        "Buffer is empty, updating offset SCN to {}",
+                                                        endScn);
+                                                offsetContext.setScn(endScn);
+                                            } else {
+                                                final Scn minStartScn =
+                                                        transactionalBuffer.getMinimumScn();
+                                                if (!minStartScn.isNull()) {
+                                                    offsetContext.setScn(
+                                                            minStartScn.subtract(Scn.valueOf(1)));
+                                                    dispatcher.dispatchHeartbeatEvent(
+                                                            offsetContext);
+                                                }
+                                            }
+                                            startScn = endScn;
                                         }
                                     }
-                                    startScn = endScn;
+
+                                    afterHandleScn(offsetContext);
+                                    streamingMetrics.setCurrentBatchProcessingTime(
+                                            Duration.between(start, Instant.now()));
                                 }
                             }
-
-                            afterHandleScn(offsetContext);
-                            streamingMetrics.setCurrentBatchProcessingTime(
-                                    Duration.between(start, Instant.now()));
                             pauseBetweenMiningSessions();
                         }
                     }
@@ -332,6 +360,58 @@ public class LogMinerStreamingChangeEventSource
                 LOGGER.info("Transactional buffer dump: {}", transactionalBuffer.toString());
                 LOGGER.info("Streaming metrics dump: {}", streamingMetrics.toString());
             }
+        }
+    }
+
+    /**
+     * Starts a new Oracle LogMiner session.
+     *
+     * <p>When this is called, LogMiner prepares all the necessary state for an upcoming LogMiner
+     * view query. If the mining statement defines using DDL tracking, the data dictionary will be
+     * mined as a part of this call to prepare DDL tracking state for the upcoming LogMiner view
+     * query.
+     *
+     * @param connection database connection, should not be {@code null}
+     * @param startScn mining session's starting system change number (exclusive), should not be
+     *     {@code null}
+     * @param endScn mining session's ending system change number (inclusive), can be {@code null}
+     * @param attempts the number of mining start attempts
+     * @return true if the session was started successfully, false if it should be retried
+     * @throws SQLException if mining session failed to start
+     */
+    public boolean startMiningSession(
+            OracleConnection connection, Scn startScn, Scn endScn, int attempts)
+            throws SQLException {
+        LOGGER.info(
+                "Starting mining session startScn={}, endScn={}, strategy={}, continuous={}",
+                startScn,
+                endScn,
+                strategy,
+                isContinuousMining);
+        try {
+            Instant start = Instant.now();
+            // NOTE: we treat startSCN as the _exclusive_ lower bound for mining,
+            // whereas START_LOGMNR takes an _inclusive_ lower bound, hence the increment.
+            connection.executeWithoutCommitting(
+                    SqlUtils.startLogMinerStatement(
+                            startScn.add(ONE), endScn, strategy, isContinuousMining));
+            streamingMetrics.addCurrentMiningSessionStart(Duration.between(start, Instant.now()));
+            return true;
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1291 || e.getMessage().startsWith("ORA-01291")) {
+                if (attempts <= MINING_START_RETRIES) {
+                    LOGGER.warn("Failed to start Oracle LogMiner session, retrying...");
+                    return false;
+                }
+                LOGGER.error(
+                        "Failed to start Oracle LogMiner after '{}' attempts.",
+                        MINING_START_RETRIES,
+                        e);
+            }
+            LOGGER.error("Got exception when starting mining session.", e);
+            // Capture the database state before throwing the exception up
+            LogMinerDatabaseStateWriter.write(connection);
+            throw e;
         }
     }
 
