@@ -39,10 +39,13 @@ import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRe
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberEvent;
 import com.ververica.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.listener.ListenerService;
+import com.ververica.cdc.connectors.mysql.source.listener.MysqlListenerMessage;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +77,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
+    private final ListenerService listenerService;
 
     @Nullable private Integer binlogSplitTaskId;
 
@@ -85,6 +89,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
+        this.listenerService = new ListenerService(sourceConfig.getListenerProperties());
     }
 
     @Override
@@ -188,6 +193,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     public void close() {
         LOG.info("Closing enumerator...");
         splitAssigner.close();
+        listenerService.close();
     }
 
     // ------------------------------------------------------------------------------------------
@@ -219,11 +225,28 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             if (split.isPresent()) {
                 final MySqlSplit mySqlSplit = split.get();
                 context.assignSplit(mySqlSplit, nextAwaiting);
+
+                StartupMode startupMode = sourceConfig.getStartupOptions().startupMode;
+                String gtids = "";
+
                 if (mySqlSplit instanceof MySqlBinlogSplit) {
                     this.binlogSplitTaskId = nextAwaiting;
+
+                    MySqlBinlogSplit mySqlBinlogSplit = (MySqlBinlogSplit) mySqlSplit;
+                    if (startupMode == StartupMode.INITIAL) {
+                        gtids = mySqlBinlogSplit.getStartingOffset().getGtidSet();
+                    } else if (startupMode == StartupMode.SPECIFIC_OFFSETS
+                            && mySqlBinlogSplit.getStartingOffset().getGtidSet() != null) {
+                        gtids = mySqlBinlogSplit.getStartingOffset().getGtidSet();
+                    }
                 }
+                MysqlListenerMessage listenerMessageInformation =
+                        new MysqlListenerMessage(startupMode.toString(), gtids);
                 awaitingReader.remove();
                 LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);
+
+                listenerService.notifyAllListeners(
+                        splitAssigner.getAssignerStatus(), listenerMessageInformation);
             } else {
                 // there is no available splits by now, skip assigning
                 requestBinlogSplitUpdateIfNeed();
