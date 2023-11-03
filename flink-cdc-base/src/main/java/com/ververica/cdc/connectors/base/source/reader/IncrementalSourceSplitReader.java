@@ -121,7 +121,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
             if (nextSplit.isSnapshotSplit()) {
                 if (currentFetcher == null) {
                     final FetchTask.Context taskContext =
-                            dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
+                            dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig, true);
                     currentFetcher = new IncrementalSourceScanFetcher(taskContext, subtaskId);
                 }
             } else {

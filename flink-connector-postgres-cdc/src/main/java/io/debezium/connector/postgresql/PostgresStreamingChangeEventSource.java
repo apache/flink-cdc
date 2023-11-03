@@ -5,7 +5,6 @@
  */
 package io.debezium.connector.postgresql;
 
-import io.debezium.DebeziumException;
 import io.debezium.connector.postgresql.connection.LogicalDecodingMessage;
 import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -113,12 +112,17 @@ public class PostgresStreamingChangeEventSource
 
     @Override
     public void init() {
+        // It's not necessary to refresh schema again, which is very time-consuming.
+        // The schema of taskContext is the reference of PostgresSourceFetchTaskContext#schema, and
+        // has been initialized when submit StreamSplit fetch task by
+        // IncrementalSourceStreamFetcher#submitTask -> PostgresSourceFetchTaskContext#configure.
+
         // refresh the schema so we have a latest view of the DB tables
-        try {
-            taskContext.refreshSchema(connection, true);
-        } catch (SQLException e) {
-            throw new DebeziumException("Error while executing initial schema load", e);
-        }
+        // try {
+        //     taskContext.refreshSchema(connection, true);
+        // } catch (SQLException e) {
+        //     throw new DebeziumException("Error while executing initial schema load", e);
+        // }
     }
 
     @Override
