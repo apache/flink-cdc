@@ -27,7 +27,7 @@ under the License.
 
     <groupId>com.ververica</groupId>
     <artifactId>flink-cdc-connectors</artifactId>
-    <version>3.0-SNAPSHOT</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -60,6 +60,7 @@ under the License.
     </distributionManagement>
 
     <properties>
+        <revision>3.0-SNAPSHOT</revision>
         <java.version>1.8</java.version>
         <scala.binary.version>2.12</scala.binary.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
@@ -84,6 +85,7 @@ under the License.
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <json-path.version>2.7.0</json-path.version>
         <markBundledAsOptional>true</markBundledAsOptional>
+        <flatten-maven-plugin.version>1.5.0</flatten-maven-plugin.version>
     </properties>
 
     <dependencies>
@@ -464,6 +466,33 @@ under the License.
                 <configuration>
                     <doclint>none</doclint>
                 </configuration>
+            </plugin>
+
+            <!-- This plugin takes effect for Maven version upper more than 3.5.0 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten-maven-plugin.version}</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                        <phase>process-resources</phase>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <phase>clean</phase>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
