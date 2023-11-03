@@ -77,7 +77,8 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
             new GenericContainer<>(OB_SERVER_IMAGE)
                     .withNetworkMode(NETWORK_MODE)
                     .withEnv("MODE", "slim")
-                    .withEnv("OB_MEMORY_LIMIT", "5G")
+                    .withEnv("OB_DATAFILE_SIZE", "1G")
+                    .withEnv("OB_LOG_DISK_SIZE", "4G")
                     .withEnv("OB_ROOT_PASSWORD", SYS_PASSWORD)
                     .withEnv("OB_TENANT_NAME", TEST_TENANT)
                     .withCopyFileToContainer(
