@@ -28,8 +28,8 @@ under the License.
     <packaging>pom</packaging>
 
     <modules>
-        <module>cdc-source-e2e-tests</module>
-        <module>cdc-pipeline-e2e-tests</module>
+        <module>flink-cdc-source-e2e-tests</module>
+        <module>flink-cdc-pipeline-e2e-tests</module>
     </modules>
 
 </project>

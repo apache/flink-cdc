@@ -27,43 +27,43 @@ STAGE_E2E="e2e"
 STAGE_MISC="misc"
 
 MODULES_MYSQL="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-mysql-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-mysql-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
 
 MODULES_POSTGRES="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-postgres-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-postgres-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc"
 
 MODULES_ORACLE="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-oracle-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-oracle-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc"
 
 MODULES_MONGODB="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-mongodb-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-mongodb-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc"
 
 MODULES_SQLSERVER="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-sqlserver-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-sqlserver-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc"
 
 MODULES_TIDB="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-tidb-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-tidb-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc"
 
 MODULES_OCEANBASE="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-oceanbase-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
 
 MODULES_DB2="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-db2-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-db2-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc"
 
 MODULES_VITESS="\
-flink-cdc-connect/cdc-source-connectors/flink-connector-vitess-cdc,\
-flink-cdc-connect/cdc-source-connectors/flink-sql-connector-vitess-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
 
 MODULES_E2E="\
-flink-cdc-e2e-tests/cdc-source-e2e-tests"
+flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 function get_compile_modules_for_stage() {
     local stage=$1

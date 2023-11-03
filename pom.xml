@@ -258,10 +258,10 @@ under the License.
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
                         <exclude>
-                            flink-cdc-connect/cdc-source-connectors/flink-connector-mysql-cdc/src/test/resources/file/*.json
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/test/resources/file/*.json
                         </exclude>
                         <exclude>
-                            flink-cdc-connect/cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile
                         </exclude>
                     </excludes>
                 </configuration>
