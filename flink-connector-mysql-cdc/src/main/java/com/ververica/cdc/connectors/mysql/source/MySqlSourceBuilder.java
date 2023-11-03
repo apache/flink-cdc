@@ -252,6 +252,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Restart on DB Switch. */
+    public MySqlSourceBuilder<T> restartOnDbSwitch(boolean restartOnDbSwitch) {
+        this.configFactory.restartOnDbSwitch(restartOnDbSwitch);
+        return this;
+    }
+
     /**
      * Build the {@link MySqlSource}.
      *

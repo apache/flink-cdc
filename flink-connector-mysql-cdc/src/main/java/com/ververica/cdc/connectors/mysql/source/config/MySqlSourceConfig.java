@@ -58,6 +58,8 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean closeIdleReaders;
+    private final boolean restartOnDbSwitch;
+
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
 
@@ -89,6 +91,7 @@ public class MySqlSourceConfig implements Serializable {
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
             boolean closeIdleReaders,
+            boolean restartOnDbSwitch,
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns) {
@@ -112,6 +115,7 @@ public class MySqlSourceConfig implements Serializable {
         this.includeSchemaChanges = includeSchemaChanges;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
+        this.restartOnDbSwitch = restartOnDbSwitch;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
@@ -198,6 +202,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isCloseIdleReaders() {
         return closeIdleReaders;
+    }
+
+    public boolean isRestartOnDbSwitch() {
+        return restartOnDbSwitch;
     }
 
     public Properties getDbzProperties() {

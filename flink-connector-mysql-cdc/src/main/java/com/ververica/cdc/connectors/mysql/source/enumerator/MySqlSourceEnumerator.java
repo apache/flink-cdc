@@ -34,6 +34,7 @@ import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.BinlogSplitUpdateRequestEvent;
+import com.ververica.cdc.connectors.mysql.source.events.DnsIpChangedEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
@@ -169,6 +170,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                     "The enumerator receives notice from subtask {} for the binlog split assignment. ",
                     subtaskId);
             binlogSplitTaskId = subtaskId;
+        } else if (sourceEvent instanceof DnsIpChangedEvent) {
+            LOG.warn("IP address in DNS has changed");
+            throw new FlinkRuntimeException("IP address in DNS has changed");
         }
     }
 
