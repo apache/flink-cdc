@@ -27,31 +27,16 @@ under the License.
 
     <groupId>com.ververica</groupId>
     <artifactId>flink-cdc-connectors</artifactId>
-    <version>2.5-SNAPSHOT</version>
+    <version>3.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
-        <module>flink-cdc-base</module>
-        <module>flink-connector-db2-cdc</module>
-        <module>flink-connector-debezium</module>
-        <module>flink-connector-mongodb-cdc</module>
-        <module>flink-connector-mysql-cdc</module>
-        <module>flink-connector-oceanbase-cdc</module>
-        <module>flink-connector-oracle-cdc</module>
-        <module>flink-connector-postgres-cdc</module>
-        <module>flink-connector-sqlserver-cdc</module>
-        <module>flink-connector-test-util</module>
-        <module>flink-connector-tidb-cdc</module>
-        <module>flink-connector-vitess-cdc</module>
-        <module>flink-sql-connector-db2-cdc</module>
-        <module>flink-sql-connector-mongodb-cdc</module>
-        <module>flink-sql-connector-mysql-cdc</module>
-        <module>flink-sql-connector-oceanbase-cdc</module>
-        <module>flink-sql-connector-oracle-cdc</module>
-        <module>flink-sql-connector-postgres-cdc</module>
-        <module>flink-sql-connector-sqlserver-cdc</module>
-        <module>flink-sql-connector-tidb-cdc</module>
-        <module>flink-sql-connector-vitess-cdc</module>
+        <module>flink-cdc-cli</module>
+        <module>flink-cdc-common</module>
+        <module>flink-cdc-composer</module>
+        <module>flink-cdc-dist</module>
+        <module>flink-cdc-connect</module>
+        <module>flink-cdc-runtime</module>
         <module>flink-cdc-e2e-tests</module>
     </modules>
 
@@ -98,6 +83,7 @@ under the License.
         <oblogclient.version>1.1.0</oblogclient.version>
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <json-path.version>2.7.0</json-path.version>
+        <markBundledAsOptional>true</markBundledAsOptional>
     </properties>
 
     <dependencies>
@@ -271,8 +257,12 @@ under the License.
                         <exclude>docs/site/**</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
-                        <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
-                        <exclude>flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile</exclude>
+                        <exclude>
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/test/resources/file/*.json
+                        </exclude>
+                        <exclude>
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile
+                        </exclude>
                     </excludes>
                 </configuration>
             </plugin>

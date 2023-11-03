@@ -27,43 +27,43 @@ STAGE_E2E="e2e"
 STAGE_MISC="misc"
 
 MODULES_MYSQL="\
-flink-connector-mysql-cdc,\
-flink-sql-connector-mysql-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
 
 MODULES_POSTGRES="\
-flink-connector-postgres-cdc,\
-flink-sql-connector-postgres-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc"
 
 MODULES_ORACLE="\
-flink-connector-oracle-cdc,\
-flink-sql-connector-oracle-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc"
 
 MODULES_MONGODB="\
-flink-connector-mongodb-cdc,\
-flink-sql-connector-mongodb-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc"
 
 MODULES_SQLSERVER="\
-flink-connector-sqlserver-cdc,\
-flink-sql-connector-sqlserver-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc"
 
 MODULES_TIDB="\
-flink-connector-tidb-cdc,\
-flink-sql-connector-tidb-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc"
 
 MODULES_OCEANBASE="\
-flink-connector-oceanbase-cdc,\
-flink-sql-connector-oceanbase-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
 
 MODULES_DB2="\
-flink-connector-db2-cdc,\
-flink-sql-connector-db2-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc"
 
 MODULES_VITESS="\
-flink-connector-vitess-cdc,\
-flink-sql-connector-vitess-cdc"
+flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
+flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
 
 MODULES_E2E="\
-flink-cdc-e2e-tests"
+flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 function get_compile_modules_for_stage() {
     local stage=$1
