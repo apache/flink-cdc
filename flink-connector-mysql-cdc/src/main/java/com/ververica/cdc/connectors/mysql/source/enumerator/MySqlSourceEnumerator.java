@@ -43,6 +43,8 @@ import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
+import com.ververica.cdc.connectors.mysql.source.utils.SlackWebhookUtils;
+import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,6 +223,28 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 context.assignSplit(mySqlSplit, nextAwaiting);
                 if (mySqlSplit instanceof MySqlBinlogSplit) {
                     this.binlogSplitTaskId = nextAwaiting;
+
+                    if (sourceConfig.doNotifySnapshotToBinlogSwitch()) {
+                        MySqlBinlogSplit mySqlBinlogSplit = (MySqlBinlogSplit) mySqlSplit;
+                        StartupMode startupMode = sourceConfig.getStartupOptions().startupMode;
+                        String position = "";
+                        if (startupMode == StartupMode.INITIAL) {
+                            position = mySqlBinlogSplit.getStartingOffset().getGtidSet();
+                        } else if (startupMode == StartupMode.SPECIFIC_OFFSETS) {
+                            if (mySqlBinlogSplit.getStartingOffset().getGtidSet() != null) {
+                                position = mySqlBinlogSplit.getStartingOffset().getGtidSet();
+                            } else {
+                                position = startupMode.toString();
+                            }
+                        } else {
+                            position = startupMode.toString();
+                        }
+                        SlackWebhookUtils.notify(
+                                this.sourceConfig.getHookUrl(),
+                                "BINLOG STREAM START",
+                                this.sourceConfig.getTableList().get(0),
+                                position);
+                    }
                 }
                 awaitingReader.remove();
                 LOG.info("The enumerator assigns split {} to subtask {}", mySqlSplit, nextAwaiting);

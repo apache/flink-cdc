@@ -77,6 +77,9 @@ public class MySqlSnapshotSplitReadTask
     private final TopicSelector<TableId> topicSelector;
     private final EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
     private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
+    private final String tableName;
+    private final String hookUrl;
+    private final boolean doNotifySnapshotToBinlogSwitch;
 
     public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
@@ -87,6 +90,9 @@ public class MySqlSnapshotSplitReadTask
             TopicSelector<TableId> topicSelector,
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
+            String tableName,
+            String hookUrl,
+            boolean doNotifySnapshotToBinlogSwitch,
             MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
         this.connectorConfig = connectorConfig;
@@ -98,6 +104,9 @@ public class MySqlSnapshotSplitReadTask
         this.topicSelector = topicSelector;
         this.snapshotReceiver = snapshotReceiver;
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
+        this.tableName = tableName;
+        this.hookUrl = hookUrl;
+        this.doNotifySnapshotToBinlogSwitch = doNotifySnapshotToBinlogSwitch;
     }
 
     @Override
@@ -161,7 +170,6 @@ public class MySqlSnapshotSplitReadTask
                 snapshotSplit, highWatermark, SignalEventDispatcher.WatermarkKind.HIGH);
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setHighWatermark(highWatermark);
-
         return SnapshotResult.completed(ctx.offset);
     }
 

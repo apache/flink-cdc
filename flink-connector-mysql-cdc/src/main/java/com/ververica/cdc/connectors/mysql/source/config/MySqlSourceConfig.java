@@ -58,6 +58,8 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean includeSchemaChanges;
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean closeIdleReaders;
+    private final boolean notifySnapshotToBinlogSwitch;
+    private final String hookUrl;
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
 
@@ -89,6 +91,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean includeSchemaChanges,
             boolean scanNewlyAddedTableEnabled,
             boolean closeIdleReaders,
+            boolean notifySnapshotToBinlogSwitch,
+            String hookUrl,
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns) {
@@ -112,6 +116,8 @@ public class MySqlSourceConfig implements Serializable {
         this.includeSchemaChanges = includeSchemaChanges;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
+        this.notifySnapshotToBinlogSwitch = notifySnapshotToBinlogSwitch;
+        this.hookUrl = hookUrl;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
@@ -141,6 +147,14 @@ public class MySqlSourceConfig implements Serializable {
 
     public List<String> getTableList() {
         return tableList;
+    }
+
+    public boolean doNotifySnapshotToBinlogSwitch() {
+        return notifySnapshotToBinlogSwitch;
+    }
+
+    public String getHookUrl() {
+        return hookUrl;
     }
 
     @Nullable
@@ -198,6 +212,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isCloseIdleReaders() {
         return closeIdleReaders;
+    }
+
+    public boolean isNotifySnapshotToBinlogSwitch() {
+        return notifySnapshotToBinlogSwitch;
     }
 
     public Properties getDbzProperties() {

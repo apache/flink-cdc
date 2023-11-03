@@ -73,6 +73,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean includeSchemaChanges = false;
     private boolean scanNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
+    private String hookUrl = null;
+    private boolean notifySnapshotToBinlogSwitch = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
@@ -277,6 +279,13 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Enable to notify phase switch from snapshot to binlog stream. */
+    public MySqlSourceConfigFactory notifySnapshotToBinlogSwitch(String hookUrl) {
+        this.hookUrl = hookUrl;
+        this.notifySnapshotToBinlogSwitch = true;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -366,6 +375,8 @@ public class MySqlSourceConfigFactory implements Serializable {
                 includeSchemaChanges,
                 scanNewlyAddedTableEnabled,
                 closeIdleReaders,
+                notifySnapshotToBinlogSwitch,
+                hookUrl,
                 props,
                 jdbcProperties,
                 chunkKeyColumns);

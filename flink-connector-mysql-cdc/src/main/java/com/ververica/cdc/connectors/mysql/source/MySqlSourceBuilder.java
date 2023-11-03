@@ -252,6 +252,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Enable to notify phase switch from snapshot to binlog stream. */
+    public MySqlSourceBuilder<T> notifySnapshotToBinlogSwitch(String hookUrl) {
+        this.configFactory.notifySnapshotToBinlogSwitch(hookUrl);
+        return this;
+    }
+
     /**
      * Build the {@link MySqlSource}.
      *

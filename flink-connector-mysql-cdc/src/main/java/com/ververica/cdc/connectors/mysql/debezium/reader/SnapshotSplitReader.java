@@ -124,6 +124,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getTopicSelector(),
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
+                        statefulTaskContext.getSourceConfig().getTableList().get(0),
+                        statefulTaskContext.getSourceConfig().getHookUrl(),
+                        statefulTaskContext.getSourceConfig().doNotifySnapshotToBinlogSwitch(),
                         currentSnapshotSplit);
         executorService.execute(
                 () -> {
