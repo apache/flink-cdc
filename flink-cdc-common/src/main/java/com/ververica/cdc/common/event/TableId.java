@@ -20,7 +20,19 @@ import org.apache.flink.annotation.PublicEvolving;
 
 import java.util.Objects;
 
-/** Unique identifier for a database table. */
+/**
+ * Unique identifier for a database table which consists of three parts: namespace, schema name and
+ * table name.
+ *
+ * <p>Connectors need to establish a mapping between Table ID and external system objects. For
+ * example,
+ *
+ * <ul>
+ *   <li>The mapping relationship for Oracle is: (database, schema, table).
+ *   <li>The mapping relationship for MySQL or Doris is: (default, database, table).
+ *   <li>The mapping relationship for Kafka is: (default, default, topic).
+ * </ul>
+ */
 @PublicEvolving
 public class TableId {
 
@@ -38,14 +50,17 @@ public class TableId {
         this.tableName = Objects.requireNonNull(tableName);
     }
 
+    /** The mapping relationship for external systems. e.g. Oracle (database, schema, table). */
     public static TableId of(String namespace, String schemaName, String tableName) {
         return new TableId(namespace, schemaName, tableName);
     }
 
+    /** The mapping relationship for external systems. e.g. MySQL (default, database, table). */
     public static TableId of(String schemaName, String tableName) {
         return new TableId(DEFAULT_NAMESPACE, schemaName, tableName);
     }
 
+    /** The mapping relationship for external systems. e.g. Kafka (default, default, topic). */
     public static TableId of(String tableName) {
         return new TableId(DEFAULT_NAMESPACE, DEFAULT_SCHEMA, tableName);
     }
