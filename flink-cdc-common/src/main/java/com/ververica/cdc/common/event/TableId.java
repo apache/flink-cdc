@@ -16,9 +16,12 @@
 
 package com.ververica.cdc.common.event;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import java.util.Objects;
 
 /** Unique identifier for a database table. */
+@PublicEvolving
 public class TableId {
 
     public static final String DEFAULT_NAMESPACE = "default";
