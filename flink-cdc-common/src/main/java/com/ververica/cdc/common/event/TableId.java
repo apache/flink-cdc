@@ -49,7 +49,7 @@ public class TableId {
     @Nullable private final String schemaName;
     private final String tableName;
 
-    public TableId(@Nullable String namespace, @Nullable String schemaName, String tableName) {
+    private TableId(@Nullable String namespace, @Nullable String schemaName, String tableName) {
         this.namespace = namespace;
         this.schemaName = schemaName;
         this.tableName = Objects.requireNonNull(tableName);
@@ -57,12 +57,13 @@ public class TableId {
 
     /** The mapping relationship for external systems. e.g. Oracle (database, schema, table). */
     public static TableId tableId(String namespace, String schemaName, String tableName) {
-        return new TableId(namespace, schemaName, tableName);
+        return new TableId(
+                Objects.requireNonNull(namespace), Objects.requireNonNull(schemaName), tableName);
     }
 
     /** The mapping relationship for external systems. e.g. MySQL (database, table). */
     public static TableId tableId(String schemaName, String tableName) {
-        return new TableId(null, schemaName, tableName);
+        return new TableId(null, Objects.requireNonNull(schemaName), tableName);
     }
 
     /** The mapping relationship for external systems. e.g. Kafka (topic). */
