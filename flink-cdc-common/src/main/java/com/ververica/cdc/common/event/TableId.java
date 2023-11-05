@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.common.event;
 
-import javax.annotation.Nullable;
-
 import java.util.Objects;
 
 /** Unique identifier for a database table. */
@@ -57,7 +55,6 @@ public class TableId {
         return namespace + "." + schemaName + "." + tableName;
     }
 
-    @Nullable
     public String getNamespace() {
         return namespace;
     }
