@@ -83,6 +83,12 @@ public class TableId {
     }
 
     public String identifier() {
+        if (namespace == null || namespace.isEmpty()) {
+            if (schemaName == null || schemaName.isEmpty()) {
+                return tableName;
+            }
+            return schemaName + "." + tableName;
+        }
         return namespace + "." + schemaName + "." + tableName;
     }
 
