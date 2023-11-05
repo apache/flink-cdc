@@ -18,61 +18,66 @@ package com.ververica.cdc.common.event;
 
 import org.apache.flink.annotation.PublicEvolving;
 
+import javax.annotation.Nullable;
+
 import java.util.Objects;
 
 /**
- * Unique identifier for a database table which consists of three parts: namespace, schema name and
- * table name.
+ * The unique identifier used to represent the path of external table or external data collection,
+ * all external system data collection could map to a dedicated {@code TableId}.
  *
- * <p>Connectors need to establish a mapping between Table ID and external system objects. For
- * example,
+ * <ul>
+ *   <li>{@code TableId} contains at most three parts, it will be treated as namespace, schema name
+ *       and table name.
+ *   <li>{@code TableId} could contain two parts, it will be treated as schema name and table name.
+ *   <li>{@code TableId} could contain only one part, it will be treated as table name.
+ * </ul>
+ *
+ * <p>Connectors need to establish the mapping between {@code TableId} and external data collection
+ * object path. For example,
  *
  * <ul>
  *   <li>The mapping relationship for Oracle is: (database, schema, table).
- *   <li>The mapping relationship for MySQL or Doris is: (default, database, table).
- *   <li>The mapping relationship for Kafka is: (default, default, topic).
+ *   <li>The mapping relationship for MySQL or Doris is: (database, table).
+ *   <li>The mapping relationship for Kafka is: (topic).
  * </ul>
  */
 @PublicEvolving
 public class TableId {
 
-    public static final String DEFAULT_NAMESPACE = "default";
-
-    public static final String DEFAULT_SCHEMA = "default";
-
-    private final String namespace;
-    private final String schemaName;
+    @Nullable private final String namespace;
+    @Nullable private final String schemaName;
     private final String tableName;
 
-    public TableId(String namespace, String schemaName, String tableName) {
-        this.namespace = Objects.requireNonNull(namespace);
-        this.schemaName = Objects.requireNonNull(schemaName);
+    public TableId(@Nullable String namespace, @Nullable String schemaName, String tableName) {
+        this.namespace = namespace;
+        this.schemaName = schemaName;
         this.tableName = Objects.requireNonNull(tableName);
     }
 
     /** The mapping relationship for external systems. e.g. Oracle (database, schema, table). */
-    public static TableId of(String namespace, String schemaName, String tableName) {
+    public static TableId tableId(String namespace, String schemaName, String tableName) {
         return new TableId(namespace, schemaName, tableName);
     }
 
-    /** The mapping relationship for external systems. e.g. MySQL (default, database, table). */
-    public static TableId of(String schemaName, String tableName) {
-        return new TableId(DEFAULT_NAMESPACE, schemaName, tableName);
+    /** The mapping relationship for external systems. e.g. MySQL (database, table). */
+    public static TableId tableId(String schemaName, String tableName) {
+        return new TableId(null, schemaName, tableName);
     }
 
-    /** The mapping relationship for external systems. e.g. Kafka (default, default, topic). */
-    public static TableId of(String tableName) {
-        return new TableId(DEFAULT_NAMESPACE, DEFAULT_SCHEMA, tableName);
+    /** The mapping relationship for external systems. e.g. Kafka (topic). */
+    public static TableId tableId(String tableName) {
+        return new TableId(null, null, tableName);
     }
 
     public static TableId parse(String tableId) {
         String[] parts = Objects.requireNonNull(tableId).split("\\.");
         if (parts.length == 3) {
-            return of(parts[0], parts[1], parts[2]);
+            return tableId(parts[0], parts[1], parts[2]);
         } else if (parts.length == 2) {
-            return of(parts[0], parts[1]);
+            return tableId(parts[0], parts[1]);
         } else if (parts.length == 1) {
-            return of(parts[0]);
+            return tableId(parts[0]);
         }
         throw new IllegalArgumentException("Invalid tableId: " + tableId);
     }
@@ -81,10 +86,12 @@ public class TableId {
         return namespace + "." + schemaName + "." + tableName;
     }
 
+    @Nullable
     public String getNamespace() {
         return namespace;
     }
 
+    @Nullable
     public String getSchemaName() {
         return schemaName;
     }
