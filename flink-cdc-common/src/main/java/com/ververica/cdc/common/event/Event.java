@@ -16,13 +16,11 @@
 
 package com.ververica.cdc.common.event;
 
-import java.util.Date;
+import org.apache.flink.annotation.PublicEvolving;
 
 /**
  * Class {@code Event} is the super interface defines the events of external systems flowing into
  * Flink CDC.
  */
-public interface Event {
-    /** Describes the actual occurrence time of the event. */
-    Date eventTime();
-}
+@PublicEvolving
+public interface Event {}

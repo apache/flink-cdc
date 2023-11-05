@@ -16,14 +16,12 @@
 
 package com.ververica.cdc.common.event;
 
-/** Enum {@code OperationType} describes the type of operation that the change event reports. */
+/**
+ * Enum {@code OperationType} describes the type of operation that the data change event reports.
+ */
 public enum OperationType {
     INSERT,
     UPDATE,
     REPLACE,
-    DELETE,
-
-    CREATE,
-    RENAME,
-    DROP
+    DELETE
 }

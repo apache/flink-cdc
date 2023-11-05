@@ -16,7 +16,10 @@
 
 package com.ververica.cdc.common.event;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 /** Class {@code DataRecord} describes the data of changed record in the external system. */
+@PublicEvolving
 public interface DataRecord {
 
     /** Returns the number of fields in this row. */

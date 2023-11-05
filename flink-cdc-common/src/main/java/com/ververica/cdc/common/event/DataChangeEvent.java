@@ -16,12 +16,15 @@
 
 package com.ververica.cdc.common.event;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import java.util.Map;
 
 /**
  * Class {@code DataChangeEvent} represents the data change events of external systems, such as
  * INSERT, UPDATE, DELETE and so on.
  */
+@PublicEvolving
 public interface DataChangeEvent extends ChangeEvent {
 
     /** Describes the record of data before change. */
@@ -29,6 +32,9 @@ public interface DataChangeEvent extends ChangeEvent {
 
     /** Describes the record of data after change. */
     DataRecord after();
+
+    /** Describes the operation type of the change event. e.g. INSERT, UPDATE, REPLACE, DELETE. */
+    OperationType op();
 
     /** Optional, describes the metadata of the change event. e.g. MySQL binlog file name, pos. */
     Map<String, String> meta();

@@ -23,6 +23,8 @@ public class TableId {
 
     public static final String DEFAULT_NAMESPACE = "default";
 
+    public static final String DEFAULT_SCHEMA = "default";
+
     private final String namespace;
     private final String schemaName;
     private final String tableName;
@@ -41,12 +43,18 @@ public class TableId {
         return new TableId(DEFAULT_NAMESPACE, schemaName, tableName);
     }
 
+    public static TableId of(String tableName) {
+        return new TableId(DEFAULT_NAMESPACE, DEFAULT_SCHEMA, tableName);
+    }
+
     public static TableId parse(String tableId) {
         String[] parts = Objects.requireNonNull(tableId).split("\\.");
         if (parts.length == 3) {
             return of(parts[0], parts[1], parts[2]);
         } else if (parts.length == 2) {
             return of(parts[0], parts[1]);
+        } else if (parts.length == 1) {
+            return of(parts[0]);
         }
         throw new IllegalArgumentException("Invalid tableId: " + tableId);
     }

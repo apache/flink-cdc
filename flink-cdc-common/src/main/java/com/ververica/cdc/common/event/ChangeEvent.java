@@ -16,15 +16,15 @@
 
 package com.ververica.cdc.common.event;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 /**
  * Class {@code ChangeEvent} represents the change events of external systems, including {@link
  * DataChangeEvent} and {@link SchemaChangeEvent}.
  */
+@PublicEvolving
 public interface ChangeEvent extends Event {
 
     /** Describes the database table corresponding to the occurrence of a change event. */
     TableId tableId();
-
-    /** Describes the operation type of the change event. e.g. INSERT, UPDATE, DELETE and others. */
-    OperationType op();
 }
