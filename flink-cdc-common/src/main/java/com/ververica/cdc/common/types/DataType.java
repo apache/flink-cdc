@@ -149,6 +149,14 @@ public abstract class DataType implements Serializable {
         return Objects.hash(isNullable, typeRoot);
     }
 
+    public DataType notNull() {
+        return copy(false);
+    }
+
+    public DataType nullable() {
+        return copy(true);
+    }
+
     // --------------------------------------------------------------------------------------------
 
     protected String withNullability(String format, Object... params) {

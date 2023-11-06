@@ -34,6 +34,7 @@ import java.util.Objects;
  */
 @PublicEvolving
 public final class TimeType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     public static final int MIN_PRECISION = 0;

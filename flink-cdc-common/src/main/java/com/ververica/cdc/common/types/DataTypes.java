@@ -41,12 +41,25 @@ public class DataTypes {
     }
 
     /**
-     * Data type of a variable-length binary string (=a sequence of bytes).
+     * Data type of a variable-length binary string (=a sequence of bytes) {@code VARBINARY(n)}
+     * where {@code n} is the maximum number of bytes. {@code n} must have a value between 1 and
+     * {@link Integer#MAX_VALUE} (both inclusive).
      *
-     * @see BytesType
+     * @see VarBinaryType
      */
-    public static BytesType BYTES() {
-        return new BytesType();
+    public static VarBinaryType VARBINARY(int n) {
+        return new VarBinaryType(n);
+    }
+
+    /**
+     * Data type of a variable-length binary string (=a sequence of bytes) with defined maximum
+     * length. This is a shortcut for {@code VARBINARY(2147483647)} for representing JVM byte
+     * arrays.
+     *
+     * @see VarBinaryType
+     */
+    public static VarBinaryType BYTES() {
+        return VarBinaryType.bytesType();
     }
 
     /**
@@ -125,12 +138,24 @@ public class DataTypes {
     }
 
     /**
-     * Data type of a variable-length character string.
+     * Data type of a variable-length character string {@code VARCHAR(n)} where {@code n} is the
+     * maximum number of code points. {@code n} must have a value between 1 and {@link
+     * Integer#MAX_VALUE} (both inclusive).
      *
-     * @see StringType
+     * @see VarCharType
      */
-    public static StringType STRING() {
-        return new StringType();
+    public static DataType VARCHAR(int n) {
+        return new VarCharType(n);
+    }
+
+    /**
+     * Data type of a variable-length character string with defined maximum length. This is a
+     * shortcut for {@code VARCHAR(2147483647)} for representing JVM strings.
+     *
+     * @see VarCharType
+     */
+    public static DataType STRING() {
+        return VarCharType.stringType();
     }
 
     /**
@@ -241,15 +266,16 @@ public class DataTypes {
      * <p>Compared to the SQL standard, leap seconds (23:59:60 and 23:59:61) are not supported as
      * the semantics are closer to {@link java.time.OffsetDateTime}.
      *
-     * @see #TIMESTAMP(int)
+     * @see #TIMESTAMP()
      * @see #TIMESTAMP_LTZ()
-     * @see LocalZonedTimestampType
+     * @see ZonedTimestampType
      */
-    public static LocalZonedTimestampType TIMESTAMP_LTZ() {
-        return new LocalZonedTimestampType();
+    public static ZonedTimestampType TIMESTAMP_TZ() {
+        return new ZonedTimestampType();
     }
 
     /**
+     * Data type of a timestamp WITH time zone {@code TIMESTAMP(p) WITH TIME ZONE} where {@code p}
      * is the number of digits of fractional seconds (=precision). {@code p} must have a value
      * between 0 and 9 (both inclusive).
      *
@@ -262,6 +288,59 @@ public class DataTypes {
      *
      * @see #TIMESTAMP(int)
      * @see #TIMESTAMP_LTZ(int)
+     * @see ZonedTimestampType
+     */
+    public static ZonedTimestampType TIMESTAMP_TZ(int precision) {
+        return new ZonedTimestampType(precision);
+    }
+
+    /**
+     * Data type of a timestamp WITH LOCAL time zone {@code TIMESTAMP(p) WITH LOCAL TIME ZONE} where
+     * {@code p} is the number of digits of fractional seconds (=precision). {@code p} must have a
+     * value between 0 and 9 (both inclusive).
+     *
+     * <p>An instance consists of {@code year-month-day hour:minute:second[.fractional] zone} with
+     * up to nanosecond precision and values ranging from {@code 0000-01-01 00:00:00.000000000
+     * +14:59} to {@code 9999-12-31 23:59:59.999999999 -14:59}. Leap seconds (23:59:60 and 23:59:61)
+     * are not supported as the semantics are closer to {@link java.time.OffsetDateTime}.
+     *
+     * <p>Compared to {@link org.apache.flink.table.types.logical.ZonedTimestampType}, the time zone
+     * offset information is not stored physically in every datum. Instead, the type assumes {@link
+     * java.time.Instant} semantics in UTC time zone at the edges of the table ecosystem. Every
+     * datum is interpreted in the local time zone configured in the current session for computation
+     * and visualization.
+     *
+     * <p>This type fills the gap between time zone free and time zone mandatory timestamp types by
+     * allowing the interpretation of UTC timestamps according to the configured session timezone.
+     *
+     * @see #TIMESTAMP()
+     * @see #TIMESTAMP_TZ()
+     * @see LocalZonedTimestampType
+     */
+    public static LocalZonedTimestampType TIMESTAMP_LTZ() {
+        return new LocalZonedTimestampType();
+    }
+
+    /**
+     * Data type of a timestamp WITH LOCAL time zone {@code TIMESTAMP WITH LOCAL TIME ZONE} with 6
+     * digits of fractional seconds by default.
+     *
+     * <p>An instance consists of {@code year-month-day hour:minute:second[.fractional] zone} with
+     * up to microsecond precision and values ranging from {@code 0000-01-01 00:00:00.000000 +14:59}
+     * to {@code 9999-12-31 23:59:59.999999 -14:59}. Leap seconds (23:59:60 and 23:59:61) are not
+     * supported as the semantics are closer to {@link java.time.OffsetDateTime}.
+     *
+     * <p>Compared to {@link org.apache.flink.table.types.logical.ZonedTimestampType}, the time zone
+     * offset information is not stored physically in every datum. Instead, the type assumes {@link
+     * java.time.Instant} semantics in UTC time zone at the edges of the table ecosystem. Every
+     * datum is interpreted in the local time zone configured in the current session for computation
+     * and visualization.
+     *
+     * <p>This type fills the gap between time zone free and time zone mandatory timestamp types by
+     * allowing the interpretation of UTC timestamps according to the configured session timezone.
+     *
+     * @see #TIMESTAMP(int)
+     * @see #TIMESTAMP_TZ(int)
      * @see LocalZonedTimestampType
      */
     public static LocalZonedTimestampType TIMESTAMP_LTZ(int precision) {

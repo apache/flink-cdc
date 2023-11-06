@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
  */
 @PublicEvolving
 public final class RowType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     public static final String FORMAT = "ROW<%s>";

@@ -24,6 +24,7 @@ import java.util.List;
 /** Data type of an 8-byte double precision floating point number. */
 @PublicEvolving
 public final class DoubleType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     private static final String FORMAT = "DOUBLE";

@@ -27,6 +27,7 @@ import java.util.List;
  */
 @PublicEvolving
 public final class BigIntType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     private static final String FORMAT = "BIGINT";

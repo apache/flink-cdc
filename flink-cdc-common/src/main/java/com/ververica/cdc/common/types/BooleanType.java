@@ -24,6 +24,7 @@ import java.util.List;
 /** Data type of a boolean with a (possibly) three-valued logic of {@code TRUE, FALSE, UNKNOWN}. */
 @PublicEvolving
 public class BooleanType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     private static final String FORMAT = "BOOLEAN";

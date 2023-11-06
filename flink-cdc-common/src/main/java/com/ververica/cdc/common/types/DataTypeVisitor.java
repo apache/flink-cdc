@@ -29,13 +29,13 @@ public interface DataTypeVisitor<R> {
 
     R visit(CharType charType);
 
-    R visit(StringType stringType);
+    R visit(VarCharType varCharType);
 
     R visit(BooleanType booleanType);
 
     R visit(BinaryType binaryType);
 
-    R visit(BytesType bytesType);
+    R visit(VarBinaryType varBinaryType);
 
     R visit(DecimalType decimalType);
 

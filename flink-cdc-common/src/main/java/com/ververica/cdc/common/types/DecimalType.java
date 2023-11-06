@@ -25,6 +25,7 @@ import java.util.Objects;
 /** Data type of a decimal number with fixed precision and scale. */
 @PublicEvolving
 public final class DecimalType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     public static final int MIN_PRECISION = 1;

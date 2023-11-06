@@ -30,8 +30,8 @@ public abstract class DataTypeDefaultVisitor<R> implements DataTypeVisitor<R> {
     }
 
     @Override
-    public R visit(StringType stringType) {
-        return defaultMethod(stringType);
+    public R visit(VarCharType varCharType) {
+        return defaultMethod(varCharType);
     }
 
     @Override
@@ -45,7 +45,7 @@ public abstract class DataTypeDefaultVisitor<R> implements DataTypeVisitor<R> {
     }
 
     @Override
-    public R visit(BytesType bytesType) {
+    public R visit(VarBinaryType bytesType) {
         return defaultMethod(bytesType);
     }
 

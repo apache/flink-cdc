@@ -36,6 +36,7 @@ import static com.ververica.cdc.common.utils.EncodingUtils.escapeSingleQuotes;
  */
 @PublicEvolving
 public class DataField implements Serializable {
+
     private static final long serialVersionUID = 1L;
 
     public static final String FIELD_FORMAT_WITH_DESCRIPTION = "%s %s '%s'";

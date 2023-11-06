@@ -24,6 +24,7 @@ import java.util.List;
 /** Data type of a 1-byte signed integer with values from -128 to 127. */
 @PublicEvolving
 public final class TinyIntType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     private static final String FORMAT = "TINYINT";

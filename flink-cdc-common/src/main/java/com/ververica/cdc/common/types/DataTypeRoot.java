@@ -45,13 +45,13 @@ import java.util.Set;
 public enum DataTypeRoot {
     CHAR(DataTypeFamily.PREDEFINED, DataTypeFamily.CHARACTER_STRING),
 
-    STRING(DataTypeFamily.PREDEFINED, DataTypeFamily.CHARACTER_STRING),
+    VARCHAR(DataTypeFamily.PREDEFINED, DataTypeFamily.CHARACTER_STRING),
 
     BOOLEAN(DataTypeFamily.PREDEFINED),
 
     BINARY(DataTypeFamily.PREDEFINED, DataTypeFamily.BINARY_STRING),
 
-    BYTES(DataTypeFamily.PREDEFINED, DataTypeFamily.BINARY_STRING),
+    VARBINARY(DataTypeFamily.PREDEFINED, DataTypeFamily.BINARY_STRING),
 
     DECIMAL(DataTypeFamily.PREDEFINED, DataTypeFamily.NUMERIC, DataTypeFamily.EXACT_NUMERIC),
 

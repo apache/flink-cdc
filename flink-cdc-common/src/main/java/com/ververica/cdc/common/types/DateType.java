@@ -30,6 +30,7 @@ import java.util.List;
  */
 @PublicEvolving
 public final class DateType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     private static final String FORMAT = "DATE";

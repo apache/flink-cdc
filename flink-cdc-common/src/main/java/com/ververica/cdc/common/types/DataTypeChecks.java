@@ -20,6 +20,7 @@ package com.ververica.cdc.common.types;
  * Utilities for checking {@link DataType} and avoiding a lot of type casting and repetitive work.
  */
 public final class DataTypeChecks {
+
     private static final LengthExtractor LENGTH_EXTRACTOR = new LengthExtractor();
 
     public static int getLength(DataType dataType) {

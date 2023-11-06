@@ -24,6 +24,7 @@ import java.util.List;
 /** Data type of a 2-byte signed integer with values from -32,768 to 32,767. */
 @PublicEvolving
 public final class SmallIntType extends DataType {
+
     private static final long serialVersionUID = 1L;
 
     private static final String FORMAT = "SMALLINT";
