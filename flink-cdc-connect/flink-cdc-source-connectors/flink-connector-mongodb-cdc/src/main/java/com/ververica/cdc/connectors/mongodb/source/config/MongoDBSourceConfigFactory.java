@@ -155,6 +155,19 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     }
 
     /**
+     * change.stream.full.document
+     *
+     * <p>Determines what to return for update operations when using a Change Stream. When set to
+     * true, the change stream for partial updates will include both a delta describing the changes
+     * to the document and a copy of the entire document that was changed from some time after the
+     * change occurred. Default: true
+     */
+    public MongoDBSourceConfigFactory updateLookup(boolean updateLookup) {
+        this.updateLookup = updateLookup;
+        return this;
+    }
+
+    /**
      * scan.startup.mode
      *
      * <p>Optional startup mode for MongoDB CDC consumer, valid enumerations are initial,

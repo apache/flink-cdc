@@ -257,6 +257,13 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>是否尝试使用 MongoDB 前像/后像产生完整事件流。请查阅 <a href="#a-name-id-003-a">完整事件流</a> 章节了解更多详细信息。该功能仅支持 MongoDB 6.0 之后的版本。</td>
     </tr>
     <tr>
+      <td>change.stream.full.document</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>读取change stream时是否返回完整的文档信息。</td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

@@ -263,6 +263,13 @@ Connector Options
       <td>Whether try to generate full-mode changelog based on pre- and post-images in MongoDB. Refer to <a href="#a-name-id-003-a">Full Changelog</a>  for more details. Supports MongoDB 6.0 and above only.</td>
     </tr>
     <tr>
+      <td>change.stream.full.document</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Determines what to return for update operations when using a Change Stream.</td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
