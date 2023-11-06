@@ -28,4 +28,8 @@ import com.ververica.cdc.common.event.Event;
 @PublicEvolving
 public interface FlinkSourceProvider extends EventSourceProvider {
     Source<Event, ?, ?> getSource();
+
+    static FlinkSourceProvider of(Source<Event, ?, ?> source) {
+        return () -> source;
+    }
 }
