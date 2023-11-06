@@ -28,4 +28,8 @@ import com.ververica.cdc.common.event.Event;
 @PublicEvolving
 public interface FlinkSinkFunctionProvider extends EventSinkProvider {
     SinkFunction<Event> getSinkFunction();
+
+    static FlinkSinkFunctionProvider of(SinkFunction<Event> sinkFunction) {
+        return () -> sinkFunction;
+    }
 }
