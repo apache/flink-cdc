@@ -48,14 +48,14 @@ public class SchemaEvolutionClient {
         return new SchemaEvolutionClient(env.getOperatorCoordinatorEventGateway());
     }
 
-    /** send {@link SinkWriterRegisterEvent} to {@link SchemaOperatorCoordinator} */
+    /** send {@link SinkWriterRegisterEvent} to {@link SchemaOperatorCoordinator}. */
     public void registerSubtask(int subtaskId) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 SCHEMA_EVOLUTION_OPERATOR_ID,
                 new SerializedValue<>(new SinkWriterRegisterEvent(subtaskId)));
     }
 
-    /** send {@link FlushSuccessEvent} to {@link SchemaOperatorCoordinator} */
+    /** send {@link FlushSuccessEvent} to {@link SchemaOperatorCoordinator}. */
     public void notifyFlushSuccess(int subtaskId) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 SCHEMA_EVOLUTION_OPERATOR_ID,

@@ -24,6 +24,6 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 @PublicEvolving
 public interface SupportSchemaEvolutionWriting {
 
-    /** change writing client based on SchemaChangeEvent */
+    /** change writing client based on SchemaChangeEvent. */
     void applySchemaChangeEvent(SchemaChangeEvent schemaChangeEvent);
 }
