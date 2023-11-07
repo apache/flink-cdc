@@ -21,14 +21,13 @@ import org.apache.flink.annotation.PublicEvolving;
 /**
  * {@code DataSource} is used to access metadata and read change data from external systems. It can
  * read data from multiple tables simultaneously.
- *
- * <p>The ability to perform full database synchronization comes from the implementation of the
- * Flink source. After obtaining user configuration, the Flink source connector needs to be able to
- * send all data from a specific database downstream according to the specified data type.
  */
 @PublicEvolving
 public interface DataSource {
+
+    /** Get the {@link EventSourceProvider} for reading events from external systems. */
     EventSourceProvider getEventSourceProvider();
 
+    /** Get the {@link MetadataAccessor} for accessing metadata from external systems. */
     MetadataAccessor getMetadataAccessor();
 }

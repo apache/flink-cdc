@@ -27,8 +27,11 @@ import com.ververica.cdc.common.event.Event;
  */
 @PublicEvolving
 public interface FlinkSourceProvider extends EventSourceProvider {
+
+    /** Get the {@link Source} for reading events from external systems. */
     Source<Event, ?, ?> getSource();
 
+    /** Create a {@link FlinkSourceProvider} from a {@link Source}. */
     static FlinkSourceProvider of(Source<Event, ?, ?> source) {
         return () -> source;
     }

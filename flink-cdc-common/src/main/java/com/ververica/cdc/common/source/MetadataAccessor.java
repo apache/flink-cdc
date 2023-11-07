@@ -24,7 +24,10 @@ import javax.annotation.Nullable;
 
 import java.util.List;
 
-/** {@code MetadataAccessor} is used to read the metadata from external systems. */
+/**
+ * {@code MetadataAccessor} is used by {@link DataSource} to access the metadata from external
+ * systems.
+ */
 @PublicEvolving
 public interface MetadataAccessor {
 
