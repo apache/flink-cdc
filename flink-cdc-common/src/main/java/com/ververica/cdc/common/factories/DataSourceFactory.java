@@ -16,11 +16,14 @@
 
 package com.ververica.cdc.common.factories;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import com.ververica.cdc.common.source.DataSource;
 
 /**
  * A factory to create {@link DataSource} instances. See also {@link Factory} for more information.
  */
+@PublicEvolving
 public interface DataSourceFactory extends Factory {
 
     /** Creates a {@link DataSource} instance. */

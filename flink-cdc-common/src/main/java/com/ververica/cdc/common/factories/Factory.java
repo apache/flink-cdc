@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.common.factories;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.configuration.ConfigOption;
 
 import java.util.Set;
@@ -37,6 +38,7 @@ import java.util.Set;
  *
  * <p>It is the responsibility of each factory to perform validation before returning an instance.
  */
+@PublicEvolving
 public interface Factory {
 
     /** Returns a unique identifier among same factory interfaces. */

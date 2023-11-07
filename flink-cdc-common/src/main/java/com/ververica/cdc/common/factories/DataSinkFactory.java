@@ -16,11 +16,14 @@
 
 package com.ververica.cdc.common.factories;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 import com.ververica.cdc.common.sink.DataSink;
 
 /**
  * A factory to create {@link DataSink} instances. See also {@link Factory} for more information.
  */
+@PublicEvolving
 public interface DataSinkFactory extends Factory {
 
     /** Creates a {@link DataSink} instance. */
