@@ -19,12 +19,15 @@ package com.ververica.cdc.common.sink;
 import org.apache.flink.annotation.PublicEvolving;
 
 /**
- * {@code DataSink} is used to write change data and apply metadata changes by {@link
+ * {@code DataSink} is used to write changed data and apply metadata changes by {@link
  * MetadataApplier} to external systems.
  */
 @PublicEvolving
 public interface DataSink {
+
+    /** Get the {@link EventSinkProvider} for writing changed data to external systems. */
     EventSinkProvider getEventSinkProvider();
 
+    /** Get the {@link MetadataApplier} for applying metadata changes to external systems. */
     MetadataApplier getMetadataApplier();
 }

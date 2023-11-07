@@ -27,8 +27,11 @@ import com.ververica.cdc.common.event.Event;
  */
 @PublicEvolving
 public interface FlinkSinkFunctionProvider extends EventSinkProvider {
+
+    /** Get the {@link SinkFunction} for writing events to external systems. */
     SinkFunction<Event> getSinkFunction();
 
+    /** Create a {@link FlinkSinkFunctionProvider} from a {@link SinkFunction}. */
     static FlinkSinkFunctionProvider of(SinkFunction<Event> sinkFunction) {
         return () -> sinkFunction;
     }

@@ -23,5 +23,7 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 /** {@code MetadataApplier} is used to apply metadata changes to external systems. */
 @PublicEvolving
 public interface MetadataApplier {
+
+    /** Apply the given {@link SchemaChangeEvent} to external systems. */
     void applySchemaChange(SchemaChangeEvent schemaChangeEvent);
 }
