@@ -16,24 +16,14 @@
 
 package com.ververica.cdc.runtime.operators.schema.event;
 
-import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.streaming.runtime.operators.sink.DataSinkWriterOperator;
 
-import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
+import com.ververica.cdc.common.event.Event;
 
 /**
- * A {@link OperatorEvent} from sink writer to notify {@link SchemaOperatorCoordinator} that it
- * finished flushing.
+ * An {@link Event} from SchemaOperator to notify {@link DataSinkWriterOperator} that it start
+ * flushing.
  */
-public class FlushSuccessEvent implements OperatorEvent {
+public class FlushEvent implements Event {
     private static final long serialVersionUID = 1L;
-
-    private final int taskId;
-
-    public FlushSuccessEvent(int taskId) {
-        this.taskId = taskId;
-    }
-
-    public int getTaskId() {
-        return taskId;
-    }
 }

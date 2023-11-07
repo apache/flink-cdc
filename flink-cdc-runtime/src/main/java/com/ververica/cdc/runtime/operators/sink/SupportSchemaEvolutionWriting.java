@@ -14,23 +14,16 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.runtime.operators.schema.event;
+package com.ververica.cdc.runtime.operators.sink;
 
-import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.annotation.PublicEvolving;
 
-import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
+import com.ververica.cdc.common.event.SchemaChangeEvent;
 
-/** A {@link OperatorEvent} that register sink writer to {@link SchemaOperatorCoordinator}. */
-public class SinkWriterRegisterEvent implements OperatorEvent {
-    private static final long serialVersionUID = 1L;
+/** apply metadata changes to writer of external systems. */
+@PublicEvolving
+public interface SupportSchemaEvolutionWriting {
 
-    private final int taskId;
-
-    public SinkWriterRegisterEvent(int taskId) {
-        this.taskId = taskId;
-    }
-
-    public int getTaskId() {
-        return taskId;
-    }
+    /** change writing client based on SchemaChangeEvent */
+    void applySchemaChangeEvent(SchemaChangeEvent schemaChangeEvent);
 }
