@@ -19,6 +19,7 @@ package com.ververica.cdc.common.source;
 import org.apache.flink.annotation.PublicEvolving;
 
 import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.schema.Schema;
 
 import javax.annotation.Nullable;
 
@@ -40,5 +41,6 @@ public interface MetadataAccessor {
     /** List tables by namespace and schema from external systems. */
     List<TableId> listTables(@Nullable String namespace, @Nullable String schemaName);
 
-    // TODO: Schema getTableSchema(TableID tableId);
+    /** Get the schema of the given table. */
+    Schema getTableSchema(TableId tableId);
 }
