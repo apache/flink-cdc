@@ -26,12 +26,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
-import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
-import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.runtime.operators.schema.event.FlushEvent;
 import com.ververica.cdc.runtime.operators.sink.SchemaEvolutionClient;
-import com.ververica.cdc.runtime.operators.sink.SupportSchemaEvolutionWriting;
 
 import java.lang.reflect.Field;
 
@@ -86,12 +83,7 @@ public class DataSinkWriterOperator<CommT> extends SinkWriterOperator<Event, Com
             copySinkWriter.flush(false);
             schemaEvolutionClient.notifyFlushSuccess(
                     getRuntimeContext().getIndexOfThisSubtask(), ((FlushEvent) event).getTableId());
-        } else if (event instanceof SchemaChangeEvent) {
-            if (copySinkWriter instanceof SupportSchemaEvolutionWriting) {
-                ((SupportSchemaEvolutionWriting) copySinkWriter)
-                        .applySchemaChangeEvent((SchemaChangeEvent) event);
-            }
-        } else if (event instanceof DataChangeEvent) {
+        } else {
             super.processElement(element);
         }
     }
