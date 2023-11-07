@@ -39,17 +39,17 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
     private static final long serialVersionUID = 1L;
 
     /**
-     * The transformation uid of schema evolution operator.
+     * The transformation uid of schema operator.
      *
      * <p>Note: we use a deterministic operator id to identify the coordinator for cross-operator
      * communication.
      *
      * @see org.apache.flink.api.dag.Transformation#setUid(String)
      */
-    public static final String SCHEMA_EVOLUTION_OPERATOR_UID = "$$_schema_evolution_operator_$$";
+    public static final String SCHEMA_OPERATOR_UID = "$$_schema_operator_$$";
 
     /**
-     * The operator id of schema evolution operator and coordinator.
+     * The operator id of schema operator and coordinator.
      *
      * <p>Note: we use a deterministic operator id to identify the coordinator for cross-operator
      * communication.
@@ -61,7 +61,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
     private static byte[] generateOperatorHash() {
         final HashFunction hashFunction = Hashing.murmur3_128(0);
         Hasher hasher = hashFunction.newHasher();
-        hasher.putString(SCHEMA_EVOLUTION_OPERATOR_UID, StandardCharsets.UTF_8);
+        hasher.putString(SCHEMA_OPERATOR_UID, StandardCharsets.UTF_8);
         return hasher.hash().asBytes();
     }
 

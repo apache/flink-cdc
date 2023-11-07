@@ -84,7 +84,8 @@ public class DataSinkWriterOperator<CommT> extends SinkWriterOperator<Event, Com
         Event event = element.getValue();
         if (event instanceof FlushEvent) {
             copySinkWriter.flush(false);
-            schemaEvolutionClient.notifyFlushSuccess(getRuntimeContext().getIndexOfThisSubtask());
+            schemaEvolutionClient.notifyFlushSuccess(
+                    getRuntimeContext().getIndexOfThisSubtask(), ((FlushEvent) event).getTableId());
         } else if (event instanceof SchemaChangeEvent) {
             if (copySinkWriter instanceof SupportSchemaEvolutionWriting) {
                 ((SupportSchemaEvolutionWriting) copySinkWriter)

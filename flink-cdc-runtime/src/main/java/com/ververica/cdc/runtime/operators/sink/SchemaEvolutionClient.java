@@ -22,6 +22,7 @@ import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.runtime.operators.sink.DataSinkWriterOperator;
 import org.apache.flink.util.SerializedValue;
 
+import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
 import com.ververica.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import com.ververica.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
@@ -49,16 +50,16 @@ public class SchemaEvolutionClient {
     }
 
     /** send {@link SinkWriterRegisterEvent} to {@link SchemaOperatorCoordinator}. */
-    public void registerSubtask(int subtaskId) throws IOException {
+    public void registerSubtask(int subtask) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 SCHEMA_EVOLUTION_OPERATOR_ID,
-                new SerializedValue<>(new SinkWriterRegisterEvent(subtaskId)));
+                new SerializedValue<>(new SinkWriterRegisterEvent(subtask)));
     }
 
     /** send {@link FlushSuccessEvent} to {@link SchemaOperatorCoordinator}. */
-    public void notifyFlushSuccess(int subtaskId) throws IOException {
+    public void notifyFlushSuccess(int subtask, TableId tableId) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 SCHEMA_EVOLUTION_OPERATOR_ID,
-                new SerializedValue<>(new FlushSuccessEvent(subtaskId)));
+                new SerializedValue<>(new FlushSuccessEvent(subtask, tableId)));
     }
 }

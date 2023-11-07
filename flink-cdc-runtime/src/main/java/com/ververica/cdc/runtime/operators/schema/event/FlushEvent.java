@@ -19,11 +19,24 @@ package com.ververica.cdc.runtime.operators.schema.event;
 import org.apache.flink.streaming.runtime.operators.sink.DataSinkWriterOperator;
 
 import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
 
 /**
- * An {@link Event} from SchemaOperator to notify {@link DataSinkWriterOperator} that it start
- * flushing.
+ * An {@link Event} from {@link SchemaOperator} to notify {@link DataSinkWriterOperator} that it
+ * start flushing.
  */
 public class FlushEvent implements Event {
+
     private static final long serialVersionUID = 1L;
+
+    private final TableId tableId;
+
+    public FlushEvent(TableId tableId) {
+        this.tableId = tableId;
+    }
+
+    public TableId getTableId() {
+        return tableId;
+    }
 }
