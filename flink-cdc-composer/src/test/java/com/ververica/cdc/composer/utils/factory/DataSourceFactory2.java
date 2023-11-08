@@ -30,21 +30,6 @@ import java.util.Set;
 public class DataSourceFactory2 implements DataSourceFactory {
 
     @Override
-    public DataSource createDataSource() {
-        return new DataSource() {
-            @Override
-            public EventSourceProvider getEventSourceProvider() {
-                return null;
-            }
-
-            @Override
-            public MetadataAccessor getMetadataAccessor() {
-                return null;
-            }
-        };
-    }
-
-    @Override
     public String identifier() {
         return "data-sink-factory-2";
     }
@@ -57,5 +42,20 @@ public class DataSourceFactory2 implements DataSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         return new HashSet<>();
+    }
+
+    @Override
+    public DataSource createDataSource(Context context) {
+        return new DataSource() {
+            @Override
+            public EventSourceProvider getEventSourceProvider() {
+                return null;
+            }
+
+            @Override
+            public MetadataAccessor getMetadataAccessor() {
+                return null;
+            }
+        };
     }
 }

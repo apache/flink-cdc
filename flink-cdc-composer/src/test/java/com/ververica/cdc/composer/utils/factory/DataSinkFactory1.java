@@ -29,7 +29,7 @@ import java.util.Set;
 /** A dummy {@link DataSinkFactory} for testing. */
 public class DataSinkFactory1 implements DataSinkFactory {
     @Override
-    public DataSink createDataSink() {
+    public DataSink createDataSink(Context context) {
         return new DataSink() {
             @Override
             public EventSinkProvider getEventSinkProvider() {
