@@ -45,9 +45,9 @@ import java.lang.reflect.Field;
  */
 public class DataSinkWriterOperator<CommT> extends SinkWriterOperator<Event, CommT> {
 
-    SchemaEvolutionClient schemaEvolutionClient;
+    private SchemaEvolutionClient schemaEvolutionClient;
 
-    private SinkWriter copySinkWriter;
+    private SinkWriter<Event> copySinkWriter;
 
     private final OperatorID schemaOperatorID;
 
