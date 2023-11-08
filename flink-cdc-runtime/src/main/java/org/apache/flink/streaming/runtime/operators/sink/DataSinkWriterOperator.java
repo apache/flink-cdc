@@ -72,10 +72,28 @@ public class DataSinkWriterOperator<CommT> extends SinkWriterOperator<Event, Com
     @Override
     public void open() throws Exception {
         super.open();
-        Class<? extends SinkWriterOperator> cls = this.getClass();
-        Field field = cls.getDeclaredField("sinkWriter");
-        field.setAccessible(true);
-        copySinkWriter = (SinkWriter) field.get(this);
+        copySinkWriter = (SinkWriter) getFieldValue("sinkWriter");
+    }
+
+    /**
+     * Finds a field by name from its declaring class. This also searches for the field in super
+     * classes.
+     *
+     * @param fieldName the name of the field to find.
+     * @return the Object value of this field.
+     */
+    private Object getFieldValue(String fieldName) throws IllegalAccessException {
+        Class clazz = this.getClass();
+        while (clazz != null) {
+            try {
+                Field field = clazz.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field.get(this);
+            } catch (NoSuchFieldException e) {
+                clazz = clazz.getSuperclass();
+            }
+        }
+        return null;
     }
 
     @Override

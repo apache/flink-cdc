@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.runtime.operators.sink;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.runtime.operators.sink.DataSinkWriterOperator;
@@ -34,7 +33,6 @@ import java.io.IOException;
  * Client for {@link DataSinkWriterOperator} interact with {@link SchemaOperatorCoordinator} when
  * table schema evolution happened.
  */
-@PublicEvolving
 public class SchemaEvolutionClient {
 
     private final TaskOperatorEventGateway toCoordinator;
