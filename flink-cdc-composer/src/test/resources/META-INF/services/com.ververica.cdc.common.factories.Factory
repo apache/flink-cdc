@@ -16,4 +16,3 @@ com.ververica.cdc.composer.utils.factory.DataSinkFactory1
 com.ververica.cdc.composer.utils.factory.DataSinkFactory2
 com.ververica.cdc.composer.utils.factory.DataSourceFactory1
 com.ververica.cdc.composer.utils.factory.DataSourceFactory2
-

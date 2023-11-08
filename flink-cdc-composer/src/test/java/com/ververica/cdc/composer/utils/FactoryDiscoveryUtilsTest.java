@@ -64,8 +64,6 @@ class FactoryDiscoveryUtilsTest {
         assertTrue(
                 FactoryDiscoveryUtils.getJarPathByIdentifier("data-source-factory-1", Factory.class)
                         .getPath()
-                        .endsWith(
-                                "flink-cdc-connectors/flink-cdc"
-                                        + "-composer/target/test-classes/"));
+                        .endsWith("/flink-cdc" + "-composer/target/test-classes/"));
     }
 }
