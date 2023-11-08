@@ -31,9 +31,11 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -45,7 +47,7 @@ public class Schema implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private final Map<String, Column> columns;
+    private final List<Column> columns;
 
     private final List<String> primaryKeys;
 
@@ -53,8 +55,11 @@ public class Schema implements Serializable {
 
     private final @Nullable String comment;
 
+    // Used to index column by name
+    private transient volatile Map<String, Column> nameToColumns;
+
     private Schema(
-            Map<String, Column> columns,
+            List<Column> columns,
             List<String> primaryKeys,
             Map<String, String> options,
             @Nullable String comment) {
@@ -71,19 +76,19 @@ public class Schema implements Serializable {
 
     /** Returns all {@link Column}s of this schema. */
     public List<Column> getColumns() {
-        return new ArrayList<>(columns.values());
+        return columns;
     }
 
     /** Returns all column names. It does not distinguish between different kinds of columns. */
     public List<String> getColumnNames() {
-        return new ArrayList<>(columns.keySet());
+        return columns.stream().map(Column::getName).collect(Collectors.toList());
     }
 
     /**
      * Returns all column data types. It does not distinguish between different kinds of columns.
      */
     public List<DataType> getColumnDataTypes() {
-        return columns.values().stream().map(Column::getType).collect(Collectors.toList());
+        return columns.stream().map(Column::getType).collect(Collectors.toList());
     }
 
     /** Returns the primary keys of the table or data collection. */
@@ -107,7 +112,8 @@ public class Schema implements Serializable {
      * @param columnName the name of the column
      */
     public Optional<Column> getColumn(String columnName) {
-        return Optional.ofNullable(columns.get(columnName));
+        initializeNameToColumns();
+        return Optional.ofNullable(nameToColumns.get(columnName));
     }
 
     /**
@@ -117,9 +123,25 @@ public class Schema implements Serializable {
      */
     public DataType toRowDataType() {
         final DataField[] fields =
-                columns.values().stream().map(Schema::columnToField).toArray(DataField[]::new);
+                columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
         // the row should never be null
         return ROW(fields).notNull();
+    }
+
+    // -----------------------------------------------------------------------------------
+    private void initializeNameToColumns() {
+        if (nameToColumns == null) {
+            // make the method thread-safe
+            synchronized (this) {
+                // we need to check nullability again here
+                if (nameToColumns == null) {
+                    nameToColumns = new HashMap<>();
+                    for (Column col : columns) {
+                        nameToColumns.put(col.getName(), col);
+                    }
+                }
+            }
+        }
     }
 
     private static DataField columnToField(Column column) {
@@ -140,16 +162,17 @@ public class Schema implements Serializable {
     @PublicEvolving
     public static final class Builder {
 
-        private final Map<String, Column> columns;
-
+        private final List<Column> columns;
         private List<String> primaryKeys = new ArrayList<>();
-
         private Map<String, String> options = new HashMap<>();
-
         private @Nullable String comment;
 
+        // Used to check duplicate columns
+        private final Set<String> columnNames;
+
         public Builder() {
-            this.columns = new HashMap<>();
+            this.columns = new ArrayList<>();
+            this.columnNames = new HashSet<>();
         }
 
         /** Adopts all fields of the given row as physical columns of the schema. */
@@ -171,7 +194,7 @@ public class Schema implements Serializable {
          */
         public Builder physicalColumn(String columnName, DataType type) {
             checkColumn(columnName, type);
-            columns.put(columnName, Column.physicalColumn(columnName, type));
+            columns.add(Column.physicalColumn(columnName, type));
             return this;
         }
 
@@ -184,7 +207,7 @@ public class Schema implements Serializable {
          */
         public Builder physicalColumn(String columnName, DataType type, String comment) {
             checkColumn(columnName, type);
-            columns.put(columnName, Column.physicalColumn(columnName, type));
+            columns.add(Column.physicalColumn(columnName, type, comment));
             return this;
         }
 
@@ -196,7 +219,7 @@ public class Schema implements Serializable {
          */
         public Builder metadataColumn(String columnName, DataType type) {
             checkColumn(columnName, type);
-            columns.put(columnName, Column.metadataColumn(columnName, type));
+            columns.add(Column.metadataColumn(columnName, type));
             return this;
         }
 
@@ -209,7 +232,7 @@ public class Schema implements Serializable {
          */
         public Builder metadataColumn(String columnName, DataType type, String metadataKey) {
             checkColumn(columnName, type);
-            columns.put(columnName, Column.metadataColumn(columnName, type, metadataKey));
+            columns.add(Column.metadataColumn(columnName, type, metadataKey, null));
             return this;
         }
 
@@ -224,19 +247,20 @@ public class Schema implements Serializable {
         public Builder metadataColumn(
                 String columnName, DataType type, String metadataKey, String comment) {
             checkColumn(columnName, type);
-            columns.put(columnName, Column.metadataColumn(columnName, type, metadataKey, comment));
+            columns.add(Column.metadataColumn(columnName, type, metadataKey, comment));
             return this;
         }
 
         private void checkColumn(String columnName, DataType type) {
             Preconditions.checkNotNull(columnName, "Column name must not be null.");
             Preconditions.checkNotNull(type, "Data type must not be null.");
-            if (columns.containsKey(columnName)) {
+            if (columnNames.contains(columnName)) {
                 throw new IllegalArgumentException(
                         String.format(
                                 "Column names must be unique, the duplicate column name: '%s'",
                                 columnName));
             }
+            columnNames.add(columnName);
         }
 
         /**
