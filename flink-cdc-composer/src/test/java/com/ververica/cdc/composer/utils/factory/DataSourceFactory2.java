@@ -18,25 +18,27 @@ package com.ververica.cdc.composer.utils.factory;
 
 import org.apache.flink.configuration.ConfigOption;
 
-import com.ververica.cdc.common.factories.DataSinkFactory;
-import com.ververica.cdc.common.sink.DataSink;
-import com.ververica.cdc.common.sink.EventSinkProvider;
-import com.ververica.cdc.common.sink.MetadataApplier;
+import com.ververica.cdc.common.factories.DataSourceFactory;
+import com.ververica.cdc.common.source.DataSource;
+import com.ververica.cdc.common.source.EventSourceProvider;
+import com.ververica.cdc.common.source.MetadataAccessor;
 
 import java.util.HashSet;
 import java.util.Set;
 
-public class DataSourceFactory2 implements DataSinkFactory {
+/** A dummy {@link DataSourceFactory} for testing. */
+public class DataSourceFactory2 implements DataSourceFactory {
+
     @Override
-    public DataSink createDataSink() {
-        return new DataSink() {
+    public DataSource createDataSource() {
+        return new DataSource() {
             @Override
-            public EventSinkProvider getEventSinkProvider() {
+            public EventSourceProvider getEventSourceProvider() {
                 return null;
             }
 
             @Override
-            public MetadataApplier getMetadataApplier() {
+            public MetadataAccessor getMetadataAccessor() {
                 return null;
             }
         };

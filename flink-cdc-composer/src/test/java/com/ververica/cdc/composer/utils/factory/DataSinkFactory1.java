@@ -26,6 +26,7 @@ import com.ververica.cdc.common.sink.MetadataApplier;
 import java.util.HashSet;
 import java.util.Set;
 
+/** A dummy {@link DataSinkFactory} for testing. */
 public class DataSinkFactory1 implements DataSinkFactory {
     @Override
     public DataSink createDataSink() {
