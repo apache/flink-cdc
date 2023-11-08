@@ -28,10 +28,10 @@ import java.util.Map;
 public interface DataChangeEvent extends ChangeEvent {
 
     /** Describes the record of data before change. */
-    DataRecord before();
+    RecordData before();
 
     /** Describes the record of data after change. */
-    DataRecord after();
+    RecordData after();
 
     /** Describes the operation type of the change event. e.g. INSERT, UPDATE, REPLACE, DELETE. */
     OperationType op();
