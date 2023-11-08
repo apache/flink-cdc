@@ -51,7 +51,7 @@ public class DataSinkWriterOperator<CommT> extends SinkWriterOperator<Event, Com
 
     private final OperatorID schemaOperatorID;
 
-    DataSinkWriterOperator(
+    public DataSinkWriterOperator(
             Sink<Event> sink,
             ProcessingTimeService processingTimeService,
             MailboxExecutor mailboxExecutor,
