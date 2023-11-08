@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
@@ -38,26 +37,16 @@ public class FactoryDiscoveryUtils {
     /** Returns the {@link Factory} for the given identifier. */
     @SuppressWarnings("unchecked")
     public static <T extends Factory> T getFactoryByIdentifier(
-            String identifier, Class<T> implementClass) {
+            String identifier, Class<T> factoryClass) {
 
         final ServiceLoader<Factory> loader = ServiceLoader.load(Factory.class);
-
         final List<Factory> factoryList = new ArrayList<>();
-        final Iterator<Factory> factories = loader.iterator();
-        while (factories.hasNext()) {
-            try {
-                final Factory factory = factories.next();
-                if (factory != null
-                        && factory.identifier().equals(identifier)
-                        && implementClass.isAssignableFrom(factory.getClass())) {
-                    factoryList.add(factory);
-                }
-            } catch (Throwable e) {
-                if (e.getCause() instanceof NoClassDefFoundError) {
-                    LOG.info("Could not load factory due to missing dependencies.");
-                } else {
-                    throw e;
-                }
+
+        for (Factory factory : loader) {
+            if (factory != null
+                    && factory.identifier().equals(identifier)
+                    && factoryClass.isAssignableFrom(factory.getClass())) {
+                factoryList.add(factory);
             }
         }
 
