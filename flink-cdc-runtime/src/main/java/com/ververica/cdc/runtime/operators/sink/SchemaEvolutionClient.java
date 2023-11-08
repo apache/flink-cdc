@@ -17,19 +17,18 @@
 package com.ververica.cdc.runtime.operators.sink;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.runtime.execution.Environment;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.runtime.operators.sink.DataSinkWriterOperator;
 import org.apache.flink.util.SerializedValue;
 
 import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
 import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
 import com.ververica.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import com.ververica.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 
 import java.io.IOException;
-
-import static com.ververica.cdc.runtime.operators.schema.SchemaOperatorFactory.SCHEMA_EVOLUTION_OPERATOR_ID;
 
 /**
  * Client for {@link DataSinkWriterOperator} interact with {@link SchemaOperatorCoordinator} when
@@ -40,26 +39,24 @@ public class SchemaEvolutionClient {
 
     private final TaskOperatorEventGateway toCoordinator;
 
-    public SchemaEvolutionClient(TaskOperatorEventGateway toCoordinator) {
-        this.toCoordinator = toCoordinator;
-    }
+    /** a determinant OperatorID of {@link SchemaOperator}. */
+    private final OperatorID schemaOperatorID;
 
-    /** Creates a {@link SchemaEvolutionClient} from {@link Environment}. */
-    public static SchemaEvolutionClient of(Environment env) {
-        return new SchemaEvolutionClient(env.getOperatorCoordinatorEventGateway());
+    public SchemaEvolutionClient(
+            TaskOperatorEventGateway toCoordinator, OperatorID schemaOperatorID) {
+        this.toCoordinator = toCoordinator;
+        this.schemaOperatorID = schemaOperatorID;
     }
 
     /** send {@link SinkWriterRegisterEvent} to {@link SchemaOperatorCoordinator}. */
     public void registerSubtask(int subtask) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
-                SCHEMA_EVOLUTION_OPERATOR_ID,
-                new SerializedValue<>(new SinkWriterRegisterEvent(subtask)));
+                schemaOperatorID, new SerializedValue<>(new SinkWriterRegisterEvent(subtask)));
     }
 
     /** send {@link FlushSuccessEvent} to {@link SchemaOperatorCoordinator}. */
     public void notifyFlushSuccess(int subtask, TableId tableId) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
-                SCHEMA_EVOLUTION_OPERATOR_ID,
-                new SerializedValue<>(new FlushSuccessEvent(subtask, tableId)));
+                schemaOperatorID, new SerializedValue<>(new FlushSuccessEvent(subtask, tableId)));
     }
 }

@@ -19,6 +19,7 @@ package org.apache.flink.streaming.runtime.operators.sink;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.Output;
@@ -48,17 +49,24 @@ public class DataSinkWriterOperator<CommT> extends SinkWriterOperator<Event, Com
 
     private SinkWriter copySinkWriter;
 
+    private final OperatorID schemaOperatorID;
+
     DataSinkWriterOperator(
             Sink<Event> sink,
             ProcessingTimeService processingTimeService,
-            MailboxExecutor mailboxExecutor) {
+            MailboxExecutor mailboxExecutor,
+            OperatorID schemaOperatorID) {
         super(sink, processingTimeService, mailboxExecutor);
+        this.schemaOperatorID = schemaOperatorID;
     }
 
     @Override
     public void setup(StreamTask containingTask, StreamConfig config, Output output) {
         super.setup(containingTask, config, output);
-        schemaEvolutionClient = SchemaEvolutionClient.of(containingTask.getEnvironment());
+        schemaEvolutionClient =
+                new SchemaEvolutionClient(
+                        containingTask.getEnvironment().getOperatorCoordinatorEventGateway(),
+                        schemaOperatorID);
     }
 
     @Override
