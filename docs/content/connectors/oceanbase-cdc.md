@@ -11,7 +11,7 @@ In order to set up the OceanBase CDC connector, the following table provides dep
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-oceanbase-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
   <version>2.5-SNAPSHOT</version>
 </dependency>
 ```

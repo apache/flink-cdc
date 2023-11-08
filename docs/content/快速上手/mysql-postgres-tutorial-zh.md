@@ -72,10 +72,10 @@ docker-compose up -d
 1. 下载 [Flink 1.17.0](https://archive.apache.org/dist/flink/flink-1.17.0/flink-1.17.0-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.17.0`
 2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.17.0/lib/` 下：
 
-   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译**
+   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译**
     - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-    - [flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.5-SNAPSHOT/flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar)
-    - [flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.5-SNAPSHOT/flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar)
+    - flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar
+    - flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar
 
 ### 准备数据
 #### 在 MySQL 数据库中准备数据

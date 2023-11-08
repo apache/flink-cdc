@@ -76,10 +76,10 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 1. Download [Flink 1.17.0](https://archive.apache.org/dist/flink/flink-1.17.0/flink-1.17.0-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.17.0`
 2. Download following JAR package required and put them under `flink-1.17.0/lib/`:
 
-   **Download links are available only for stable releases, SNAPSHOT dependency need build by yourself. **
+   **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself.**
     - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-    - [flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.5-SNAPSHOT/flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar)
-    - [flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.5-SNAPSHOT/flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar)
+    - flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar
+    - flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar
 
 ### Preparing data in databases
 #### Preparing data in MySQL
