@@ -21,7 +21,6 @@ import org.apache.flink.annotation.PublicEvolving;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.source.DataSource;
 
-import java.io.Serializable;
 import java.util.Objects;
 
 /**
@@ -29,7 +28,7 @@ import java.util.Objects;
  * {@link DataSource} before all {@link DataChangeEvent} with the same tableId
  */
 @PublicEvolving
-public class CreateTableEvent implements SchemaChangeEvent, Serializable {
+public class CreateTableEvent implements SchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 

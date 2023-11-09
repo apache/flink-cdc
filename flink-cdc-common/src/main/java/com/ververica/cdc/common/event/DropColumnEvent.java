@@ -20,7 +20,6 @@ import org.apache.flink.annotation.PublicEvolving;
 
 import com.ververica.cdc.common.schema.Column;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 
@@ -29,7 +28,7 @@ import java.util.Objects;
  * lenient column type changes.
  */
 @PublicEvolving
-public class DropColumnEvent implements SchemaChangeEvent, Serializable {
+public class DropColumnEvent implements SchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 

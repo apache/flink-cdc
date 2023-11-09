@@ -20,6 +20,8 @@ import org.apache.flink.annotation.PublicEvolving;
 
 import com.ververica.cdc.common.schema.Column;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
@@ -29,7 +31,7 @@ import java.util.Objects;
  * lenient column type changes.
  */
 @PublicEvolving
-public final class AddColumnEvent implements SchemaChangeEvent, Serializable {
+public final class AddColumnEvent implements SchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 
@@ -58,35 +60,39 @@ public final class AddColumnEvent implements SchemaChangeEvent, Serializable {
     /** represents result of an ADD COLUMN DDL that may change column sequence. */
     public static class ColumnWithPosition implements Serializable {
 
-        final Column column;
+        /** The added column. */
+        private final Column addColumn;
 
-        final ColumnPosition position;
+        /** The position of the added column. */
+        private final ColumnPosition position;
 
-        final Column otherColumn;
+        /** The added column lies in the position relative to this column. */
+        private final @Nullable Column existingColumn;
 
         /** In the default scenario, we add fields at the end of the column. */
-        public ColumnWithPosition(Column column) {
-            this.column = column;
+        public ColumnWithPosition(Column addColumn) {
+            this.addColumn = addColumn;
             position = ColumnPosition.LAST;
-            otherColumn = null;
+            existingColumn = null;
         }
 
-        public ColumnWithPosition(Column column, ColumnPosition position, Column otherColumn) {
-            this.column = column;
+        public ColumnWithPosition(
+                Column addColumn, ColumnPosition position, Column existingColumn) {
+            this.addColumn = addColumn;
             this.position = position;
-            this.otherColumn = otherColumn;
+            this.existingColumn = existingColumn;
         }
 
-        public Column getColumn() {
-            return column;
+        public Column getAddColumn() {
+            return addColumn;
         }
 
         public ColumnPosition getPosition() {
             return position;
         }
 
-        public Column getOtherColumn() {
-            return otherColumn;
+        public Column getExistingColumn() {
+            return existingColumn;
         }
 
         @Override
@@ -101,25 +107,25 @@ public final class AddColumnEvent implements SchemaChangeEvent, Serializable {
                 return false;
             }
             ColumnWithPosition that = (ColumnWithPosition) o;
-            return Objects.equals(column, that.column)
+            return Objects.equals(addColumn, that.addColumn)
                     && Objects.equals(position, that.position)
-                    && Objects.equals(otherColumn, that.otherColumn);
+                    && Objects.equals(existingColumn, that.existingColumn);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(column, position, otherColumn);
+            return Objects.hash(addColumn, position, existingColumn);
         }
 
         @Override
         public String toString() {
             return "ColumnWithPosition{"
                     + "column="
-                    + column
+                    + addColumn
                     + ", position="
                     + position
-                    + ", otherColumn="
-                    + otherColumn
+                    + ", existingColumn="
+                    + existingColumn
                     + '}';
         }
     }
