@@ -15,6 +15,7 @@
 # limitations under the License.
 ################################################################################
 STAGE_CORE="core"
+STAGE_PIPELINE_CONNECTORS="pipeline_connectors"
 STAGE_MYSQL="mysql"
 STAGE_POSTGRES="postgres"
 STAGE_ORACLE="oracle"
@@ -31,7 +32,9 @@ MODULES_CORE="\
 flink-cdc-cli,\
 flink-cdc-common,\
 flink-cdc-composer,\
-flink-cdc-runtime,\
+flink-cdc-runtime"
+
+MODULES_PIPELINE_CONNECTORS="\
 flink-cdc-connect/flink-cdc-pipeline-connectors"
 
 MODULES_MYSQL="\
@@ -81,6 +84,9 @@ function get_compile_modules_for_stage() {
         (${STAGE_CORE})
             echo "-pl $MODULES_CORE -am"
         ;;
+        (${STAGE_PIPELINE_CONNECTORS})
+            echo "-pl $MODULES_PIPELINE_CONNECTORS -am"
+        ;;
         (${STAGE_MYSQL})
             echo "-pl $MODULES_MYSQL -am"
         ;;
@@ -125,6 +131,7 @@ function get_test_modules_for_stage() {
     local stage=$1
 
     local modules_core=$MODULES_CORE
+    local modules_pipeline_connectors=$MODULES_PIPELINE_CONNECTORS
     local modules_mysql=$MODULES_MYSQL
     local modules_postgres=$MODULES_POSTGRES
     local modules_oracle=$MODULES_ORACLE
@@ -150,6 +157,9 @@ function get_test_modules_for_stage() {
     case ${stage} in
         (${STAGE_CORE})
             echo "-pl $modules_core"
+        ;;
+        (${STAGE_PIPELINE_CONNECTORS})
+            echo "-pl $modules_pipeline_connectors"
         ;;
         (${STAGE_MYSQL})
             echo "-pl $modules_mysql"
