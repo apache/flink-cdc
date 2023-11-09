@@ -30,7 +30,7 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    public DataChangeEvent(
+    private DataChangeEvent(
             TableId tableId,
             RecordData before,
             RecordData after,
