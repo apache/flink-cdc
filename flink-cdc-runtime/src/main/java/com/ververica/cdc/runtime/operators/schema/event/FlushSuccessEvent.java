@@ -18,6 +18,7 @@ package com.ververica.cdc.runtime.operators.schema.event;
 
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
+import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
 
 /**
@@ -26,4 +27,21 @@ import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoor
  */
 public class FlushSuccessEvent implements OperatorEvent {
     private static final long serialVersionUID = 1L;
+
+    private final int subtask;
+
+    private final TableId tableId;
+
+    public FlushSuccessEvent(int subtask, TableId tableId) {
+        this.subtask = subtask;
+        this.tableId = tableId;
+    }
+
+    public int getSubtask() {
+        return subtask;
+    }
+
+    public TableId getTableId() {
+        return tableId;
+    }
 }
