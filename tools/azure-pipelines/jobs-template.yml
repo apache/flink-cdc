@@ -72,6 +72,10 @@ jobs:
       clean: all
     strategy:
       matrix:
+        core:
+          module: core
+        pipeline_connectors:
+          module: pipeline_connectors
         postgres:
           module: postgres
         oracle:
