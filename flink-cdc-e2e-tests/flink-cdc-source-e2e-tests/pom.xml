@@ -276,6 +276,16 @@ under the License.
                         </artifactItem>
 
                         <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc</artifactId>
+                            <version>${jdbc.version-1.18}</version>
+                            <destFileName>jdbc-connector_${flink-1.18}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
                             <groupId>com.ververica</groupId>
                             <artifactId>flink-sql-connector-mysql-cdc</artifactId>
                             <version>${project.version}</version>
